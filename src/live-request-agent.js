@@ -195,6 +195,14 @@ function mergeAnalysisMetadata({
 
   const sourceNotes = [];
 
+  if (Array.isArray(overrideMetadata.analysisSources)) {
+    sourceNotes.push(
+      ...overrideMetadata.analysisSources
+        .map((entry) => cleanOptionalText(entry))
+        .filter(Boolean),
+    );
+  }
+
   if (linkMetadata?.track || linkMetadata?.artist) {
     sourceNotes.push('link metadata');
   }
@@ -236,7 +244,7 @@ function mergeAnalysisMetadata({
       (primaryUrl ? detectPlatformFromUrl(primaryUrl) : 'manual'),
     sourceUrl: primaryUrl,
     thumbnailUrl: overrideMetadata.thumbnailUrl || linkMetadata?.thumbnailUrl || '',
-    analysisSources: sourceNotes,
+    analysisSources: [...new Set(sourceNotes)],
   };
 }
 

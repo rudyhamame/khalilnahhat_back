@@ -20,6 +20,7 @@ const {
   analyzeLiveRequest,
   buildReorderedQueue,
 } = require('./live-request-agent');
+const { analyzeAudioWithCyanite } = require('./cyanite');
 const { createSessionToken, hashPassword, verifyPassword } = require('./security');
 
 const app = express();
@@ -718,25 +719,32 @@ app.post('/api/live-sessions/analyze', requireAdmin, async (request, response) =
   const message = [input.artist, input.track, sourceUrl].filter(Boolean).join(' - ') || input.audioOriginalName || '';
 
   try {
-    const analysis = await analyzeLiveRequest(message, [], {
+    const cyaniteAnalysis = await analyzeAudioWithCyanite({
+      audioUrl: input.audioUrl,
       track: input.track,
       artist: input.artist,
+      audioOriginalName: input.audioOriginalName,
+    });
+    const cyaniteMetadata = cyaniteAnalysis?.metadata || {};
+    const analysis = await analyzeLiveRequest(message, [], {
+      track: cyaniteMetadata.track || input.track,
+      artist: cyaniteMetadata.artist || input.artist,
       duration: input.duration,
-      genre: input.genre,
-      genres: input.genres,
-      subgenres: input.subgenres,
+      genre: cyaniteMetadata.genre || input.genre,
+      genres: cyaniteMetadata.genres || input.genres,
+      subgenres: cyaniteMetadata.subgenres || input.subgenres,
       language: input.language,
-      musicMoods: input.musicMoods,
-      instruments: input.instruments,
-      bpm: input.bpm,
-      musicalKey: input.musicalKey,
-      vocals: input.vocals,
-      energy: input.energy,
-      beat: input.beat,
-      lyricsSummary: input.lyricsSummary,
+      musicMoods: cyaniteMetadata.musicMoods || input.musicMoods,
+      instruments: cyaniteMetadata.instruments || input.instruments,
+      bpm: cyaniteMetadata.bpm || input.bpm,
+      musicalKey: cyaniteMetadata.musicalKey || input.musicalKey,
+      vocals: cyaniteMetadata.vocals || input.vocals,
+      energy: cyaniteMetadata.energy || input.energy,
+      beat: cyaniteMetadata.beat || input.beat,
+      lyricsSummary: cyaniteMetadata.lyricsSummary || input.lyricsSummary,
       lyricsMoods: input.lyricsMoods,
       lyricsEnergy: input.lyricsEnergy,
-      themes: input.themes,
+      themes: cyaniteMetadata.themes || input.themes,
       lyricsLanguage: input.lyricsLanguage,
       explicit: input.explicit,
       sourceUrl,
@@ -745,6 +753,7 @@ app.post('/api/live-sessions/analyze', requireAdmin, async (request, response) =
 
     return response.json({
       item: {
+        analysisStatus: cyaniteAnalysis?.status || 'finished',
         track: analysis.metadata.track || input.track,
         artist: analysis.metadata.artist || input.artist,
         duration: analysis.metadata.duration || input.duration,
@@ -768,7 +777,7 @@ app.post('/api/live-sessions/analyze', requireAdmin, async (request, response) =
         analysisSources: Array.isArray(analysis.metadata.analysisSources)
           ? analysis.metadata.analysisSources
           : [],
-        summary: analysis.summary,
+        summary: cyaniteAnalysis?.summary || analysis.summary,
       },
     });
   } catch (error) {

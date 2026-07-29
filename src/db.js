@@ -10,11 +10,11 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017';
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'khalil';
 
 async function seedDefaults() {
-  if ((await LiveSession.countDocuments()) === 0) {
+  if (defaultLiveSessions.length && (await LiveSession.countDocuments()) === 0) {
     await LiveSession.insertMany(defaultLiveSessions);
   }
 
-  if ((await ArchiveItem.countDocuments()) === 0) {
+  if (defaultArchiveItems.length && (await ArchiveItem.countDocuments()) === 0) {
     await ArchiveItem.insertMany(defaultArchiveItems);
   }
 

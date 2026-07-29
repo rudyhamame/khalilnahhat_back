@@ -170,413 +170,33 @@ async function fetchLinkMetadata(url) {
   };
 }
 
-function getSonoTellerConfig() {
-  const apiUrl = process.env.SONOTELLER_API_URL || '';
-  const apiKey = process.env.SONOTELLER_API_KEY || '';
-  const apiHost = process.env.SONOTELLER_API_HOST || '';
-  const apiMethod = (process.env.SONOTELLER_HTTP_METHOD || 'POST').toUpperCase();
-
-  return {
-    apiUrl,
-    apiKey,
-    apiHost,
-    apiMethod,
-    enabled: Boolean(apiUrl && apiKey),
-  };
-}
-
-function readNestedValue(payload, candidatePaths) {
-  for (const candidatePath of candidatePaths) {
-    const value = candidatePath.split('.').reduce((currentValue, segment) => {
-      if (currentValue && typeof currentValue === 'object' && segment in currentValue) {
-        return currentValue[segment];
-      }
-
-      return undefined;
-    }, payload);
-
-    if (value !== undefined && value !== null && `${value}`.trim() !== '') {
-      return value;
-    }
-  }
-
-  return '';
-}
-
-function normalizeSonoTellerResponse(payload) {
-  if (!payload || typeof payload !== 'object') {
-    return null;
-  }
-
-  const track = cleanOptionalText(
-    readNestedValue(payload, [
-      'track',
-      'song',
-      'title',
-      'data.track',
-      'data.song',
-      'data.title',
-      'result.track',
-      'result.song',
-      'result.title',
-    ]),
-  );
-  const artist = cleanOptionalText(
-    readNestedValue(payload, [
-      'artist',
-      'artist_name',
-      'author',
-      'data.artist',
-      'data.artist_name',
-      'result.artist',
-      'result.artist_name',
-    ]),
-  );
-  const genre = cleanOptionalText(
-    readNestedValue(payload, [
-      'genre',
-      'primary_genre',
-      'genres',
-      'data.genre',
-      'data.genres',
-      'data.primary_genre',
-      'result.genre',
-      'result.genres',
-      'result.primary_genre',
-    ]),
-  );
-  const genres = normalizeListText(
-    readNestedValue(payload, [
-      'genres',
-      'genre',
-      'primary_genre',
-      'music.genres',
-      'music.genre',
-      'data.genres',
-      'data.genre',
-      'result.genres',
-      'result.genre',
-    ]),
-  );
-  const subgenres = normalizeListText(
-    readNestedValue(payload, [
-      'subgenres',
-      'sub_genres',
-      'subgenre',
-      'music.subgenres',
-      'data.subgenres',
-      'data.sub_genres',
-      'result.subgenres',
-      'result.sub_genres',
-    ]),
-  );
-  const language = cleanOptionalText(
-    readNestedValue(payload, [
-      'language',
-      'lyrics_language',
-      'data.language',
-      'data.lyrics_language',
-      'result.language',
-      'result.lyrics_language',
-    ]),
-  );
-  const duration = cleanOptionalText(
-    readNestedValue(payload, [
-      'duration',
-      'duration_formatted',
-      'data.duration',
-      'data.duration_formatted',
-      'result.duration',
-      'result.duration_formatted',
-    ]),
-  );
-  const mood = cleanOptionalText(
-    readNestedValue(payload, [
-      'mood',
-      'moods',
-      'music_moods',
-      'data.mood',
-      'data.moods',
-      'data.music_moods',
-      'result.mood',
-      'result.moods',
-      'result.music_moods',
-    ]),
-  );
-  const musicMoods = normalizeListText(
-    readNestedValue(payload, [
-      'music_moods',
-      'moods',
-      'mood',
-      'music.moods',
-      'data.music_moods',
-      'data.moods',
-      'result.music_moods',
-      'result.moods',
-    ]),
-  );
-  const instruments = normalizeListText(
-    readNestedValue(payload, [
-      'instruments',
-      'instrumentation',
-      'music.instruments',
-      'data.instruments',
-      'data.instrumentation',
-      'result.instruments',
-      'result.instrumentation',
-    ]),
-  );
-  const energy = cleanOptionalText(
-    readNestedValue(payload, [
-      'energy',
-      'energy_level',
-      'data.energy',
-      'data.energy_level',
-      'result.energy',
-      'result.energy_level',
-    ]),
-  );
-  const beat = cleanOptionalText(
-    readNestedValue(payload, [
-      'beat',
-      'bpm',
-      'tempo',
-      'data.beat',
-      'data.bpm',
-      'data.tempo',
-      'result.beat',
-      'result.bpm',
-      'result.tempo',
-    ]),
-  );
-  const bpm = cleanOptionalText(
-    readNestedValue(payload, [
-      'bpm',
-      'tempo',
-      'beat',
-      'music.bpm',
-      'music.tempo',
-      'data.bpm',
-      'data.tempo',
-      'result.bpm',
-      'result.tempo',
-    ]),
-  );
-  const musicalKey = cleanOptionalText(
-    readNestedValue(payload, [
-      'key',
-      'musical_key',
-      'music.key',
-      'data.key',
-      'data.musical_key',
-      'result.key',
-      'result.musical_key',
-    ]),
-  );
-  const vocals = normalizeListText(
-    readNestedValue(payload, [
-      'vocals',
-      'vocal_type',
-      'vocal_presence',
-      'music.vocals',
-      'data.vocals',
-      'data.vocal_type',
-      'result.vocals',
-      'result.vocal_type',
-    ]),
-  );
-  const lyricsSummary = cleanOptionalText(
-    readNestedValue(payload, [
-      'lyrics_summary',
-      'summary',
-      'lyrics.summary',
-      'data.lyrics_summary',
-      'data.summary',
-      'result.lyrics_summary',
-      'result.summary',
-    ]),
-  );
-  const lyricsMoods = normalizeListText(
-    readNestedValue(payload, [
-      'lyrics_moods',
-      'lyric_moods',
-      'lyrics.moods',
-      'data.lyrics_moods',
-      'result.lyrics_moods',
-    ]),
-  );
-  const lyricsEnergy = cleanOptionalText(
-    readNestedValue(payload, [
-      'lyrics_energy',
-      'lyric_energy',
-      'emotion_intensity',
-      'sentiment_intensity',
-      'lyrics.energy',
-      'data.lyrics_energy',
-      'data.lyric_energy',
-      'result.lyrics_energy',
-      'result.lyric_energy',
-    ]),
-  );
-  const themes = readNestedValue(payload, [
-    'themes',
-    'tags',
-    'keywords',
-    'data.themes',
-    'data.tags',
-    'result.themes',
-    'result.tags',
-  ]);
-  const lyricsLanguage = cleanOptionalText(
-    readNestedValue(payload, [
-      'lyrics_language',
-      'language',
-      'lyrics.language',
-      'data.lyrics_language',
-      'result.lyrics_language',
-    ]),
-  );
-  const explicit = cleanOptionalText(
-    readNestedValue(payload, [
-      'explicit',
-      'explicit_content',
-      'lyrics.explicit',
-      'data.explicit',
-      'data.explicit_content',
-      'result.explicit',
-      'result.explicit_content',
-    ]),
-  );
-
-  return {
-    track,
-    artist,
-    genre: genre || genres.split(',')[0]?.trim() || '',
-    genres: genres || genre,
-    subgenres,
-    language: language || lyricsLanguage,
-    musicMoods: musicMoods || mood,
-    instruments,
-    bpm: bpm || beat,
-    musicalKey,
-    vocals,
-    duration,
-    mood: Array.isArray(mood) ? mood.join(', ') : cleanOptionalText(mood),
-    energy,
-    beat: beat || bpm,
-    lyricsSummary,
-    lyricsMoods,
-    lyricsEnergy,
-    lyricsLanguage: lyricsLanguage || language,
-    explicit,
-    themes: Array.isArray(themes) ? themes.join(', ') : cleanOptionalText(themes),
-    raw: payload,
-  };
-}
-
-async function fetchSonoTellerAnalysis({
-  message,
-  sourceUrl,
-  sourcePlatform,
-  track,
-  artist,
-}) {
-  const config = getSonoTellerConfig();
-
-  if (!config.enabled) {
-    return null;
-  }
-
-  const headers = {
-    Accept: 'application/json',
-    'Content-Type': 'application/json',
-  };
-
-  if (config.apiHost) {
-    headers['x-rapidapi-key'] = config.apiKey;
-    headers['x-rapidapi-host'] = config.apiHost;
-  } else {
-    headers.Authorization = `Bearer ${config.apiKey}`;
-  }
-
-  const payload = {
-    url: sourceUrl || '',
-    sourceUrl: sourceUrl || '',
-    platform: sourcePlatform || 'manual',
-    message,
-    track: track || '',
-    artist: artist || '',
-    title: [artist, track].filter(Boolean).join(' - '),
-  };
-
-  const requestOptions =
-    config.apiMethod === 'GET'
-      ? {
-          method: 'GET',
-          headers,
-        }
-      : {
-          method: config.apiMethod,
-          headers,
-          body: JSON.stringify(payload),
-        };
-
-  const targetUrl =
-    config.apiMethod === 'GET'
-      ? `${config.apiUrl}?${new URLSearchParams(payload).toString()}`
-      : config.apiUrl;
-
-  const response = await fetch(targetUrl, requestOptions);
-  const responsePayload = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    const error = new Error(
-      responsePayload?.message || responsePayload?.error || `SonoTeller analysis failed with status ${response.status}.`,
-    );
-    error.payload = responsePayload;
-    throw error;
-  }
-
-  return normalizeSonoTellerResponse(responsePayload);
-}
-
 function mergeAnalysisMetadata({
   overrideMetadata,
   linkMetadata,
   inferredFromMessage,
-  sonotellerMetadata,
   primaryUrl,
 }) {
   const mergedTrack =
     cleanOptionalText(overrideMetadata.track) ||
     cleanOptionalText(linkMetadata?.track) ||
-    cleanOptionalText(sonotellerMetadata?.track) ||
     cleanOptionalText(inferredFromMessage.track);
   const mergedArtist =
     cleanOptionalText(overrideMetadata.artist) ||
     cleanOptionalText(linkMetadata?.artist) ||
-    cleanOptionalText(sonotellerMetadata?.artist) ||
     cleanOptionalText(inferredFromMessage.artist);
   const mergedGenre =
     cleanOptionalText(overrideMetadata.genre) ||
-    cleanOptionalText(overrideMetadata.genres) ||
-    cleanOptionalText(sonotellerMetadata?.genre);
+    cleanOptionalText(overrideMetadata.genres);
   const mergedLanguage =
     cleanOptionalText(overrideMetadata.language) ||
-    cleanOptionalText(overrideMetadata.lyricsLanguage) ||
-    cleanOptionalText(sonotellerMetadata?.language);
+    cleanOptionalText(overrideMetadata.lyricsLanguage);
   const mergedDuration =
-    cleanOptionalText(overrideMetadata.duration) ||
-    cleanOptionalText(sonotellerMetadata?.duration);
+    cleanOptionalText(overrideMetadata.duration);
 
   const sourceNotes = [];
 
   if (linkMetadata?.track || linkMetadata?.artist) {
     sourceNotes.push('link metadata');
-  }
-
-  if (sonotellerMetadata) {
-    sourceNotes.push('SonoTeller');
   }
 
   if (!sourceNotes.length) {
@@ -589,30 +209,27 @@ function mergeAnalysisMetadata({
     artist: mergedArtist,
     duration: mergedDuration,
     genre: mergedGenre,
-    genres: cleanOptionalText(overrideMetadata.genres) || cleanOptionalText(sonotellerMetadata?.genres) || mergedGenre,
-    subgenres: cleanOptionalText(overrideMetadata.subgenres) || cleanOptionalText(sonotellerMetadata?.subgenres) || '',
+    genres: cleanOptionalText(overrideMetadata.genres) || mergedGenre,
+    subgenres: cleanOptionalText(overrideMetadata.subgenres) || '',
     language: mergedLanguage,
-    musicMoods: cleanOptionalText(overrideMetadata.musicMoods) || cleanOptionalText(sonotellerMetadata?.musicMoods || ''),
-    instruments: cleanOptionalText(overrideMetadata.instruments) || cleanOptionalText(sonotellerMetadata?.instruments || ''),
-    bpm: cleanOptionalText(overrideMetadata.bpm) || cleanOptionalText(sonotellerMetadata?.bpm || ''),
-    musicalKey: cleanOptionalText(overrideMetadata.musicalKey) || cleanOptionalText(sonotellerMetadata?.musicalKey || ''),
-    vocals: cleanOptionalText(overrideMetadata.vocals) || cleanOptionalText(sonotellerMetadata?.vocals || ''),
-    mood: cleanOptionalText(sonotellerMetadata?.mood || ''),
-    energy: cleanOptionalText(sonotellerMetadata?.energy || ''),
+    musicMoods: cleanOptionalText(overrideMetadata.musicMoods) || '',
+    instruments: cleanOptionalText(overrideMetadata.instruments) || '',
+    bpm: cleanOptionalText(overrideMetadata.bpm) || '',
+    musicalKey: cleanOptionalText(overrideMetadata.musicalKey) || '',
+    vocals: cleanOptionalText(overrideMetadata.vocals) || '',
+    mood: '',
+    energy: cleanOptionalText(overrideMetadata.energy) || '',
     beat:
       cleanOptionalText(overrideMetadata.beat) ||
-      cleanOptionalText(overrideMetadata.bpm) ||
-      cleanOptionalText(sonotellerMetadata?.beat || '') ||
-      cleanOptionalText(sonotellerMetadata?.bpm || ''),
-    lyricsSummary: cleanOptionalText(overrideMetadata.lyricsSummary) || cleanOptionalText(sonotellerMetadata?.lyricsSummary || ''),
-    lyricsMoods: cleanOptionalText(overrideMetadata.lyricsMoods) || cleanOptionalText(sonotellerMetadata?.lyricsMoods || ''),
-    lyricsEnergy: cleanOptionalText(overrideMetadata.lyricsEnergy) || cleanOptionalText(sonotellerMetadata?.lyricsEnergy || ''),
-    themes: cleanOptionalText(sonotellerMetadata?.themes || ''),
+      cleanOptionalText(overrideMetadata.bpm),
+    lyricsSummary: cleanOptionalText(overrideMetadata.lyricsSummary) || '',
+    lyricsMoods: cleanOptionalText(overrideMetadata.lyricsMoods) || '',
+    lyricsEnergy: cleanOptionalText(overrideMetadata.lyricsEnergy) || '',
+    themes: '',
     lyricsLanguage:
       cleanOptionalText(overrideMetadata.lyricsLanguage) ||
-      cleanOptionalText(sonotellerMetadata?.lyricsLanguage || '') ||
       mergedLanguage,
-    explicit: cleanOptionalText(overrideMetadata.explicit) || cleanOptionalText(sonotellerMetadata?.explicit || ''),
+    explicit: cleanOptionalText(overrideMetadata.explicit) || '',
     sourcePlatform:
       overrideMetadata.sourcePlatform ||
       linkMetadata?.sourcePlatform ||
@@ -708,31 +325,11 @@ async function analyzeLiveRequest(message, sessions, overrideMetadata = {}) {
   const linkMetadata = primaryUrl ? await fetchLinkMetadata(primaryUrl) : null;
   const plainText = stripUrls(message);
   const inferredFromMessage = inferTrackArtistFromTitle(plainText);
-  let sonotellerMetadata = null;
-
-  try {
-    sonotellerMetadata = await fetchSonoTellerAnalysis({
-      message,
-      sourceUrl: primaryUrl,
-      sourcePlatform: linkMetadata?.sourcePlatform || (primaryUrl ? detectPlatformFromUrl(primaryUrl) : 'manual'),
-      track:
-        cleanOptionalText(overrideMetadata.track) ||
-        cleanOptionalText(linkMetadata?.track) ||
-        cleanOptionalText(inferredFromMessage.track),
-      artist:
-        cleanOptionalText(overrideMetadata.artist) ||
-        cleanOptionalText(linkMetadata?.artist) ||
-        cleanOptionalText(inferredFromMessage.artist),
-    });
-  } catch {
-    sonotellerMetadata = null;
-  }
 
   const metadata = mergeAnalysisMetadata({
     overrideMetadata,
     linkMetadata,
     inferredFromMessage,
-    sonotellerMetadata,
     primaryUrl,
   });
 
@@ -748,7 +345,6 @@ async function analyzeLiveRequest(message, sessions, overrideMetadata = {}) {
     duplicateSession,
     insertion,
     linkMetadata,
-    sonotellerMetadata,
     summary: duplicateSession
       ? `Integrated analysis from ${analysisSourcesLabel}: this request matches "${duplicateSession.track}" already in the live session list.`
       : insertion.label

@@ -7,10 +7,11 @@ const defaultArchiveItems = [];
 const defaultLiveStreamConfig = {
   key: 'primary',
   isLive: false,
-  title: 'Khalil Nahhat Live DJ Session',
+  title: '',
   streamUrl: '',
   posterImage: '',
   statusLabel: 'Offline until Khalil starts the next OBS stream.',
+  activeSessionId: '',
   muxLiveStreamId: '',
   muxPlaybackId: '',
   muxStreamKey: '',

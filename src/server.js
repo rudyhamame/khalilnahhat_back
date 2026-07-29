@@ -2,20 +2,29 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const multer = require('multer');
+const cloudinary = require('cloudinary').v2;
 const { z } = require('zod');
 const { connectToDatabase, MONGODB_DB_NAME, MONGODB_URI } = require('./db');
 const { ADMIN_USERNAME, defaultLiveStreamConfig } = require('./default-data');
 const {
   ArchiveItem,
   Booking,
+  LiveRequest,
   LiveSession,
   LiveStreamConfig,
   User,
 } = require('./models');
+const {
+  LIVE_PLAY_STATES,
+  analyzeLiveRequest,
+  buildReorderedQueue,
+} = require('./live-request-agent');
 const { createSessionToken, hashPassword, verifyPassword } = require('./security');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+const upload = multer({ storage: multer.memoryStorage() });
 
 const bookingSchema = z.object({
   fullName: z.string().trim().min(1, 'Full name is required.'),
@@ -51,9 +60,74 @@ const loginSchema = z.object({
 
 const liveSessionSchema = z.object({
   track: z.string().trim().min(1, 'Song / music is required.'),
+  artist: z.string().trim().optional().default(''),
   duration: z.string().trim().default(''),
   genre: z.string().trim().default(''),
+  genres: z.string().trim().optional().default(''),
+  subgenres: z.string().trim().optional().default(''),
   language: z.string().trim().default(''),
+  musicMoods: z.string().trim().optional().default(''),
+  instruments: z.string().trim().optional().default(''),
+  bpm: z.string().trim().optional().default(''),
+  musicalKey: z.string().trim().optional().default(''),
+  vocals: z.string().trim().optional().default(''),
+  energy: z.string().trim().optional().default(''),
+  beat: z.string().trim().optional().default(''),
+  lyricsSummary: z.string().trim().optional().default(''),
+  lyricsMoods: z.string().trim().optional().default(''),
+  lyricsEnergy: z.string().trim().optional().default(''),
+  themes: z.string().trim().optional().default(''),
+  lyricsLanguage: z.string().trim().optional().default(''),
+  explicit: z.string().trim().optional().default(''),
+  playState: z.enum(LIVE_PLAY_STATES).default('queued'),
+  sortOrder: z.coerce.number().optional(),
+  sourcePlatform: z.string().trim().optional().default('manual'),
+  sourceUrl: z.string().trim().optional().default(''),
+  audioUrl: z.string().trim().optional().default(''),
+  audioPublicId: z.string().trim().optional().default(''),
+  audioOriginalName: z.string().trim().optional().default(''),
+});
+
+const liveRequestAnalysisSchema = z.object({
+  requesterName: z.string().trim().optional().default('Audience'),
+  message: z.string().trim().min(1, 'A song name or music link is required.'),
+});
+
+const liveRequestCreateSchema = z.object({
+  requesterName: z.string().trim().optional().default('Audience'),
+  message: z.string().trim().min(1, 'A song name or music link is required.'),
+  metadata: z.object({
+    track: z.string().trim().min(1, 'A recognized track title is required.'),
+    artist: z.string().trim().optional().default(''),
+    duration: z.string().trim().optional().default(''),
+    genre: z.string().trim().optional().default(''),
+    genres: z.string().trim().optional().default(''),
+    subgenres: z.string().trim().optional().default(''),
+    language: z.string().trim().optional().default(''),
+    mood: z.string().trim().optional().default(''),
+    musicMoods: z.string().trim().optional().default(''),
+    instruments: z.string().trim().optional().default(''),
+    bpm: z.string().trim().optional().default(''),
+    musicalKey: z.string().trim().optional().default(''),
+    vocals: z.string().trim().optional().default(''),
+    energy: z.string().trim().optional().default(''),
+    beat: z.string().trim().optional().default(''),
+    lyricsSummary: z.string().trim().optional().default(''),
+    lyricsMoods: z.string().trim().optional().default(''),
+    lyricsEnergy: z.string().trim().optional().default(''),
+    themes: z.string().trim().optional().default(''),
+    lyricsLanguage: z.string().trim().optional().default(''),
+    explicit: z.string().trim().optional().default(''),
+    sourcePlatform: z.string().trim().optional().default('manual'),
+    sourceUrl: z.string().trim().optional().default(''),
+    thumbnailUrl: z.string().trim().optional().default(''),
+    analysisSources: z.array(z.string().trim()).optional().default([]),
+  }),
+});
+
+const liveRequestReviewSchema = z.object({
+  decision: z.enum(['approved', 'rejected']),
+  adminNote: z.string().trim().optional().default(''),
 });
 
 const archiveItemSchema = z.object({
@@ -72,6 +146,33 @@ const liveStreamConfigSchema = z.object({
   streamUrl: z.string().trim().default(''),
   posterImage: z.string().trim().default(''),
   statusLabel: z.string().trim().default(''),
+  activeSessionId: z.string().trim().default(''),
+});
+
+const liveSessionAnalysisSchema = z.object({
+  track: z.string().trim().optional().default(''),
+  artist: z.string().trim().optional().default(''),
+  duration: z.string().trim().optional().default(''),
+  genre: z.string().trim().optional().default(''),
+  genres: z.string().trim().optional().default(''),
+  subgenres: z.string().trim().optional().default(''),
+  language: z.string().trim().optional().default(''),
+  musicMoods: z.string().trim().optional().default(''),
+  instruments: z.string().trim().optional().default(''),
+  bpm: z.string().trim().optional().default(''),
+  musicalKey: z.string().trim().optional().default(''),
+  vocals: z.string().trim().optional().default(''),
+  energy: z.string().trim().optional().default(''),
+  beat: z.string().trim().optional().default(''),
+  lyricsSummary: z.string().trim().optional().default(''),
+  lyricsMoods: z.string().trim().optional().default(''),
+  lyricsEnergy: z.string().trim().optional().default(''),
+  themes: z.string().trim().optional().default(''),
+  lyricsLanguage: z.string().trim().optional().default(''),
+  explicit: z.string().trim().optional().default(''),
+  sourceUrl: z.string().trim().optional().default(''),
+  audioUrl: z.string().trim().optional().default(''),
+  audioOriginalName: z.string().trim().optional().default(''),
 });
 
 const anamPersonaConfig = {
@@ -121,9 +222,110 @@ function serializeLiveSession(session) {
   return {
     id: session.externalId || session.id,
     track: session.track,
+    artist: session.artist || '',
     duration: session.duration,
     genre: session.genre,
+    genres: session.genres || '',
+    subgenres: session.subgenres || '',
     language: session.language,
+    musicMoods: session.musicMoods || '',
+    instruments: session.instruments || '',
+    bpm: session.bpm || '',
+    musicalKey: session.musicalKey || '',
+    vocals: session.vocals || '',
+    energy: session.energy || '',
+    beat: session.beat || '',
+    lyricsSummary: session.lyricsSummary || '',
+    lyricsMoods: session.lyricsMoods || '',
+    lyricsEnergy: session.lyricsEnergy || '',
+    themes: session.themes || '',
+    lyricsLanguage: session.lyricsLanguage || '',
+    explicit: session.explicit || '',
+    playState: session.playState || 'queued',
+    sortOrder: Number(session.sortOrder || 0),
+    sourcePlatform: session.sourcePlatform || 'manual',
+    sourceUrl: session.sourceUrl || '',
+    audioUrl: session.audioUrl || '',
+    audioOriginalName: session.audioOriginalName || '',
+  };
+}
+
+function uploadAudioBufferToCloudinary(file) {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: 'khalil/live-sessions',
+        resource_type: 'video',
+        use_filename: true,
+        unique_filename: true,
+        overwrite: false,
+      },
+      (error, result) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve(result);
+      },
+    );
+
+    uploadStream.end(file.buffer);
+  });
+}
+
+async function deleteCloudinaryAudio(publicId) {
+  if (!publicId) {
+    return;
+  }
+
+  try {
+    await cloudinary.uploader.destroy(publicId, { resource_type: 'video' });
+  } catch (error) {
+    console.error('Failed to delete Cloudinary audio asset:', error);
+  }
+}
+
+function serializeLiveRequest(request) {
+  return {
+    id: request.externalId || request.id,
+    requesterName: request.requesterName || 'Audience',
+    message: request.message,
+    track: request.track,
+    artist: request.artist || '',
+    duration: request.duration || '',
+    genre: request.genre || '',
+    genres: request.genres || '',
+    subgenres: request.subgenres || '',
+    language: request.language || '',
+    mood: request.mood || '',
+    musicMoods: request.musicMoods || '',
+    instruments: request.instruments || '',
+    bpm: request.bpm || '',
+    musicalKey: request.musicalKey || '',
+    vocals: request.vocals || '',
+    energy: request.energy || '',
+    beat: request.beat || '',
+    lyricsSummary: request.lyricsSummary || '',
+    lyricsMoods: request.lyricsMoods || '',
+    lyricsEnergy: request.lyricsEnergy || '',
+    themes: request.themes || '',
+    lyricsLanguage: request.lyricsLanguage || '',
+    explicit: request.explicit || '',
+    sourcePlatform: request.sourcePlatform || 'manual',
+    sourceUrl: request.sourceUrl || '',
+    thumbnailUrl: request.thumbnailUrl || '',
+    analysisSources: Array.isArray(request.analysisSources) ? request.analysisSources : [],
+    requestStatus: request.requestStatus || 'pending_admin',
+    duplicateSessionId: request.duplicateSessionExternalId || '',
+    suggestedInsertAfterId: request.suggestedInsertAfterId || '',
+    suggestedInsertBeforeId: request.suggestedInsertBeforeId || '',
+    suggestedInsertLabel: request.suggestedInsertLabel || '',
+    aiSummary: request.aiSummary || '',
+    adminNote: request.adminNote || '',
+    createdSessionId: request.createdSessionExternalId || '',
+    createdAt: request.createdAt,
+    updatedAt: request.updatedAt,
   };
 }
 
@@ -143,10 +345,11 @@ function serializeArchiveItem(item) {
 function serializeLiveStreamConfig(config) {
   return {
     isLive: Boolean(config?.isLive),
-    title: config?.title || defaultLiveStreamConfig.title,
+    title: config?.title || '',
     streamUrl: config?.streamUrl || '',
     posterImage: config?.posterImage || '',
     statusLabel: config?.statusLabel || defaultLiveStreamConfig.statusLabel,
+    activeSessionId: config?.activeSessionId || '',
   };
 }
 
@@ -178,6 +381,12 @@ function parseCorsOrigins(value) {
 
 const configuredCorsOrigins = parseCorsOrigins(process.env.CORS_ORIGIN);
 
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
 async function getLiveStreamConfig() {
   let config = await LiveStreamConfig.findOne({ key: defaultLiveStreamConfig.key });
 
@@ -186,6 +395,15 @@ async function getLiveStreamConfig() {
   }
 
   return config;
+}
+
+async function getOrderedLiveSessions() {
+  return LiveSession.find().sort({ sortOrder: 1, createdAt: 1 });
+}
+
+async function getNextLiveSessionSortOrder() {
+  const lastSession = await LiveSession.findOne().sort({ sortOrder: -1, createdAt: -1 });
+  return lastSession ? Number(lastSession.sortOrder || 0) + 100 : 100;
 }
 
 async function createMuxLiveStream(title) {
@@ -282,7 +500,7 @@ app.get('/api/health', async (_request, response) => {
 
 app.get('/api/bootstrap', async (_request, response) => {
   const [liveSessions, archiveItems, liveStreamConfig] = await Promise.all([
-    LiveSession.find().sort({ createdAt: 1 }),
+    getOrderedLiveSessions(),
     ArchiveItem.find().sort({ createdAt: 1 }),
     getLiveStreamConfig(),
   ]);
@@ -437,14 +655,128 @@ app.post('/api/live-sessions', requireAdmin, async (request, response) => {
     });
   }
 
+  const nextSortOrder =
+    typeof parsed.data.sortOrder === 'number' && Number.isFinite(parsed.data.sortOrder)
+      ? parsed.data.sortOrder
+      : await getNextLiveSessionSortOrder();
+  const { sortOrder: _ignoredSortOrder, ...sessionPayload } = parsed.data;
+
   const session = await LiveSession.create({
     externalId: `live-session-${Date.now()}`,
-    ...parsed.data,
+    sortOrder: nextSortOrder,
+    ...sessionPayload,
   });
 
   return response.status(201).json({
     item: serializeLiveSession(session),
   });
+});
+
+app.post('/api/live-sessions/upload-audio', requireAdmin, upload.single('audio'), async (request, response) => {
+  if (!request.file) {
+    return response.status(400).json({
+      message: 'Audio file is required.',
+    });
+  }
+
+  if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+    return response.status(500).json({
+      message: 'Cloudinary credentials are missing from the server environment.',
+    });
+  }
+
+  try {
+    const result = await uploadAudioBufferToCloudinary(request.file);
+
+    return response.status(201).json({
+      item: {
+        audioUrl: result.secure_url || '',
+        audioPublicId: result.public_id || '',
+        audioOriginalName: request.file.originalname || '',
+      },
+    });
+  } catch (error) {
+    console.error('Cloudinary audio upload failed:', error);
+    return response.status(500).json({
+      message: 'Audio upload failed.',
+    });
+  }
+});
+
+app.post('/api/live-sessions/analyze', requireAdmin, async (request, response) => {
+  const parsed = liveSessionAnalysisSchema.safeParse(request.body);
+
+  if (!parsed.success) {
+    return response.status(400).json({
+      message: 'Live session analysis payload failed validation.',
+      errors: parsed.error.flatten().fieldErrors,
+    });
+  }
+
+  const input = parsed.data;
+  const sourceUrl = input.sourceUrl || input.audioUrl || '';
+  const message = [input.artist, input.track, sourceUrl].filter(Boolean).join(' - ') || input.audioOriginalName || '';
+
+  try {
+    const analysis = await analyzeLiveRequest(message, [], {
+      track: input.track,
+      artist: input.artist,
+      duration: input.duration,
+      genre: input.genre,
+      genres: input.genres,
+      subgenres: input.subgenres,
+      language: input.language,
+      musicMoods: input.musicMoods,
+      instruments: input.instruments,
+      bpm: input.bpm,
+      musicalKey: input.musicalKey,
+      vocals: input.vocals,
+      energy: input.energy,
+      beat: input.beat,
+      lyricsSummary: input.lyricsSummary,
+      lyricsMoods: input.lyricsMoods,
+      lyricsEnergy: input.lyricsEnergy,
+      themes: input.themes,
+      lyricsLanguage: input.lyricsLanguage,
+      explicit: input.explicit,
+      sourceUrl,
+      sourcePlatform: sourceUrl ? 'link' : 'manual',
+    });
+
+    return response.json({
+      item: {
+        track: analysis.metadata.track || input.track,
+        artist: analysis.metadata.artist || input.artist,
+        duration: analysis.metadata.duration || input.duration,
+        genre: analysis.metadata.genre || input.genre,
+        genres: analysis.metadata.genres || input.genres,
+        subgenres: analysis.metadata.subgenres || input.subgenres,
+        language: analysis.metadata.language || input.language,
+        musicMoods: analysis.metadata.musicMoods || input.musicMoods,
+        instruments: analysis.metadata.instruments || input.instruments,
+        bpm: analysis.metadata.bpm || input.bpm,
+        musicalKey: analysis.metadata.musicalKey || input.musicalKey,
+        vocals: analysis.metadata.vocals || input.vocals,
+        energy: analysis.metadata.energy || input.energy,
+        beat: analysis.metadata.beat || input.beat,
+        lyricsSummary: analysis.metadata.lyricsSummary || input.lyricsSummary,
+        lyricsMoods: analysis.metadata.lyricsMoods || input.lyricsMoods,
+        lyricsEnergy: analysis.metadata.lyricsEnergy || input.lyricsEnergy,
+        themes: analysis.metadata.themes || input.themes,
+        lyricsLanguage: analysis.metadata.lyricsLanguage || input.lyricsLanguage,
+        explicit: analysis.metadata.explicit || input.explicit,
+        analysisSources: Array.isArray(analysis.metadata.analysisSources)
+          ? analysis.metadata.analysisSources
+          : [],
+        summary: analysis.summary,
+      },
+    });
+  } catch (error) {
+    console.error('Live session analysis failed:', error);
+    return response.status(500).json({
+      message: 'Live session analysis failed.',
+    });
+  }
 });
 
 app.patch('/api/live-sessions/:id', requireAdmin, async (request, response) => {
@@ -483,6 +815,8 @@ app.delete('/api/live-sessions/:id', requireAdmin, async (request, response) => 
     });
   }
 
+  await deleteCloudinaryAudio(deleted.audioPublicId);
+
   return response.json({
     ok: true,
   });
@@ -514,6 +848,237 @@ app.get('/api/live-stream/admin', requireAdmin, async (_request, response) => {
 
   return response.json({
     item: serializeAdminLiveStreamConfig(config),
+  });
+});
+
+app.post('/api/live-requests/analyze', async (request, response) => {
+  const parsed = liveRequestAnalysisSchema.safeParse(request.body);
+
+  if (!parsed.success) {
+    return response.status(400).json({
+      message: 'Live request analysis payload failed validation.',
+      errors: parsed.error.flatten().fieldErrors,
+    });
+  }
+
+  const liveSessions = await getOrderedLiveSessions();
+  const analysis = await analyzeLiveRequest(parsed.data.message, liveSessions, {
+    requesterName: parsed.data.requesterName,
+  });
+
+  if (!analysis.metadata.track) {
+    return response.status(400).json({
+      message: 'The request agent could not recognize a song title yet.',
+    });
+  }
+
+  return response.json({
+    analysis: {
+      metadata: analysis.metadata,
+      duplicateSessionId: analysis.duplicateSession?.externalId || '',
+      duplicateTrack: analysis.duplicateSession?.track || '',
+      suggestedInsertAfterId: analysis.insertion.insertAfterId,
+      suggestedInsertBeforeId: analysis.insertion.insertBeforeId,
+      suggestedInsertLabel: analysis.insertion.label,
+      aiSummary: analysis.summary,
+    },
+  });
+});
+
+app.post('/api/live-requests', async (request, response) => {
+  const parsed = liveRequestCreateSchema.safeParse(request.body);
+
+  if (!parsed.success) {
+    return response.status(400).json({
+      message: 'Live request payload failed validation.',
+      errors: parsed.error.flatten().fieldErrors,
+    });
+  }
+
+  const liveSessions = await getOrderedLiveSessions();
+  const analysis = await analyzeLiveRequest(parsed.data.message, liveSessions, {
+    requesterName: parsed.data.requesterName,
+    ...parsed.data.metadata,
+  });
+
+  const requestStatus = analysis.duplicateSession ? 'duplicate' : 'pending_admin';
+  const liveRequest = await LiveRequest.create({
+    externalId: `live-request-${Date.now()}`,
+    requesterName: parsed.data.requesterName,
+    message: parsed.data.message,
+    track: analysis.metadata.track,
+    artist: analysis.metadata.artist,
+    duration: analysis.metadata.duration,
+    genre: analysis.metadata.genre,
+    genres: analysis.metadata.genres,
+    subgenres: analysis.metadata.subgenres,
+    language: analysis.metadata.language,
+    mood: analysis.metadata.mood,
+    musicMoods: analysis.metadata.musicMoods,
+    instruments: analysis.metadata.instruments,
+    bpm: analysis.metadata.bpm,
+    musicalKey: analysis.metadata.musicalKey,
+    vocals: analysis.metadata.vocals,
+    energy: analysis.metadata.energy,
+    beat: analysis.metadata.beat,
+    lyricsSummary: analysis.metadata.lyricsSummary,
+    lyricsMoods: analysis.metadata.lyricsMoods,
+    lyricsEnergy: analysis.metadata.lyricsEnergy,
+    themes: analysis.metadata.themes,
+    lyricsLanguage: analysis.metadata.lyricsLanguage,
+    explicit: analysis.metadata.explicit,
+    sourcePlatform: analysis.metadata.sourcePlatform,
+    sourceUrl: analysis.metadata.sourceUrl,
+    thumbnailUrl: analysis.metadata.thumbnailUrl,
+    analysisSources: analysis.metadata.analysisSources,
+    requestStatus,
+    duplicateSessionExternalId: analysis.duplicateSession?.externalId || '',
+    suggestedInsertAfterId: analysis.insertion.insertAfterId,
+    suggestedInsertBeforeId: analysis.insertion.insertBeforeId,
+    suggestedInsertLabel: analysis.insertion.label,
+    aiSummary: analysis.summary,
+  });
+
+  return response.status(201).json({
+    item: serializeLiveRequest(liveRequest),
+    message:
+      requestStatus === 'duplicate'
+        ? 'This track already exists in the live session list, so the request was flagged as a duplicate.'
+        : 'Request transmitted to Khalil for review.',
+  });
+});
+
+app.get('/api/live-requests/admin', requireAdmin, async (_request, response) => {
+  const requests = await LiveRequest.find().sort({ createdAt: -1 });
+
+  return response.json({
+    items: requests.map(serializeLiveRequest),
+  });
+});
+
+app.patch('/api/live-requests/:id/review', requireAdmin, async (request, response) => {
+  const parsed = liveRequestReviewSchema.safeParse(request.body);
+
+  if (!parsed.success) {
+    return response.status(400).json({
+      message: 'Live request review payload failed validation.',
+      errors: parsed.error.flatten().fieldErrors,
+    });
+  }
+
+  const liveRequest = await LiveRequest.findOne({ externalId: request.params.id });
+
+  if (!liveRequest) {
+    return response.status(404).json({
+      message: 'Live request not found.',
+    });
+  }
+
+  if (parsed.data.decision === 'rejected') {
+    liveRequest.requestStatus = 'rejected';
+    liveRequest.adminNote = parsed.data.adminNote;
+    await liveRequest.save();
+
+    return response.json({
+      item: serializeLiveRequest(liveRequest),
+    });
+  }
+
+  const liveSessions = await getOrderedLiveSessions();
+  const analysis = await analyzeLiveRequest(liveRequest.message, liveSessions, {
+    requesterName: liveRequest.requesterName,
+    track: liveRequest.track,
+    artist: liveRequest.artist,
+    duration: liveRequest.duration,
+    genre: liveRequest.genre,
+    genres: liveRequest.genres,
+    subgenres: liveRequest.subgenres,
+    language: liveRequest.language,
+    mood: liveRequest.mood,
+    musicMoods: liveRequest.musicMoods,
+    instruments: liveRequest.instruments,
+    bpm: liveRequest.bpm,
+    musicalKey: liveRequest.musicalKey,
+    vocals: liveRequest.vocals,
+    energy: liveRequest.energy,
+    beat: liveRequest.beat,
+    lyricsSummary: liveRequest.lyricsSummary,
+    lyricsMoods: liveRequest.lyricsMoods,
+    lyricsEnergy: liveRequest.lyricsEnergy,
+    themes: liveRequest.themes,
+    lyricsLanguage: liveRequest.lyricsLanguage,
+    explicit: liveRequest.explicit,
+    sourcePlatform: liveRequest.sourcePlatform,
+    sourceUrl: liveRequest.sourceUrl,
+    thumbnailUrl: liveRequest.thumbnailUrl,
+  });
+
+  const duplicate = analysis.duplicateSession;
+  if (duplicate) {
+    liveRequest.requestStatus = 'duplicate';
+    liveRequest.duplicateSessionExternalId = duplicate.externalId;
+    liveRequest.adminNote =
+      parsed.data.adminNote || `Duplicate found: ${duplicate.track} is already in the live session list.`;
+    await liveRequest.save();
+
+    return response.status(409).json({
+      message: 'This request matches an existing live session item.',
+      item: serializeLiveRequest(liveRequest),
+    });
+  }
+
+  const createdSession = await LiveSession.create({
+    externalId: `live-session-${Date.now()}`,
+    track: liveRequest.track,
+    artist: liveRequest.artist,
+    duration: liveRequest.duration,
+    genre: liveRequest.genre,
+    genres: liveRequest.genres,
+    subgenres: liveRequest.subgenres,
+    language: liveRequest.language,
+    musicMoods: liveRequest.musicMoods,
+    instruments: liveRequest.instruments,
+    bpm: liveRequest.bpm,
+    musicalKey: liveRequest.musicalKey,
+    vocals: liveRequest.vocals,
+    energy: liveRequest.energy,
+    beat: liveRequest.beat,
+    lyricsSummary: liveRequest.lyricsSummary,
+    lyricsMoods: liveRequest.lyricsMoods,
+    lyricsEnergy: liveRequest.lyricsEnergy,
+    themes: liveRequest.themes,
+    lyricsLanguage: liveRequest.lyricsLanguage,
+    explicit: liveRequest.explicit,
+    playState: 'requested',
+    sortOrder: 0,
+    sourcePlatform: liveRequest.sourcePlatform,
+    sourceUrl: liveRequest.sourceUrl,
+    requestExternalId: liveRequest.externalId,
+  });
+
+  const reorderedQueue = buildReorderedQueue(liveSessions, createdSession, analysis.insertion.insertIndex);
+  await Promise.all(
+    reorderedQueue.map(({ session, sortOrder }) =>
+      LiveSession.updateOne(
+        { _id: session._id },
+        { sortOrder },
+      ),
+    ),
+  );
+
+  liveRequest.requestStatus = 'approved';
+  liveRequest.adminNote = parsed.data.adminNote;
+  liveRequest.createdSessionExternalId = createdSession.externalId;
+  liveRequest.suggestedInsertAfterId = analysis.insertion.insertAfterId;
+  liveRequest.suggestedInsertBeforeId = analysis.insertion.insertBeforeId;
+  liveRequest.suggestedInsertLabel = analysis.insertion.label;
+  await liveRequest.save();
+
+  const refreshedLiveSessions = await getOrderedLiveSessions();
+
+  return response.json({
+    item: serializeLiveRequest(liveRequest),
+    liveSessions: refreshedLiveSessions.map(serializeLiveSession),
   });
 });
 

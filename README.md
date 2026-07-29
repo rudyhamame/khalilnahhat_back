@@ -36,6 +36,18 @@ You can also force the database name explicitly with:
 MONGODB_DB_NAME=khalil
 ```
 
+## Configure CORS
+
+`CORS_ORIGIN` now supports a comma-separated list of allowed frontend origins.
+
+Example:
+
+```text
+CORS_ORIGIN=http://localhost:5173,http://192.168.68.104:5173,https://your-frontend.onrender.com
+```
+
+Use `*` only if you intentionally want to allow every origin.
+
 ## Run in development
 
 ```bash

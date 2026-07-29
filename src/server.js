@@ -165,6 +165,19 @@ function serializeAdminLiveStreamConfig(config) {
   };
 }
 
+function parseCorsOrigins(value) {
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
+const configuredCorsOrigins = parseCorsOrigins(process.env.CORS_ORIGIN);
+
 async function getLiveStreamConfig() {
   let config = await LiveStreamConfig.findOne({ key: defaultLiveStreamConfig.key });
 
@@ -242,7 +255,17 @@ async function requireAdmin(request, response, next) {
 
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || '*',
+    origin(origin, callback) {
+      if (!origin || configuredCorsOrigins.length === 0 || configuredCorsOrigins.includes('*')) {
+        return callback(null, true);
+      }
+
+      if (configuredCorsOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`Origin ${origin} is not allowed by CORS.`));
+    },
   }),
 );
 app.use(express.json());

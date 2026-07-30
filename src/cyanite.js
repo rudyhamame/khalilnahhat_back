@@ -142,7 +142,10 @@ async function fetchCyaniteLibraryTrack(trackId) {
                 instrumentTags
                 advancedInstrumentTags
                 bpmRangeAdjusted
-                key
+                keyPrediction {
+                  value
+                  confidence
+                }
                 timeSignature
                 energyLevel
                 voicePresenceProfile
@@ -276,7 +279,7 @@ function mapCyaniteResultToSession(result, fallback = {}) {
     musicMoods,
     instruments,
     bpm: bpmValue || fallback.bpm || '',
-    musicalKey: result.key ? String(result.key).trim() : fallback.musicalKey || '',
+    musicalKey: result.keyPrediction?.value ? String(result.keyPrediction.value).trim() : fallback.musicalKey || '',
     vocals: vocals || fallback.vocals || '',
     energy: result.energyLevel ? String(result.energyLevel).trim() : fallback.energy || '',
     beat: bpmValue || fallback.beat || '',

@@ -749,6 +749,9 @@ app.post('/api/live-sessions/analyze', requireAdmin, async (request, response) =
       explicit: input.explicit,
       sourceUrl,
       sourcePlatform: sourceUrl ? 'link' : 'manual',
+      analysisSources: Array.isArray(cyaniteMetadata.analysisSources)
+        ? cyaniteMetadata.analysisSources
+        : [],
     });
 
     return response.json({
@@ -783,7 +786,7 @@ app.post('/api/live-sessions/analyze', requireAdmin, async (request, response) =
   } catch (error) {
     console.error('Live session analysis failed:', error);
     return response.status(500).json({
-      message: 'Live session analysis failed.',
+      message: error?.message || 'Live session analysis failed.',
     });
   }
 });

@@ -133,12 +133,19 @@ const liveRequestReviewSchema = z.object({
 
 const archiveItemSchema = z.object({
   title: z.string().trim().min(1, 'Title is required.'),
+  artist: z.string().trim().optional().default(''),
   category: z.string().trim().min(1, 'Category is required.'),
+  genre: z.string().trim().optional().default(''),
+  duration: z.string().trim().optional().default(''),
   location: z.string().trim().default(''),
   date: z.string().trim().default(''),
   mediaType: z.string().trim().default(''),
+  description: z.string().trim().optional().default(''),
   image: z.string().trim().default(''),
   alt: z.string().trim().default(''),
+  audioUrl: z.string().trim().optional().default(''),
+  audioPublicId: z.string().trim().optional().default(''),
+  audioOriginalName: z.string().trim().optional().default(''),
 });
 
 const liveStreamConfigSchema = z.object({
@@ -334,12 +341,18 @@ function serializeArchiveItem(item) {
   return {
     id: item.externalId || item.id,
     title: item.title,
+    artist: item.artist || '',
     category: item.category,
+    genre: item.genre || '',
+    duration: item.duration || '',
     location: item.location,
     date: item.date,
     mediaType: item.mediaType,
+    description: item.description || '',
     image: item.image,
     alt: item.alt,
+    audioUrl: item.audioUrl || '',
+    audioOriginalName: item.audioOriginalName || '',
   };
 }
 

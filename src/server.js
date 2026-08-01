@@ -443,11 +443,16 @@ function parseCorsOrigins(value) {
 
   return value
     .split(',')
-    .map((origin) => origin.trim())
+    .map((origin) => origin.trim().replace(/\/+$/, ''))
     .filter(Boolean);
 }
 
-const configuredCorsOrigins = parseCorsOrigins(process.env.CORS_ORIGIN);
+const configuredCorsOrigins = new Set([
+  'http://localhost:5173',
+  'http://192.168.68.104:5173',
+  'https://djkhalilnahhat.onrender.com',
+  ...parseCorsOrigins(process.env.CORS_ORIGIN),
+]);
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -555,15 +560,17 @@ async function requireAuth(request, response, next) {
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || configuredCorsOrigins.length === 0 || configuredCorsOrigins.includes('*')) {
+      if (!origin || configuredCorsOrigins.has('*')) {
         return callback(null, true);
       }
 
-      if (configuredCorsOrigins.includes(origin)) {
+      if (configuredCorsOrigins.has(origin.replace(/\/+$/, ''))) {
         return callback(null, true);
       }
 
-      return callback(new Error(`Origin ${origin} is not allowed by CORS.`));
+      const corsError = new Error(`Origin ${origin} is not allowed by CORS.`);
+      corsError.status = 403;
+      return callback(corsError);
     },
   }),
 );
@@ -1412,8 +1419,8 @@ app.post('/api/bookings', async (request, response) => {
 
 app.use((error, _request, response, _next) => {
   console.error(error);
-  response.status(500).json({
-    message: 'Unexpected server error.',
+  response.status(error.status || 500).json({
+    message: error.status === 403 ? error.message : 'Unexpected server error.',
   });
 });
 

@@ -7,6 +7,7 @@ Express + MongoDB API for the Khalil Nahhat site. The whole app now uses one sha
 - live session rows
 - archive items
 - booking requests
+- customer service requests and published quotes
 
 ## Install
 
@@ -60,6 +61,20 @@ npm run dev
 npm start
 ```
 
+## Configure Brevo email notifications
+
+Service request notifications use Brevo's transactional email API, not SMTP. Configure these environment variables locally and in Render:
+
+```text
+BREVO_API_KEY=your_brevo_api_key
+EMAIL_FROM_ADDRESS=your_verified_brevo_sender
+EMAIL_FROM_NAME=Khalil Nahhat Website
+SERVICE_REQUEST_NOTIFICATION_EMAIL=khalilnahhatdj@gmail.com
+ADMIN_SERVICES_URL=https://your-frontend.onrender.com/#admin-services
+```
+
+`EMAIL_FROM_ADDRESS` must be a sender verified in your Brevo account. A failed notification is logged but does not discard the customer's saved request.
+
 ## Endpoints
 
 - `GET /api/health`
@@ -76,6 +91,10 @@ npm start
 - `DELETE /api/archive-items/:id`
 - `POST /api/session-token`
 - `POST /api/bookings`
+- `POST /api/service-requests`
+- `GET /api/service-requests/mine`
+- `GET /api/service-requests/admin`
+- `PATCH /api/service-requests/:id/quote`
 
 ## Notes
 
@@ -83,4 +102,4 @@ npm start
 - No admin account is seeded automatically.
 - Any real database user with username `khalilnahhat` is treated as admin.
 - Add `ANAM_API_KEY` to enable server-generated Anam session tokens for the dashboard avatar.
-- No email is sent automatically yet; bookings are persisted in MongoDB.
+- New service requests notify `SERVICE_REQUEST_NOTIFICATION_EMAIL` through the Brevo API when configured.

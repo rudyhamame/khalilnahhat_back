@@ -23,6 +23,7 @@ const {
 } = require('./live-request-agent');
 const { analyzeAudioWithCyanite } = require('./cyanite');
 const { createSessionToken, hashPassword, verifyPassword } = require('./security');
+const { sendServiceRequestNotification } = require('./brevo');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -746,8 +747,18 @@ app.post('/api/service-requests', requireAuth, async (request, response) => {
     status: 'pending',
   });
 
+  let notificationSent = false;
+
+  try {
+    const notification = await sendServiceRequestNotification(serviceRequest);
+    notificationSent = notification.sent;
+  } catch (error) {
+    console.error('Failed to send Brevo service request notification:', error);
+  }
+
   return response.status(201).json({
     item: serializeServiceRequest(serviceRequest, false),
+    notificationSent,
   });
 });
 

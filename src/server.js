@@ -5,7 +5,7 @@ const cors = require('cors');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { z } = require('zod');
-const { connectToDatabase, MONGODB_DB_NAME, MONGODB_URI } = require('./db');
+const { connectToDatabase, MONGODB_DB_NAME } = require('./db');
 const { ADMIN_USERNAME, defaultLiveStreamConfig } = require('./default-data');
 const {
   ArchiveItem,
@@ -573,7 +573,6 @@ app.get('/api/health', async (_request, response) => {
   response.json({
     ok: true,
     service: 'khalil app api',
-    database: MONGODB_URI,
     databaseName: MONGODB_DB_NAME,
     time: new Date().toISOString(),
   });

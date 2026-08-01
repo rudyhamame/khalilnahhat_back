@@ -44,7 +44,7 @@ MONGODB_DB_NAME=khalil
 Example:
 
 ```text
-CORS_ORIGIN=http://localhost:5173,http://192.168.68.104:5173,https://your-frontend.onrender.com
+CORS_ORIGIN=http://localhost:5173,http://192.168.68.104:5173,https://djkhalilnahhat.onrender.com
 ```
 
 Use `*` only if you intentionally want to allow every origin.
@@ -70,7 +70,7 @@ BREVO_API_KEY=your_brevo_api_key
 EMAIL_FROM_ADDRESS=your_verified_brevo_sender
 EMAIL_FROM_NAME=Khalil Nahhat Website
 SERVICE_REQUEST_NOTIFICATION_EMAIL=khalilnahhatdj@gmail.com
-ADMIN_SERVICES_URL=https://your-frontend.onrender.com/#admin-services
+ADMIN_SERVICES_URL=https://djkhalilnahhat.onrender.com/#admin-services
 ```
 
 `EMAIL_FROM_ADDRESS` must be a sender verified in your Brevo account. A failed notification is logged but does not discard the customer's saved request.

@@ -13,6 +13,7 @@ const {
   LiveRequest,
   LiveSession,
   LiveStreamConfig,
+  ServiceRequest,
   User,
 } = require('./models');
 const {
@@ -157,6 +158,23 @@ const liveStreamConfigSchema = z.object({
   activeSessionId: z.string().trim().default(''),
 });
 
+const serviceRequestCreateSchema = z.object({
+  items: z.array(z.object({
+    serviceId: z.string().trim().min(1),
+    name: z.string().trim().min(1),
+    category: z.string().trim().min(1),
+    quantity: z.coerce.number().int().min(1),
+  })).min(1, 'Select at least one service.'),
+});
+
+const serviceRequestQuoteSchema = z.object({
+  items: z.array(z.object({
+    serviceId: z.string().trim().min(1),
+    unitPrice: z.coerce.number().min(0),
+  })).min(1),
+  adminNote: z.string().trim().optional().default(''),
+});
+
 const liveSessionAnalysisSchema = z.object({
   track: z.string().trim().optional().default(''),
   artist: z.string().trim().optional().default(''),
@@ -223,6 +241,41 @@ function serializeUser(user) {
     email: user.email,
     phoneNumber: user.phoneNumber,
     isAdmin: isAdminUser(user),
+  };
+}
+
+function serializeServiceRequest(serviceRequest, includeQuote = true) {
+  const isQuoted = serviceRequest.status === 'quoted';
+  const items = serviceRequest.items.map((item) => {
+    const serializedItem = {
+      serviceId: item.serviceId,
+      name: item.name,
+      category: item.category,
+      quantity: item.quantity,
+    };
+
+    if (includeQuote || isQuoted) {
+      serializedItem.unitPrice = item.unitPrice;
+      serializedItem.lineTotal = Number(item.unitPrice || 0) * item.quantity;
+    }
+
+    return serializedItem;
+  });
+
+  return {
+    id: serviceRequest.externalId || serviceRequest.id,
+    customerName: serviceRequest.customerName,
+    customerUsername: serviceRequest.customerUsername,
+    customerEmail: serviceRequest.customerEmail,
+    items,
+    status: serviceRequest.status,
+    currency: serviceRequest.currency || 'CAD',
+    adminNote: isQuoted || includeQuote ? serviceRequest.adminNote || '' : '',
+    total: isQuoted || includeQuote
+      ? items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0)
+      : null,
+    createdAt: serviceRequest.createdAt,
+    quotedAt: serviceRequest.quotedAt,
   };
 }
 
@@ -485,6 +538,19 @@ async function requireAdmin(request, response, next) {
   return next();
 }
 
+async function requireAuth(request, response, next) {
+  const user = await authFromRequest(request);
+
+  if (!user) {
+    return response.status(401).json({
+      message: 'Sign in is required.',
+    });
+  }
+
+  request.authUser = user;
+  return next();
+}
+
 app.use(
   cors({
     origin(origin, callback) {
@@ -656,6 +722,88 @@ app.post('/api/auth/logout', async (request, response) => {
 
   response.json({
     ok: true,
+  });
+});
+
+app.post('/api/service-requests', requireAuth, async (request, response) => {
+  const parsed = serviceRequestCreateSchema.safeParse(request.body);
+
+  if (!parsed.success) {
+    return response.status(400).json({
+      message: 'Service request payload failed validation.',
+      errors: parsed.error.flatten().fieldErrors,
+    });
+  }
+
+  const user = request.authUser;
+  const serviceRequest = await ServiceRequest.create({
+    externalId: `service-request-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    userId: user._id,
+    customerName: `${user.firstName} ${user.lastName}`.trim(),
+    customerUsername: user.username,
+    customerEmail: user.email,
+    items: parsed.data.items,
+    status: 'pending',
+  });
+
+  return response.status(201).json({
+    item: serializeServiceRequest(serviceRequest, false),
+  });
+});
+
+app.get('/api/service-requests/mine', requireAuth, async (request, response) => {
+  const requests = await ServiceRequest.find({ userId: request.authUser._id }).sort({ createdAt: -1 });
+
+  return response.json({
+    items: requests.map((item) => serializeServiceRequest(item, false)),
+  });
+});
+
+app.get('/api/service-requests/admin', requireAdmin, async (_request, response) => {
+  const requests = await ServiceRequest.find().sort({ createdAt: -1 });
+
+  return response.json({
+    items: requests.map((item) => serializeServiceRequest(item, true)),
+  });
+});
+
+app.patch('/api/service-requests/:id/quote', requireAdmin, async (request, response) => {
+  const parsed = serviceRequestQuoteSchema.safeParse(request.body);
+
+  if (!parsed.success) {
+    return response.status(400).json({
+      message: 'Service quote payload failed validation.',
+      errors: parsed.error.flatten().fieldErrors,
+    });
+  }
+
+  const serviceRequest = await ServiceRequest.findOne({ externalId: request.params.id });
+
+  if (!serviceRequest) {
+    return response.status(404).json({
+      message: 'Service request not found.',
+    });
+  }
+
+  const quoteByServiceId = new Map(parsed.data.items.map((item) => [item.serviceId, item.unitPrice]));
+  const hasEveryItem = serviceRequest.items.every((item) => quoteByServiceId.has(item.serviceId));
+
+  if (!hasEveryItem || quoteByServiceId.size !== serviceRequest.items.length) {
+    return response.status(400).json({
+      message: 'Enter an amount for every requested service before publishing.',
+    });
+  }
+
+  serviceRequest.items.forEach((item) => {
+    item.unitPrice = quoteByServiceId.get(item.serviceId);
+  });
+  serviceRequest.adminNote = parsed.data.adminNote;
+  serviceRequest.status = 'quoted';
+  serviceRequest.quotedAt = new Date();
+  await serviceRequest.save();
+
+  return response.json({
+    item: serializeServiceRequest(serviceRequest, true),
   });
 });
 

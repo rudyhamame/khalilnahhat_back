@@ -161,12 +161,45 @@ const liveStreamConfigSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+const serviceRequestItemSchema = new mongoose.Schema(
+  {
+    serviceId: { type: String, required: true, trim: true },
+    name: { type: String, required: true, trim: true },
+    category: { type: String, required: true, trim: true },
+    quantity: { type: Number, required: true, min: 1 },
+    unitPrice: { type: Number, default: null, min: 0 },
+  },
+  { _id: false },
+);
+
+const serviceRequestSchema = new mongoose.Schema(
+  {
+    externalId: { type: String, required: true, unique: true, trim: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User', index: true },
+    customerName: { type: String, required: true, trim: true },
+    customerUsername: { type: String, required: true, trim: true },
+    customerEmail: { type: String, required: true, trim: true, lowercase: true },
+    items: { type: [serviceRequestItemSchema], required: true },
+    status: {
+      type: String,
+      enum: ['pending', 'quoted'],
+      default: 'pending',
+      trim: true,
+    },
+    currency: { type: String, default: 'CAD', trim: true },
+    adminNote: { type: String, default: '', trim: true },
+    quotedAt: { type: Date, default: null },
+  },
+  { timestamps: true },
+);
+
 const User = mongoose.model('User', userSchema);
 const LiveSession = mongoose.model('LiveSession', liveSessionSchema);
 const LiveRequest = mongoose.model('LiveRequest', liveRequestSchema);
 const ArchiveItem = mongoose.model('ArchiveItem', archiveItemSchema);
 const Booking = mongoose.model('Booking', bookingSchema);
 const LiveStreamConfig = mongoose.model('LiveStreamConfig', liveStreamConfigSchema);
+const ServiceRequest = mongoose.model('ServiceRequest', serviceRequestSchema);
 
 module.exports = {
   ArchiveItem,
@@ -174,5 +207,6 @@ module.exports = {
   LiveRequest,
   LiveSession,
   LiveStreamConfig,
+  ServiceRequest,
   User,
 };

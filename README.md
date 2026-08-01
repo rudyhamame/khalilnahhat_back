@@ -71,6 +71,7 @@ EMAIL_FROM_ADDRESS=your_verified_brevo_sender
 EMAIL_FROM_NAME=Khalil Nahhat Website
 SERVICE_REQUEST_NOTIFICATION_EMAIL=khalilnahhatdj@gmail.com
 ADMIN_SERVICES_URL=https://djkhalilnahhat.onrender.com/#admin-services
+CUSTOMER_SERVICES_URL=https://djkhalilnahhat.onrender.com/#dashboard-services
 ```
 
 `EMAIL_FROM_ADDRESS` must be a sender verified in your Brevo account. A failed notification is logged but does not discard the customer's saved request.

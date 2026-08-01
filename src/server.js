@@ -23,7 +23,10 @@ const {
 } = require('./live-request-agent');
 const { analyzeAudioWithCyanite } = require('./cyanite');
 const { createSessionToken, hashPassword, verifyPassword } = require('./security');
-const { sendServiceRequestNotification } = require('./brevo');
+const {
+  sendServiceQuoteNotification,
+  sendServiceRequestNotification,
+} = require('./brevo');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -819,8 +822,18 @@ app.patch('/api/service-requests/:id/quote', requireAdmin, async (request, respo
   serviceRequest.quotedAt = new Date();
   await serviceRequest.save();
 
+  let notificationSent = false;
+
+  try {
+    const notification = await sendServiceQuoteNotification(serviceRequest);
+    notificationSent = notification.sent;
+  } catch (error) {
+    console.error('Failed to send Brevo service quote notification:', error);
+  }
+
   return response.json({
     item: serializeServiceRequest(serviceRequest, true),
+    notificationSent,
   });
 });
 

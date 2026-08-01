@@ -981,6 +981,21 @@ app.get('/api/live-requests/admin', requireAdmin, async (_request, response) => 
   });
 });
 
+app.delete('/api/live-requests/:id', requireAdmin, async (request, response) => {
+  const deleted = await LiveRequest.findOneAndDelete({ externalId: request.params.id });
+
+  if (!deleted) {
+    return response.status(404).json({
+      message: 'Live request not found.',
+    });
+  }
+
+  return response.json({
+    id: deleted.externalId,
+    message: 'Audience request deleted.',
+  });
+});
+
 app.patch('/api/live-requests/:id/review', requireAdmin, async (request, response) => {
   const parsed = liveRequestReviewSchema.safeParse(request.body);
 

@@ -743,9 +743,10 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
   if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
     if (session.payment_status === 'paid' || event.type.endsWith('succeeded')) {
       await LiveRequest.findOneAndUpdate(
-        { requestGroupId: session.metadata?.requestGroupId, stripeCheckoutSessionId: session.id },
+        { requestGroupId: session.metadata?.requestGroupId },
         {
           paymentStatus: 'paid',
+          stripeCheckoutSessionId: session.id,
           stripePaymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : '',
           requestStatus: 'pending_admin',
           aiSummary: 'Payment received. Direct audience request awaiting Khalil review.',
@@ -763,7 +764,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           paymentStatus: 'paid',
         }).sort({ createdAt: 1 });
         try {
-          await sendLiveRequestReceipt({
+          const receipt = await sendLiveRequestReceipt({
             email: receiptCandidate.requesterEmail,
             requesterName: receiptCandidate.requesterName,
             groupId: receiptCandidate.requestGroupId,
@@ -771,10 +772,12 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             amountTotal: session.amount_total,
             currency: session.currency,
           });
-          await LiveRequest.updateMany(
-            { requestGroupId: receiptCandidate.requestGroupId, paymentStatus: 'paid' },
-            { receiptSentAt: new Date() },
-          );
+          if (receipt.sent) {
+            await LiveRequest.updateMany(
+              { requestGroupId: receiptCandidate.requestGroupId, paymentStatus: 'paid' },
+              { receiptSentAt: new Date() },
+            );
+          }
         } catch (error) {
           console.error('Failed to send live request receipt:', error);
         }
@@ -1086,6 +1089,56 @@ app.patch('/api/prices/:id', requireAdmin, async (request, response) => {
   }
 
   return response.json({ item: serializeServicePrice(price) });
+});
+
+app.get('/api/transactions', requireAdmin, async (_request, response) => {
+  if (!stripe) {
+    return response.status(503).json({ message: 'Stripe transactions are not configured.' });
+  }
+
+  try {
+    const checkoutSessions = await stripe.checkout.sessions.list({ limit: 100 });
+    const groupIds = checkoutSessions.data
+      .map((session) => session.metadata?.requestGroupId)
+      .filter(Boolean);
+    const requests = groupIds.length
+      ? await LiveRequest.find({ requestGroupId: { $in: groupIds } }).sort({ createdAt: 1 })
+      : [];
+    const requestsByGroup = new Map();
+    requests.forEach((request) => {
+      const group = requestsByGroup.get(request.requestGroupId) || [];
+      group.push(request);
+      requestsByGroup.set(request.requestGroupId, group);
+    });
+
+    return response.json({
+      items: checkoutSessions.data.map((session) => {
+        const groupId = session.metadata?.requestGroupId || '';
+        const groupRequests = requestsByGroup.get(groupId) || [];
+        return {
+          id: session.id,
+          type: 'Stripe Checkout',
+          status: session.status || 'unknown',
+          paymentStatus: session.payment_status || 'unknown',
+          amountTotal: session.amount_total || 0,
+          currency: (session.currency || 'cad').toUpperCase(),
+          customerEmail: session.customer_details?.email || groupRequests[0]?.requesterEmail || '',
+          requestGroupId: groupId,
+          serviceId: session.metadata?.serviceId || 'unknown',
+          serviceName: session.metadata?.serviceName || 'Stripe payment',
+          requestCount: groupRequests.length,
+          requestTitles: groupRequests.map((request) => request.track || request.message),
+          confirmationCodes: groupRequests.map((request) => request.confirmationCode).filter(Boolean),
+          createdAt: session.created ? new Date(session.created * 1000).toISOString() : null,
+          receiptSent: groupRequests.some((request) => Boolean(request.receiptSentAt)),
+          paymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : '',
+        };
+      }),
+    });
+  } catch (error) {
+    console.error('Stripe transactions fetch failed:', error);
+    return response.status(502).json({ message: 'Stripe transactions could not be loaded.' });
+  }
 });
 
 app.post('/api/live-sessions', requireAdmin, async (request, response) => {
@@ -1488,7 +1541,18 @@ async function createLiveRequestCheckout(request, response) {
           quantity: liveRequests.length,
         },
       ],
-      metadata: { requestGroupId },
+      metadata: {
+        requestGroupId,
+        serviceId: 'song-request-live',
+        serviceName: 'Song Request During Live Events',
+      },
+      payment_intent_data: {
+        metadata: {
+          requestGroupId,
+          serviceId: 'song-request-live',
+          serviceName: 'Song Request During Live Events',
+        },
+      },
       success_url: `${getFrontendUrl()}/?stripe=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${getFrontendUrl()}/?stripe=cancelled`,
     });

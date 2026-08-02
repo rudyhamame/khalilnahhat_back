@@ -176,7 +176,48 @@ async function sendServiceQuoteNotification(serviceRequest) {
   });
 }
 
+async function sendLiveRequestReceipt({ email, requesterName, groupId, confirmationRequests, amountTotal, currency }) {
+  const rows = confirmationRequests.map((request) => `
+    <tr>
+      <td style="padding:10px 12px;border-bottom:1px solid #292929;color:#f4f1ed;">${escapeHtml(request.track || request.message)}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid #292929;color:#ef3939;font-family:monospace;">${escapeHtml(request.confirmationCode)}</td>
+    </tr>
+  `).join('');
+  const total = new Intl.NumberFormat('en-CA', {
+    style: 'currency',
+    currency: String(currency || 'CAD').toUpperCase(),
+  }).format(Number(amountTotal || 0) / 100);
+
+  return sendBrevoEmail({
+    to: [{ email, name: requesterName || 'Audience' }],
+    replyTo: {
+      email: process.env.SERVICE_REQUEST_NOTIFICATION_EMAIL?.trim() || DEFAULT_NOTIFICATION_EMAIL,
+      name: 'Khalil Nahhat',
+    },
+    subject: `Song request receipt ${groupId}`,
+    tags: ['live-song-request', 'payment-receipt'],
+    htmlContent: `<!doctype html>
+      <html><body style="margin:0;background:#080808;color:#f4f1ed;font-family:Arial,sans-serif;">
+        <div style="max-width:680px;margin:0 auto;padding:32px 20px;">
+          <p style="margin:0 0 8px;color:#ef3939;font-size:12px;letter-spacing:2px;">KN// SONG REQUESTS</p>
+          <h1 style="margin:0 0 12px;font-size:30px;">Payment confirmed</h1>
+          <p style="margin:0 0 24px;color:#b8b3ad;line-height:1.6;">Hello ${escapeHtml(requesterName || 'Audience')}, your request payment was received. Khalil will review the songs for the live event.</p>
+          <div style="padding:14px 18px;background:#121212;border:1px solid #292929;">
+            <p style="margin:0 0 8px;"><strong>Group confirmation:</strong> ${escapeHtml(groupId)}</p>
+            <p style="margin:0;"><strong>Total paid:</strong> ${escapeHtml(total)}</p>
+          </div>
+          <table style="width:100%;margin-top:18px;border-collapse:collapse;background:#121212;border:1px solid #292929;">
+            <thead><tr><th style="padding:10px 12px;text-align:left;color:#ef3939;">Song request</th><th style="padding:10px 12px;text-align:left;color:#ef3939;">Confirmation code</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <p style="margin:24px 0 0;color:#777;font-size:12px;line-height:1.6;">Keep this email if you need to reference your request codes.</p>
+        </div>
+      </body></html>`,
+  });
+}
+
 module.exports = {
+  sendLiveRequestReceipt,
   sendServiceQuoteNotification,
   sendServiceRequestNotification,
 };

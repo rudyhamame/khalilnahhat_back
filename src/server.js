@@ -24,7 +24,6 @@ const {
   analyzeLiveRequest,
   buildReorderedQueue,
 } = require('./live-request-agent');
-const { analyzeAudioWithCyanite } = require('./cyanite');
 const { createSessionToken, hashPassword, verifyPassword } = require('./security');
 const { convertYoutubeToWav } = require('./youtube-audio');
 const {
@@ -163,6 +162,12 @@ const liveSessionSchema = z.object({
   audioUrl: z.string().trim().optional().default(''),
   audioPublicId: z.string().trim().optional().default(''),
   audioOriginalName: z.string().trim().optional().default(''),
+  coverImage: z.string().trim().optional().default(''),
+  coverPublicId: z.string().trim().optional().default(''),
+  coverOriginalName: z.string().trim().optional().default(''),
+  coverZoom: z.coerce.number().min(1).max(2.5).optional().default(1),
+  coverPositionX: z.coerce.number().min(0).max(100).optional().default(50),
+  coverPositionY: z.coerce.number().min(0).max(100).optional().default(50),
 });
 
 const liveRequestAnalysisSchema = z.object({
@@ -286,6 +291,29 @@ const archiveItemSchema = z.object({
   audioUrl: z.string().trim().optional().default(''),
   audioPublicId: z.string().trim().optional().default(''),
   audioOriginalName: z.string().trim().optional().default(''),
+  trackClass: z.string().trim().optional().default(''),
+  genres: z.string().trim().optional().default(''),
+  subgenres: z.string().trim().optional().default(''),
+  language: z.string().trim().optional().default(''),
+  musicMoods: z.string().trim().optional().default(''),
+  instruments: z.string().trim().optional().default(''),
+  bpm: z.string().trim().optional().default(''),
+  musicalKey: z.string().trim().optional().default(''),
+  vocals: z.string().trim().optional().default(''),
+  energy: z.string().trim().optional().default(''),
+  beat: z.string().trim().optional().default(''),
+  lyricsSummary: z.string().trim().optional().default(''),
+  lyricsMoods: z.string().trim().optional().default(''),
+  lyricsEnergy: z.string().trim().optional().default(''),
+  themes: z.string().trim().optional().default(''),
+  lyricsLanguage: z.string().trim().optional().default(''),
+  explicit: z.string().trim().optional().default(''),
+  coverImage: z.string().trim().optional().default(''),
+  coverPublicId: z.string().trim().optional().default(''),
+  coverOriginalName: z.string().trim().optional().default(''),
+  coverZoom: z.coerce.number().min(1).max(2.5).optional().default(1),
+  coverPositionX: z.coerce.number().min(0).max(100).optional().default(50),
+  coverPositionY: z.coerce.number().min(0).max(100).optional().default(50),
 });
 
 const liveStreamConfigSchema = z.object({
@@ -312,32 +340,6 @@ const serviceRequestQuoteSchema = z.object({
     unitPrice: z.coerce.number().min(0),
   })).min(1),
   adminNote: z.string().trim().optional().default(''),
-});
-
-const liveSessionAnalysisSchema = z.object({
-  track: z.string().trim().optional().default(''),
-  artist: z.string().trim().optional().default(''),
-  duration: z.string().trim().optional().default(''),
-  genre: z.string().trim().optional().default(''),
-  genres: z.string().trim().optional().default(''),
-  subgenres: z.string().trim().optional().default(''),
-  language: z.string().trim().optional().default(''),
-  musicMoods: z.string().trim().optional().default(''),
-  instruments: z.string().trim().optional().default(''),
-  bpm: z.string().trim().optional().default(''),
-  musicalKey: z.string().trim().optional().default(''),
-  vocals: z.string().trim().optional().default(''),
-  energy: z.string().trim().optional().default(''),
-  beat: z.string().trim().optional().default(''),
-  lyricsSummary: z.string().trim().optional().default(''),
-  lyricsMoods: z.string().trim().optional().default(''),
-  lyricsEnergy: z.string().trim().optional().default(''),
-  themes: z.string().trim().optional().default(''),
-  lyricsLanguage: z.string().trim().optional().default(''),
-  explicit: z.string().trim().optional().default(''),
-  sourceUrl: z.string().trim().optional().default(''),
-  audioUrl: z.string().trim().optional().default(''),
-  audioOriginalName: z.string().trim().optional().default(''),
 });
 
 const anamPersonaConfig = {
@@ -448,6 +450,12 @@ function serializeLiveSession(session) {
     sourceUrl: session.sourceUrl || '',
     audioUrl: session.audioUrl || '',
     audioOriginalName: session.audioOriginalName || '',
+    coverImage: session.coverImage || '',
+    coverPublicId: session.coverPublicId || '',
+    coverOriginalName: session.coverOriginalName || '',
+    coverZoom: Number(session.coverZoom || 1),
+    coverPositionX: Number(session.coverPositionX ?? 50),
+    coverPositionY: Number(session.coverPositionY ?? 50),
   };
 }
 
@@ -471,6 +479,47 @@ function uploadAudioBufferToCloudinary(file) {
       },
     );
 
+    uploadStream.end(file.buffer);
+  });
+}
+
+function uploadPosterBufferToCloudinary(file) {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: 'khalil/live-posters',
+        resource_type: 'image',
+        use_filename: true,
+        unique_filename: true,
+        overwrite: false,
+      },
+      (error, result) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(result);
+      },
+    );
+    uploadStream.end(file.buffer);
+  });
+}
+
+function uploadCoverBufferToCloudinary(file) {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: 'khalil/song-covers',
+        resource_type: 'image',
+        use_filename: true,
+        unique_filename: true,
+        overwrite: false,
+      },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result);
+      },
+    );
     uploadStream.end(file.buffer);
   });
 }
@@ -554,6 +603,29 @@ function serializeArchiveItem(item) {
     alt: item.alt,
     audioUrl: item.audioUrl || '',
     audioOriginalName: item.audioOriginalName || '',
+    coverImage: item.coverImage || '',
+    coverPublicId: item.coverPublicId || '',
+    coverOriginalName: item.coverOriginalName || '',
+    coverZoom: Number(item.coverZoom || 1),
+    coverPositionX: Number(item.coverPositionX ?? 50),
+    coverPositionY: Number(item.coverPositionY ?? 50),
+    trackClass: item.trackClass || '',
+    genres: item.genres || '',
+    subgenres: item.subgenres || '',
+    language: item.language || '',
+    musicMoods: item.musicMoods || '',
+    instruments: item.instruments || '',
+    bpm: item.bpm || '',
+    musicalKey: item.musicalKey || '',
+    vocals: item.vocals || '',
+    energy: item.energy || '',
+    beat: item.beat || '',
+    lyricsSummary: item.lyricsSummary || '',
+    lyricsMoods: item.lyricsMoods || '',
+    lyricsEnergy: item.lyricsEnergy || '',
+    themes: item.themes || '',
+    lyricsLanguage: item.lyricsLanguage || '',
+    explicit: item.explicit || '',
   };
 }
 
@@ -1199,90 +1271,48 @@ app.post('/api/live-sessions/upload-audio', requireAdmin, upload.single('audio')
   }
 });
 
-app.post('/api/live-sessions/analyze', requireAdmin, async (request, response) => {
-  const parsed = liveSessionAnalysisSchema.safeParse(request.body);
-
-  if (!parsed.success) {
-    return response.status(400).json({
-      message: 'Live session analysis payload failed validation.',
-      errors: parsed.error.flatten().fieldErrors,
-    });
+app.post('/api/live-stream/upload-poster', requireAdmin, upload.single('poster'), async (request, response) => {
+  if (!request.file) {
+    return response.status(400).json({ message: 'Poster image is required.' });
   }
 
-  const input = parsed.data;
-  const sourceUrl = input.sourceUrl || input.audioUrl || '';
-  const message = [input.artist, input.track, sourceUrl].filter(Boolean).join(' - ') || input.audioOriginalName || '';
+  if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+    return response.status(500).json({ message: 'Cloudinary credentials are missing from the server environment.' });
+  }
 
   try {
-    const cyaniteAnalysis = await analyzeAudioWithCyanite({
-      audioUrl: input.audioUrl,
-      track: input.track,
-      artist: input.artist,
-      audioOriginalName: input.audioOriginalName,
-    });
-    const cyaniteMetadata = cyaniteAnalysis?.metadata || {};
-    const analysis = await analyzeLiveRequest(message, [], {
-      track: cyaniteMetadata.track || input.track,
-      artist: cyaniteMetadata.artist || input.artist,
-      duration: input.duration,
-      genre: cyaniteMetadata.genre || input.genre,
-      genres: cyaniteMetadata.genres || input.genres,
-      subgenres: cyaniteMetadata.subgenres || input.subgenres,
-      language: input.language,
-      musicMoods: cyaniteMetadata.musicMoods || input.musicMoods,
-      instruments: cyaniteMetadata.instruments || input.instruments,
-      bpm: cyaniteMetadata.bpm || input.bpm,
-      musicalKey: cyaniteMetadata.musicalKey || input.musicalKey,
-      vocals: cyaniteMetadata.vocals || input.vocals,
-      energy: cyaniteMetadata.energy || input.energy,
-      beat: cyaniteMetadata.beat || input.beat,
-      lyricsSummary: cyaniteMetadata.lyricsSummary || input.lyricsSummary,
-      lyricsMoods: input.lyricsMoods,
-      lyricsEnergy: input.lyricsEnergy,
-      themes: cyaniteMetadata.themes || input.themes,
-      lyricsLanguage: input.lyricsLanguage,
-      explicit: input.explicit,
-      sourceUrl,
-      sourcePlatform: sourceUrl ? 'link' : 'manual',
-      analysisSources: Array.isArray(cyaniteMetadata.analysisSources)
-        ? cyaniteMetadata.analysisSources
-        : [],
-    });
-
-    return response.json({
+    const result = await uploadPosterBufferToCloudinary(request.file);
+    return response.status(201).json({
       item: {
-        analysisStatus: cyaniteAnalysis?.status || 'finished',
-        track: analysis.metadata.track || input.track,
-        artist: analysis.metadata.artist || input.artist,
-        duration: analysis.metadata.duration || input.duration,
-        genre: analysis.metadata.genre || input.genre,
-        genres: analysis.metadata.genres || input.genres,
-        subgenres: analysis.metadata.subgenres || input.subgenres,
-        language: analysis.metadata.language || input.language,
-        musicMoods: analysis.metadata.musicMoods || input.musicMoods,
-        instruments: analysis.metadata.instruments || input.instruments,
-        bpm: analysis.metadata.bpm || input.bpm,
-        musicalKey: analysis.metadata.musicalKey || input.musicalKey,
-        vocals: analysis.metadata.vocals || input.vocals,
-        energy: analysis.metadata.energy || input.energy,
-        beat: analysis.metadata.beat || input.beat,
-        lyricsSummary: analysis.metadata.lyricsSummary || input.lyricsSummary,
-        lyricsMoods: analysis.metadata.lyricsMoods || input.lyricsMoods,
-        lyricsEnergy: analysis.metadata.lyricsEnergy || input.lyricsEnergy,
-        themes: analysis.metadata.themes || input.themes,
-        lyricsLanguage: analysis.metadata.lyricsLanguage || input.lyricsLanguage,
-        explicit: analysis.metadata.explicit || input.explicit,
-        analysisSources: Array.isArray(analysis.metadata.analysisSources)
-          ? analysis.metadata.analysisSources
-          : [],
-        summary: cyaniteAnalysis?.summary || analysis.summary,
+        posterImage: result.secure_url || result.url || '',
+        posterPublicId: result.public_id || '',
+        posterOriginalName: request.file.originalname || '',
       },
     });
   } catch (error) {
-    console.error('Live session analysis failed:', error);
-    return response.status(500).json({
-      message: error?.message || 'Live session analysis failed.',
+    console.error('Cloudinary poster upload failed:', error);
+    return response.status(500).json({ message: 'Poster image upload failed.' });
+  }
+});
+
+app.post('/api/live-sessions/upload-cover', requireAdmin, upload.single('cover'), async (request, response) => {
+  if (!request.file) return response.status(400).json({ message: 'Cover image is required.' });
+  if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+    return response.status(500).json({ message: 'Cloudinary credentials are missing from the server environment.' });
+  }
+
+  try {
+    const result = await uploadCoverBufferToCloudinary(request.file);
+    return response.status(201).json({
+      item: {
+        coverImage: result.secure_url || result.url || '',
+        coverPublicId: result.public_id || '',
+        coverOriginalName: request.file.originalname || '',
+      },
     });
+  } catch (error) {
+    console.error('Cloudinary cover upload failed:', error);
+    return response.status(500).json({ message: 'Cover image upload failed.' });
   }
 });
 

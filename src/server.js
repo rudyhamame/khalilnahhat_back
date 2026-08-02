@@ -23,6 +23,7 @@ const {
 } = require('./live-request-agent');
 const { analyzeAudioWithCyanite } = require('./cyanite');
 const { createSessionToken, hashPassword, verifyPassword } = require('./security');
+const { convertYoutubeToWav } = require('./youtube-audio');
 const {
   sendServiceQuoteNotification,
   sendServiceRequestNotification,
@@ -64,10 +65,15 @@ const loginSchema = z.object({
   password: z.string().trim().min(1, 'Password is required.'),
 });
 
+const youtubeSearchSchema = z.object({
+  query: z.string().trim().min(2, 'Enter at least two characters to search YouTube.'),
+});
+
 const liveSessionSchema = z.object({
   track: z.string().trim().min(1, 'Song / music is required.'),
   artist: z.string().trim().optional().default(''),
   duration: z.string().trim().default(''),
+  trackClass: z.string().trim().optional().default(''),
   genre: z.string().trim().default(''),
   genres: z.string().trim().optional().default(''),
   subgenres: z.string().trim().optional().default(''),
@@ -289,6 +295,7 @@ function serializeLiveSession(session) {
     track: session.track,
     artist: session.artist || '',
     duration: session.duration,
+    trackClass: session.trackClass || '',
     genre: session.genre,
     genres: session.genres || '',
     subgenres: session.subgenres || '',
@@ -380,6 +387,8 @@ function serializeLiveRequest(request) {
     sourcePlatform: request.sourcePlatform || 'manual',
     sourceUrl: request.sourceUrl || '',
     thumbnailUrl: request.thumbnailUrl || '',
+    audioUrl: request.audioUrl || '',
+    audioOriginalName: request.audioOriginalName || '',
     analysisSources: Array.isArray(request.analysisSources) ? request.analysisSources : [],
     requestStatus: request.requestStatus || 'pending_admin',
     duplicateSessionId: request.duplicateSessionExternalId || '',
@@ -1052,6 +1061,123 @@ app.get('/api/live-stream/admin', requireAdmin, async (_request, response) => {
   return response.json({
     item: serializeAdminLiveStreamConfig(config),
   });
+});
+
+app.get('/api/youtube/search', async (request, response) => {
+  const parsed = youtubeSearchSchema.safeParse({ query: request.query.q });
+
+  if (!parsed.success) {
+    return response.status(400).json({
+      message: parsed.error.flatten().fieldErrors.query?.[0] || 'A YouTube search query is required.',
+    });
+  }
+
+  if (!process.env.YOUTUBE_API_KEY) {
+    return response.status(503).json({ message: 'YouTube search is not configured on the server.' });
+  }
+
+  try {
+    const searchUrl = new URL('https://www.googleapis.com/youtube/v3/search');
+    searchUrl.search = new URLSearchParams({
+      part: 'snippet',
+      type: 'video',
+      maxResults: '8',
+      q: parsed.data.query,
+      key: process.env.YOUTUBE_API_KEY,
+    });
+    const searchResponse = await fetch(searchUrl);
+    const searchPayload = await searchResponse.json();
+
+    if (!searchResponse.ok) {
+      console.error('YouTube search failed:', searchPayload.error?.message || searchResponse.status);
+      return response.status(502).json({ message: 'YouTube search is temporarily unavailable.' });
+    }
+
+    const ids = (searchPayload.items || []).map((item) => item.id?.videoId).filter(Boolean);
+    if (!ids.length) {
+      return response.json({ items: [] });
+    }
+
+    const detailsUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
+    detailsUrl.search = new URLSearchParams({
+      part: 'contentDetails',
+      id: ids.join(','),
+      key: process.env.YOUTUBE_API_KEY,
+    });
+    const detailsResponse = await fetch(detailsUrl);
+    const detailsPayload = await detailsResponse.json();
+    const durations = new Map((detailsPayload.items || []).map((item) => [item.id, item.contentDetails?.duration || '']));
+
+    return response.json({
+      items: (searchPayload.items || []).map((item) => {
+        const videoId = item.id.videoId;
+        return {
+          id: videoId,
+          title: item.snippet?.title || 'Untitled video',
+          channelTitle: item.snippet?.channelTitle || '',
+          description: item.snippet?.description || '',
+          thumbnail: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.default?.url || '',
+          duration: durations.get(videoId) || '',
+          url: `https://www.youtube.com/watch?v=${videoId}`,
+        };
+      }),
+    });
+  } catch (error) {
+    console.error('YouTube search network error:', error);
+    return response.status(502).json({ message: 'YouTube search is temporarily unavailable.' });
+  }
+});
+
+app.post('/api/youtube/to-wav', requireAdmin, async (request, response) => {
+  const sourceUrl = typeof request.body?.url === 'string' ? request.body.url.trim() : '';
+
+  if (!sourceUrl) {
+    return response.status(400).json({ message: 'A YouTube URL is required.' });
+  }
+
+  try {
+    const result = await convertYoutubeToWav(sourceUrl);
+    response.type('audio/wav');
+    response.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
+    return response.send(result.buffer);
+  } catch (error) {
+    console.error('YouTube WAV conversion failed:', error);
+    return response.status(502).json({
+      message: 'YouTube conversion failed. Confirm yt-dlp and FFmpeg are installed on the server and that you have permission to use the audio.',
+    });
+  }
+});
+
+app.post('/api/live-requests/:id/to-wav', requireAdmin, async (request, response) => {
+  const liveRequest = await LiveRequest.findOne({ externalId: request.params.id });
+
+  if (!liveRequest) {
+    return response.status(404).json({ message: 'Audience request not found.' });
+  }
+
+  if (liveRequest.sourcePlatform !== 'youtube' || !liveRequest.sourceUrl) {
+    return response.status(400).json({ message: 'This request does not contain a YouTube source URL.' });
+  }
+
+  try {
+    const result = await convertYoutubeToWav(liveRequest.sourceUrl);
+    const uploadResult = await uploadAudioBufferToCloudinary({
+      buffer: result.buffer,
+      originalname: result.fileName,
+      mimetype: 'audio/wav',
+    });
+    liveRequest.audioUrl = uploadResult.secure_url || uploadResult.url || '';
+    liveRequest.audioPublicId = uploadResult.public_id || '';
+    liveRequest.audioOriginalName = result.fileName;
+    await liveRequest.save();
+
+    return response.json({ item: serializeLiveRequest(liveRequest) });
+  } catch (error) {
+    console.error('Audience request WAV conversion failed:', error);
+    return response.status(502).json({
+      message: 'Could not convert this YouTube request to WAV. Confirm the backend tools are installed and the audio is permitted for use.',
+    });
+  }
 });
 
 app.post('/api/live-requests/analyze', async (request, response) => {

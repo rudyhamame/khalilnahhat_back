@@ -91,6 +91,8 @@ CUSTOMER_SERVICES_URL=https://djkhalilnahhat.onrender.com/dashboard/services
 - `PATCH /api/archive-items/:id`
 - `DELETE /api/archive-items/:id`
 - `POST /api/session-token`
+- `GET /api/youtube/search`
+- `POST /api/youtube/to-wav` (admin only)
 - `POST /api/bookings`
 - `POST /api/service-requests`
 - `GET /api/service-requests/mine`
@@ -104,3 +106,24 @@ CUSTOMER_SERVICES_URL=https://djkhalilnahhat.onrender.com/dashboard/services
 - Any real database user with username `khalilnahhat` is treated as admin.
 - Add `ANAM_API_KEY` to enable server-generated Anam session tokens for the dashboard avatar.
 - New service requests notify `SERVICE_REQUEST_NOTIFICATION_EMAIL` through the Brevo API when configured.
+
+## YouTube to WAV
+
+The admin Live Sessions form can convert a permitted YouTube URL to WAV, upload it to Cloudinary, and send it through the existing metadata/Cyanite analysis flow. The converter does not expose a public downloader endpoint.
+
+Install the required tools on the backend host:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ffmpeg
+python3 -m pip install --user yt-dlp
+```
+
+If the executables are not on the process `PATH`, set:
+
+```text
+YT_DLP_PATH=/absolute/path/to/yt-dlp
+FFMPEG_PATH=/absolute/path/to/ffmpeg
+```
+
+For Render, add the equivalent `ffmpeg` and `yt-dlp` installation commands to the backend Build Command, then redeploy. Only convert audio you own or are licensed to use.

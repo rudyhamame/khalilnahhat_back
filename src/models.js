@@ -20,6 +20,7 @@ const liveSessionSchema = new mongoose.Schema(
     track: { type: String, required: true, trim: true },
     artist: { type: String, default: '', trim: true },
     duration: { type: String, default: '', trim: true },
+    trackClass: { type: String, default: '', trim: true },
     genre: { type: String, default: '', trim: true },
     genres: { type: String, default: '', trim: true },
     subgenres: { type: String, default: '', trim: true },
@@ -83,6 +84,9 @@ const liveRequestSchema = new mongoose.Schema(
     sourcePlatform: { type: String, default: 'manual', trim: true },
     sourceUrl: { type: String, default: '', trim: true },
     thumbnailUrl: { type: String, default: '', trim: true },
+    audioUrl: { type: String, default: '', trim: true },
+    audioPublicId: { type: String, default: '', trim: true },
+    audioOriginalName: { type: String, default: '', trim: true },
     analysisSources: [{ type: String, trim: true }],
     requestStatus: {
       type: String,

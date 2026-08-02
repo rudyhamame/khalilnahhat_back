@@ -110,6 +110,8 @@ Create a Stripe webhook endpoint at `https://djkhalilnahhat-back.onrender.com/ap
 - `GET /api/youtube/search`
 - `POST /api/live-requests/checkout`
 - `POST /api/stripe/webhook`
+- `GET /api/prices`
+- `PATCH /api/prices/:id`
 - `POST /api/bookings`
 - `POST /api/service-requests`
 - `GET /api/service-requests/mine`

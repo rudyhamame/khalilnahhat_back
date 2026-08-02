@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const crypto = require('crypto');
 const cors = require('cors');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
@@ -15,6 +16,7 @@ const {
   LiveSession,
   LiveStreamConfig,
   ServiceRequest,
+  ServicePrice,
   User,
 } = require('./models');
 const {
@@ -28,6 +30,7 @@ const { convertYoutubeToWav } = require('./youtube-audio');
 const {
   sendServiceQuoteNotification,
   sendServiceRequestNotification,
+  sendLiveRequestReceipt,
 } = require('./brevo');
 
 const app = express();
@@ -37,8 +40,62 @@ const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SEC
 const liveRequestPriceCents = Number.parseInt(process.env.STRIPE_LIVE_REQUEST_PRICE_CENTS || '500', 10);
 const liveRequestCurrency = (process.env.STRIPE_LIVE_REQUEST_CURRENCY || 'cad').toLowerCase();
 
+const DEFAULT_SERVICE_PRICES = [
+  ['professional-dj-service', 'Professional DJ Service', 'DJ'],
+  ['qsc-k12-2-speaker', 'QSC K12.2 Speaker', 'Sound'],
+  ['elite-15-speaker', 'Elite 15-inch Speaker', 'Sound'],
+  ['es18p-subwoofer', 'ES18P 18-inch Subwoofer', 'Sound'],
+  ['shure-microphone', 'Shure Microphone', 'Sound'],
+  ['soundcraft-soundboard', 'Soundcraft Soundboard', 'Sound'],
+  ['jbl-concert-system', 'JBL Concert-Level System', 'Sound'],
+  ['intelligent-moving-head', 'Intelligent Moving Head', 'Lighting'],
+  ['baseplate-trussing', 'Baseplate / Trussing', 'Lighting'],
+  ['uplight', 'Uplight', 'Lighting'],
+  ['smoke-machine', 'Smoke Machine', 'Special Effects'],
+  ['sparkler-machine', 'Sparkler Machine', 'Special Effects'],
+  ['dry-ice-machine', 'Dry Ice Machine', 'Special Effects'],
+  ['co2-gun', 'CO2 Gun with Tank', 'Special Effects'],
+  ['six-panel-led-screen', 'Six-Panel LED Screen', 'Video'],
+  ['projector', 'Projector', 'Video'],
+  ['song-request-live', 'Song Request During Live Events', 'Live Events'],
+].map(([serviceId, name, category]) => ({ serviceId, name, category }));
+
 function getFrontendUrl() {
   return (process.env.FRONTEND_URL || process.env.PUBLIC_APP_URL || 'http://localhost:5173').replace(/\/+$/, '');
+}
+
+async function ensureServicePrices() {
+  const fallbackAmount = Number.isInteger(liveRequestPriceCents) && liveRequestPriceCents >= 0
+    ? liveRequestPriceCents
+    : 500;
+
+  await Promise.all(
+    DEFAULT_SERVICE_PRICES.map((price) =>
+      ServicePrice.updateOne(
+        { serviceId: price.serviceId },
+        {
+          $setOnInsert: {
+            ...price,
+            amountCents: price.serviceId === 'song-request-live' ? fallbackAmount : 0,
+            currency: price.serviceId === 'song-request-live' ? liveRequestCurrency.toUpperCase() : 'CAD',
+            isActive: true,
+          },
+        },
+        { upsert: true },
+      ),
+    ),
+  );
+}
+
+function serializeServicePrice(price) {
+  return {
+    id: price.serviceId,
+    name: price.name,
+    category: price.category,
+    amountCents: price.amountCents,
+    currency: price.currency,
+    isActive: price.isActive,
+  };
 }
 
 const bookingSchema = z.object({
@@ -144,6 +201,20 @@ const liveRequestCreateSchema = z.object({
     analysisSources: z.array(z.string().trim()).optional().default([]),
   }).optional(),
 });
+
+const liveRequestCheckoutSchema = z.object({
+  requesterName: z.string().trim().optional().default('Audience'),
+  requesterEmail: z.string().trim().email('A valid email is required for the receipt.'),
+  requests: z.array(
+    z.object({
+      message: z.string().trim().min(1, 'Each song request must include a song or link.'),
+    }),
+  ).min(1, 'Add at least one song request.').max(12, 'You can request up to 12 songs at once.'),
+});
+
+function createCode(prefix) {
+  return `${prefix}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+}
 
 const liveRequestReviewSchema = z.object({
   decision: z.enum(['approved', 'rejected']),
@@ -420,6 +491,9 @@ function serializeLiveRequest(request) {
   return {
     id: request.externalId || request.id,
     requesterName: request.requesterName || 'Audience',
+    requesterEmail: request.requesterEmail || '',
+    requestGroupId: request.requestGroupId || '',
+    confirmationCode: request.confirmationCode || '',
     message: request.message,
     track: request.track,
     artist: request.artist || '',
@@ -449,6 +523,7 @@ function serializeLiveRequest(request) {
     audioOriginalName: request.audioOriginalName || '',
     paymentStatus: request.paymentStatus || 'paid',
     stripeCheckoutSessionId: request.stripeCheckoutSessionId || '',
+    receiptSentAt: request.receiptSentAt || null,
     analysisSources: Array.isArray(request.analysisSources) ? request.analysisSources : [],
     requestStatus: request.requestStatus || 'pending_admin',
     duplicateSessionId: request.duplicateSessionExternalId || '',
@@ -668,7 +743,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
   if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
     if (session.payment_status === 'paid' || event.type.endsWith('succeeded')) {
       await LiveRequest.findOneAndUpdate(
-        { externalId: session.metadata?.liveRequestId, stripeCheckoutSessionId: session.id },
+        { requestGroupId: session.metadata?.requestGroupId, stripeCheckoutSessionId: session.id },
         {
           paymentStatus: 'paid',
           stripePaymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : '',
@@ -676,6 +751,34 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           aiSummary: 'Payment received. Direct audience request awaiting Khalil review.',
         },
       );
+
+      const receiptCandidate = await LiveRequest.findOne({
+        requestGroupId: session.metadata?.requestGroupId,
+        paymentStatus: 'paid',
+        receiptSentAt: null,
+      });
+      if (receiptCandidate) {
+        const groupRequests = await LiveRequest.find({
+          requestGroupId: receiptCandidate.requestGroupId,
+          paymentStatus: 'paid',
+        }).sort({ createdAt: 1 });
+        try {
+          await sendLiveRequestReceipt({
+            email: receiptCandidate.requesterEmail,
+            requesterName: receiptCandidate.requesterName,
+            groupId: receiptCandidate.requestGroupId,
+            confirmationRequests: groupRequests,
+            amountTotal: session.amount_total,
+            currency: session.currency,
+          });
+          await LiveRequest.updateMany(
+            { requestGroupId: receiptCandidate.requestGroupId, paymentStatus: 'paid' },
+            { receiptSentAt: new Date() },
+          );
+        } catch (error) {
+          console.error('Failed to send live request receipt:', error);
+        }
+      }
     }
   } else if (event.type === 'checkout.session.expired') {
     await LiveRequest.findOneAndUpdate(
@@ -944,6 +1047,45 @@ app.patch('/api/service-requests/:id/quote', requireAdmin, async (request, respo
     item: serializeServiceRequest(serviceRequest, true),
     notificationSent,
   });
+});
+
+const servicePriceUpdateSchema = z.object({
+  amountCents: z.coerce.number().int().min(0, 'Price cannot be negative.'),
+  currency: z.string().trim().length(3).default('CAD'),
+  isActive: z.boolean().default(true),
+});
+
+app.get('/api/prices', requireAdmin, async (_request, response) => {
+  await ensureServicePrices();
+  const prices = await ServicePrice.find().sort({ category: 1, name: 1 });
+  return response.json({ items: prices.map(serializeServicePrice) });
+});
+
+app.patch('/api/prices/:id', requireAdmin, async (request, response) => {
+  const parsed = servicePriceUpdateSchema.safeParse(request.body);
+
+  if (!parsed.success) {
+    return response.status(400).json({
+      message: 'Price payload failed validation.',
+      errors: parsed.error.flatten().fieldErrors,
+    });
+  }
+
+  const price = await ServicePrice.findOneAndUpdate(
+    { serviceId: request.params.id },
+    {
+      amountCents: parsed.data.amountCents,
+      currency: parsed.data.currency.toUpperCase(),
+      isActive: parsed.data.isActive,
+    },
+    { new: true },
+  );
+
+  if (!price) {
+    return response.status(404).json({ message: 'Price item not found.' });
+  }
+
+  return response.json({ item: serializeServicePrice(price) });
 });
 
 app.post('/api/live-sessions', requireAdmin, async (request, response) => {
@@ -1295,7 +1437,7 @@ app.post('/api/live-requests/analyze', async (request, response) => {
 });
 
 async function createLiveRequestCheckout(request, response) {
-  const parsed = liveRequestCreateSchema.safeParse(request.body);
+  const parsed = liveRequestCheckoutSchema.safeParse(request.body);
 
   if (!parsed.success) {
     return response.status(400).json({
@@ -1308,21 +1450,27 @@ async function createLiveRequestCheckout(request, response) {
     return response.status(503).json({ message: 'Song request payments are not configured.' });
   }
 
-  if (!Number.isInteger(liveRequestPriceCents) || liveRequestPriceCents < 50) {
+  await ensureServicePrices();
+  const songRequestPrice = await ServicePrice.findOne({ serviceId: 'song-request-live', isActive: true });
+
+  if (!songRequestPrice || !Number.isInteger(songRequestPrice.amountCents) || songRequestPrice.amountCents < 50) {
     return response.status(503).json({ message: 'The song request price is not configured correctly.' });
   }
 
-  const metadata = parsed.data.metadata || buildDirectRequestMetadata(parsed.data.message);
-  const externalId = `live-request-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const liveRequest = await LiveRequest.create({
-    externalId,
+  const requestGroupId = createCode('GROUP');
+  const requestDrafts = parsed.data.requests.map((item) => ({
+    externalId: `live-request-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     requesterName: parsed.data.requesterName,
-    message: parsed.data.message,
-    ...metadata,
+    requesterEmail: parsed.data.requesterEmail,
+    requestGroupId,
+    confirmationCode: createCode('REQ'),
+    message: item.message,
+    ...buildDirectRequestMetadata(item.message),
     requestStatus: 'pending_admin',
     paymentStatus: 'unpaid',
     aiSummary: 'Payment pending before Khalil review.',
-  });
+  }));
+  const liveRequests = await LiveRequest.insertMany(requestDrafts);
 
   try {
     const checkoutSession = await stripe.checkout.sessions.create({
@@ -1330,30 +1478,32 @@ async function createLiveRequestCheckout(request, response) {
       line_items: [
         {
           price_data: {
-            currency: liveRequestCurrency,
+            currency: songRequestPrice.currency.toLowerCase(),
             product_data: {
               name: 'Khalil live song request',
-              description: metadata.track || 'Audience song request',
+              description: `${liveRequests.length} audience song request${liveRequests.length === 1 ? '' : 's'}`,
             },
-            unit_amount: liveRequestPriceCents,
+            unit_amount: songRequestPrice.amountCents,
           },
-          quantity: 1,
+          quantity: liveRequests.length,
         },
       ],
-      metadata: { liveRequestId: externalId },
+      metadata: { requestGroupId },
       success_url: `${getFrontendUrl()}/?stripe=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${getFrontendUrl()}/?stripe=cancelled`,
     });
 
-    liveRequest.stripeCheckoutSessionId = checkoutSession.id;
-    await liveRequest.save();
+    await LiveRequest.updateMany(
+      { requestGroupId },
+      { stripeCheckoutSessionId: checkoutSession.id },
+    );
 
     return response.status(201).json({
       checkoutUrl: checkoutSession.url,
       message: 'Redirecting you to secure payment.',
     });
   } catch (error) {
-    await LiveRequest.deleteOne({ _id: liveRequest._id });
+    await LiveRequest.deleteMany({ requestGroupId });
     console.error('Stripe Checkout session creation failed:', error);
     return response.status(502).json({ message: 'Secure payment could not be started.' });
   }

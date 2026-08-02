@@ -59,6 +59,9 @@ const liveRequestSchema = new mongoose.Schema(
   {
     externalId: { type: String, required: true, unique: true, trim: true },
     requesterName: { type: String, default: 'Audience', trim: true },
+    requesterEmail: { type: String, default: '', trim: true, lowercase: true },
+    requestGroupId: { type: String, default: '', trim: true, index: true },
+    confirmationCode: { type: String, default: '', trim: true, unique: true, sparse: true },
     message: { type: String, required: true, trim: true },
     track: { type: String, required: true, trim: true },
     artist: { type: String, default: '', trim: true },
@@ -95,6 +98,7 @@ const liveRequestSchema = new mongoose.Schema(
     },
     stripeCheckoutSessionId: { type: String, default: '', trim: true },
     stripePaymentIntentId: { type: String, default: '', trim: true },
+    receiptSentAt: { type: Date, default: null },
     analysisSources: [{ type: String, trim: true }],
     requestStatus: {
       type: String,
@@ -205,6 +209,18 @@ const serviceRequestSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+const servicePriceSchema = new mongoose.Schema(
+  {
+    serviceId: { type: String, required: true, unique: true, trim: true },
+    name: { type: String, required: true, trim: true },
+    category: { type: String, default: 'service', trim: true },
+    amountCents: { type: Number, required: true, min: 0 },
+    currency: { type: String, default: 'CAD', trim: true, uppercase: true },
+    isActive: { type: Boolean, default: true },
+  },
+  { timestamps: true },
+);
+
 const User = mongoose.model('User', userSchema);
 const LiveSession = mongoose.model('LiveSession', liveSessionSchema);
 const LiveRequest = mongoose.model('LiveRequest', liveRequestSchema);
@@ -212,6 +228,7 @@ const ArchiveItem = mongoose.model('ArchiveItem', archiveItemSchema);
 const Booking = mongoose.model('Booking', bookingSchema);
 const LiveStreamConfig = mongoose.model('LiveStreamConfig', liveStreamConfigSchema);
 const ServiceRequest = mongoose.model('ServiceRequest', serviceRequestSchema);
+const ServicePrice = mongoose.model('ServicePrice', servicePriceSchema);
 
 module.exports = {
   ArchiveItem,
@@ -220,5 +237,6 @@ module.exports = {
   LiveSession,
   LiveStreamConfig,
   ServiceRequest,
+  ServicePrice,
   User,
 };

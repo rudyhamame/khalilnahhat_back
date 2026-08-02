@@ -76,6 +76,22 @@ CUSTOMER_SERVICES_URL=https://djkhalilnahhat.onrender.com/dashboard/services
 
 `EMAIL_FROM_ADDRESS` must be a sender verified in your Brevo account. A failed notification is logged but does not discard the customer's saved request.
 
+## Configure Stripe song-request payments
+
+Song requests use Stripe-hosted Checkout. The backend creates an unpaid request, redirects the audience to Stripe, and only makes the request visible to the admin after a verified `checkout.session.completed` webhook marks it paid.
+
+Configure these variables in local `.env` and the Render backend environment:
+
+```text
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_LIVE_REQUEST_PRICE_CENTS=500
+STRIPE_LIVE_REQUEST_CURRENCY=cad
+FRONTEND_URL=https://djkhalilnahhat.onrender.com
+```
+
+Create a Stripe webhook endpoint at `https://djkhalilnahhat-back.onrender.com/api/stripe/webhook` and subscribe it to `checkout.session.completed`, `checkout.session.async_payment_succeeded`, and `checkout.session.expired`. Use test-mode keys while testing and production keys only after the complete flow works.
+
 ## Endpoints
 
 - `GET /api/health`
@@ -92,7 +108,8 @@ CUSTOMER_SERVICES_URL=https://djkhalilnahhat.onrender.com/dashboard/services
 - `DELETE /api/archive-items/:id`
 - `POST /api/session-token`
 - `GET /api/youtube/search`
-- `POST /api/youtube/to-wav` (admin only)
+- `POST /api/live-requests/checkout`
+- `POST /api/stripe/webhook`
 - `POST /api/bookings`
 - `POST /api/service-requests`
 - `GET /api/service-requests/mine`

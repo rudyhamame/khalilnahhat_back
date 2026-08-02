@@ -87,6 +87,14 @@ const liveRequestSchema = new mongoose.Schema(
     audioUrl: { type: String, default: '', trim: true },
     audioPublicId: { type: String, default: '', trim: true },
     audioOriginalName: { type: String, default: '', trim: true },
+    paymentStatus: {
+      type: String,
+      enum: ['unpaid', 'paid', 'failed', 'refunded'],
+      default: 'paid',
+      trim: true,
+    },
+    stripeCheckoutSessionId: { type: String, default: '', trim: true },
+    stripePaymentIntentId: { type: String, default: '', trim: true },
     analysisSources: [{ type: String, trim: true }],
     requestStatus: {
       type: String,

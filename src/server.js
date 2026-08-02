@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
+const Stripe = require('stripe');
 const { z } = require('zod');
 const { connectToDatabase, MONGODB_DB_NAME } = require('./db');
 const { ADMIN_USERNAME, defaultLiveStreamConfig } = require('./default-data');
@@ -32,6 +33,13 @@ const {
 const app = express();
 const PORT = process.env.PORT || 4000;
 const upload = multer({ storage: multer.memoryStorage() });
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
+const liveRequestPriceCents = Number.parseInt(process.env.STRIPE_LIVE_REQUEST_PRICE_CENTS || '500', 10);
+const liveRequestCurrency = (process.env.STRIPE_LIVE_REQUEST_CURRENCY || 'cad').toLowerCase();
+
+function getFrontendUrl() {
+  return (process.env.FRONTEND_URL || process.env.PUBLIC_APP_URL || 'http://localhost:5173').replace(/\/+$/, '');
+}
 
 const bookingSchema = z.object({
   fullName: z.string().trim().min(1, 'Full name is required.'),
@@ -134,13 +142,63 @@ const liveRequestCreateSchema = z.object({
     sourceUrl: z.string().trim().optional().default(''),
     thumbnailUrl: z.string().trim().optional().default(''),
     analysisSources: z.array(z.string().trim()).optional().default([]),
-  }),
+  }).optional(),
 });
 
 const liveRequestReviewSchema = z.object({
   decision: z.enum(['approved', 'rejected']),
   adminNote: z.string().trim().optional().default(''),
 });
+
+function buildDirectRequestMetadata(message) {
+  const urls = Array.from(String(message || '').matchAll(/https?:\/\/[^\s]+/g), (match) => match[0]);
+  const sourceUrl = urls[0] || '';
+  const sourcePlatform = sourceUrl
+    ? (() => {
+        try {
+          const hostname = new URL(sourceUrl).hostname.toLowerCase();
+          if (hostname.includes('youtube.com') || hostname.includes('youtu.be')) return 'youtube';
+          if (hostname.includes('spotify.com')) return 'spotify';
+          if (hostname.includes('anghami.com')) return 'anghami';
+          if (hostname.includes('instagram.com')) return 'instagram';
+          if (hostname.includes('facebook.com') || hostname.includes('fb.watch')) return 'facebook';
+          if (hostname.includes('tiktok.com')) return 'tiktok';
+        } catch {
+          return 'link';
+        }
+        return 'link';
+      })()
+    : 'manual';
+  const track = String(message || '').replace(/https?:\/\/[^\s]+/g, '').replace(/\s+/g, ' ').trim();
+
+  return {
+    track: track || 'Song request',
+    artist: '',
+    duration: '',
+    genre: '',
+    genres: '',
+    subgenres: '',
+    language: '',
+    mood: '',
+    musicMoods: '',
+    instruments: '',
+    bpm: '',
+    musicalKey: '',
+    vocals: '',
+    energy: '',
+    beat: '',
+    lyricsSummary: '',
+    lyricsMoods: '',
+    lyricsEnergy: '',
+    themes: '',
+    lyricsLanguage: '',
+    explicit: '',
+    sourcePlatform,
+    sourceUrl,
+    thumbnailUrl: '',
+    analysisSources: [],
+  };
+}
 
 const archiveItemSchema = z.object({
   title: z.string().trim().min(1, 'Title is required.'),
@@ -389,6 +447,8 @@ function serializeLiveRequest(request) {
     thumbnailUrl: request.thumbnailUrl || '',
     audioUrl: request.audioUrl || '',
     audioOriginalName: request.audioOriginalName || '',
+    paymentStatus: request.paymentStatus || 'paid',
+    stripeCheckoutSessionId: request.stripeCheckoutSessionId || '',
     analysisSources: Array.isArray(request.analysisSources) ? request.analysisSources : [],
     requestStatus: request.requestStatus || 'pending_admin',
     duplicateSessionId: request.duplicateSessionExternalId || '',
@@ -586,6 +646,46 @@ app.use(
     },
   }),
 );
+
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (request, response) => {
+  if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET) {
+    return response.status(503).json({ message: 'Stripe webhook is not configured.' });
+  }
+
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(
+      request.body,
+      request.headers['stripe-signature'],
+      process.env.STRIPE_WEBHOOK_SECRET,
+    );
+  } catch (error) {
+    console.error('Stripe webhook signature verification failed:', error.message);
+    return response.status(400).json({ message: 'Invalid Stripe webhook signature.' });
+  }
+
+  const session = event.data.object;
+  if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
+    if (session.payment_status === 'paid' || event.type.endsWith('succeeded')) {
+      await LiveRequest.findOneAndUpdate(
+        { externalId: session.metadata?.liveRequestId, stripeCheckoutSessionId: session.id },
+        {
+          paymentStatus: 'paid',
+          stripePaymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : '',
+          requestStatus: 'pending_admin',
+          aiSummary: 'Payment received. Direct audience request awaiting Khalil review.',
+        },
+      );
+    }
+  } else if (event.type === 'checkout.session.expired') {
+    await LiveRequest.findOneAndUpdate(
+      { externalId: session.metadata?.liveRequestId, stripeCheckoutSessionId: session.id },
+      { paymentStatus: 'failed', aiSummary: 'Payment session expired before completion.' },
+    );
+  }
+
+  return response.json({ received: true });
+});
 app.use(express.json());
 
 app.get('/api/health', async (_request, response) => {
@@ -1128,26 +1228,6 @@ app.get('/api/youtube/search', async (request, response) => {
   }
 });
 
-app.post('/api/youtube/to-wav', requireAdmin, async (request, response) => {
-  const sourceUrl = typeof request.body?.url === 'string' ? request.body.url.trim() : '';
-
-  if (!sourceUrl) {
-    return response.status(400).json({ message: 'A YouTube URL is required.' });
-  }
-
-  try {
-    const result = await convertYoutubeToWav(sourceUrl);
-    response.type('audio/wav');
-    response.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
-    return response.send(result.buffer);
-  } catch (error) {
-    console.error('YouTube WAV conversion failed:', error);
-    return response.status(502).json({
-      message: 'YouTube conversion failed. Confirm yt-dlp and FFmpeg are installed on the server and that you have permission to use the audio.',
-    });
-  }
-});
-
 app.post('/api/live-requests/:id/to-wav', requireAdmin, async (request, response) => {
   const liveRequest = await LiveRequest.findOne({ externalId: request.params.id });
 
@@ -1214,7 +1294,7 @@ app.post('/api/live-requests/analyze', async (request, response) => {
   });
 });
 
-app.post('/api/live-requests', async (request, response) => {
+async function createLiveRequestCheckout(request, response) {
   const parsed = liveRequestCreateSchema.safeParse(request.body);
 
   if (!parsed.success) {
@@ -1224,61 +1304,66 @@ app.post('/api/live-requests', async (request, response) => {
     });
   }
 
-  const liveSessions = await getOrderedLiveSessions();
-  const analysis = await analyzeLiveRequest(parsed.data.message, liveSessions, {
-    requesterName: parsed.data.requesterName,
-    ...parsed.data.metadata,
-  });
+  if (!stripe) {
+    return response.status(503).json({ message: 'Song request payments are not configured.' });
+  }
 
-  const requestStatus = analysis.duplicateSession ? 'duplicate' : 'pending_admin';
+  if (!Number.isInteger(liveRequestPriceCents) || liveRequestPriceCents < 50) {
+    return response.status(503).json({ message: 'The song request price is not configured correctly.' });
+  }
+
+  const metadata = parsed.data.metadata || buildDirectRequestMetadata(parsed.data.message);
+  const externalId = `live-request-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const liveRequest = await LiveRequest.create({
-    externalId: `live-request-${Date.now()}`,
+    externalId,
     requesterName: parsed.data.requesterName,
     message: parsed.data.message,
-    track: analysis.metadata.track,
-    artist: analysis.metadata.artist,
-    duration: analysis.metadata.duration,
-    genre: analysis.metadata.genre,
-    genres: analysis.metadata.genres,
-    subgenres: analysis.metadata.subgenres,
-    language: analysis.metadata.language,
-    mood: analysis.metadata.mood,
-    musicMoods: analysis.metadata.musicMoods,
-    instruments: analysis.metadata.instruments,
-    bpm: analysis.metadata.bpm,
-    musicalKey: analysis.metadata.musicalKey,
-    vocals: analysis.metadata.vocals,
-    energy: analysis.metadata.energy,
-    beat: analysis.metadata.beat,
-    lyricsSummary: analysis.metadata.lyricsSummary,
-    lyricsMoods: analysis.metadata.lyricsMoods,
-    lyricsEnergy: analysis.metadata.lyricsEnergy,
-    themes: analysis.metadata.themes,
-    lyricsLanguage: analysis.metadata.lyricsLanguage,
-    explicit: analysis.metadata.explicit,
-    sourcePlatform: analysis.metadata.sourcePlatform,
-    sourceUrl: analysis.metadata.sourceUrl,
-    thumbnailUrl: analysis.metadata.thumbnailUrl,
-    analysisSources: analysis.metadata.analysisSources,
-    requestStatus,
-    duplicateSessionExternalId: analysis.duplicateSession?.externalId || '',
-    suggestedInsertAfterId: analysis.insertion.insertAfterId,
-    suggestedInsertBeforeId: analysis.insertion.insertBeforeId,
-    suggestedInsertLabel: analysis.insertion.label,
-    aiSummary: analysis.summary,
+    ...metadata,
+    requestStatus: 'pending_admin',
+    paymentStatus: 'unpaid',
+    aiSummary: 'Payment pending before Khalil review.',
   });
 
-  return response.status(201).json({
-    item: serializeLiveRequest(liveRequest),
-    message:
-      requestStatus === 'duplicate'
-        ? 'This track already exists in the live session list, so the request was flagged as a duplicate.'
-        : 'Request transmitted to Khalil for review.',
-  });
-});
+  try {
+    const checkoutSession = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      line_items: [
+        {
+          price_data: {
+            currency: liveRequestCurrency,
+            product_data: {
+              name: 'Khalil live song request',
+              description: metadata.track || 'Audience song request',
+            },
+            unit_amount: liveRequestPriceCents,
+          },
+          quantity: 1,
+        },
+      ],
+      metadata: { liveRequestId: externalId },
+      success_url: `${getFrontendUrl()}/?stripe=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${getFrontendUrl()}/?stripe=cancelled`,
+    });
+
+    liveRequest.stripeCheckoutSessionId = checkoutSession.id;
+    await liveRequest.save();
+
+    return response.status(201).json({
+      checkoutUrl: checkoutSession.url,
+      message: 'Redirecting you to secure payment.',
+    });
+  } catch (error) {
+    await LiveRequest.deleteOne({ _id: liveRequest._id });
+    console.error('Stripe Checkout session creation failed:', error);
+    return response.status(502).json({ message: 'Secure payment could not be started.' });
+  }
+}
+
+app.post('/api/live-requests/checkout', createLiveRequestCheckout);
+app.post('/api/live-requests', createLiveRequestCheckout);
 
 app.get('/api/live-requests/admin', requireAdmin, async (_request, response) => {
-  const requests = await LiveRequest.find().sort({ createdAt: -1 });
+  const requests = await LiveRequest.find({ paymentStatus: 'paid' }).sort({ createdAt: -1 });
 
   return response.json({
     items: requests.map(serializeLiveRequest),

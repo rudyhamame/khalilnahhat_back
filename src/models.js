@@ -219,6 +219,8 @@ const liveStreamConfigSchema = new mongoose.Schema(
     muxPlaybackId: { type: String, default: '', trim: true },
     muxStreamKey: { type: String, default: '', trim: true },
     muxRtmpUrl: { type: String, default: '', trim: true },
+    broadcastMode: { type: String, enum: ['youtube', 'mux', 'webrtc'], default: 'youtube', trim: true },
+    webrtcRoomName: { type: String, default: '', trim: true },
   },
   { timestamps: true },
 );

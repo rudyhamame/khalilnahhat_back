@@ -6,6 +6,7 @@ const cors = require('cors');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const Stripe = require('stripe');
+const { AccessToken, RoomServiceClient } = require('livekit-server-sdk');
 const { z } = require('zod');
 const { connectToDatabase, MONGODB_DB_NAME } = require('./db');
 const { ADMIN_USERNAME, defaultLiveStreamConfig } = require('./default-data');
@@ -637,6 +638,7 @@ function serializeLiveStreamConfig(config) {
     posterImage: config?.posterImage || '',
     statusLabel: config?.statusLabel || defaultLiveStreamConfig.statusLabel,
     activeSessionId: config?.activeSessionId || '',
+    broadcastMode: config?.broadcastMode || defaultLiveStreamConfig.broadcastMode,
   };
 }
 
@@ -652,7 +654,36 @@ function serializeAdminLiveStreamConfig(config) {
     muxStreamKey: config?.muxStreamKey || '',
     muxRtmpUrl: config?.muxRtmpUrl || defaultLiveStreamConfig.muxRtmpUrl,
     muxPlaybackUrl: buildMuxPlaybackUrl(config?.muxPlaybackId || ''),
+    webrtcRoomName: config?.webrtcRoomName || '',
   };
+}
+
+function getLiveKitConfig() {
+  const apiKey = process.env.LIVEKIT_API_KEY;
+  const apiSecret = process.env.LIVEKIT_API_SECRET;
+  const wsUrl = process.env.LIVEKIT_URL;
+
+  if (!apiKey || !apiSecret || !wsUrl) {
+    const error = new Error('LiveKit credentials are not configured on the server.');
+    error.status = 503;
+    throw error;
+  }
+
+  return { apiKey, apiSecret, wsUrl };
+}
+
+async function createLiveKitToken({ roomName, identity, name, canPublish }) {
+  const { apiKey, apiSecret } = getLiveKitConfig();
+  const accessToken = new AccessToken(apiKey, apiSecret, { identity, name });
+  accessToken.addGrant({
+    room: roomName,
+    roomJoin: true,
+    canPublish,
+    canSubscribe: true,
+    canPublishData: canPublish,
+  });
+
+  return accessToken.toJwt();
 }
 
 function parseCorsOrigins(value) {
@@ -1371,7 +1402,7 @@ app.patch('/api/live-stream', requireAdmin, async (request, response) => {
 
   const config = await LiveStreamConfig.findOneAndUpdate(
     { key: defaultLiveStreamConfig.key },
-    parsed.data,
+    { ...parsed.data, broadcastMode: 'youtube', webrtcRoomName: '' },
     { upsert: true, new: true, setDefaultsOnInsert: true },
   );
 
@@ -1786,6 +1817,104 @@ app.post('/api/live-stream/mux', requireAdmin, async (request, response) => {
     console.error('MUX live stream creation failed:', error.payload || error);
     return response.status(error.status || 500).json({
       message: error.message || 'Failed to create Mux live stream.',
+    });
+  }
+});
+
+app.post('/api/live-stream/webrtc/go-live', requireAdmin, async (request, response) => {
+  try {
+    const currentConfig = await getLiveStreamConfig();
+    const roomName = `khalil-live-${crypto.randomUUID()}`;
+    const title = request.body?.title?.trim() || currentConfig.title || defaultLiveStreamConfig.title;
+
+    const updatedConfig = await LiveStreamConfig.findOneAndUpdate(
+      { key: defaultLiveStreamConfig.key },
+      {
+        isLive: true,
+        title,
+        streamUrl: '',
+        statusLabel: 'Live now — broadcasting straight from the browser.',
+        broadcastMode: 'webrtc',
+        webrtcRoomName: roomName,
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
+
+    const token = await createLiveKitToken({
+      roomName,
+      identity: 'khalil-broadcaster',
+      name: 'Khalil Nahhat',
+      canPublish: true,
+    });
+
+    return response.status(201).json({
+      item: serializeAdminLiveStreamConfig(updatedConfig),
+      token,
+      url: getLiveKitConfig().wsUrl,
+      roomName,
+    });
+  } catch (error) {
+    console.error('WebRTC go-live failed:', error);
+    return response.status(error.status || 500).json({
+      message: error.message || 'Failed to start the browser broadcast.',
+    });
+  }
+});
+
+app.post('/api/live-stream/webrtc/end', requireAdmin, async (_request, response) => {
+  const currentConfig = await getLiveStreamConfig();
+
+  const updatedConfig = await LiveStreamConfig.findOneAndUpdate(
+    { key: defaultLiveStreamConfig.key },
+    {
+      isLive: false,
+      statusLabel: defaultLiveStreamConfig.statusLabel,
+      webrtcRoomName: '',
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  );
+
+  if (currentConfig.webrtcRoomName) {
+    try {
+      const { apiKey, apiSecret, wsUrl } = getLiveKitConfig();
+      const roomService = new RoomServiceClient(wsUrl, apiKey, apiSecret);
+      await roomService.deleteRoom(currentConfig.webrtcRoomName);
+    } catch (error) {
+      console.error('Failed to close LiveKit room:', error.message);
+    }
+  }
+
+  return response.json({
+    item: serializeAdminLiveStreamConfig(updatedConfig),
+  });
+});
+
+app.post('/api/live-stream/webrtc/viewer-token', async (_request, response) => {
+  try {
+    const currentConfig = await getLiveStreamConfig();
+
+    if (!currentConfig.isLive || currentConfig.broadcastMode !== 'webrtc' || !currentConfig.webrtcRoomName) {
+      return response.status(409).json({
+        message: 'The browser broadcast is not live right now.',
+      });
+    }
+
+    const token = await createLiveKitToken({
+      roomName: currentConfig.webrtcRoomName,
+      identity: `viewer-${crypto.randomUUID()}`,
+      name: 'Viewer',
+      canPublish: false,
+    });
+
+    return response.json({
+      token,
+      url: getLiveKitConfig().wsUrl,
+      roomName: currentConfig.webrtcRoomName,
+    });
+  } catch (error) {
+    console.error('WebRTC viewer token failed:', error);
+    return response.status(error.status || 500).json({
+      message: error.message || 'Unable to issue a viewer token.',
     });
   }
 });

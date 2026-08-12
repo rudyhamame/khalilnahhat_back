@@ -16,6 +16,8 @@ const defaultLiveStreamConfig = {
   muxPlaybackId: '',
   muxStreamKey: '',
   muxRtmpUrl: 'rtmps://global-live.mux.com:443/app',
+  broadcastMode: 'youtube',
+  webrtcRoomName: '',
 };
 
 module.exports = {

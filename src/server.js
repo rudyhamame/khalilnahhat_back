@@ -2030,7 +2030,7 @@ app.use((_request, response) => {
 async function startServer(port = PORT) {
   await connectToDatabase();
 
-  return app.listen(port, () => {
+  return app.listen(port, '127.0.0.1', () => {
     console.log(`Khalil app API listening on http://localhost:${port}`);
   });
 }

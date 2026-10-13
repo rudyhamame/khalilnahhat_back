@@ -26,6 +26,7 @@ const {
   buildReorderedQueue,
 } = require('./live-request-agent');
 const { registerEquipmentRoutes } = require('./equipment');
+const { DAY_MS, quoteTotals, registerQuoteLifecycle } = require('./quote-lifecycle');
 const { createSessionToken, hashPassword, verifyPassword } = require('./security');
 const { convertYoutubeToWav } = require('./youtube-audio');
 const {
@@ -361,6 +362,9 @@ const serviceRequestQuoteSchema = z.object({
     unitPrice: z.coerce.number().min(0),
   })).min(1),
   adminNote: z.string().trim().optional().default(''),
+  validDays: z.coerce.number().int().min(1).max(60).optional(),
+  taxPercent: z.coerce.number().min(0).max(30).optional(),
+  depositAmount: z.coerce.number().min(0).optional(),
 });
 
 const anamPersonaConfig = {
@@ -440,6 +444,10 @@ function serializeServiceRequest(serviceRequest, includeQuote = true) {
       : null,
     createdAt: serviceRequest.createdAt,
     quotedAt: serviceRequest.quotedAt,
+    ...(isQuoted || includeQuote || serviceRequest.status === 'accepted' ? quoteTotals(serviceRequest) : {}),
+    expiresAt: serviceRequest.expiresAt,
+    validDays: serviceRequest.validDays,
+    changeRequest: serviceRequest.changeRequest || '',
   };
 }
 
@@ -1162,6 +1170,11 @@ app.patch('/api/service-requests/:id/quote', requireAdmin, async (request, respo
   serviceRequest.adminNote = parsed.data.adminNote;
   serviceRequest.status = 'quoted';
   serviceRequest.quotedAt = new Date();
+  if (parsed.data.validDays) serviceRequest.validDays = parsed.data.validDays;
+  if (parsed.data.taxPercent !== undefined) serviceRequest.taxPercent = parsed.data.taxPercent;
+  if (parsed.data.depositAmount !== undefined) serviceRequest.depositAmount = parsed.data.depositAmount;
+  serviceRequest.expiresAt = new Date(Date.now() + serviceRequest.validDays * DAY_MS);
+  serviceRequest.reminderSentAt = null;
   await serviceRequest.save();
 
   let notificationSent = false;
@@ -2046,6 +2059,7 @@ app.use((error, _request, response, _next) => {
 });
 
 registerEquipmentRoutes(app, requireAdmin);
+registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize: serializeServiceRequest });
 
 app.use((_request, response) => {
   response.status(404).json({

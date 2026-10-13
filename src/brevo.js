@@ -216,7 +216,22 @@ async function sendLiveRequestReceipt({ email, requesterName, groupId, confirmat
   });
 }
 
+async function sendQuoteExpiryReminder(serviceRequest, expiresAt) {
+  const when = new Intl.DateTimeFormat('en-CA', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Toronto' }).format(expiresAt);
+
+  return sendBrevoEmail({
+    to: [{ email: serviceRequest.customerEmail, name: serviceRequest.customerName }],
+    subject: `Your Echo Event Entertainment quote expires soon (${serviceRequest.requestNumber || serviceRequest.externalId})`,
+    tags: ['quote-expiry-reminder'],
+    htmlContent: `<p>Hello ${escapeHtml(serviceRequest.customerName)},</p>
+      <p>Your quotation <strong>${escapeHtml(serviceRequest.requestNumber || serviceRequest.externalId)}</strong> expires on <strong>${escapeHtml(when)}</strong> (Toronto time). Log in to review and accept it before then.</p>
+      <p>A quotation does not guarantee a booking. Your date is confirmed only after you accept the quote and pay the deposit.</p>
+      <p>Echo Event Entertainment</p>`,
+  });
+}
+
 module.exports = {
+  sendQuoteExpiryReminder,
   sendLiveRequestReceipt,
   sendServiceQuoteNotification,
   sendServiceRequestNotification,

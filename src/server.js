@@ -26,6 +26,7 @@ const {
   buildReorderedQueue,
 } = require('./live-request-agent');
 const { registerEquipmentRoutes } = require('./equipment');
+const { handleDepositWebhook, registerDeposits } = require('./deposits');
 const { DAY_MS, quoteTotals, registerQuoteLifecycle } = require('./quote-lifecycle');
 const { createSessionToken, hashPassword, verifyPassword } = require('./security');
 const { convertYoutubeToWav } = require('./youtube-audio');
@@ -411,7 +412,7 @@ function serializeUser(user) {
 }
 
 function serializeServiceRequest(serviceRequest, includeQuote = true) {
-  const isQuoted = ['quoted', 'accepted', 'expired'].includes(serviceRequest.status);
+  const isQuoted = ['quoted', 'accepted', 'expired', 'confirmed'].includes(serviceRequest.status);
   const items = serviceRequest.items.map((item) => {
     const serializedItem = {
       serviceId: item.serviceId,
@@ -448,6 +449,8 @@ function serializeServiceRequest(serviceRequest, includeQuote = true) {
     expiresAt: serviceRequest.expiresAt,
     validDays: serviceRequest.validDays,
     changeRequest: serviceRequest.changeRequest || '',
+    depositPaidCents: (serviceRequest.payments || []).reduce((sum, p) => sum + (p.amountCents || 0), 0),
+    paymentIssue: includeQuote ? serviceRequest.paymentIssue || '' : '',
   };
 }
 
@@ -870,6 +873,11 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
   } catch (error) {
     console.error('Stripe webhook signature verification failed:', error.message);
     return response.status(400).json({ message: 'Invalid Stripe webhook signature.' });
+  }
+
+  if (event.data.object.metadata?.kind === 'event-deposit') {
+    await handleDepositWebhook(event);
+    return response.json({ received: true });
   }
 
   const session = event.data.object;
@@ -2059,6 +2067,7 @@ app.use((error, _request, response, _next) => {
 });
 
 registerEquipmentRoutes(app, requireAdmin);
+registerDeposits(app, { requireAuth, requireAdmin, serialize: serializeServiceRequest, stripe, getFrontendUrl });
 registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize: serializeServiceRequest });
 
 app.use((_request, response) => {

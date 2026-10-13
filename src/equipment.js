@@ -14,6 +14,7 @@ const equipmentSchema = new mongoose.Schema(
     priceCents: { type: Number, default: 0, min: 0 }, // internal only, never in public output
     minQuantity: { type: Number, default: 1, min: 1 },
     quantityOwned: { type: Number, default: 1, min: 0 },
+    stockTracked: { type: Boolean, default: false }, // enforce quantityOwned in availability checks once real stock is entered
     isActive: { type: Boolean, default: true },
     sortOrder: { type: Number, default: 0 },
   },
@@ -57,14 +58,14 @@ const publicView = (e) => ({
   description: e.description, imageUrl: e.imageUrl, minQuantity: e.minQuantity,
 });
 const adminView = (e) => ({
-  ...publicView(e), priceCents: e.priceCents, quantityOwned: e.quantityOwned, isActive: e.isActive, sortOrder: e.sortOrder,
+  ...publicView(e), priceCents: e.priceCents, quantityOwned: e.quantityOwned, stockTracked: e.stockTracked, isActive: e.isActive, sortOrder: e.sortOrder,
 });
 
 const fields = {
   category: z.string().trim().min(1), name: z.string().trim().min(1),
   brandModel: z.string().trim(), description: z.string().trim(), imageUrl: z.string().trim(),
   priceCents: z.number().int().min(0), minQuantity: z.number().int().min(1),
-  quantityOwned: z.number().int().min(0), isActive: z.boolean(), sortOrder: z.number().int(),
+  quantityOwned: z.number().int().min(0), stockTracked: z.boolean(), isActive: z.boolean(), sortOrder: z.number().int(),
 };
 const createSchema = z.object({ slug: z.string().trim().regex(/^[a-z0-9-]+$/), ...fields }).partial().required({ slug: true, category: true, name: true });
 const updateSchema = z.object(fields).partial();

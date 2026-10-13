@@ -230,7 +230,19 @@ async function sendQuoteExpiryReminder(serviceRequest, expiresAt) {
   });
 }
 
+async function sendBookingConfirmation(sr, paidCents) {
+  const khalilEmail = process.env.SERVICE_REQUEST_NOTIFICATION_EMAIL?.trim() || DEFAULT_NOTIFICATION_EMAIL;
+  const ref = escapeHtml(sr.requestNumber || sr.externalId);
+  const body = (who) => `<p>${who}</p>
+    <p>Booking <strong>${ref}</strong> is <strong>confirmed</strong> for <strong>${escapeHtml(sr.event.eventDate)}</strong> at ${escapeHtml(sr.event.venueName || sr.event.city || 'your venue')}.</p>
+    <p>Deposit received: ${formatCad(paidCents / 100)}. Remaining balance is shown in your dashboard.</p>
+    <p>Echo Event Entertainment</p>`;
+  await sendBrevoEmail({ to: [{ email: sr.customerEmail, name: sr.customerName }], subject: `Booking confirmed ${ref}`, tags: ['booking-confirmation'], htmlContent: body(`Hello ${escapeHtml(sr.customerName)},`) });
+  await sendBrevoEmail({ to: [{ email: khalilEmail }], subject: `New confirmed booking ${ref}`, tags: ['booking-admin'], htmlContent: body(`${escapeHtml(sr.customerName)} paid the deposit.`) });
+}
+
 module.exports = {
+  sendBookingConfirmation,
   sendQuoteExpiryReminder,
   sendLiveRequestReceipt,
   sendServiceQuoteNotification,

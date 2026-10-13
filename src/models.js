@@ -246,7 +246,7 @@ const serviceRequestSchema = new mongoose.Schema(
     items: { type: [serviceRequestItemSchema], required: true },
     status: {
       type: String,
-      enum: ['pending', 'quoted', 'accepted', 'changes_requested', 'expired', 'cancelled'],
+      enum: ['pending', 'quoted', 'accepted', 'changes_requested', 'expired', 'cancelled', 'confirmed'],
       default: 'pending',
       trim: true,
     },
@@ -258,6 +258,11 @@ const serviceRequestSchema = new mongoose.Schema(
     reminderSentAt: { type: Date, default: null },
     acceptedAt: { type: Date, default: null },
     changeRequest: { type: String, default: '' },
+    paymentIssue: { type: String, default: '' },
+    payments: {
+      type: [new mongoose.Schema({ kind: String, amountCents: Number, sessionId: String, paidAt: Date }, { _id: false })],
+      default: [],
+    },
     requestNumber: { type: String, default: '', trim: true },
     event: { type: mongoose.Schema.Types.Mixed, default: null },
     adminNote: { type: String, default: '', trim: true },

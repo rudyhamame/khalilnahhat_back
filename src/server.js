@@ -411,7 +411,7 @@ function serializeUser(user) {
 }
 
 function serializeServiceRequest(serviceRequest, includeQuote = true) {
-  const isQuoted = serviceRequest.status === 'quoted';
+  const isQuoted = ['quoted', 'accepted', 'expired'].includes(serviceRequest.status);
   const items = serviceRequest.items.map((item) => {
     const serializedItem = {
       serviceId: item.serviceId,
@@ -444,7 +444,7 @@ function serializeServiceRequest(serviceRequest, includeQuote = true) {
       : null,
     createdAt: serviceRequest.createdAt,
     quotedAt: serviceRequest.quotedAt,
-    ...(isQuoted || includeQuote || serviceRequest.status === 'accepted' ? quoteTotals(serviceRequest) : {}),
+    ...(isQuoted || includeQuote ? quoteTotals(serviceRequest) : {}),
     expiresAt: serviceRequest.expiresAt,
     validDays: serviceRequest.validDays,
     changeRequest: serviceRequest.changeRequest || '',

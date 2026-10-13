@@ -25,6 +25,7 @@ const {
   analyzeLiveRequest,
   buildReorderedQueue,
 } = require('./live-request-agent');
+const { registerEquipmentRoutes } = require('./equipment');
 const { createSessionToken, hashPassword, verifyPassword } = require('./security');
 const { convertYoutubeToWav } = require('./youtube-audio');
 const {
@@ -2020,6 +2021,8 @@ app.use((error, _request, response, _next) => {
     message: error.status === 403 ? error.message : 'Unexpected server error.',
   });
 });
+
+registerEquipmentRoutes(app, requireAdmin);
 
 app.use((_request, response) => {
   response.status(404).json({

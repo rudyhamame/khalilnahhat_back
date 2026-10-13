@@ -334,6 +334,25 @@ const serviceRequestCreateSchema = z.object({
     category: z.string().trim().min(1),
     quantity: z.coerce.number().int().min(1),
   })).min(1, 'Select at least one service.'),
+  event: z.object({
+    eventType: z.string().trim().min(1).max(40),
+    eventDate: z.string().trim().min(1).max(20),
+    startTime: z.string().trim().max(10).default(''),
+    endTime: z.string().trim().max(10).default(''),
+    phone: z.string().trim().min(5).max(30),
+    contactMethod: z.string().trim().max(20).default('email'),
+    company: z.string().trim().max(120).default(''),
+    venueName: z.string().trim().max(160).default(''),
+    venueAddress: z.string().trim().max(240).default(''),
+    city: z.string().trim().max(80).default(''),
+    postalCode: z.string().trim().max(12).default(''),
+    inGta: z.boolean().default(true),
+    indoor: z.boolean().default(true),
+    guests: z.coerce.number().int().min(0).max(100000).default(0),
+    services: z.array(z.string().trim().max(40)).max(12).default([]),
+    musicStyle: z.string().trim().max(40).default(''),
+    notes: z.string().trim().max(3000).default(''),
+  }).optional(),
 });
 
 const serviceRequestQuoteSchema = z.object({
@@ -406,6 +425,8 @@ function serializeServiceRequest(serviceRequest, includeQuote = true) {
   });
 
   return {
+    requestNumber: serviceRequest.requestNumber || '',
+    event: serviceRequest.event || null,
     id: serviceRequest.externalId || serviceRequest.id,
     customerName: serviceRequest.customerName,
     customerUsername: serviceRequest.customerUsername,
@@ -1072,6 +1093,8 @@ app.post('/api/service-requests', requireAuth, async (request, response) => {
     customerUsername: user.username,
     customerEmail: user.email,
     items: parsed.data.items,
+    event: parsed.data.event || null,
+    requestNumber: `ECHO-${Date.now().toString(36).toUpperCase()}`,
     status: 'pending',
   });
 

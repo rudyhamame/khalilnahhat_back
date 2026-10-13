@@ -251,6 +251,8 @@ const serviceRequestSchema = new mongoose.Schema(
       trim: true,
     },
     currency: { type: String, default: 'CAD', trim: true },
+    requestNumber: { type: String, default: '', trim: true },
+    event: { type: mongoose.Schema.Types.Mixed, default: null },
     adminNote: { type: String, default: '', trim: true },
     quotedAt: { type: Date, default: null },
   },

@@ -241,7 +241,13 @@ async function sendBookingConfirmation(sr, paidCents) {
   await sendBrevoEmail({ to: [{ email: khalilEmail }], subject: `New confirmed booking ${ref}`, tags: ['booking-admin'], htmlContent: body(`${escapeHtml(sr.customerName)} paid the deposit.`) });
 }
 
+// Generic transactional email: html must already be escaped by the caller.
+function sendSimpleEmail({ to, name = '', subject, html, tags = [] }) {
+  return sendBrevoEmail({ to: [{ email: to, name }], subject, tags, htmlContent: html });
+}
+
 module.exports = {
+  sendSimpleEmail,
   sendBookingConfirmation,
   sendQuoteExpiryReminder,
   sendLiveRequestReceipt,

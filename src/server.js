@@ -27,6 +27,10 @@ const {
 } = require('./live-request-agent');
 const { registerEquipmentRoutes } = require('./equipment');
 const { handleDepositWebhook, registerDeposits } = require('./deposits');
+const { registerPlanning } = require('./planning');
+const { registerMeetings } = require('./meetings');
+const { registerAccount, sendVerification } = require('./account');
+const { registerContent } = require('./content');
 const { DAY_MS, quoteTotals, registerQuoteLifecycle } = require('./quote-lifecycle');
 const { createSessionToken, hashPassword, verifyPassword } = require('./security');
 const { convertYoutubeToWav } = require('./youtube-audio');
@@ -407,6 +411,7 @@ function serializeUser(user) {
     lastName: user.lastName,
     email: user.email,
     phoneNumber: user.phoneNumber,
+    emailVerified: Boolean(user.emailVerified),
     isAdmin: isAdminUser(user),
   };
 }
@@ -450,6 +455,8 @@ function serializeServiceRequest(serviceRequest, includeQuote = true) {
     validDays: serviceRequest.validDays,
     changeRequest: serviceRequest.changeRequest || '',
     depositPaidCents: (serviceRequest.payments || []).reduce((sum, p) => sum + (p.amountCents || 0), 0),
+    payments: (serviceRequest.payments || []).map((p) => ({ kind: p.kind, amountCents: p.amountCents, sessionId: p.sessionId, paidAt: p.paidAt })),
+    planning: serviceRequest.planning || null,
     paymentIssue: includeQuote ? serviceRequest.paymentIssue || '' : '',
   };
 }
@@ -875,7 +882,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
     return response.status(400).json({ message: 'Invalid Stripe webhook signature.' });
   }
 
-  if (event.data.object.metadata?.kind === 'event-deposit') {
+  if (['event-deposit', 'event-balance'].includes(event.data.object.metadata?.kind)) {
     await handleDepositWebhook(event);
     return response.json({ received: true });
   }
@@ -1071,6 +1078,8 @@ app.post('/api/auth/signup', async (request, response) => {
     isAdmin: normalizedUsername === ADMIN_USERNAME,
     sessionToken: createSessionToken(),
   });
+
+  sendVerification(user, getFrontendUrl()).catch((error) => console.error('Verification email failed:', error));
 
   return response.status(201).json({
     token: user.sessionToken,
@@ -2067,6 +2076,10 @@ app.use((error, _request, response, _next) => {
 });
 
 registerEquipmentRoutes(app, requireAdmin);
+registerPlanning(app, { requireAuth, serialize: serializeServiceRequest });
+registerMeetings(app, { requireAuth, requireAdmin });
+registerAccount(app, { requireAuth, getFrontendUrl });
+registerContent(app, requireAdmin);
 registerDeposits(app, { requireAuth, requireAdmin, serialize: serializeServiceRequest, stripe, getFrontendUrl });
 registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize: serializeServiceRequest });
 

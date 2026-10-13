@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { ServiceRequest } = require('./models');
 const { Equipment } = require('./equipment');
 const { sendBookingConfirmation } = require('./brevo');
+const { quoteTotals } = require('./quote-lifecycle');
 
 const HOLD_MS = 30 * 60 * 1000; // Stripe Checkout's minimum session lifetime
 
@@ -71,15 +72,29 @@ async function confirmFromSession(session) {
       sr.paymentIssue = 'Deposit was paid after the date hold lapsed and the date is now taken. Refund required.';
     }
   }
-  sr.payments.push({ kind: 'deposit', amountCents: paidCents, sessionId: session.id, paidAt: new Date() });
+  sr.payments.push({ kind: 'deposit', amountCents: paidCents, sessionId: session.id, paymentIntentId: String(session.payment_intent || ''), paidAt: new Date() });
   if (booking) sr.status = 'confirmed';
   await sr.save();
   if (booking) sendBookingConfirmation(sr, paidCents).catch((e) => console.error('Booking confirmation email failed:', e));
 }
 
-// Called by the Stripe webhook for sessions tagged kind=event-deposit.
+const netPaidCents = (sr) => (sr.payments || []).reduce((s, p) => s + (p.amountCents || 0), 0);
+const balanceCents = (sr) => Math.max(0, toCents(quoteTotals(sr).total) - netPaidCents(sr));
+
+async function recordBalance(session) {
+  const sr = await ServiceRequest.findOne({ externalId: session.metadata?.serviceRequestId });
+  if (!sr || sr.payments.some((p) => p.sessionId === session.id)) return;
+  sr.payments.push({ kind: 'balance', amountCents: session.amount_total || 0, sessionId: session.id, paymentIntentId: String(session.payment_intent || ''), paidAt: new Date() });
+  await sr.save();
+}
+
+// Called by the Stripe webhook for sessions tagged kind=event-deposit or event-balance.
 async function handleDepositWebhook(event) {
   const session = event.data.object;
+  if (session.metadata?.kind === 'event-balance') {
+    if (event.type !== 'checkout.session.expired' && session.payment_status === 'paid') await recordBalance(session);
+    return;
+  }
   if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
     if (session.payment_status === 'paid') await confirmFromSession(session);
   } else if (event.type === 'checkout.session.expired') {
@@ -114,6 +129,56 @@ function registerDeposits(app, { requireAuth, requireAdmin, serialize, stripe, g
     });
     await EventBooking.updateOne({ _id: hold._id }, { stripeSessionId: session.id });
     return res.json({ url: session.url });
+  });
+
+  app.post('/api/service-requests/:id/pay-balance', requireAuth, async (req, res) => {
+    if (!stripe) return res.status(503).json({ message: 'Online payments are not configured yet.' });
+    const sr = await ServiceRequest.findOne({ externalId: req.params.id });
+    if (!sr || String(sr.userId) !== String(req.authUser._id)) return res.status(404).json({ message: 'Service request not found.' });
+    if (sr.status !== 'confirmed') return res.status(409).json({ message: 'Pay the deposit to confirm the booking first.' });
+    const remaining = balanceCents(sr);
+    if (remaining <= 0) return res.status(409).json({ message: 'Nothing left to pay.' });
+    const asked = req.body?.amount === undefined ? remaining : toCents(req.body.amount);
+    if (!Number.isFinite(asked) || asked < 100 || asked > remaining) return res.status(400).json({ message: 'Enter an amount between $1.00 and the remaining balance.' });
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      customer_email: sr.customerEmail,
+      line_items: [{ quantity: 1, price_data: { currency: 'cad', unit_amount: asked, product_data: { name: `Event payment ${sr.requestNumber || sr.externalId}` } } }],
+      metadata: { kind: 'event-balance', serviceRequestId: sr.externalId },
+      payment_intent_data: { metadata: { kind: 'event-balance', serviceRequestId: sr.externalId } },
+      success_url: `${getFrontendUrl()}/dashboard/services?payment=success`,
+      cancel_url: `${getFrontendUrl()}/dashboard/services?payment=cancelled`,
+    });
+    return res.json({ url: session.url });
+  });
+
+  app.post('/api/service-requests/:id/refund', requireAdmin, async (req, res) => {
+    if (!stripe) return res.status(503).json({ message: 'Online payments are not configured yet.' });
+    const sr = await ServiceRequest.findOne({ externalId: req.params.id });
+    const pay = sr?.payments.find((p) => p.sessionId === req.body?.sessionId && p.kind !== 'refund');
+    if (!pay?.paymentIntentId) return res.status(404).json({ message: 'Payment not found.' });
+    const refunded = sr.payments.filter((p) => p.kind === 'refund' && p.sessionId === pay.sessionId).reduce((s, p) => s - p.amountCents, 0);
+    const amount = req.body.amountCents === undefined ? pay.amountCents - refunded : Number(req.body.amountCents);
+    if (!Number.isInteger(amount) || amount < 1 || amount > pay.amountCents - refunded) return res.status(400).json({ message: 'Invalid refund amount.' });
+    await stripe.refunds.create({ payment_intent: pay.paymentIntentId, amount });
+    sr.payments.push({ kind: 'refund', amountCents: -amount, sessionId: pay.sessionId, paymentIntentId: pay.paymentIntentId, paidAt: new Date() });
+    await sr.save();
+    return res.json({ item: serialize(sr, true) });
+  });
+
+  // Printable receipt for one payment; owner or admin.
+  app.get('/api/service-requests/:id/receipt/:sessionId', requireAuth, async (req, res) => {
+    const sr = await ServiceRequest.findOne({ externalId: req.params.id });
+    const u = req.authUser;
+    if (!sr || (String(sr.userId) !== String(u._id) && !u.isAdmin)) return res.status(404).json({ message: 'Receipt not found.' });
+    const pay = sr.payments.find((p) => p.sessionId === req.params.sessionId);
+    if (!pay) return res.status(404).json({ message: 'Receipt not found.' });
+    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const money = (c) => new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(c / 100);
+    res.type('html').send(`<!doctype html><meta charset="utf-8"><title>Receipt ${esc(sr.requestNumber)}</title>
+      <body style="font-family:sans-serif;max-width:560px;margin:40px auto"><h1>Echo Event Entertainment</h1><h2>Receipt</h2>
+      <p>Booking: <strong>${esc(sr.requestNumber || sr.externalId)}</strong><br>Customer: ${esc(sr.customerName)}<br>Event date: ${esc(sr.event?.eventDate)}</p>
+      <p>${esc(pay.kind)} payment: <strong>${money(pay.amountCents)}</strong><br>Paid: ${esc(new Date(pay.paidAt).toLocaleString('en-CA', { timeZone: 'America/Toronto' }))}<br>Reference: ${esc(pay.sessionId)}</p></body>`);
   });
 
   app.get('/api/bookings/confirmed', requireAdmin, async (_req, res) => {

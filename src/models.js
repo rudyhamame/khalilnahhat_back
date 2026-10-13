@@ -10,6 +10,10 @@ const userSchema = new mongoose.Schema(
     phoneNumber: { type: String, required: true, trim: true },
     isAdmin: { type: Boolean, default: false },
     sessionToken: { type: String, default: '' },
+    emailVerified: { type: Boolean, default: false },
+    verifyTokenHash: { type: String, default: '' },
+    resetTokenHash: { type: String, default: '' },
+    resetExpires: { type: Date, default: null },
   },
   { timestamps: true },
 );
@@ -259,8 +263,9 @@ const serviceRequestSchema = new mongoose.Schema(
     acceptedAt: { type: Date, default: null },
     changeRequest: { type: String, default: '' },
     paymentIssue: { type: String, default: '' },
+    planning: { type: mongoose.Schema.Types.Mixed, default: null },
     payments: {
-      type: [new mongoose.Schema({ kind: String, amountCents: Number, sessionId: String, paidAt: Date }, { _id: false })],
+      type: [new mongoose.Schema({ kind: String, amountCents: Number, sessionId: String, paymentIntentId: String, paidAt: Date }, { _id: false })],
       default: [],
     },
     requestNumber: { type: String, default: '', trim: true },

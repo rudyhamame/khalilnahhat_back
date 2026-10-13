@@ -119,12 +119,10 @@ const liveRequestSchema = new mongoose.Schema(
     explicit: { type: String, default: '', trim: true },
     paymentStatus: {
       type: String,
-      enum: ['unpaid', 'paid', 'failed', 'refunded'],
+      enum: ['unpaid', 'paid', 'failed', 'refunded', 'none'],
       default: 'paid',
       trim: true,
     },
-    stripeCheckoutSessionId: { type: String, default: '', trim: true },
-    stripePaymentIntentId: { type: String, default: '', trim: true },
     receiptSentAt: { type: Date, default: null },
     analysisSources: [{ type: String, trim: true }],
     requestStatus: {
@@ -262,10 +260,10 @@ const serviceRequestSchema = new mongoose.Schema(
     reminderSentAt: { type: Date, default: null },
     acceptedAt: { type: Date, default: null },
     changeRequest: { type: String, default: '' },
-    paymentIssue: { type: String, default: '' },
+    paymentInstructions: { type: String, default: '' },
     planning: { type: mongoose.Schema.Types.Mixed, default: null },
     payments: {
-      type: [new mongoose.Schema({ kind: String, amountCents: Number, sessionId: String, paymentIntentId: String, paidAt: Date }, { _id: false })],
+      type: [new mongoose.Schema({ kind: String, amountCents: Number, method: String, reference: { type: String, default: '' }, paidAt: Date, voided: { type: Boolean, default: false } })],
       default: [],
     },
     requestNumber: { type: String, default: '', trim: true },

@@ -5,7 +5,6 @@ const crypto = require('crypto');
 const cors = require('cors');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
-const Stripe = require('stripe');
 const { AccessToken, RoomServiceClient } = require('livekit-server-sdk');
 const { z } = require('zod');
 const { connectToDatabase, MONGODB_DB_NAME } = require('./db');
@@ -26,7 +25,7 @@ const {
   buildReorderedQueue,
 } = require('./live-request-agent');
 const { registerEquipmentRoutes } = require('./equipment');
-const { handleDepositWebhook, registerDeposits } = require('./deposits');
+const { registerPayments } = require('./payments');
 const { registerPlanning } = require('./planning');
 const { registerMeetings } = require('./meetings');
 const { registerAccount, sendVerification } = require('./account');
@@ -37,15 +36,13 @@ const { convertYoutubeToWav } = require('./youtube-audio');
 const {
   sendServiceQuoteNotification,
   sendServiceRequestNotification,
-  sendLiveRequestReceipt,
 } = require('./brevo');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 const upload = multer({ storage: multer.memoryStorage() });
-const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
-const liveRequestPriceCents = Number.parseInt(process.env.STRIPE_LIVE_REQUEST_PRICE_CENTS || '500', 10);
-const liveRequestCurrency = (process.env.STRIPE_LIVE_REQUEST_CURRENCY || 'cad').toLowerCase();
+const liveRequestPriceCents = 0;
+const liveRequestCurrency = 'cad';
 
 const DEFAULT_SERVICE_PRICES = [
   ['professional-dj-service', 'Professional DJ Service', 'DJ'],
@@ -370,6 +367,7 @@ const serviceRequestQuoteSchema = z.object({
   validDays: z.coerce.number().int().min(1).max(60).optional(),
   taxPercent: z.coerce.number().min(0).max(30).optional(),
   depositAmount: z.coerce.number().min(0).optional(),
+  paymentInstructions: z.string().trim().max(1000).optional(),
 });
 
 const anamPersonaConfig = {
@@ -454,10 +452,10 @@ function serializeServiceRequest(serviceRequest, includeQuote = true) {
     expiresAt: serviceRequest.expiresAt,
     validDays: serviceRequest.validDays,
     changeRequest: serviceRequest.changeRequest || '',
-    depositPaidCents: (serviceRequest.payments || []).reduce((sum, p) => sum + (p.amountCents || 0), 0),
-    payments: (serviceRequest.payments || []).map((p) => ({ kind: p.kind, amountCents: p.amountCents, sessionId: p.sessionId, paidAt: p.paidAt })),
+    depositPaidCents: (serviceRequest.payments || []).filter((p) => !p.voided).reduce((sum, p) => sum + (p.amountCents || 0), 0),
+    paymentInstructions: serviceRequest.paymentInstructions || '',
+    payments: (serviceRequest.payments || []).map((p) => ({ id: String(p._id), kind: p.kind, amountCents: p.amountCents, method: p.method, reference: p.reference, paidAt: p.paidAt, voided: Boolean(p.voided) })),
     planning: serviceRequest.planning || null,
-    paymentIssue: includeQuote ? serviceRequest.paymentIssue || '' : '',
   };
 }
 
@@ -612,7 +610,6 @@ function serializeLiveRequest(request) {
     audioUrl: request.audioUrl || '',
     audioOriginalName: request.audioOriginalName || '',
     paymentStatus: request.paymentStatus || 'paid',
-    stripeCheckoutSessionId: request.stripeCheckoutSessionId || '',
     receiptSentAt: request.receiptSentAt || null,
     analysisSources: Array.isArray(request.analysisSources) ? request.analysisSources : [],
     requestStatus: request.requestStatus || 'pending_admin',
@@ -865,81 +862,6 @@ app.use(
   }),
 );
 
-app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (request, response) => {
-  if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET) {
-    return response.status(503).json({ message: 'Stripe webhook is not configured.' });
-  }
-
-  let event;
-  try {
-    event = stripe.webhooks.constructEvent(
-      request.body,
-      request.headers['stripe-signature'],
-      process.env.STRIPE_WEBHOOK_SECRET,
-    );
-  } catch (error) {
-    console.error('Stripe webhook signature verification failed:', error.message);
-    return response.status(400).json({ message: 'Invalid Stripe webhook signature.' });
-  }
-
-  if (['event-deposit', 'event-balance'].includes(event.data.object.metadata?.kind)) {
-    await handleDepositWebhook(event);
-    return response.json({ received: true });
-  }
-
-  const session = event.data.object;
-  if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
-    if (session.payment_status === 'paid' || event.type.endsWith('succeeded')) {
-      await LiveRequest.findOneAndUpdate(
-        { requestGroupId: session.metadata?.requestGroupId },
-        {
-          paymentStatus: 'paid',
-          stripeCheckoutSessionId: session.id,
-          stripePaymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : '',
-          requestStatus: 'pending_admin',
-          aiSummary: 'Payment received. Direct audience request awaiting Khalil review.',
-        },
-      );
-
-      const receiptCandidate = await LiveRequest.findOne({
-        requestGroupId: session.metadata?.requestGroupId,
-        paymentStatus: 'paid',
-        receiptSentAt: null,
-      });
-      if (receiptCandidate) {
-        const groupRequests = await LiveRequest.find({
-          requestGroupId: receiptCandidate.requestGroupId,
-          paymentStatus: 'paid',
-        }).sort({ createdAt: 1 });
-        try {
-          const receipt = await sendLiveRequestReceipt({
-            email: receiptCandidate.requesterEmail,
-            requesterName: receiptCandidate.requesterName,
-            groupId: receiptCandidate.requestGroupId,
-            confirmationRequests: groupRequests,
-            amountTotal: session.amount_total,
-            currency: session.currency,
-          });
-          if (receipt.sent) {
-            await LiveRequest.updateMany(
-              { requestGroupId: receiptCandidate.requestGroupId, paymentStatus: 'paid' },
-              { receiptSentAt: new Date() },
-            );
-          }
-        } catch (error) {
-          console.error('Failed to send live request receipt:', error);
-        }
-      }
-    }
-  } else if (event.type === 'checkout.session.expired') {
-    await LiveRequest.findOneAndUpdate(
-      { externalId: session.metadata?.liveRequestId, stripeCheckoutSessionId: session.id },
-      { paymentStatus: 'failed', aiSummary: 'Payment session expired before completion.' },
-    );
-  }
-
-  return response.json({ received: true });
-});
 app.use(express.json());
 
 app.get('/api/health', async (_request, response) => {
@@ -1190,6 +1112,7 @@ app.patch('/api/service-requests/:id/quote', requireAdmin, async (request, respo
   if (parsed.data.validDays) serviceRequest.validDays = parsed.data.validDays;
   if (parsed.data.taxPercent !== undefined) serviceRequest.taxPercent = parsed.data.taxPercent;
   if (parsed.data.depositAmount !== undefined) serviceRequest.depositAmount = parsed.data.depositAmount;
+  if (parsed.data.paymentInstructions !== undefined) serviceRequest.paymentInstructions = parsed.data.paymentInstructions;
   serviceRequest.expiresAt = new Date(Date.now() + serviceRequest.validDays * DAY_MS);
   serviceRequest.reminderSentAt = null;
   await serviceRequest.save();
@@ -1246,56 +1169,6 @@ app.patch('/api/prices/:id', requireAdmin, async (request, response) => {
   }
 
   return response.json({ item: serializeServicePrice(price) });
-});
-
-app.get('/api/transactions', requireAdmin, async (_request, response) => {
-  if (!stripe) {
-    return response.status(503).json({ message: 'Stripe transactions are not configured.' });
-  }
-
-  try {
-    const checkoutSessions = await stripe.checkout.sessions.list({ limit: 100 });
-    const groupIds = checkoutSessions.data
-      .map((session) => session.metadata?.requestGroupId)
-      .filter(Boolean);
-    const requests = groupIds.length
-      ? await LiveRequest.find({ requestGroupId: { $in: groupIds } }).sort({ createdAt: 1 })
-      : [];
-    const requestsByGroup = new Map();
-    requests.forEach((request) => {
-      const group = requestsByGroup.get(request.requestGroupId) || [];
-      group.push(request);
-      requestsByGroup.set(request.requestGroupId, group);
-    });
-
-    return response.json({
-      items: checkoutSessions.data.map((session) => {
-        const groupId = session.metadata?.requestGroupId || '';
-        const groupRequests = requestsByGroup.get(groupId) || [];
-        return {
-          id: session.id,
-          type: 'Stripe Checkout',
-          status: session.status || 'unknown',
-          paymentStatus: session.payment_status || 'unknown',
-          amountTotal: session.amount_total || 0,
-          currency: (session.currency || 'cad').toUpperCase(),
-          customerEmail: session.customer_details?.email || groupRequests[0]?.requesterEmail || '',
-          requestGroupId: groupId,
-          serviceId: session.metadata?.serviceId || 'unknown',
-          serviceName: session.metadata?.serviceName || 'Stripe payment',
-          requestCount: groupRequests.length,
-          requestTitles: groupRequests.map((request) => request.track || request.message),
-          confirmationCodes: groupRequests.map((request) => request.confirmationCode).filter(Boolean),
-          createdAt: session.created ? new Date(session.created * 1000).toISOString() : null,
-          receiptSent: groupRequests.some((request) => Boolean(request.receiptSentAt)),
-          paymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : '',
-        };
-      }),
-    });
-  } catch (error) {
-    console.error('Stripe transactions fetch failed:', error);
-    return response.status(502).json({ message: 'Stripe transactions could not be loaded.' });
-  }
 });
 
 app.post('/api/live-sessions', requireAdmin, async (request, response) => {
@@ -1604,7 +1477,8 @@ app.post('/api/live-requests/analyze', async (request, response) => {
   });
 });
 
-async function createLiveRequestCheckout(request, response) {
+// Song requests are free; every request waits for Khalil's review before it is used.
+async function createLiveRequest(request, response) {
   const parsed = liveRequestCheckoutSchema.safeParse(request.body);
 
   if (!parsed.success) {
@@ -1614,19 +1488,8 @@ async function createLiveRequestCheckout(request, response) {
     });
   }
 
-  if (!stripe) {
-    return response.status(503).json({ message: 'Song request payments are not configured.' });
-  }
-
-  await ensureServicePrices();
-  const songRequestPrice = await ServicePrice.findOne({ serviceId: 'song-request-live', isActive: true });
-
-  if (!songRequestPrice || !Number.isInteger(songRequestPrice.amountCents) || songRequestPrice.amountCents < 50) {
-    return response.status(503).json({ message: 'The song request price is not configured correctly.' });
-  }
-
   const requestGroupId = createCode('GROUP');
-  const requestDrafts = parsed.data.requests.map((item) => ({
+  await LiveRequest.insertMany(parsed.data.requests.map((item) => ({
     externalId: `live-request-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     requesterName: parsed.data.requesterName,
     requesterEmail: parsed.data.requesterEmail,
@@ -1635,64 +1498,18 @@ async function createLiveRequestCheckout(request, response) {
     message: item.message,
     ...buildDirectRequestMetadata(item.message),
     requestStatus: 'pending_admin',
-    paymentStatus: 'unpaid',
-    aiSummary: 'Payment pending before Khalil review.',
-  }));
-  const liveRequests = await LiveRequest.insertMany(requestDrafts);
+    paymentStatus: 'none',
+    aiSummary: 'Awaiting Khalil review.',
+  })));
 
-  try {
-    const checkoutSession = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      line_items: [
-        {
-          price_data: {
-            currency: songRequestPrice.currency.toLowerCase(),
-            product_data: {
-              name: 'Khalil live song request',
-              description: `${liveRequests.length} audience song request${liveRequests.length === 1 ? '' : 's'}`,
-            },
-            unit_amount: songRequestPrice.amountCents,
-          },
-          quantity: liveRequests.length,
-        },
-      ],
-      metadata: {
-        requestGroupId,
-        serviceId: 'song-request-live',
-        serviceName: 'Song Request During Live Events',
-      },
-      payment_intent_data: {
-        metadata: {
-          requestGroupId,
-          serviceId: 'song-request-live',
-          serviceName: 'Song Request During Live Events',
-        },
-      },
-      success_url: `${getFrontendUrl()}/?stripe=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${getFrontendUrl()}/?stripe=cancelled`,
-    });
-
-    await LiveRequest.updateMany(
-      { requestGroupId },
-      { stripeCheckoutSessionId: checkoutSession.id },
-    );
-
-    return response.status(201).json({
-      checkoutUrl: checkoutSession.url,
-      message: 'Redirecting you to secure payment.',
-    });
-  } catch (error) {
-    await LiveRequest.deleteMany({ requestGroupId });
-    console.error('Stripe Checkout session creation failed:', error);
-    return response.status(502).json({ message: 'Secure payment could not be started.' });
-  }
+  return response.status(201).json({ message: 'Request sent. Khalil will review it.' });
 }
 
-app.post('/api/live-requests/checkout', createLiveRequestCheckout);
-app.post('/api/live-requests', createLiveRequestCheckout);
+app.post('/api/live-requests/checkout', createLiveRequest);
+app.post('/api/live-requests', createLiveRequest);
 
 app.get('/api/live-requests/admin', requireAdmin, async (_request, response) => {
-  const requests = await LiveRequest.find({ paymentStatus: 'paid' }).sort({ createdAt: -1 });
+  const requests = await LiveRequest.find({ paymentStatus: { $in: ['paid', 'none'] } }).sort({ createdAt: -1 });
 
   return response.json({
     items: requests.map(serializeLiveRequest),
@@ -2080,7 +1897,7 @@ registerPlanning(app, { requireAuth, serialize: serializeServiceRequest });
 registerMeetings(app, { requireAuth, requireAdmin });
 registerAccount(app, { requireAuth, getFrontendUrl });
 registerContent(app, requireAdmin);
-registerDeposits(app, { requireAuth, requireAdmin, serialize: serializeServiceRequest, stripe, getFrontendUrl });
+registerPayments(app, { requireAuth, requireAdmin, serialize: serializeServiceRequest });
 registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize: serializeServiceRequest });
 
 app.use((_request, response) => {

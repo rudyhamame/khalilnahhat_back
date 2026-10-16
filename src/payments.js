@@ -3,7 +3,7 @@ const { z } = require('zod');
 const { ServiceRequest } = require('./models');
 const { Equipment } = require('./equipment');
 const { sendBookingConfirmation } = require('./brevo');
-const { quoteTotals } = require('./quote-lifecycle');
+const { quoteTotals, isExpired } = require('./quote-lifecycle');
 
 const bookingSchema = new mongoose.Schema(
   {
@@ -61,6 +61,8 @@ function registerPayments(app, { requireAuth, requireAdmin, serialize }) {
     const net = netPaidCents(sr);
     const totalCents = toCents(quoteTotals(sr).total);
 
+    if (kind === 'deposit' && isExpired(sr)) return fail(res, 409, 'This quote has expired. Extend and accept it again before recording a deposit.');
+    if (kind !== 'refund' && net + cents > totalCents) return fail(res, 400, 'That is more than the remaining balance.');
     if (kind === 'deposit' && sr.status !== 'accepted') return fail(res, 409, 'A deposit can be recorded once the customer has accepted the quote.');
     if (kind !== 'deposit' && sr.status !== 'confirmed') return fail(res, 409, 'Confirm the booking with a deposit first.');
     if (kind === 'balance' && net + cents > totalCents) return fail(res, 400, 'That is more than the remaining balance.');

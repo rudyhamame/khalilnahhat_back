@@ -15,12 +15,12 @@ function quoteTotals(sr) {
   return { subtotal: round2(subtotal), taxPercent: sr.taxPercent ?? 0, tax, total, deposit, balance: round2(total - deposit) };
 }
 
-const isExpired = (sr) => sr.status === 'quoted' && sr.expiresAt && sr.expiresAt <= new Date();
+const isExpired = (sr) => ['quoted', 'accepted'].includes(sr.status) && sr.expiresAt && sr.expiresAt <= new Date();
 
 // Marks overdue quotes Expired and sends the one-time 48h reminder. Safe to run repeatedly.
 async function sweepQuotes() {
   const now = new Date();
-  await ServiceRequest.updateMany({ status: 'quoted', expiresAt: { $lte: now } }, { status: 'expired' });
+  await ServiceRequest.updateMany({ status: { $in: ['quoted', 'accepted'] }, expiresAt: { $lte: now } }, { status: 'expired' });
   const due = await ServiceRequest.find({
     status: 'quoted', reminderSentAt: null, expiresAt: { $gt: now, $lte: new Date(now.getTime() + REMINDER_MS) },
   });
@@ -58,7 +58,7 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize }) {
     if (!parsed.success) return res.status(400).json({ message: 'Describe the changes you need.' });
     const sr = await find(req.params.id);
     if (!own(req, sr)) return notFound(res);
-    if (sr.status !== 'quoted') return res.status(409).json({ message: 'Only an active quote can be changed.' });
+    if (isExpired(sr) || sr.status !== 'quoted') return res.status(409).json({ message: 'Only an active quote can be changed.' });
     sr.status = 'changes_requested';
     sr.changeRequest = parsed.data.message;
     await sr.save();
@@ -74,7 +74,7 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize }) {
     if (!['quoted', 'expired', 'changes_requested'].includes(sr.status) || !sr.quotedAt) {
       return res.status(409).json({ message: 'Only a sent quote can be extended or reactivated.' });
     }
-    const base = sr.status === 'quoted' && sr.expiresAt > new Date() ? sr.expiresAt.getTime() : Date.now();
+    const base = ['quoted', 'accepted'].includes(sr.status) && sr.expiresAt > new Date() ? sr.expiresAt.getTime() : Date.now();
     sr.expiresAt = new Date(base + parsed.data.days * DAY_MS);
     sr.status = 'quoted';
     sr.reminderSentAt = null;

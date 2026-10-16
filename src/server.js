@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const cors = require('cors');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
-const { AccessToken, RoomServiceClient } = require('livekit-server-sdk');
+const { AccessToken, RoomServiceClient, WebhookReceiver } = require('livekit-server-sdk');
 const { z } = require('zod');
 const { connectToDatabase, MONGODB_DB_NAME } = require('./db');
 const { ADMIN_USERNAME, defaultLiveStreamConfig } = require('./default-data');
@@ -24,6 +24,8 @@ const {
   analyzeLiveRequest,
   buildReorderedQueue,
 } = require('./live-request-agent');
+const { eventSchema, normalizeQuoteItems } = require('./quote-validation');
+const { Equipment } = require('./equipment');
 const { registerEquipmentRoutes } = require('./equipment');
 const { registerPayments } = require('./payments');
 const { registerPlanning } = require('./planning');
@@ -337,25 +339,7 @@ const serviceRequestCreateSchema = z.object({
     category: z.string().trim().min(1),
     quantity: z.coerce.number().int().min(1),
   })).min(1, 'Select at least one service.'),
-  event: z.object({
-    eventType: z.string().trim().min(1).max(40),
-    eventDate: z.string().trim().min(1).max(20),
-    startTime: z.string().trim().max(10).default(''),
-    endTime: z.string().trim().max(10).default(''),
-    phone: z.string().trim().min(5).max(30),
-    contactMethod: z.string().trim().max(20).default('email'),
-    company: z.string().trim().max(120).default(''),
-    venueName: z.string().trim().max(160).default(''),
-    venueAddress: z.string().trim().max(240).default(''),
-    city: z.string().trim().max(80).default(''),
-    postalCode: z.string().trim().max(12).default(''),
-    inGta: z.boolean().default(true),
-    indoor: z.boolean().default(true),
-    guests: z.coerce.number().int().min(0).max(100000).default(0),
-    services: z.array(z.string().trim().max(40)).max(12).default([]),
-    musicStyle: z.string().trim().max(40).default(''),
-    notes: z.string().trim().max(3000).default(''),
-  }).optional(),
+  event: eventSchema.optional(),
 });
 
 const serviceRequestQuoteSchema = z.object({
@@ -613,6 +597,7 @@ function serializeLiveRequest(request) {
     receiptSentAt: request.receiptSentAt || null,
     analysisSources: Array.isArray(request.analysisSources) ? request.analysisSources : [],
     requestStatus: request.requestStatus || 'pending_admin',
+    broadcastRoomName: request.broadcastRoomName || '',
     duplicateSessionId: request.duplicateSessionExternalId || '',
     suggestedInsertAfterId: request.suggestedInsertAfterId || '',
     suggestedInsertBeforeId: request.suggestedInsertBeforeId || '',
@@ -675,6 +660,7 @@ function serializeLiveStreamConfig(config) {
     posterImage: config?.posterImage || '',
     statusLabel: config?.statusLabel || defaultLiveStreamConfig.statusLabel,
     activeSessionId: config?.activeSessionId || '',
+    webrtcRoomName: config?.webrtcRoomName || '',
     broadcastMode: config?.broadcastMode || defaultLiveStreamConfig.broadcastMode,
   };
 }
@@ -700,7 +686,7 @@ function getLiveKitConfig() {
   const apiSecret = process.env.LIVEKIT_API_SECRET;
   const wsUrl = process.env.LIVEKIT_URL;
 
-  if (!apiKey || !apiSecret || !wsUrl) {
+  if (!apiKey || !apiSecret || !wsUrl || !/^wss:\/\/[^/]+/.test(wsUrl)) {
     const error = new Error('LiveKit credentials are not configured on the server.');
     error.status = 503;
     throw error;
@@ -711,7 +697,7 @@ function getLiveKitConfig() {
 
 async function createLiveKitToken({ roomName, identity, name, canPublish }) {
   const { apiKey, apiSecret } = getLiveKitConfig();
-  const accessToken = new AccessToken(apiKey, apiSecret, { identity, name });
+  const accessToken = new AccessToken(apiKey, apiSecret, { identity, name, ttl: '10m' });
   accessToken.addGrant({
     room: roomName,
     roomJoin: true,
@@ -862,7 +848,10 @@ app.use(
   }),
 );
 
-app.use(express.json());
+require('./live-recordings').registerRecordingProxy(app);
+app.use(express.json({ type: ['application/json', 'application/webhook+json'], verify(request, _response, buffer) {
+  if (request.path === '/api/live-stream/webrtc/webhook') request.rawBody = buffer.toString('utf8');
+} }));
 
 app.get('/api/health', async (_request, response) => {
   response.json({
@@ -985,6 +974,7 @@ app.post('/api/auth/signup', async (request, response) => {
   }
 
   const normalizedUsername = parsed.data.username.toLowerCase();
+  if (normalizedUsername === ADMIN_USERNAME) return response.status(400).json({ message: 'That username is reserved. Please choose another.' });
 
   if (await User.findOne({ username: normalizedUsername })) {
     return response.status(409).json({
@@ -1030,6 +1020,11 @@ app.post('/api/service-requests', requireAuth, async (request, response) => {
       message: 'Service request payload failed validation.',
       errors: parsed.error.flatten().fieldErrors,
     });
+  }
+
+  if (parsed.data.event) {
+    try { parsed.data.items = normalizeQuoteItems(parsed.data.items, await Equipment.find({ isActive: true })); }
+    catch (error) { return response.status(400).json({ message: error.message }); }
   }
 
   const user = request.authUser;
@@ -1092,6 +1087,10 @@ app.patch('/api/service-requests/:id/quote', requireAdmin, async (request, respo
     return response.status(404).json({
       message: 'Service request not found.',
     });
+  }
+
+  if (['confirmed', 'cancelled'].includes(serviceRequest.status) || (serviceRequest.payments || []).some((p) => !p.voided)) {
+    return response.status(409).json({ message: 'A cancelled or paid booking cannot be repriced through the quote editor.' });
   }
 
   const quoteByServiceId = new Map(parsed.data.items.map((item) => [item.serviceId, item.unitPrice]));
@@ -1692,72 +1691,15 @@ app.post('/api/live-stream/mux', requireAdmin, async (request, response) => {
   }
 });
 
-app.post('/api/live-stream/webrtc/go-live', requireAdmin, async (request, response) => {
-  try {
-    const currentConfig = await getLiveStreamConfig();
-    const roomName = `khalil-live-${crypto.randomUUID()}`;
-    const title = request.body?.title?.trim() || currentConfig.title || defaultLiveStreamConfig.title;
-
-    const updatedConfig = await LiveStreamConfig.findOneAndUpdate(
-      { key: defaultLiveStreamConfig.key },
-      {
-        isLive: true,
-        title,
-        streamUrl: '',
-        statusLabel: 'Live now — broadcasting straight from the browser.',
-        broadcastMode: 'webrtc',
-        webrtcRoomName: roomName,
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
-    );
-
-    const token = await createLiveKitToken({
-      roomName,
-      identity: 'khalil-broadcaster',
-      name: 'Khalil Nahhat',
-      canPublish: true,
-    });
-
-    return response.status(201).json({
-      item: serializeAdminLiveStreamConfig(updatedConfig),
-      token,
-      url: getLiveKitConfig().wsUrl,
-      roomName,
-    });
-  } catch (error) {
-    console.error('WebRTC go-live failed:', error);
-    return response.status(error.status || 500).json({
-      message: error.message || 'Failed to start the browser broadcast.',
-    });
-  }
-});
-
-app.post('/api/live-stream/webrtc/end', requireAdmin, async (_request, response) => {
-  const currentConfig = await getLiveStreamConfig();
-
-  const updatedConfig = await LiveStreamConfig.findOneAndUpdate(
-    { key: defaultLiveStreamConfig.key },
-    {
-      isLive: false,
-      statusLabel: defaultLiveStreamConfig.statusLabel,
-      webrtcRoomName: '',
-    },
-    { upsert: true, new: true, setDefaultsOnInsert: true },
-  );
-
-  if (currentConfig.webrtcRoomName) {
-    try {
-      const { apiKey, apiSecret, wsUrl } = getLiveKitConfig();
-      const roomService = new RoomServiceClient(wsUrl, apiKey, apiSecret);
-      await roomService.deleteRoom(currentConfig.webrtcRoomName);
-    } catch (error) {
-      console.error('Failed to close LiveKit room:', error.message);
-    }
-  }
-
-  return response.json({
-    item: serializeAdminLiveStreamConfig(updatedConfig),
-  });
+require('./live-broadcast').registerLiveBroadcastRoutes(app, {
+  requireAdmin, getLiveStreamConfig, LiveStreamConfig, defaults: defaultLiveStreamConfig,
+  createToken: createLiveKitToken, getConfig: getLiveKitConfig,
+  serialize: serializeAdminLiveStreamConfig, serializePublic: serializeLiveStreamConfig,
+  RoomServiceClient, randomUUID: crypto.randomUUID, prepareRecording: require('./live-recordings').prepareRecordingRoom,
+  verifyWebhook: async (body, authorization) => {
+    const { apiKey, apiSecret } = getLiveKitConfig();
+    return new WebhookReceiver(apiKey, apiSecret).receive(body, authorization);
+  },
 });
 
 app.post('/api/live-stream/webrtc/viewer-token', async (_request, response) => {
@@ -1892,6 +1834,10 @@ app.use((error, _request, response, _next) => {
   });
 });
 
+require('./mobile-admin').registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest: serializeServiceRequest });
+require('./archive-player').registerArchivePlayer(app, { requireAdmin });
+require('./live-recordings').registerLiveRecordings(app, requireAdmin);
+require('./live-suggestions').registerLiveSuggestions(app, { getLiveStreamConfig });
 registerEquipmentRoutes(app, requireAdmin);
 registerPlanning(app, { requireAuth, serialize: serializeServiceRequest });
 registerMeetings(app, { requireAuth, requireAdmin });

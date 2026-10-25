@@ -1868,4 +1868,6 @@ if (require.main === module) {
   });
 }
 
+require('./live-comments').registerLiveComments(app, { getLiveStreamConfig });
+
 module.exports = { app, startServer };

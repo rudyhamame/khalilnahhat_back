@@ -1838,6 +1838,7 @@ require('./mobile-admin').registerMobileAdmin(app, { requireAdmin, requireAuth, 
 require('./archive-player').registerArchivePlayer(app, { requireAdmin });
 require('./live-recordings').registerLiveRecordings(app, requireAdmin);
 require('./live-suggestions').registerLiveSuggestions(app, { getLiveStreamConfig });
+require('./live-comments').registerLiveComments(app, { getLiveStreamConfig });
 registerEquipmentRoutes(app, requireAdmin);
 registerPlanning(app, { requireAuth, serialize: serializeServiceRequest });
 registerMeetings(app, { requireAuth, requireAdmin });
@@ -1867,7 +1868,5 @@ if (require.main === module) {
     process.exit(1);
   });
 }
-
-require('./live-comments').registerLiveComments(app, { getLiveStreamConfig });
 
 module.exports = { app, startServer };

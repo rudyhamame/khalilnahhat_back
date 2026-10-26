@@ -144,6 +144,9 @@ const liveRequestSchema = new mongoose.Schema(
 
 const archiveItemSchema = new mongoose.Schema(
   {
+    albumId: { type: String, default: '', index: true },
+    published: { type: Boolean, default: true, index: true },
+    sortOrder: { type: Number, default: 0 },
     externalId: { type: String, required: true, unique: true, trim: true },
     title: { type: String, required: true, trim: true },
     artist: { type: String, default: '', trim: true },
@@ -223,6 +226,13 @@ const liveStreamConfigSchema = new mongoose.Schema(
     muxRtmpUrl: { type: String, default: '', trim: true },
     broadcastMode: { type: String, enum: ['youtube', 'mux', 'webrtc'], default: 'youtube', trim: true },
     webrtcRoomName: { type: String, default: '', trim: true },
+    broadcastSource: { type: String, enum: ['', 'browser', 'obs'], default: '' },
+    obsRoomName: { type: String, default: '' },
+    obsIngressId: { type: String, default: '' },
+    obsUrl: { type: String, default: '' },
+    obsStreamKey: { type: String, default: '' },
+    obsState: { type: String, default: '' },
+    obsExpiresAt: { type: Date, default: null },
   },
   { timestamps: true },
 );

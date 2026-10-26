@@ -6,8 +6,8 @@ test('playlist accepts selected uploaded music and preserves administrator order
 test('playlist refuses missing, duplicate, external or another account audio',()=>{
  assert.match(validatePlaylistSelection(['missing'],rows,'echo'),/no longer exists/);
  assert.match(validatePlaylistSelection(['a','a'],rows,'echo'),/once/);
- assert.match(validatePlaylistSelection(['a'],[{...rows[0],audioUrl:'https://example.com/a.mp3'}],'echo'),/Cloudinary/);
- assert.match(validatePlaylistSelection(['a'],rows,'another-cloud'),/Cloudinary/);
+ assert.match(validatePlaylistSelection(['a'],[{...rows[0],audioUrl:'https://example.com/a.mp3'}],'echo'),/Upload/);
+ assert.match(validatePlaylistSelection(['a'],rows,'another-cloud'),/Upload/);
 });
 test('Cloudinary URL validation forbids HTTP, lookalike hosts and image resources',()=>{
  for(const url of ['http://res.cloudinary.com/echo/video/a.mp3','https://res.cloudinary.com.evil.example/echo/video/a.mp3','https://res.cloudinary.com/echo/image/upload/a.jpg'])assert.equal(isCloudinaryAudio(url,'echo'),false);

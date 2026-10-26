@@ -25,7 +25,7 @@ test('stale phone cannot stop a replacement broadcast', async () => {
 });
 test('starting claims the offline singleton atomically', async () => {
   const ctx=setup(); const result=await ctx.call('go-live',{ title:' Phone set ' });
-  assert.equal(result.statusCode,201); assert.deepEqual(ctx.writes[0].filter,{ key:'live',isLive:{$ne:true} });
+  assert.equal(result.statusCode,201); assert.deepEqual(ctx.writes[0].filter,{ key:'live',isLive:{$ne:true},obsRoomName:{$in:['',null]} });
   assert.equal(result.body.item.title,'Phone set');
 });
 test('concurrent go-live loser receives no publishing token', async () => {
@@ -86,4 +86,10 @@ test('recording setup failure releases only its own live claim and returns no to
  const ctx=setup({prepareRecording:async()=>{throw Object.assign(new Error('Recording unavailable'),{status:503});}});
  const result=await ctx.call('go-live');assert.equal(result.statusCode,503);assert.equal(result.body.token,undefined);
  assert.equal(ctx.writes.length,2);assert.deepEqual(ctx.writes[1].filter,{key:'live',webrtcRoomName:'khalil-live-new'});assert.equal(ctx.writes[1].change.isLive,false);
+});
+
+test('browser and phone cannot claim or end a waiting OBS session', async()=>{
+ const ctx=setup();ctx.current.obsRoomName='khalil-obs-reserved';
+ assert.equal((await ctx.call('go-live')).statusCode,409);
+ assert.equal((await ctx.call('end')).statusCode,409);assert.equal(ctx.writes.length,0);
 });

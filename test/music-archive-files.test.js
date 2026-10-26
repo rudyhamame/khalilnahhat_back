@@ -1,0 +1,34 @@
+const {test} = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('fs/promises');
+const os = require('os');
+const path = require('path');
+const express = require('express');
+const {saveLocalFile,registerArchiveFiles,localAssetPattern,previewUrl,validPreview} = require('../src/music-archive-files');
+const {memoryModel} = require('./helpers/archive-memory');
+test('draft file previews are signed and expire; path traversal is rejected', () => {
+  const url='/api/music-archive/media/12345678-1234-1234-1234-123456789abc';
+  const signed=new URL(previewUrl(url),'http://localhost');
+  const query=Object.fromEntries(signed.searchParams);
+  assert.equal(validPreview(url,query),true);
+  assert.equal(validPreview(url,{...query,expires:1}),false);
+  assert.equal(validPreview(url,{...query,signature:'0'.repeat(64)}),false);
+  assert.equal(localAssetPattern.test('/api/music-archive/media/../../secret'),false);
+});
+test('local media is private until published, supports ranges, and becomes private when hidden', async t => {
+  const directory=await fs.mkdtemp(path.join(os.tmpdir(),'archive-file-test-'));
+  t.after(()=>fs.rm(directory,{recursive:true,force:true}));
+  const AssetModel=memoryModel(); let songs=[];
+  const stored=await saveLocalFile({buffer:Buffer.from('0123456789'),mimetype:'audio/mpeg',originalname:'track.mp3'},{AssetModel,directory});
+  const app=express(); registerArchiveFiles(app,{AssetModel,directory,publicSongs:async()=>songs,Album:memoryModel(),Category:memoryModel()});
+  const server=app.listen(0,'127.0.0.1'); await new Promise(resolve=>server.once('listening',resolve));
+  t.after(()=>new Promise(resolve=>server.close(resolve)));
+  const base=`http://127.0.0.1:${server.address().port}`;
+  assert.equal((await fetch(base+stored.url)).status,404);
+  assert.equal(await (await fetch(base+stored.previewUrl)).text(),'0123456789');
+  songs=[{audioUrl:stored.url}];
+  const range=await fetch(base+stored.url,{headers:{Range:'bytes=2-4'}});
+  assert.equal(range.status,206); assert.equal(range.headers.get('content-range'),'bytes 2-4/10'); assert.equal(await range.text(),'234');
+  assert.equal((await fetch(base+stored.url,{headers:{Range:'bytes=20-'}})).status,416);
+  songs=[]; assert.equal((await fetch(base+stored.url)).status,404);
+});

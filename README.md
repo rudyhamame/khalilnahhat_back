@@ -116,7 +116,9 @@ There is no online payment processor. The admin records each payment (e-transfer
 
 ## YouTube to WAV
 
-The admin Live Sessions form can convert a permitted YouTube URL to WAV, upload it to Cloudinary, and send it through the existing metadata/Cyanite analysis flow. The converter does not expose a public downloader endpoint.
+The admin Add music form accepts a YouTube video link instead of an audio upload. Enter the track title and details, then select Add track to convert the video to WAV, upload the audio to Cloudinary, and create the music archive entry. Failed requests keep the form filled for retry. Existing audience-request conversion also uses this converter.
+
+`POST /api/archive-items` accepts optional `youtubeUrl` for administrators only. It rejects requests containing both a YouTube link and an uploaded `audioUrl`. Only individual YouTube video links are accepted; playlists and live streams are excluded. Conversion is limited to 30 minutes, a 100 MB source/output, and a three-minute process timeout. One archive conversion runs at a time per server process. Newly uploaded audio is removed if saving the archive entry fails. The frontend and backend must both be deployed for this feature. Automatic metadata analysis for imported links is not included.
 
 Install the required tools on the backend host:
 
@@ -134,3 +136,12 @@ FFMPEG_PATH=/absolute/path/to/ffmpeg
 ```
 
 For Render, add the equivalent `ffmpeg` and `yt-dlp` installation commands to the backend Build Command, then redeploy. Only convert audio you own or are licensed to use.
+
+
+### YouTube account panel
+
+The Add music form has a Music source selector. YouTube mode includes an administrator-only connection panel: account/session label, access status and last check, a link to sign in or switch account on YouTube, session import/replacement, a real video access check, and sign-out from the converter. A browser sign-in alone does not update the server. The label is supplied by the administrator; it is not a verified Google identity. This is cookie-session authentication, not Google OAuth, and an OAuth sign-in alone does not grant video download access.
+
+Configure `YT_DLP_COOKIES_FILE` to a private persistent file outside the repository (production: `/run/youtube-auth/cookies.txt`, backed by `/srv/rh/echo-dj/youtube-auth`). The file and its status metadata are mode 0600 in a mode 0700 directory. The converter copies the file to its own temporary directory and removes that copy after each operation. Only YouTube/Google domains are accepted on session import; unrelated cookies are discarded. Sign-out removes the server session and metadata and leaves the browser signed in. Expired or rejected sessions are explicit errors and never create an empty archive entry.
+
+Connection endpoints, all admin-only: `GET/POST/DELETE /api/admin/youtube-session`, `POST /api/admin/youtube-session/check` with `{ sourceUrl }`. Session import uses multipart `sessionFile` (Netscape cookies.txt, max 1 MB) and `accountLabel`. No cookie values are returned in API responses. Session changes are rejected while a conversion is active.

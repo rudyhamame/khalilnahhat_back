@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const cors = require('cors');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
-const { AccessToken, RoomServiceClient, WebhookReceiver } = require('livekit-server-sdk');
+const { AccessToken, RoomServiceClient, WebhookReceiver, IngressClient } = require('livekit-server-sdk');
 const { z } = require('zod');
 const { connectToDatabase, MONGODB_DB_NAME } = require('./db');
 const { ADMIN_USERNAME, defaultLiveStreamConfig } = require('./default-data');
@@ -34,7 +34,9 @@ const { registerAccount, sendVerification } = require('./account');
 const { registerContent } = require('./content');
 const { DAY_MS, quoteTotals, registerQuoteLifecycle } = require('./quote-lifecycle');
 const { createSessionToken, hashPassword, verifyPassword } = require('./security');
-const { convertYoutubeToWav } = require('./youtube-audio');
+const { convertYoutubeToWav, normalizeYoutubeUrl } = require('./youtube-audio');
+const { createArchiveHandler } = require('./archive-create');
+const { createYoutubeSessionStore, registerYoutubeSessionRoutes } = require('./youtube-session');
 const {
   sendServiceQuoteNotification,
   sendServiceRequestNotification,
@@ -624,9 +626,9 @@ function serializeArchiveItem(item) {
     description: item.description || '',
     image: item.image,
     alt: item.alt,
-    audioUrl: item.audioUrl || '',
+    audioUrl: require('./music-archive').deliveryUrl(item.audioUrl),
     audioOriginalName: item.audioOriginalName || '',
-    coverImage: item.coverImage || '',
+    coverImage: require('./music-archive').deliveryUrl(item.coverImage),
     coverPublicId: item.coverPublicId || '',
     coverOriginalName: item.coverOriginalName || '',
     coverZoom: Number(item.coverZoom || 1),
@@ -662,6 +664,7 @@ function serializeLiveStreamConfig(config) {
     activeSessionId: config?.activeSessionId || '',
     webrtcRoomName: config?.webrtcRoomName || '',
     broadcastMode: config?.broadcastMode || defaultLiveStreamConfig.broadcastMode,
+    broadcastSource: config?.broadcastSource || '',
   };
 }
 
@@ -672,6 +675,8 @@ function buildMuxPlaybackUrl(playbackId) {
 function serializeAdminLiveStreamConfig(config) {
   return {
     ...serializeLiveStreamConfig(config),
+    obs: { roomName: config?.obsRoomName || '', state: config?.obsState || '',
+      url: config?.obsUrl || '', streamKey: config?.obsStreamKey || '', expiresAt: config?.obsExpiresAt || null },
     muxLiveStreamId: config?.muxLiveStreamId || '',
     muxPlaybackId: config?.muxPlaybackId || '',
     muxStreamKey: config?.muxStreamKey || '',
@@ -865,7 +870,7 @@ app.get('/api/health', async (_request, response) => {
 app.get('/api/bootstrap', async (_request, response) => {
   const [liveSessions, archiveItems, liveStreamConfig] = await Promise.all([
     getOrderedLiveSessions(),
-    ArchiveItem.find().sort({ createdAt: 1 }),
+    require('./music-archive').publicSongs(),
     getLiveStreamConfig(),
   ]);
 
@@ -1327,10 +1332,11 @@ app.patch('/api/live-stream', requireAdmin, async (request, response) => {
   }
 
   const config = await LiveStreamConfig.findOneAndUpdate(
-    { key: defaultLiveStreamConfig.key },
+    { key: defaultLiveStreamConfig.key, obsRoomName: { $in: ['', null] } },
     { ...parsed.data, broadcastMode: 'youtube', webrtcRoomName: '' },
-    { upsert: true, new: true, setDefaultsOnInsert: true },
+    { new: true },
   );
+  if (!config) return response.status(409).json({ message: 'End the OBS session before changing its source.' });
 
   return response.json({
     item: serializeLiveStreamConfig(config),
@@ -1338,6 +1344,7 @@ app.patch('/api/live-stream', requireAdmin, async (request, response) => {
 });
 
 app.get('/api/live-stream/admin', requireAdmin, async (_request, response) => {
+  response.set('Cache-Control', 'no-store');
   const config = await getLiveStreamConfig();
 
   return response.json({
@@ -1659,6 +1666,7 @@ app.patch('/api/live-requests/:id/review', requireAdmin, async (request, respons
 app.post('/api/live-stream/mux', requireAdmin, async (request, response) => {
   try {
     const currentConfig = await getLiveStreamConfig();
+    if (currentConfig.obsRoomName) return response.status(409).json({ message: 'End the OBS session first.' });
     const muxLiveStream = await createMuxLiveStream(request.body?.title || currentConfig.title);
     const muxPlaybackId = muxLiveStream.playback_ids?.[0]?.id || '';
     const muxStreamKey = muxLiveStream.stream_key || '';
@@ -1666,7 +1674,7 @@ app.post('/api/live-stream/mux', requireAdmin, async (request, response) => {
     const streamUrl = buildMuxPlaybackUrl(muxPlaybackId);
 
     const updatedConfig = await LiveStreamConfig.findOneAndUpdate(
-      { key: defaultLiveStreamConfig.key },
+      { key: defaultLiveStreamConfig.key, obsRoomName: { $in: ['', null] } },
       {
         title: request.body?.title?.trim() || currentConfig.title || defaultLiveStreamConfig.title,
         streamUrl,
@@ -1677,9 +1685,10 @@ app.post('/api/live-stream/mux', requireAdmin, async (request, response) => {
         muxStreamKey,
         muxRtmpUrl,
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
+      { new: true },
     );
 
+    if (!updatedConfig) return response.status(409).json({ message: 'The broadcast changed. Refresh its status.' });
     return response.status(201).json({
       item: serializeAdminLiveStreamConfig(updatedConfig),
     });
@@ -1695,7 +1704,7 @@ require('./live-broadcast').registerLiveBroadcastRoutes(app, {
   requireAdmin, getLiveStreamConfig, LiveStreamConfig, defaults: defaultLiveStreamConfig,
   createToken: createLiveKitToken, getConfig: getLiveKitConfig,
   serialize: serializeAdminLiveStreamConfig, serializePublic: serializeLiveStreamConfig,
-  RoomServiceClient, randomUUID: crypto.randomUUID, prepareRecording: require('./live-recordings').prepareRecordingRoom,
+  RoomServiceClient, IngressClient, randomUUID: crypto.randomUUID, prepareRecording: require('./live-recordings').prepareRecordingRoom,
   verifyWebhook: async (body, authorization) => {
     const { apiKey, apiSecret } = getLiveKitConfig();
     return new WebhookReceiver(apiKey, apiSecret).receive(body, authorization);
@@ -1732,25 +1741,40 @@ app.post('/api/live-stream/webrtc/viewer-token', async (_request, response) => {
   }
 });
 
-app.post('/api/archive-items', requireAdmin, async (request, response) => {
-  const parsed = archiveItemSchema.safeParse(request.body);
-
-  if (!parsed.success) {
-    return response.status(400).json({
-      message: 'Archive payload failed validation.',
-      errors: parsed.error.flatten().fieldErrors,
-    });
-  }
-
-  const item = await ArchiveItem.create({
-    externalId: `archive-${Date.now()}`,
-    ...parsed.data,
-  });
-
-  return response.status(201).json({
-    item: serializeArchiveItem(item),
-  });
+const youtubeSessionStore = createYoutubeSessionStore(process.env.YT_DLP_COOKIES_FILE);
+let youtubeConversionActive = false;
+async function convertArchiveYoutube(sourceUrl) {
+  if (youtubeConversionActive) throw Object.assign(new Error('Another conversion is running.'), { code: 'YOUTUBE_BUSY' });
+  youtubeConversionActive = true;
+  try {
+    const result = await convertYoutubeToWav(sourceUrl);
+    await youtubeSessionStore.recordPublicAccess('ready', 'Public video downloaded and converted without an account.').catch(() => {});
+    return result;
+  } catch (error) {
+    await youtubeSessionStore.recordPublicAccess(error.code === 'YOUTUBE_PUBLIC_ACCESS_BLOCKED' ? 'blocked' : 'error', error.code === 'YOUTUBE_PUBLIC_ACCESS_BLOCKED'
+      ? 'YouTube blocked public download access. Upload an audio file instead.'
+      : error.code === 'YOUTUBE_WORKER_UNAVAILABLE' ? 'The local audio service is offline. Keep the admin computer online.' : 'This video could not be converted. Check availability, duration and file size.').catch(() => {});
+    throw error;
+  } finally { youtubeConversionActive = false; }
+}
+registerYoutubeSessionRoutes(app, {
+  requireAdmin, usesLocalWorker: () => Boolean(process.env.YOUTUBE_WORKER_SOCKET), store: youtubeSessionStore, convert: convertArchiveYoutube, normalizeUrl: normalizeYoutubeUrl, isBusy: () => youtubeConversionActive,
+  upload: multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024, files: 1, fields: 1 } }).single('sessionFile'),
 });
+
+app.post('/api/archive-items', requireAdmin, createArchiveHandler({
+  schema: archiveItemSchema.extend({
+    youtubeUrl: z.string().trim().max(2048).optional().default('').refine(
+      (value) => !value || Boolean(normalizeYoutubeUrl(value)),
+      'Enter a valid YouTube video link.',
+    ),
+  }),
+  convert: convertArchiveYoutube,
+  upload: uploadAudioBufferToCloudinary,
+  removeUpload: (publicId) => cloudinary.uploader.destroy(publicId, { resource_type: 'video' }),
+  create: (data) => ArchiveItem.create(data),
+  serialize: serializeArchiveItem,
+}));
 
 app.patch('/api/archive-items/:id', requireAdmin, async (request, response) => {
   const parsed = archiveItemSchema.partial().safeParse(request.body);
@@ -1836,6 +1860,8 @@ app.use((error, _request, response, _next) => {
 
 require('./mobile-admin').registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest: serializeServiceRequest });
 require('./archive-player').registerArchivePlayer(app, { requireAdmin });
+require('./stem-separation').registerStemSeparation(app, { requireAdmin });
+require('./music-archive').registerMusicArchive(app, { requireAdmin });
 require('./live-recordings').registerLiveRecordings(app, requireAdmin);
 require('./live-suggestions').registerLiveSuggestions(app, { getLiveStreamConfig });
 require('./live-comments').registerLiveComments(app, { getLiveStreamConfig });

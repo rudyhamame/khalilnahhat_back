@@ -9,6 +9,8 @@ const testimonialSchema = new mongoose.Schema(
     eventType: { type: String, default: '', trim: true },
     text: { type: String, required: true, trim: true },
     textAr: { type: String, default: '', trim: true },
+    reply: { type: String, default: '', trim: true, maxlength: 2000 },
+    repliedAt: { type: Date, default: null },
     imageUrl: { type: String, default: '' },
     isPublished: { type: Boolean, default: true },
     sortOrder: { type: Number, default: 0 },
@@ -34,7 +36,7 @@ const Testimonial = mongoose.models.Testimonial || mongoose.model('Testimonial',
 const MediaItem = mongoose.models.MediaItem || mongoose.model('MediaItem', mediaSchema);
 
 const str = (max) => z.string().trim().max(max);
-const testimonialFields = { name: str(120).min(1), eventType: str(80), text: str(2000).min(1), textAr: str(2000), imageUrl: str(500), isPublished: z.boolean(), sortOrder: z.number().int() };
+const testimonialFields = { name: str(120).min(1), eventType: str(80), text: str(2000).min(1), textAr: str(2000), reply: str(2000), imageUrl: str(500), isPublished: z.boolean(), sortOrder: z.number().int() };
 const mediaFields = {
   kind: z.enum(['mix', 'video', 'photo']), category: str(80), title: str(160).min(1), titleAr: str(160), coverUrl: str(500),
   mediaUrl: str(500).min(1), durationSec: z.number().int().min(0), downloadable: z.boolean(), isPublished: z.boolean(), sortOrder: z.number().int(),
@@ -54,7 +56,9 @@ function crud(app, requireAdmin, base, Model, fields, required, publicFilter) {
   app.patch(`${base}/:id`, requireAdmin, async (req, res) => {
     const p = update.safeParse(req.body);
     if (!p.success) return bad(res);
-    const d = await Model.findByIdAndUpdate(req.params.id, p.data, { new: true }).catch(() => null);
+    const changes = { ...p.data };
+    if (Model === Testimonial && Object.hasOwn(changes, 'reply')) changes.repliedAt = changes.reply ? new Date() : null;
+    const d = await Model.findByIdAndUpdate(req.params.id, { $set: changes }, { new: true, runValidators: true }).catch(() => null);
     return d ? res.json({ item: view(d) }) : res.status(404).json({ message: 'Not found.' });
   });
   app.delete(`${base}/:id`, requireAdmin, async (req, res) => {

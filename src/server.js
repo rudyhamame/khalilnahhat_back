@@ -1,3 +1,4 @@
+const {findPasswordAccount}=require('./password-account');
 require('dotenv').config();
 
 const express = require('express');
@@ -130,16 +131,17 @@ const bookingSchema = z.object({
 const signupSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required.'),
   lastName: z.string().trim().min(1, 'Last name is required.'),
-  username: z.string().trim().min(1, 'Username is required.'),
+  username: z.string().trim().min(1).optional(),
   password: z.string().trim().min(1, 'Password is required.'),
   email: z.string().trim().email('A valid email is required.'),
   phoneNumber: z.string().trim().min(1, 'Phone number is required.'),
 });
 
 const loginSchema = z.object({
-  username: z.string().trim().min(1, 'Username is required.'),
+  email: z.string().trim().email('A valid email address is required.').optional(),
+  username: z.string().trim().min(1).optional(),
   password: z.string().trim().min(1, 'Password is required.'),
-});
+}).refine(value=>value.email||value.username,{message:'Email address is required.'});
 
 const youtubeSearchSchema = z.object({
   query: z.string().trim().min(2, 'Enter at least two characters to search YouTube.'),
@@ -955,12 +957,11 @@ app.post('/api/auth/login', async (request, response) => {
     });
   }
 
-  const username = parsed.data.username.toLowerCase();
-  const user = await User.findOne({ username });
+  const user = await findPasswordAccount(User, parsed.data);
 
   if (!user || !verifyPassword(parsed.data.password, user.passwordHash)) {
     return response.status(401).json({
-      message: 'Incorrect username or password.',
+      message: 'Incorrect email address or password.',
     });
   }
 
@@ -987,7 +988,7 @@ app.post('/api/auth/signup', async (request, response) => {
     });
   }
 
-  const normalizedUsername = parsed.data.username.toLowerCase();
+  const normalizedUsername = parsed.data.username?.toLowerCase() || `client-${crypto.randomUUID()}`;
   if (normalizedUsername === ADMIN_USERNAME) return response.status(400).json({ message: 'That username is reserved. Please choose another.' });
 
   if (await User.findOne({ username: normalizedUsername })) {
@@ -995,6 +996,9 @@ app.post('/api/auth/signup', async (request, response) => {
       message: 'That username is already registered.',
     });
   }
+
+  const existingEmail = await User.exists({email:new RegExp(`^${parsed.data.email.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}$`,'i')});
+  if(existingEmail)return response.status(409).json({message:'That email address is already registered. Sign in or reset your password.'});
 
   const user = await User.create({
     ...parsed.data,

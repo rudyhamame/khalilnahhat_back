@@ -5,7 +5,7 @@ const {RoomServiceClient,EgressClient}=require('livekit-server-sdk');
 const {RoomEgress,AutoParticipantEgress,EncodedFileOutput,S3Upload,EncodedFileType,EncodingOptionsPreset}=require('@livekit/protocol');
 const {ArchiveItem}=require('./models');
 const {MediaItem}=require('./content');
-const http=require('http');
+const {recordingStorageConfig}=require('./recording-storage');
 const fs=require('fs/promises');
 const {createWriteStream}=require('fs');
 const {pipeline}=require('stream/promises');
@@ -21,11 +21,11 @@ const schema=new mongoose.Schema({
  error:{type:String,default:''},published:{type:Boolean,default:false},test:{type:Boolean,default:false},
 },{timestamps:true});
 const LiveRecording=mongoose.models.LiveRecording||mongoose.model('LiveRecording',schema);
-const BUCKET='echo-live-archive';
-function configured(){return Boolean(process.env.ECHO_RECORDING_ACCESS_KEY&&process.env.ECHO_RECORDING_SECRET&&process.env.ECHO_RECORDING_PUBLIC_ENDPOINT&&process.env.CLOUDINARY_API_SECRET);}
+function configured(){return Boolean(recordingStorageConfig()&&process.env.CLOUDINARY_API_SECRET);}
 function store(){
- const endpoint=process.env.ECHO_RECORDING_STORAGE_ENDPOINT?new URL(process.env.ECHO_RECORDING_STORAGE_ENDPOINT):null;
- return new Client({endPoint:endpoint?.hostname||process.env.ECHO_RECORDING_HOST||'echo-recording-store',port:endpoint?Number(endpoint.port||(endpoint.protocol==='https:'?443:80)):9000,useSSL:endpoint?.protocol==='https:',accessKey:process.env.ECHO_RECORDING_ACCESS_KEY,secretKey:process.env.ECHO_RECORDING_SECRET,region:'us-east-1'});
+ const config=recordingStorageConfig();
+ if(!config)throw Object.assign(new Error('Configure private S3 recording storage before broadcasting.'),{status:503});
+ return new Client({endPoint:config.host,port:config.port,useSSL:config.useSSL,accessKey:config.accessKey,secretKey:config.secretKey,region:config.region});
 }
 function sdk(Class){return new Class(process.env.LIVEKIT_URL,process.env.LIVEKIT_API_KEY,process.env.LIVEKIT_API_SECRET);}
 function recordingParts(row){return row.parts?.length?Array.from(row.parts):row.publicId?[{publicId:row.publicId,delivery:row.delivery||'authenticated',bytes:row.bytes,duration:row.duration}]:[];}
@@ -44,13 +44,15 @@ async function uploadRecordingPart(filename,publicId){
 function objectBelongsToRoom(key,roomName){return typeof key==='string'&&key.startsWith(roomName+'/')&&!key.includes('..')&&key.endsWith('.mp4');}
 async function prepareRecordingRoom(roomName,title,test=false){
  if(!configured())throw Object.assign(new Error('Automatic recording storage is not configured.'),{status:503});
+ const config=recordingStorageConfig(),BUCKET=config.bucket;
  const client=store();
- if(!await client.bucketExists(BUCKET))await client.makeBucket(BUCKET,'us-east-1');
- // Bound retained staging data; the bucket also enforces a hard quota.
+ if(!await client.bucketExists(BUCKET))throw Object.assign(new Error('Create the private recording staging bucket before broadcasting.'),{status:503});
+ // Bound visible staging data before another recording. Provider spending caps and
+ // version lifecycle rules must be configured separately.
  let used=0;for await(const obj of client.listObjectsV2(BUCKET,'',true)){used+=obj.size||0;}
  if(used>1024*1024*1024)throw Object.assign(new Error('Recording staging storage needs attention before another live.'),{status:503});
  const file=new EncodedFileOutput({fileType:EncodedFileType.MP4,filepath:`${roomName}/{publisher_identity}-{time}.mp4`,disableManifest:true,
-  output:{case:'s3',value:new S3Upload({accessKey:process.env.ECHO_RECORDING_ACCESS_KEY,secret:process.env.ECHO_RECORDING_SECRET,endpoint:process.env.ECHO_RECORDING_PUBLIC_ENDPOINT,bucket:BUCKET,region:'us-east-1',forcePathStyle:true})}});
+  output:{case:'s3',value:new S3Upload({accessKey:process.env.ECHO_RECORDING_ACCESS_KEY,secret:process.env.ECHO_RECORDING_SECRET,endpoint:config.publicEndpoint,bucket:BUCKET,region:config.region,forcePathStyle:true})}});
  const recording=await LiveRecording.create({roomName,title:title||'DJ Khalil — Live',test});
  try {
   await sdk(RoomServiceClient).createRoom({name:roomName,emptyTimeout:180,departureTimeout:15,
@@ -58,23 +60,8 @@ async function prepareRecordingRoom(roomName,title,test=false){
  }catch(error){await LiveRecording.updateOne({_id:recording._id},{$set:{status:'failed',error:'LiveKit could not enable recording.'}});throw Object.assign(new Error('LiveKit could not enable automatic recording.'),{status:503});}
  return recording;
 }
-function registerRecordingProxy(app){
- app.use('/echo-live-archive',(req,res)=>{
-  if(!configured())return res.status(503).end();
-  // Preserve the complete S3 path and Host header so the staging store verifies SigV4 itself.
-  const headers={...req.headers};delete headers.connection;
-  // Cloudflare normalizes Accept-Encoding. AWS Go signs its original identity value.
-  // Restoring that value leaves Garage responsible for validating the complete signature.
-  if(headers.authorization?.match(/SignedHeaders=([^,]+)/)?.[1].split(';').includes('accept-encoding'))headers['accept-encoding']='identity';
-  const upstream=http.request({hostname:process.env.ECHO_RECORDING_HOST||'echo-recording-store',port:9000,path:req.originalUrl,method:req.method,headers},response=>{
-   res.writeHead(response.statusCode,response.headers);response.pipe(res);
-  });
-  upstream.setTimeout(180_000,()=>upstream.destroy());
-  upstream.on('error',()=>{if(!res.headersSent)res.status(502).end();else res.destroy();});
-  req.on('aborted',()=>upstream.destroy());req.pipe(upstream);
- });
-}
 async function transferRecording(row){
+ const BUCKET=recordingStorageConfig()?.bucket;
  const claimed=await LiveRecording.findOneAndUpdate({_id:row._id,deletedAt:null,status:{$in:['waiting','recording','upload_failed','processing']},leaseUntil:{$lt:new Date()}},{$set:{status:'processing',leaseUntil:new Date(Date.now()+15*60*1000)},$inc:{attempts:1}},{new:true});
  if(!claimed)return;
  let directory;
@@ -175,4 +162,4 @@ function registerLiveRecordings(app,requireAdmin){
  });
  const timer=setInterval(()=>sweepRecordings().catch(()=>{}),15000);timer.unref();
 }
-module.exports={LiveRecording,prepareRecordingRoom,registerRecordingProxy,registerLiveRecordings,sweepRecordings,transferRecording,objectBelongsToRoom,view,recordingParts,recordingLink,uploadRecordingPart};
+module.exports={LiveRecording,prepareRecordingRoom,registerLiveRecordings,sweepRecordings,transferRecording,objectBelongsToRoom,view,recordingParts,recordingLink,uploadRecordingPart};

@@ -733,7 +733,7 @@ function parseCorsOrigins(value) {
 const configuredCorsOrigins = new Set([
   'http://localhost:5173',
   'http://192.168.68.104:5173',
-  'https://djkhalilnahhat.onrender.com',
+  'https://echo-khalil.onrender.com',
   ...parseCorsOrigins(process.env.CORS_ORIGIN),
 ]);
 
@@ -858,7 +858,6 @@ app.use(
   }),
 );
 
-require('./live-recordings').registerRecordingProxy(app);
 app.use(express.json({ type: ['application/json', 'application/webhook+json'], verify(request, _response, buffer) {
   if (request.path === '/api/live-stream/webrtc/webhook') request.rawBody = buffer.toString('utf8');
 } }));

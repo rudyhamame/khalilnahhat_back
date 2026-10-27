@@ -25,7 +25,7 @@ async function resolveTrack(id, local) {
   if (!local) return null;
   if (!remoteCatalog || Date.now()-remoteCatalogTime > 60000) {
     const responses = await Promise.all(['music-archive','player/playlist'].map(route =>
-      fetch(`https://khalil-api.mctoshs.ca/api/${route}`, {signal:AbortSignal.timeout(15000)})));
+      fetch(`https://echo-khalil-api.onrender.com/api/${route}`, {signal:AbortSignal.timeout(15000)})));
     if (!responses.some(response=>response.ok)) throw new Error('The published music library is unavailable.');
     const catalogs=await Promise.all(responses.map(response=>response.ok?response.json():{}));
     remoteCatalog=[...(catalogs[0].songs||[]),...(catalogs[1].enabled===false?[]:catalogs[1].items||[])];

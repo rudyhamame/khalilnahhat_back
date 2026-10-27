@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: rh-khalil-api
+    name: echo-khalil-api
     runtime: docker
     plan: free
     healthCheckPath: /api/health
@@ -11,6 +11,10 @@ services:
         value: "https://echo-khalil.onrender.com"
       - key: CORS_ORIGIN
         value: "https://echo-khalil.onrender.com"
+      - key: YOUTUBE_PROCESSING_MODE
+        value: server
+      - key: GOOGLE_CLIENT_ID
+        sync: false
       - key: MONGODB_URI
         sync: false
       - key: MUSIC_ARCHIVE_STORAGE_PROVIDER

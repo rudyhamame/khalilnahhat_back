@@ -14,16 +14,11 @@ The backend uses LiveKit Cloud RTMP ingress and the existing WebRTC viewer-token
 
 Automatic recording is enabled before the key is issued. It uses existing private staging and Cloudinary transfer; recordings stay private until published through Live archive. Existing staging/account limits still apply. An unused preparation can leave a failed/empty recording entry after the existing recorder timeout; no recording is fabricated.
 
-## Deployment (2026-10-23)
+## Current deployment
 
-The local frontend serves the UI on port 5176 (also the current 5187 preview). The shared API was deployed as a scoped image `rh-khalil-obs:20261023`, based on `rh-khalil-admin:20261015`. Only server.js, models.js, live-broadcast.js and new obs-broadcast.js changed in the image. Unrelated checkout quote/payment changes were excluded.
+The API runs on https://echo-khalil-api.onrender.com and the website on https://echo-khalil.onrender.com. Deploy the repository's standard Dockerfile through Render. Configure LiveKit credentials and private S3-compatible recording staging in the API environment; Cloudinary remains the final private recording store. See [Render deployment](RENDER-DEPLOYMENT.md). Recording is required before issuing an OBS key; missing staging storage must remain an explicit setup failure.
 
-Remote directory: `/srv/rh/echo-dj/obs-20261023`.
-Use base `/srv/rh/streaming/deploy/ovh-compose.yml`, previous `/srv/rh/echo-dj/admin-20261015/admin.override.yml`, then private `obs.override.json`. The last file snapshots the existing API environment and must remain mode 0600 on the server; do not copy it into source or artifacts. Recreate only `rh-khalil-api` with `--no-deps --no-build`. The retained previous image and `rollback.override.json` provide rollback. For rollback, use the rollback file instead of the OBS override.
-
-No public frontend publishing or Android rebuild was performed. The shared backend supports existing Android/browser producers. Accounts, login sessions, playlists and real business data were not changed.
-
-## Verification
+## Historical verification — 2026-10-23
 
 - 38 backend tests, including 10 OBS regressions and 11 browser/Android broadcast regressions.
 - Exact production image: 21 broadcast regressions pass.

@@ -44,7 +44,7 @@ MONGODB_DB_NAME=khalil
 Example:
 
 ```text
-CORS_ORIGIN=http://localhost:5173,http://192.168.68.104:5173,https://djkhalilnahhat.onrender.com
+CORS_ORIGIN=http://localhost:5173,http://192.168.68.104:5173,https://echo-khalil.onrender.com
 ```
 
 Use `*` only if you intentionally want to allow every origin.
@@ -70,8 +70,8 @@ BREVO_API_KEY=your_brevo_api_key
 EMAIL_FROM_ADDRESS=your_verified_brevo_sender
 EMAIL_FROM_NAME=Khalil Nahhat Website
 SERVICE_REQUEST_NOTIFICATION_EMAIL=khalilnahhatdj@gmail.com
-ADMIN_SERVICES_URL=https://djkhalilnahhat.onrender.com/admin/services
-CUSTOMER_SERVICES_URL=https://djkhalilnahhat.onrender.com/dashboard/services
+ADMIN_SERVICES_URL=https://echo-khalil.onrender.com/admin/services
+CUSTOMER_SERVICES_URL=https://echo-khalil.onrender.com/dashboard/services
 ```
 
 `EMAIL_FROM_ADDRESS` must be a sender verified in your Brevo account. A failed notification is logged but does not discard the customer's saved request.
@@ -135,13 +135,17 @@ YT_DLP_PATH=/absolute/path/to/yt-dlp
 FFMPEG_PATH=/absolute/path/to/ffmpeg
 ```
 
-For Render, add the equivalent `ffmpeg` and `yt-dlp` installation commands to the backend Build Command, then redeploy. Only convert audio you own or are licensed to use.
+The Render Dockerfile installs `ffmpeg` and `yt-dlp` and selects server-side conversion. Only convert audio you own or are licensed to use.
 
 
 ### YouTube account panel
 
 The Add music form has a Music source selector. YouTube mode includes an administrator-only connection panel: account/session label, access status and last check, a link to sign in or switch account on YouTube, session import/replacement, a real video access check, and sign-out from the converter. A browser sign-in alone does not update the server. The label is supplied by the administrator; it is not a verified Google identity. This is cookie-session authentication, not Google OAuth, and an OAuth sign-in alone does not grant video download access.
 
-Configure `YT_DLP_COOKIES_FILE` to a private persistent file outside the repository (production: `/run/youtube-auth/cookies.txt`, backed by `/srv/rh/echo-dj/youtube-auth`). The file and its status metadata are mode 0600 in a mode 0700 directory. The converter copies the file to its own temporary directory and removes that copy after each operation. Only YouTube/Google domains are accepted on session import; unrelated cookies are discarded. Sign-out removes the server session and metadata and leaves the browser signed in. Expired or rejected sessions are explicit errors and never create an empty archive entry.
+Configure `YT_DLP_COOKIES_FILE` to a private persistent file outside the repository (an optional persistent file configured on the API host). The file and its status metadata are mode 0600 in a mode 0700 directory. The converter copies the file to its own temporary directory and removes that copy after each operation. Only YouTube/Google domains are accepted on session import; unrelated cookies are discarded. Sign-out removes the server session and metadata and leaves the browser signed in. Expired or rejected sessions are explicit errors and never create an empty archive entry.
 
 Connection endpoints, all admin-only: `GET/POST/DELETE /api/admin/youtube-session`, `POST /api/admin/youtube-session/check` with `{ sourceUrl }`. Session import uses multipart `sessionFile` (Netscape cookies.txt, max 1 MB) and `accountLabel`. No cookie values are returned in API responses. Session changes are rejected while a conversion is active.
+
+## Current hosting
+
+Website: https://echo-khalil.onrender.com. API: https://echo-khalil-api.onrender.com/api. MongoDB uses the configured Atlas connection; archive media uses Cloudinary. The standard Dockerfile and render.yaml are the deployment entry points. Local browser previews forward API requests to Render, including AI booking and stems. See [Render deployment](docs/RENDER-DEPLOYMENT.md).

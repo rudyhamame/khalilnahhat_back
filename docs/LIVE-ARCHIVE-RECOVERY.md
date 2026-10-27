@@ -16,6 +16,6 @@ The table has plain recording titles, 20px vertical/18px horizontal cell padding
 
 ## Deployment and validation
 
-Scoped image `rh-khalil-recordings:20261023` is running in `deploy-rh-khalil-api-1`. Existing environment was preserved. Deployment overlay and private rollback/environment files are under `/srv/rh/echo-dj/recording-recovery-20261023`; never copy their environment values into source or artifacts. Previous image `rh-khalil-obs:20261023` is retained. Compose also uses the existing OVH base and admin overlay.
+The application now runs on Render using the standard Dockerfile. Saved recordings remain in Cloudinary. Recording staging is an explicit private S3-compatible service configured through the API environment; see [Render deployment](RENDER-DEPLOYMENT.md). The recovery results below describe the October 23 validation, not a new broadcast test.
 
 Backend: 46 tests pass; exact production image recording tests: 10 pass. Frontend: 11 tests pass, lint passes with two existing warnings, production build passes with the existing large-chunk warning. API health HTTP 200; unauthenticated DELETE HTTP 401. Desktop DOM confirms one viewport, four delete controls, 0px title borders, 20px/18px padding, and paused playable preview. Screenshot: `live-archive-final.png` in the workspace recovery artifacts. New real broadcast lifecycle and reconnect stitching were not exercised; existing first-completed-egress selection remains unchanged.

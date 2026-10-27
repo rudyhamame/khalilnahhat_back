@@ -44,6 +44,8 @@ const {
 } = require('./brevo');
 
 const app = express();
+// Render terminates public requests at one reverse proxy; retain per-client login limits.
+if (process.env.RENDER === 'true') app.set('trust proxy', 1);
 const PORT = process.env.PORT || 4000;
 const upload = multer({ storage: multer.memoryStorage() });
 const liveRequestPriceCents = 0;
@@ -937,6 +939,11 @@ app.get('/api/auth/me', async (request, response) => {
   return response.json({
     user: serializeUser(user),
   });
+});
+
+require('./google-auth').registerGoogleAuth(app, {
+  User, serializeUser, isAdminUser,
+  allowedOrigins: [...configuredCorsOrigins, getFrontendUrl()],
 });
 
 app.post('/api/auth/login', async (request, response) => {
@@ -1869,7 +1876,10 @@ app.use((error, _request, response, _next) => {
 require('./mobile-admin').registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest: serializeServiceRequest });
 const {createAiConfiguration,registerAiConfiguration}=require('./ai-configuration');
 const aiConfiguration=createAiConfiguration();
-registerAiConfiguration(app,{requireAdmin,service:aiConfiguration});
+registerAiConfiguration(app,{
+  requireAdmin: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, adminCheck: isAdminUser }),
+  service:aiConfiguration,
+});
 require('./ai-booking').registerAiBooking(app, {
   configService:aiConfiguration,
   requireAuth: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest }),

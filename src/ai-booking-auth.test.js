@@ -12,14 +12,14 @@ test('recognizes local sessions without an external check', async () => {
   const result = await check({ localAuth: async () => ({ id: 'local-user' }), fetchImpl: () => { throw Error('must not call'); } });
   assert.equal(result.advanced, true); assert.equal(result.user.id, 'local-user');
 });
-test('recognizes the existing OVH session when it is absent locally', async () => {
+test('recognizes the existing Render session when it is absent locally', async () => {
   const result = await check({ fetchImpl: async (url, options) => {
-    assert.equal(url, 'https://khalil-api.mctoshs.ca/api/auth/me');
+    assert.equal(url, 'https://echo-khalil-api.onrender.com/api/auth/me');
     assert.equal(options.headers.Authorization, 'Bearer unit-session');
     assert.equal(options.redirect, 'error');
-    return new Response(JSON.stringify({ user: { id: 'ovh-user', email: 'not-forwarded@example.test' } }));
+    return new Response(JSON.stringify({ user: { id: 'render-user', email: 'not-forwarded@example.test' } }));
   } });
-  assert.equal(result.advanced, true); assert.deepEqual(result.user, { id: 'ovh-user' });
+  assert.equal(result.advanced, true); assert.deepEqual(result.user, { id: 'render-user' });
 });
 test('rejects expired or absent sessions and fails closed on upstream outages', async () => {
   assert.equal((await check({}, '')).code, 401);

@@ -80,3 +80,17 @@ test('OpenRouter settings enforce free selection and verified rates independentl
  const paid=await service.save({...saved,chat:{...saved.chat,model:'vendor/paid',freeOnly:false}},'admin');assert.equal(paid.chat.providerRates.textInput,1);
  const description=await service.describe();assert.equal(description.providers.openrouter.configured,true);assert.doesNotMatch(JSON.stringify(description),/router-private|openai-private/);
 });
+
+test('OpenAI provider rates come from the catalog while customer prices remain editable',async()=>{
+ const {service}=fixture();const body=await service.load();
+ body.chat.providerRates={textInput:999,textCached:0,textOutput:999};
+ body.voice.providerRates={textInput:999,textCached:0,textOutput:999,audioInput:999,audioCached:0,audioOutput:999};
+ body.customerPricing={policy:'manual_invoice',currency:'CAD',chatReplyCents:125,voiceSessionCents:300};
+ const saved=await service.save(body,'admin');
+ assert.deepEqual(saved.chat.providerRates,defaults({}).chat.providerRates);
+ assert.deepEqual(saved.voice.providerRates,defaults({}).voice.providerRates);
+ assert.deepEqual(saved.customerPricing,body.customerPricing);
+ const changed=await service.save({...saved,chat:{...saved.chat,model:'gpt-5.6-luna'}},'admin');
+ assert.deepEqual(changed.chat.providerRates,{textInput:0.2,textCached:0.02,textOutput:1.2});
+ assert.deepEqual(changed.customerPricing,body.customerPricing);
+});

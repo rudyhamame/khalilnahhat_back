@@ -67,6 +67,11 @@ function createAiConfiguration({store=mongoStore,env=process.env,fetchImpl=fetch
     parsed.data.chat.providerRates={...model.rates};
     if(parsed.data.chat.enabled&&!openrouter.configured())throw error(503,'Configure OPENROUTER_API_KEY in Render before enabling OpenRouter.');
    }else if(!catalog.some(item=>item.mode==='chat'&&item.id===parsed.data.chat.model))throw error(400,'Choose a supported OpenAI chat model.');
+   for(const mode of ['chat','voice']){
+    if(mode==='chat'&&parsed.data.chat.provider==='openrouter')continue;
+    const model=catalog.find(item=>item.mode===mode&&item.id===parsed.data[mode].model);
+    parsed.data[mode].providerRates={...model.rates};
+   }
    for(const mode of ['chat','voice'])if(!(mode==='chat'&&parsed.data.chat.provider==='openrouter')&&parsed.data[mode].enabled&&(old[mode].model!==body[mode].model||(old[mode].provider||'openai')!==(parsed.data[mode].provider||'openai')||!old.revision)){
     if(!env.OPENAI_API_KEY)throw error(503,'Configure the provider API key on the server before enabling a model.');
     const response=await fetchImpl(`https://api.openai.com/v1/models/${encodeURIComponent(body[mode].model)}`,{headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},signal:AbortSignal.timeout(10000)});

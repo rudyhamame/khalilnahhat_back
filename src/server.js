@@ -1884,6 +1884,11 @@ registerAiConfiguration(app,{
   requireAdmin: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, adminCheck: isAdminUser }),
   service:aiConfiguration,
 });
+const {mongoBillingStore,createAiBilling,registerAiBilling}=require('./ai-billing');
+registerAiBilling(app, {
+  requireAdmin: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, adminCheck: isAdminUser }),
+  service: createAiBilling({store:mongoBillingStore(require('./ai-configuration').usageModel)}),
+});
 require('./ai-booking').registerAiBooking(app, {
   configService:aiConfiguration,
   requireAuth: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest }),

@@ -28,7 +28,7 @@ function defaults(env=process.env){
  return {revision:0,chat:{provider:chatProvider,freeOnly:true,enabled:true,model:chatModel,providerRates:chatProvider==='openrouter'?{textInput:0,textCached:0,textOutput:0}:{...entry('chat',chatModel).rates},maxOutputTokens:chatProvider==='openrouter'?4096:2400,requestsPer10Min:20},voice:{enabled:true,model:voiceModel,providerRates:{...entry('voice',voiceModel).rates},maxOutputTokens:1200,requestsPer10Min:3,maxCallSeconds:300},customerPricing:{policy:'included',currency:'CAD',chatReplyCents:0,voiceSessionCents:0}};
 }
 const configModel=mongoose.models.EchoAiConfiguration||mongoose.model('EchoAiConfiguration',new mongoose.Schema({_id:String,value:mongoose.Schema.Types.Mixed,updatedBy:String},{timestamps:true}));
-const usageModel=mongoose.models.EchoAiUsage||mongoose.model('EchoAiUsage',new mongoose.Schema({_id:String,owner:{type:String,index:true},mode:String,model:String,revision:Number,state:String,billingStatus:String,customerCents:Number,currency:String,providerUsdEstimate:{type:Number,default:null},metrics:mongoose.Schema.Types.Mixed,reference:String,paymentMethod:String,updatedBy:String},{timestamps:true}));
+const usageModel=mongoose.models.EchoAiUsage||mongoose.model('EchoAiUsage',new mongoose.Schema({_id:String,owner:{type:String,index:true},mode:String,model:String,revision:Number,state:String,billingStatus:String,customerCents:Number,currency:String,providerUsdEstimate:{type:Number,default:null},metrics:mongoose.Schema.Types.Mixed,invoiceId:String,reference:String,paymentMethod:String,updatedBy:String},{timestamps:true}));
 usageModel.schema.index({createdAt:-1});
 const mongoStore={
  getConfig:()=>configModel.findById('echo-ai').lean(),
@@ -44,7 +44,7 @@ const mongoStore={
  fail:id=>usageModel.updateOne({_id:id,state:'pending'},{$set:{state:'failed',customerCents:0,billingStatus:'included'}}),
  updateMetrics:(id,metrics)=>usageModel.updateOne({_id:id},{$set:{metrics}}),
  listUsage:()=>usageModel.find().sort({createdAt:-1}).limit(100).lean(),
- async billing(id,owner,action){return usageModel.findOneAndUpdate({_id:id,state:'completed',billingStatus:{$in:action.status==='paid'?['invoiced']:['unbilled','invoiced']}},{$set:{billingStatus:action.status,reference:action.reference,paymentMethod:action.paymentMethod||'',updatedBy:owner}},{new:true}).lean();},
+ async billing(id,owner,action){return usageModel.findOneAndUpdate({_id:id,invoiceId:{$exists:false},state:'completed',billingStatus:{$in:action.status==='paid'?['invoiced']:['unbilled','invoiced']}},{$set:{billingStatus:action.status,reference:action.reference,paymentMethod:action.paymentMethod||'',updatedBy:owner}},{new:true}).lean();},
 };
 const error=(status,message)=>Object.assign(new Error(message),{status});
 function providerEstimate(config,mode,metrics){
@@ -111,4 +111,4 @@ function registerAiConfiguration(app,{requireAdmin,service}){
  app.get('/api/ai-booking/admin/usage',requireAdmin,guarded(async(_req,res)=>res.json({items:await service.listUsage()})));
  app.patch('/api/ai-booking/admin/usage/:id',requireAdmin,guarded(async(req,res)=>{if(!/^[a-f0-9]{64}$/.test(req.params.id))throw error(400,'Invalid usage entry.');await service.billing(req.params.id,String(req.user?._id||req.authUser?.id||''),req.body);res.json({ok:true});}));
 }
-module.exports={catalog,configSchema,defaults,publicPolicy,providerEstimate,createAiConfiguration,registerAiConfiguration};
+module.exports={usageModel,catalog,configSchema,defaults,publicPolicy,providerEstimate,createAiConfiguration,registerAiConfiguration};

@@ -1766,7 +1766,7 @@ async function convertArchiveYoutube(sourceUrl) {
   } finally { youtubeConversionActive = false; }
 }
 registerYoutubeSessionRoutes(app, {
-  requireAdmin, usesLocalWorker: () => Boolean(process.env.YOUTUBE_WORKER_SOCKET), store: youtubeSessionStore, convert: convertArchiveYoutube, normalizeUrl: normalizeYoutubeUrl, isBusy: () => youtubeConversionActive,
+  requireAdmin, usesLocalWorker: () => process.env.YOUTUBE_PROCESSING_MODE !== 'server' && Boolean(process.env.YOUTUBE_WORKER_SOCKET), store: youtubeSessionStore, convert: convertArchiveYoutube, normalizeUrl: normalizeYoutubeUrl, isBusy: () => youtubeConversionActive,
   upload: multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024, files: 1, fields: 1 } }).single('sessionFile'),
 });
 

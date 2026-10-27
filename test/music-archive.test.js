@@ -52,6 +52,19 @@ test('admin CRUD, draft isolation, parent protection and reorder work through re
   assert.equal((await request(`/admin/music-archive/albums/${a.id}`,'DELETE')).status,200);
 });
 
+test('Cloudinary-required uploads fail closed when credentials are missing', async t => {
+  const app = express();
+  registerMusicArchive(app, { requireAdmin: (_req, _res, next) => next(), requireCloudinary: true, useCloudinary: false });
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const body = new FormData();
+  body.append('file', new Blob(['test bytes'], { type: 'audio/mpeg' }), 'test.mp3');
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/api/admin/music-archive/upload`, { method: 'POST', body });
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).message, /has not been saved/);
+});
+
 test('uploads require admin, reject executable/image impostor types and store allowed audio as authenticated media', async t => {
   const app = express(); const options = [];
   const fakeCloud = { uploader: { upload_stream: (config, done) => { options.push(config); return { end: () => done(null, { secure_url:'https://res.cloudinary.com/qa/video/upload/audio.mp3',duration:66 }) }; } } };

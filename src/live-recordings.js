@@ -23,7 +23,10 @@ const schema=new mongoose.Schema({
 const LiveRecording=mongoose.models.LiveRecording||mongoose.model('LiveRecording',schema);
 const BUCKET='echo-live-archive';
 function configured(){return Boolean(process.env.ECHO_RECORDING_ACCESS_KEY&&process.env.ECHO_RECORDING_SECRET&&process.env.ECHO_RECORDING_PUBLIC_ENDPOINT&&process.env.CLOUDINARY_API_SECRET);}
-function store(){return new Client({endPoint:process.env.ECHO_RECORDING_HOST||'echo-recording-store',port:9000,useSSL:false,accessKey:process.env.ECHO_RECORDING_ACCESS_KEY,secretKey:process.env.ECHO_RECORDING_SECRET,region:'us-east-1'});}
+function store(){
+ const endpoint=process.env.ECHO_RECORDING_STORAGE_ENDPOINT?new URL(process.env.ECHO_RECORDING_STORAGE_ENDPOINT):null;
+ return new Client({endPoint:endpoint?.hostname||process.env.ECHO_RECORDING_HOST||'echo-recording-store',port:endpoint?Number(endpoint.port||(endpoint.protocol==='https:'?443:80)):9000,useSSL:endpoint?.protocol==='https:',accessKey:process.env.ECHO_RECORDING_ACCESS_KEY,secretKey:process.env.ECHO_RECORDING_SECRET,region:'us-east-1'});
+}
 function sdk(Class){return new Class(process.env.LIVEKIT_URL,process.env.LIVEKIT_API_KEY,process.env.LIVEKIT_API_SECRET);}
 function recordingParts(row){return row.parts?.length?Array.from(row.parts):row.publicId?[{publicId:row.publicId,delivery:row.delivery||'authenticated',bytes:row.bytes,duration:row.duration}]:[];}
 function view(row){const parts=recordingParts(row);return {id:String(row._id),title:row.title,status:row.status,bytes:row.bytes,durationSec:row.duration,published:row.published,createdAt:row.createdAt,error:row.error||'',canPreview:row.status==='ready'&&parts.length>0,partCount:parts.length,parts:parts.map((part,index)=>({index,bytes:part.bytes,durationSec:part.duration}))};}

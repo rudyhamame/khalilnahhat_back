@@ -52,7 +52,7 @@ async function publicSongs(ArchiveModel = ArchiveItem) {
   return visibleSongs(songs, albums, categories);
 }
 
-function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, AlbumModel = Album, CategoryModel = Category, cloudinaryClient = cloudinary, useCloudinary = Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) } = {}) {
+function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, AlbumModel = Album, CategoryModel = Category, cloudinaryClient = cloudinary, requireCloudinary = process.env.RENDER === 'true' || process.env.MUSIC_ARCHIVE_STORAGE_PROVIDER === 'cloudinary', useCloudinary = Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) } = {}) {
   const models = { categories: CategoryModel, albums: AlbumModel, songs: ArchiveModel };
   async function catalog(admin) {
     const [categories, albums, songs] = await Promise.all(Object.values(models).map(model => model.find().sort({ sortOrder: 1, createdAt: -1 })));
@@ -117,6 +117,7 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, A
     const image = file && /^image\/(jpeg|png|webp)$/.test(file.mimetype);
     if (!audio && !image) return res.status(400).json({ message: 'Choose an MP3, WAV, M4A, Ogg, AAC, FLAC, WebM audio file or a JPG, PNG, WebP image.' });
     if (image && file.size > 10 * 1024 * 1024) return res.status(400).json({ message: 'Cover images must be under 10 MB.' });
+    if (requireCloudinary && !useCloudinary) return res.status(503).json({ message: 'Cloudinary storage is not configured. Contact the administrator; your file has not been saved.' });
     try {
       if (!useCloudinary) return res.status(201).json(await archiveFiles.saveLocalFile(file));
       const result = await new Promise((resolve, reject) => cloudinaryClient.uploader.upload_stream({ folder: 'khalil/music-archive', resource_type: audio ? 'video' : 'image', type: 'authenticated',

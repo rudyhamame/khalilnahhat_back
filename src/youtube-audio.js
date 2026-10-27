@@ -57,7 +57,7 @@ async function convertYoutubeToWav(sourceUrl, { localOnly = false, command } = {
     throw new Error('Only YouTube URLs can be converted.');
   }
 
-  if (!localOnly && process.env.YOUTUBE_WORKER_SOCKET) {
+  if (!localOnly && process.env.YOUTUBE_PROCESSING_MODE !== 'server' && process.env.YOUTUBE_WORKER_SOCKET) {
     return convertViaYoutubeWorker(normalizedUrl, { socketPath: process.env.YOUTUBE_WORKER_SOCKET, keyFile: process.env.YOUTUBE_WORKER_KEY_FILE });
   }
 

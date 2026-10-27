@@ -1,20 +1,20 @@
 services:
   - type: web
     name: rh-khalil-api
-    runtime: node
+    runtime: docker
     plan: free
-    buildCommand: npm ci --omit=dev
-    startCommand: npm start
-    healthCheckPath: /
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION
         value: "24"
       - key: FRONTEND_URL
-        value: "https://rh-khalil.onrender.com"
+        value: "https://echo-khalil.onrender.com"
       - key: CORS_ORIGIN
-        value: "https://rh-khalil.onrender.com"
+        value: "https://echo-khalil.onrender.com"
       - key: MONGODB_URI
         sync: false
+      - key: MUSIC_ARCHIVE_STORAGE_PROVIDER
+        value: cloudinary
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY

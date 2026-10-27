@@ -1867,7 +1867,11 @@ app.use((error, _request, response, _next) => {
 });
 
 require('./mobile-admin').registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest: serializeServiceRequest });
+const {createAiConfiguration,registerAiConfiguration}=require('./ai-configuration');
+const aiConfiguration=createAiConfiguration();
+registerAiConfiguration(app,{requireAdmin,service:aiConfiguration});
 require('./ai-booking').registerAiBooking(app, {
+  configService:aiConfiguration,
   requireAuth: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest }),
 });
 require('./booking-conversations').registerBookingConversations(app, {

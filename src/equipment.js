@@ -2,6 +2,7 @@ const cloudinary = require('cloudinary').v2;
 const mongoose = require('mongoose');
 const multer = require('multer');
 const { z } = require('zod');
+const { stockView } = require('./equipment-stock');
 
 const equipmentSchema = new mongoose.Schema(
   {
@@ -55,7 +56,7 @@ async function ensureSeed() {
 
 const publicView = (e) => ({
   id: e.slug, category: e.category, name: e.name, brandModel: e.brandModel,
-  description: e.description, imageUrl: e.imageUrl, minQuantity: e.minQuantity,
+  description: e.description, imageUrl: e.imageUrl, minQuantity: e.minQuantity, ...stockView(e),
 });
 const adminView = (e) => ({
   ...publicView(e), priceCents: e.priceCents, quantityOwned: e.quantityOwned, stockTracked: e.stockTracked, isActive: e.isActive, sortOrder: e.sortOrder,
@@ -122,4 +123,4 @@ function registerEquipmentRoutes(app, requireAdmin) {
   });
 }
 
-module.exports = { Equipment, registerEquipmentRoutes, publicView };
+module.exports = { Equipment, registerEquipmentRoutes, publicView, ensureSeed };

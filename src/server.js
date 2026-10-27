@@ -99,8 +99,9 @@ async function ensureServicePrices() {
   );
 }
 
-function serializeServicePrice(price) {
+function serializeServicePrice(price, equipment = []) {
   return {
+    ...require('./equipment-stock').priceStockView(price, equipment),
     id: price.serviceId,
     name: price.name,
     category: price.category,
@@ -1163,8 +1164,9 @@ const servicePriceUpdateSchema = z.object({
 
 app.get('/api/prices', requireAdmin, async (_request, response) => {
   await ensureServicePrices();
-  const prices = await ServicePrice.find().sort({ category: 1, name: 1 });
-  return response.json({ items: prices.map(serializeServicePrice) });
+  await require('./equipment').ensureSeed();
+  const [prices, equipment] = await Promise.all([ServicePrice.find().sort({ category: 1, name: 1 }), Equipment.find()]);
+  return response.json({ items: prices.map(price => serializeServicePrice(price, equipment)) });
 });
 
 app.patch('/api/prices/:id', requireAdmin, async (request, response) => {
@@ -1191,7 +1193,9 @@ app.patch('/api/prices/:id', requireAdmin, async (request, response) => {
     return response.status(404).json({ message: 'Price item not found.' });
   }
 
-  return response.json({ item: serializeServicePrice(price) });
+  const slug = require('./equipment-stock').PRICE_EQUIPMENT[price.serviceId];
+  const equipment = slug ? await Equipment.find({ slug }) : [];
+  return response.json({ item: serializeServicePrice(price, equipment) });
 });
 
 app.post('/api/live-sessions', requireAdmin, async (request, response) => {

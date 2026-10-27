@@ -32,3 +32,11 @@ On 2026-10-27, an isolated upload/read/content comparison/delete check passed ag
 ## Rollback and historical evidence
 
 Use Render's previous successful deploy for a code rollback. Credentials remain in Render. Retired host deployment definitions were removed from the active project; historical files and verification records remain in Git history and dated artifacts, not current operational instructions. Do not restore an old host dependency as a fallback.
+
+## OpenRouter text booking
+
+Set `OPENROUTER_API_KEY` directly in the API service’s Render environment. Do not put it in the browser or Git. With no saved AI configuration, adding this key selects `openrouter/free` for chat. An existing saved configuration is preserved: use Admin → ECHO AI Configuration to choose OpenRouter, a model, and Save configuration. Voice continues to use the separate OpenAI key and real-time model.
+
+The admin catalog refreshes from OpenRouter and lists text models advertising structured outputs. Embedding models are excluded. Free models only is enabled by default and is enforced server-side using verified zero catalog pricing and zero-price provider routing. Paid models require turning that option off explicitly. No paid model fallback is configured. Rate limits or unavailable providers return an error; manual booking remains available.
+
+OpenRouter replies are returned after the complete JSON reply has been validated; OpenAI retains token streaming. Model prices shown in the ledger are estimates. OpenRouter catalog failures preserve saved settings and expose a reload message; a removed or incompatible model fails closed rather than silently switching providers. A saved model being available in the catalog does not prove its real generation quality; test English, Arabic and realistic orders before relying on it.

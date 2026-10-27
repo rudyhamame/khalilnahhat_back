@@ -44,6 +44,8 @@ const {
 } = require('./brevo');
 
 const app = express();
+// Render terminates public requests at one reverse proxy; retain per-client login limits.
+if (process.env.RENDER === 'true') app.set('trust proxy', 1);
 const PORT = process.env.PORT || 4000;
 const upload = multer({ storage: multer.memoryStorage() });
 const liveRequestPriceCents = 0;

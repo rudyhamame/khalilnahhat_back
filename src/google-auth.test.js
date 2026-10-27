@@ -11,13 +11,13 @@ async function setup(t,{users=[],profile={},verifyFailure=false,clientId='exampl
     findOneAndUpdate:async(filter,update)=>{const user=records.find(item=>item._id===filter._id&&!item.googleSubject);if(!user)return null;Object.assign(user,update.$set);return user;},
     create:async data=>{created++;const user={...data,_id:'new-id',save:async()=>{}};records.push(user);return user;},
   };
-  const app=express();app.use(express.json());
+  const app=express();app.set('trust proxy',1);app.use(express.json());
   let nonce;
   registerGoogleAuth(app,{User,clientId,now:()=>clock.value,allowedOrigins:['https://echo.example'],isAdminUser:user=>user.username==='administrator',serializeUser:user=>({id:user._id,username:user.username,email:user.email,isAdmin:user.isAdmin}),verifyToken:async()=>{verified++;if(verifyFailure)throw Error('private provider details');return {sub:'google-subject',email:'client@gmail.com',email_verified:true,nonce,...profile};}});
   const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
   const base=`http://127.0.0.1:${server.address().port}`;
   const config=async()=>{const response=await fetch(base+'/api/auth/google/config');const data=await response.json();nonce=data.nonce;return {response,data};};
-  const post=async(body,origin='https://echo.example')=>{const response=await fetch(base+'/api/auth/google',{method:'POST',headers:{'Content-Type':'application/json',Origin:origin},body:JSON.stringify(body||{credential:'signed-google-token',nonce})});return {status:response.status,data:await response.json()};};
+  const post=async(body,origin='https://echo.example',ip='192.0.2.1')=>{const response=await fetch(base+'/api/auth/google',{method:'POST',headers:{'Content-Type':'application/json',Origin:origin,'X-Forwarded-For':ip},body:JSON.stringify(body||{credential:'signed-google-token',nonce})});return {status:response.status,data:await response.json()};};
   return {config,post,records,clock,stats:()=>({verified,created})};
 }
 test('Google sign-in stays disabled without a configured client ID',async t=>{
@@ -55,4 +55,11 @@ test('Google-only profiles allow missing phone and surname; password accounts st
   const {User}=require('./models');
   const google=new User({googleSubject:'subject',firstName:'Client',lastName:'',username:'client',passwordHash:'unusable',email:'client@gmail.com',phoneNumber:''});assert.equal(google.validateSync(),undefined);
   const password=new User({firstName:'Client',lastName:'',username:'client',passwordHash:'hash',email:'client@gmail.com',phoneNumber:''});const errors=password.validateSync().errors;assert.ok(errors.lastName);assert.ok(errors.phoneNumber);
+});
+
+test('rate limits are bounded per client behind the hosting proxy',async t=>{
+  const api=await setup(t);
+  for(let i=0;i<10;i++)assert.equal((await api.post({credential:'invalid'})).status,401);
+  assert.equal((await api.post({credential:'invalid'})).status,429);
+  await api.config();assert.equal((await api.post(undefined,'https://echo.example','192.0.2.2')).status,200);
 });

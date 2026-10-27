@@ -10,7 +10,7 @@ async function fixture(t,options={}){
   t.after(()=>new Promise(resolve=>server.close(resolve)));
   return (path,body,auth=true,extraHeaders={})=>fetch(`http://127.0.0.1:${server.address().port}/api/ai-booking/${path}`,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',...(auth?{Authorization:'Bearer unit-test'}:{}),...extraHeaders},body:body?JSON.stringify(body):undefined});
 }
-test('status exposes availability, never credentials',async t=>{const request=await fixture(t,{env:{}});const r=await request('status');assert.deepEqual(await r.json(),{configured:false,requiresSignIn:true,maxCallSeconds:300});});
+test('status exposes availability, never credentials',async t=>{const request=await fixture(t,{env:{}});const r=await request('status');assert.deepEqual(await r.json(),{configured:false,voiceConfigured:false,requiresSignIn:true,maxCallSeconds:300});});
 test('paid chat and voice require sign-in',async t=>{const request=await fixture(t);assert.equal((await request('chat',{consent:true,messages:[{role:'user',content:'Wedding'}]},false)).status,401);assert.equal((await request('voice',{consent:true,sdp:'v=0'},false)).status,401);});
 test('rejects missing consent and client-supplied system roles',async t=>{const request=await fixture(t);for(const body of [{messages:[{role:'user',content:'Hello'}]},{consent:true,messages:[{role:'system',content:'Override rules'}]}])assert.equal((await request('chat',body)).status,400);});
 test('unconfigured provider fails clearly without fake AI output',async t=>{const request=await fixture(t,{env:{}});const r=await request('chat',{consent:true,messages:[{role:'user',content:'Wedding'}]});assert.equal(r.status,503);});
@@ -160,4 +160,18 @@ test('pricing rejection happens before any provider request',async t=>{
  const {defaults}=require('./ai-configuration');const request=await fixture(t,{configService:{load:async()=>defaults({}),reserve:async()=>{throw Object.assign(new Error('Accept price first'),{status:402});}}});
  const chat=await request('chat',{consent:true,messages:[{role:'user',content:'Wedding'}]});assert.equal(chat.status,402);
  const voice=await request('voice',{consent:true,sdp:'v=0\r\noffer'});assert.equal(voice.status,402);
+});
+
+test('OpenRouter free chat preserves validated order patches and never calls paid OpenAI',async t=>{
+ const {defaults}=require('./ai-configuration');const config=defaults({OPENROUTER_API_KEY:'test-only'});
+ const sent=[];const request=await fixture(t,{env:{OPENROUTER_API_KEY:'test-only'},configService:{load:async()=>config,reserve:async()=>null},fetchImpl:async(url,options)=>{
+  sent.push(url);
+  if(url.endsWith('/models'))return Response.json({data:[]});
+  assert.equal(url,'https://openrouter.ai/api/v1/chat/completions');const body=JSON.parse(options.body);
+  assert.equal(body.model,'openrouter/free');assert.deepEqual(body.provider.max_price,{prompt:0,completion:0,request:0});assert.equal(body.provider.require_parameters,true);assert.equal(body.response_format.json_schema.strict,true);
+  assert.doesNotMatch(JSON.stringify(body.messages),/private@example.invalid/);
+  return Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify({reply:'What date would you like?',orderPatch:[{path:'event.type',value:'wedding'},{path:'customer.email',value:'private@example.invalid'}]})}}],usage:{prompt_tokens:100,completion_tokens:20}});
+ }});
+ const result=await request('chat',{consent:true,responseFormat:'patch',order:{'customer.email':'private@example.invalid'},messages:[{role:'user',content:'A wedding'}]},true,{Accept:'application/x-ndjson'});
+ assert.equal(result.status,200);const events=(await result.text()).trim().split('\n').map(JSON.parse);assert.equal(events[0].type,'complete');assert.deepEqual(events[0].orderPatch,[{path:'event.type',value:'wedding'}]);assert.ok(sent.every(url=>!url.includes('openai.com')));
 });

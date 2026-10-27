@@ -98,7 +98,7 @@ function createAiConfiguration({store=mongoStore,env=process.env,fetchImpl=fetch
   },
  };
 }
-function publicPolicy(config){return {revision:config.revision,chat:{enabled:config.chat.enabled,model:config.chat.model},voice:{enabled:config.voice.enabled,model:config.voice.model},customerPricing:config.customerPricing};}
+function publicPolicy(config){return {revision:config.revision,chat:{enabled:config.chat.enabled,model:config.chat.model,provider:config.chat.provider||'openai'},voice:{enabled:config.voice.enabled,model:config.voice.model},customerPricing:config.customerPricing};}
 function registerAiConfiguration(app,{requireAdmin,service}){
  const guarded=handler=>async(req,res)=>{res.set('Cache-Control','no-store');try{await handler(req,res);}catch(e){res.status([400,402,409,503].includes(e.status)?e.status:503).json({message:e.status?e.message:'AI configuration is temporarily unavailable.'});}};
  app.get('/api/ai-booking/admin/config',requireAdmin,guarded(async(_req,res)=>res.json(await service.describe())));

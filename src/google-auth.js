@@ -2,7 +2,9 @@ const crypto = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
 const { createSessionToken, hashPassword } = require('./security');
 
-function registerGoogleAuth(app, { User, serializeUser, isAdminUser, clientId = process.env.GOOGLE_CLIENT_ID || '', allowedOrigins = [], verifyToken, now = Date.now }) {
+function registerGoogleAuth(app, { User, serializeUser, isAdminUser, clientId = process.env.GOOGLE_CLIENT_ID || '', allowedOrigins = [], adminGoogleEmail = '', verifyToken, now = Date.now }) {
+  const adminEmail = adminGoogleEmail.trim().toLowerCase();
+  const canUseAdminGoogle = (user, email) => Boolean(adminEmail) && email === adminEmail && user.email?.toLowerCase() === adminEmail && isAdminUser(user);
   const verifier = new OAuth2Client();
   const verify = verifyToken || (async credential => (await verifier.verifyIdToken({ idToken: credential, audience: clientId })).getPayload());
   const challenges = new Map(), attempts = new Map();
@@ -42,8 +44,8 @@ function registerGoogleAuth(app, { User, serializeUser, isAdminUser, clientId = 
         const matches = await User.find({ email }).limit(2);
         if (matches.length) {
           user = matches[0];
-          if (matches.length !== 1 || user.googleSubject || user.isAdmin || isAdminUser(user) || !(email.endsWith('@gmail.com') || profile.hd)) return res.status(409).json({ message: 'Please sign in to your existing account with your username and password.' });
-          user = await User.findOneAndUpdate({ _id: user._id, username: user.username, isAdmin: { $ne: true }, googleSubject: { $exists: false } }, { $set: { googleSubject: profile.sub, emailVerified: true } }, { new: true });
+          if (matches.length !== 1 || user.googleSubject || ((user.isAdmin || isAdminUser(user)) && !canUseAdminGoogle(user, email)) || !(email.endsWith('@gmail.com') || profile.hd)) return res.status(409).json({ message: 'Please sign in to your existing account with your email address and password.' });
+          user = await User.findOneAndUpdate({ _id: user._id, username: user.username, email: user.email, isAdmin: canUseAdminGoogle(user, email) && user.isAdmin ? true : { $ne: true }, googleSubject: { $exists: false } }, { $set: { googleSubject: profile.sub, emailVerified: true } }, { new: true });
           if (!user) return res.status(409).json({ message: 'Your account changed. Please try signing in again.' });
         } else {
           user = await User.create({
@@ -57,7 +59,7 @@ function registerGoogleAuth(app, { User, serializeUser, isAdminUser, clientId = 
           });
         }
       }
-      if (user.isAdmin || isAdminUser(user)) return res.status(403).json({ message: 'Administrator accounts must sign in with their username and password.' });
+      if ((user.isAdmin || isAdminUser(user)) && !canUseAdminGoogle(user, email)) return res.status(403).json({ message: 'Administrator accounts must sign in with their email address and password.' });
       user.sessionToken = createSessionToken();
       await user.save();
       return res.json({ token: user.sessionToken, user: serializeUser(user) });

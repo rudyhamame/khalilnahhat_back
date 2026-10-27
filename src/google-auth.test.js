@@ -3,17 +3,17 @@ const assert=require('node:assert/strict');
 const express=require('express');
 const {registerGoogleAuth}=require('./google-auth');
 
-async function setup(t,{users=[],profile={},verifyFailure=false,clientId='example.apps.googleusercontent.com',clock={value:1000}}={}){
+async function setup(t,{users=[],profile={},adminGoogleEmail='',beforeLink=()=>{},verifyFailure=false,clientId='example.apps.googleusercontent.com',clock={value:1000}}={}){
   const records=users.map(item=>({...item,save:async()=>{}}));let verified=0,created=0;
   const User={
     findOne:async filter=>records.find(user=>user.googleSubject===filter.googleSubject)||null,
     find:filter=>({limit:async count=>records.filter(user=>user.email===filter.email).slice(0,count)}),
-    findOneAndUpdate:async(filter,update)=>{const user=records.find(item=>item._id===filter._id&&!item.googleSubject);if(!user)return null;Object.assign(user,update.$set);return user;},
+    findOneAndUpdate:async(filter,update)=>{beforeLink(records);const user=records.find(item=>item._id===filter._id&&item.username===filter.username&&item.email===filter.email&&!item.googleSubject&&(filter.isAdmin===true?item.isAdmin===true:item.isAdmin!==true));if(!user)return null;Object.assign(user,update.$set);return user;},
     create:async data=>{created++;const user={...data,_id:'new-id',save:async()=>{}};records.push(user);return user;},
   };
   const app=express();app.set('trust proxy',1);app.use(express.json());
   let nonce;
-  registerGoogleAuth(app,{User,clientId,now:()=>clock.value,allowedOrigins:['https://echo.example'],isAdminUser:user=>user.username==='administrator',serializeUser:user=>({id:user._id,username:user.username,email:user.email,isAdmin:user.isAdmin}),verifyToken:async()=>{verified++;if(verifyFailure)throw Error('private provider details');return {sub:'google-subject',email:'client@gmail.com',email_verified:true,nonce,...profile};}});
+  registerGoogleAuth(app,{User,clientId,adminGoogleEmail,now:()=>clock.value,allowedOrigins:['https://echo.example'],isAdminUser:user=>user.username==='administrator',serializeUser:user=>({id:user._id,username:user.username,email:user.email,isAdmin:user.isAdmin}),verifyToken:async()=>{verified++;if(verifyFailure)throw Error('private provider details');return {sub:'google-subject',email:'client@gmail.com',email_verified:true,nonce,...profile};}});
   const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
   const base=`http://127.0.0.1:${server.address().port}`;
   const config=async()=>{const response=await fetch(base+'/api/auth/google/config');const data=await response.json();nonce=data.nonce;return {response,data};};
@@ -62,4 +62,27 @@ test('rate limits are bounded per client behind the hosting proxy',async t=>{
   for(let i=0;i<10;i++)assert.equal((await api.post({credential:'invalid'})).status,401);
   assert.equal((await api.post({credential:'invalid'})).status,429);
   await api.config();assert.equal((await api.post(undefined,'https://echo.example','192.0.2.2')).status,200);
+});
+
+const adminEmail='khalilnahhatdj@gmail.com';
+const adminAccount={_id:'existing-admin',username:'administrator',email:adminEmail,isAdmin:true,passwordHash:'existing-password-hash'};
+test('approved verified Google account links the existing admin and returns to the same identity',async t=>{
+  const api=await setup(t,{adminGoogleEmail:adminEmail,profile:{email:adminEmail},users:[adminAccount]});
+  await api.config();let result=await api.post();assert.equal(result.status,200);assert.equal(result.data.user.id,adminAccount._id);assert.equal(result.data.user.isAdmin,true);assert.equal(api.records[0].username,'administrator');assert.equal(api.records[0].passwordHash,adminAccount.passwordHash);assert.equal(api.records[0].googleSubject,'google-subject');assert.equal(api.stats().created,0);
+  await api.config();result=await api.post();assert.equal(result.status,200);assert.equal(result.data.user.id,adminAccount._id);assert.equal(api.stats().created,0);
+});
+for(const [name,options,status] of [
+  ['unverified approved admin',{profile:{email:adminEmail,email_verified:false},users:[adminAccount]},401],
+  ['another admin email',{profile:{email:'other@gmail.com'},users:[{...adminAccount,email:'other@gmail.com'}]},409],
+  ['changed returning admin email',{profile:{email:'other@gmail.com'},users:[{...adminAccount,googleSubject:'google-subject'}]},403],
+  ['changed stored admin email',{profile:{email:adminEmail},users:[{...adminAccount,email:'other@gmail.com',googleSubject:'google-subject'}]},403],
+  ['ambiguous approved admin email',{profile:{email:adminEmail},users:[adminAccount,{_id:'duplicate',email:adminEmail}]},409],
+  ['approved admin already linked elsewhere',{profile:{email:adminEmail},users:[{...adminAccount,googleSubject:'another-subject'}]},409],
+  ['email changes during link',{profile:{email:adminEmail},users:[adminAccount],beforeLink:records=>{records[0].email='other@gmail.com';}},409],
+  ['reserved identity changes during link',{profile:{email:adminEmail},users:[adminAccount],beforeLink:records=>{records[0].username='another-user';}},409],
+])test(`Google admin protection rejects ${name}`,async t=>{
+  const api=await setup(t,{adminGoogleEmail:adminEmail,...options});await api.config();const result=await api.post();assert.equal(result.status,status);assert.equal(result.data.token,undefined);assert.equal(api.records[0].sessionToken,undefined);assert.equal(api.stats().created,0);
+});
+test('allowlisted email alone never promotes an ordinary client to administrator',async t=>{
+  const api=await setup(t,{adminGoogleEmail:adminEmail,profile:{email:adminEmail},users:[{_id:'client',username:'ordinary-client',email:adminEmail,isAdmin:false}]});await api.config();const result=await api.post();assert.equal(result.status,200);assert.equal(result.data.user.isAdmin,false);assert.equal(result.data.user.id,'client');
 });

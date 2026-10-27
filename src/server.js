@@ -944,6 +944,7 @@ app.get('/api/auth/me', async (request, response) => {
 
 require('./google-auth').registerGoogleAuth(app, {
   User, serializeUser, isAdminUser,
+  adminGoogleEmail: 'khalilnahhatdj@gmail.com',
   allowedOrigins: [...configuredCorsOrigins, getFrontendUrl()],
 });
 

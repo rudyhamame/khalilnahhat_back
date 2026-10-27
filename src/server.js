@@ -939,6 +939,11 @@ app.get('/api/auth/me', async (request, response) => {
   });
 });
 
+require('./google-auth').registerGoogleAuth(app, {
+  User, serializeUser, isAdminUser,
+  allowedOrigins: [...configuredCorsOrigins, getFrontendUrl()],
+});
+
 app.post('/api/auth/login', async (request, response) => {
   const parsed = loginSchema.safeParse(request.body);
 

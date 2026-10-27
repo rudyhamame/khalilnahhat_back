@@ -3,13 +3,14 @@ const mongoose = require('mongoose');
 const userSchema = new mongoose.Schema(
   {
     firstName: { type: String, required: true, trim: true },
-    lastName: { type: String, required: true, trim: true },
+    lastName: { type: String, required() { return !this.googleSubject; }, trim: true },
     username: { type: String, required: true, unique: true, trim: true, lowercase: true },
     passwordHash: { type: String, required: true },
     email: { type: String, required: true, trim: true, lowercase: true },
-    phoneNumber: { type: String, required: true, trim: true },
+    phoneNumber: { type: String, required() { return !this.googleSubject; }, trim: true },
     isAdmin: { type: Boolean, default: false },
     sessionToken: { type: String, default: '' },
+    googleSubject: { type: String, unique: true, sparse: true },
     emailVerified: { type: Boolean, default: false },
     verifyTokenHash: { type: String, default: '' },
     resetTokenHash: { type: String, default: '' },

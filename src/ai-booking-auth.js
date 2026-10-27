@@ -1,7 +1,7 @@
-// The development UI uses OVH for account routes and the local API for AI.
+// The development UI uses Render for account routes and the local API for AI.
 // Verify its existing bearer session against the same trusted account server;
 // never ask the browser to supply an identity or an authentication URL.
-function createAiBookingAuth({ localAuth, fetchImpl = fetch, authUrl = 'https://khalil-api.mctoshs.ca/api/auth/me' }) {
+function createAiBookingAuth({ localAuth, fetchImpl = fetch, authUrl = 'https://echo-khalil-api.onrender.com/api/auth/me' }) {
   return async (req, res, next) => {
     const authorization = req.headers.authorization || '';
     if (!/^Bearer \S{1,2048}$/.test(authorization)) return res.status(401).json({ message: 'Sign in is required.' });

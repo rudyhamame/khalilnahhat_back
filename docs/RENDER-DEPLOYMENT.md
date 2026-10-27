@@ -15,7 +15,7 @@ Local Vite previews on port 5176 forward all API groups, including AI booking an
 
 LiveKit needs an S3-compatible destination before the existing transfer worker stores final private recordings in Cloudinary. Cloudinary archive previews and downloads do not need the staging host after a recording is safely transferred.
 
-The proposed free-tier replacement is Backblaze B2. Create a private bucket and a bucket-scoped application key in the account. Do not use public access. Set provider paid-usage caps to $0 and leave billing disabled. The first 10 GB of storage is included; provider limits can stop recording when exceeded. Configure lifecycle cleanup for older/hidden versions so temporary staging does not accumulate hidden billable data.
+Recording staging uses Backblaze B2 in Khalil’s account. The private, encrypted bucket is `echo-khalil-live-staging-20261027`, with endpoint `https://s3.us-east-005.backblazeb2.com` and region `us-east-005`. Render holds its bucket-scoped application key. Paid-usage caps are $0; provider limits can stop recording when exceeded. The bucket keeps only the last version, allowing lifecycle cleanup of old/hidden staging versions. Do not enable public access or increase spending caps without the owner’s instruction.
 
 Enter these settings in Render:
 
@@ -27,7 +27,7 @@ Enter these settings in Render:
 
 The API no longer assumes a deployment-local object-store container, creates provider buckets, or relays S3 traffic through the application. Missing or invalid recording storage prevents preparation of a new broadcast. Existing saved Cloudinary media remains available. Objects are removed from staging only after Cloudinary confirms all archive parts.
 
-Do not claim a completed storage migration until the new account/bucket is configured, an isolated write/read/delete check succeeds, and the endpoint settings are verified after deployment. No replacement storage credentials are currently stored in this document.
+On 2026-10-27, an isolated upload/read/content comparison/delete check passed against the private bucket. All six recording settings were verified after saving in Render, and the environment deployment succeeded. Backend `2022422` and frontend `9b6fe95` are deployed. The retired API was stopped and its restart policy disabled after confirming no live broadcast and an empty former staging bucket; all other server containers remained running. The optional local API, conversion worker and reverse connection are disabled. No credentials are stored in this document. A full LiveKit-to-Cloudinary recording session has not yet been exercised after migration.
 
 ## Rollback and historical evidence
 

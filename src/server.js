@@ -25,6 +25,7 @@ const {
   buildReorderedQueue,
 } = require('./live-request-agent');
 const { eventSchema, normalizeQuoteItems } = require('./quote-validation');
+const eventOrder = require('./event-order');
 const { Equipment } = require('./equipment');
 const { registerEquipmentRoutes } = require('./equipment');
 const { registerPayments } = require('./payments');
@@ -342,6 +343,7 @@ const serviceRequestCreateSchema = z.object({
     quantity: z.coerce.number().int().min(1),
   })).min(1, 'Select at least one service.'),
   event: eventSchema.optional(),
+  order: eventOrder.orderSchema.optional(),
 });
 
 const serviceRequestQuoteSchema = z.object({
@@ -421,6 +423,7 @@ function serializeServiceRequest(serviceRequest, includeQuote = true) {
   return {
     requestNumber: serviceRequest.requestNumber || '',
     event: serviceRequest.event || null,
+    order: serviceRequest.order || null,
     id: serviceRequest.externalId || serviceRequest.id,
     customerName: serviceRequest.customerName,
     customerUsername: serviceRequest.customerUsername,
@@ -1017,6 +1020,7 @@ app.post('/api/auth/logout', async (request, response) => {
   });
 });
 
+app.get('/api/service-requests/order-contract', (_request,response) => response.json({schemaVersion:eventOrder.contract.version,canonicalOrder:true}));
 app.post('/api/service-requests', requireAuth, async (request, response) => {
   const parsed = serviceRequestCreateSchema.safeParse(request.body);
 
@@ -1027,9 +1031,12 @@ app.post('/api/service-requests', requireAuth, async (request, response) => {
     });
   }
 
-  if (parsed.data.event) {
-    try { parsed.data.items = normalizeQuoteItems(parsed.data.items, await Equipment.find({ isActive: true })); }
-    catch (error) { return response.status(400).json({ message: error.message }); }
+  if (parsed.data.order) {
+    try { Object.assign(parsed.data,eventOrder.prepareSubmittedOrder(parsed.data.order,request.authUser,parsed.data.items,await Equipment.find({isActive:true}))); }
+    catch(error){return response.status(400).json({message:error.message,fields:error.fields});}
+  } else if(parsed.data.event){
+    try {parsed.data.items=normalizeQuoteItems(parsed.data.items,await Equipment.find({isActive:true}));}
+    catch(error){return response.status(400).json({message:error.message});}
   }
 
   const user = request.authUser;
@@ -1041,6 +1048,7 @@ app.post('/api/service-requests', requireAuth, async (request, response) => {
     customerEmail: user.email,
     items: parsed.data.items,
     event: parsed.data.event || null,
+    order: parsed.data.order || null,
     requestNumber: `ECHO-${Date.now().toString(36).toUpperCase()}`,
     status: 'pending',
   });
@@ -1859,6 +1867,15 @@ app.use((error, _request, response, _next) => {
 });
 
 require('./mobile-admin').registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest: serializeServiceRequest });
+require('./ai-booking').registerAiBooking(app, {
+  requireAuth: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest }),
+});
+require('./booking-conversations').registerBookingConversations(app, {
+  requireAuth: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest }),
+});
+require('./event-drafts').registerEventDrafts(app, {
+  requireAuth: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest }),
+});
 require('./archive-player').registerArchivePlayer(app, { requireAdmin });
 require('./stem-separation').registerStemSeparation(app, { requireAdmin });
 require('./music-archive').registerMusicArchive(app, { requireAdmin });

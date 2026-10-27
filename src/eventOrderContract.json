@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "timezone": "America/Toronto",
+  "sections": [
+    {"id":"customer","title":"Your details","ar":"معلوماتك","fields":[
+      {"key":"customer.fullName","label":"Full name","ar":"الاسم الكامل","required":true,"private":true},
+      {"key":"customer.email","label":"Email","ar":"البريد الإلكتروني","type":"email","required":true,"private":true},
+      {"key":"customer.phone","label":"Phone number","ar":"رقم الهاتف","type":"tel","maxLength":30,"required":true,"private":true},
+      {"key":"customer.contactMethod","label":"Preferred contact method","ar":"طريقة التواصل المفضلة","options":["email","phone","whatsapp"],"required":true,"private":true},
+      {"key":"customer.company","label":"Company / organization","ar":"الشركة أو المؤسسة","maxLength":120,"private":true},
+      {"key":"customer.stageName","label":"Artist / stage name","ar":"الاسم الفني"}
+    ]},
+    {"id":"event","title":"The event","ar":"الفعالية","fields":[
+      {"key":"event.name","label":"Event name","ar":"اسم الفعالية"},
+      {"key":"event.type","label":"Event type","ar":"نوع الفعالية","options":["wedding","engagement","birthday","corporate","party","graduation","other"],"required":true},
+      {"key":"event.otherType","label":"Other event type","ar":"نوع الفعالية الآخر"},
+      {"key":"event.date","label":"Event date","ar":"تاريخ الفعالية","type":"date","required":true},
+      {"key":"event.startTime","label":"Start time (Toronto)","ar":"وقت البداية (تورونتو)","type":"time","required":true},
+      {"key":"event.endTime","label":"End time (Toronto; earlier time means next day)","ar":"وقت النهاية (الوقت الأسبق يعني اليوم التالي)","type":"time","required":true},
+      {"key":"event.guestCount","label":"Estimated number of guests","ar":"عدد الضيوف المتوقع","type":"number","max":100000,"required":true},
+      {"key":"event.venue.name","label":"Venue name","ar":"اسم المكان","maxLength":160,"required":true},
+      {"key":"event.venue.address","label":"Full venue address","ar":"عنوان المكان الكامل","maxLength":240,"required":true,"private":true},
+      {"key":"event.venue.city","label":"City","ar":"المدينة","maxLength":80,"required":true},
+      {"key":"event.venue.postalCode","label":"Postal code","ar":"الرمز البريدي","maxLength":12,"required":true,"private":true},
+      {"key":"event.venue.area","label":"Event area","ar":"منطقة الفعالية","options":["gta","outside_gta"],"required":true},
+      {"key":"event.venue.setting","label":"Event setting","ar":"بيئة الفعالية","options":["indoor","outdoor","both"],"required":true},
+      {"key":"event.setup.requirements","label":"Setup / production requirements","ar":"متطلبات التجهيز والإنتاج","type":"textarea"},
+      {"key":"event.setup.access","label":"Load-in, power, stage and venue access","ar":"الوصول والطاقة والمنصة","type":"textarea"},
+      {"key":"event.setup.teardown","label":"Setup and teardown timing","ar":"أوقات التركيب والتفكيك","type":"textarea"},
+      {"key":"event.setup.staffing","label":"Staffing / technician requirements","ar":"متطلبات الطاقم والفنيين","type":"textarea"},
+      {"key":"services","label":"Requested services","ar":"الخدمات المطلوبة","type":"multi","options":["dj","sound","lighting","led","fx","rental","corporate"],"required":true}
+    ]},
+    {"id":"music","title":"Music & entertainment","ar":"الموسيقى والترفيه","fields":[
+      {"key":"music.styles","label":"Music styles","ar":"أنماط الموسيقى","type":"multi","options":["arabic","english","mixed","dabke","egyptian","lebanese","syrian","khaliji","romantic","high_energy","other"]},
+      {"key":"music.otherPreferences","label":"Other music preferences","ar":"تفضيلات موسيقية أخرى","type":"textarea"},
+      {"key":"music.djMc","label":"DJ / MC requirements","ar":"متطلبات الدي جي ومقدم الحفل","type":"textarea"},
+      {"key":"music.entrance","label":"Wedding / bridal party entrance requirements","ar":"متطلبات دخول العروسين والمرافقين","type":"textarea"},
+      {"key":"music.customMix","label":"Customized mix requests","ar":"طلبات الميكس المخصص","type":"textarea"},
+      {"key":"music.announcements","label":"Personalized / special announcements","ar":"الإعلانات الخاصة","type":"textarea"},
+      {"key":"music.referenceLinks","label":"Reference songs / video links (one HTTPS link per line)","ar":"روابط الأغاني والفيديو المرجعية (رابط في كل سطر)","type":"links"}
+    ]},
+    {"id":"studioChoice","title":"Custom audio","ar":"الصوت المخصص","fields":[
+      {"key":"studio.requested","label":"Do you need a Studio / custom audio project for this event?","ar":"هل تحتاج مشروع استوديو أو صوت مخصص لهذه الفعالية؟","type":"boolean"}
+    ]},
+    {"id":"studio","title":"DJ Khalil Studio brief","ar":"تفاصيل مشروع استوديو خليل","gate":"studio.requested","fields":[
+      {"key":"studio.services","label":"Studio services","ar":"خدمات الاستوديو","type":"multi","options":["production","mixing","mastering","editing","remix","wedding_entrance","ai_customization","custom_audio"],"required":true},
+      {"key":"studio.title","label":"Project title","ar":"عنوان المشروع","required":true},
+      {"key":"studio.songTitle","label":"Song title","ar":"عنوان الأغنية"},
+      {"key":"studio.originalArtist","label":"Original artist","ar":"الفنان الأصلي"},
+      {"key":"studio.genre","label":"Genre / preferred style","ar":"النوع أو الأسلوب المفضل"},
+      {"key":"studio.description","label":"Project description / creative vision","ar":"وصف المشروع والرؤية الإبداعية","type":"textarea","required":true},
+      {"key":"studio.changes","label":"What should we change or create?","ar":"ماذا تريد تغييره أو إنشاؤه؟","type":"textarea"},
+      {"key":"studio.tempoBpm","label":"Preferred BPM (optional)","ar":"السرعة المفضلة (اختياري)","type":"number","max":500},
+      {"key":"studio.durationSeconds","label":"Desired duration in seconds","ar":"المدة المطلوبة بالثواني","type":"number","max":86400},
+      {"key":"studio.songCount","label":"Number of songs","ar":"عدد الأغاني","type":"number","max":1000},
+      {"key":"studio.stemCount","label":"Number of audio tracks / stems","ar":"عدد المسارات الصوتية","type":"number","max":10000},
+      {"key":"studio.intendedUse","label":"Intended use","ar":"الاستخدام المقصود","options":["wedding","engagement","live_performance","personal","commercial_release","social_media","corporate","other"]},
+      {"key":"studio.instructions","label":"Special instructions","ar":"تعليمات خاصة","type":"textarea"},
+      {"key":"studio.referenceLinks","label":"Studio references / existing file links (one HTTPS link per line)","ar":"روابط مراجع وملفات الاستوديو (رابط في كل سطر)","type":"links"},
+      {"key":"studio.delivery.requestedDate","label":"Requested delivery date (subject to approval)","ar":"تاريخ التسليم المطلوب (يخضع للموافقة)","type":"date","required":true},
+      {"key":"studio.delivery.urgent","label":"Is the project urgent?","ar":"هل المشروع عاجل؟","type":"boolean"},
+      {"key":"studio.delivery.notes","label":"Deadline notes","ar":"ملاحظات الموعد النهائي","type":"textarea"},
+      {"key":"studio.delivery.formats","label":"Preferred final formats","ar":"صيغ التسليم المفضلة","type":"multi","options":["mp3","wav","zip","other"]},
+      {"key":"studio.rights.materialType","label":"Rights / ownership of submitted material","ar":"حقوق المواد المقدمة","options":["original_owned","licensed","reference_only","permission_needed"]},
+      {"key":"studio.rights.confirmed","label":"I own or have the required permissions for the submitted material and requested use","ar":"أملك المواد أو الأذونات اللازمة للمواد والاستخدام المطلوب","type":"boolean","required":true,"manualOnly":true}
+    ]},
+    {"id":"entrance","title":"Custom entrance direction","ar":"تفاصيل الدخول المخصص","gate":"studio.requested","fields":[
+      {"key":"studio.entrance.brideName","label":"Bride name (if applicable)","ar":"اسم العروس (إن وجد)"},
+      {"key":"studio.entrance.groomName","label":"Groom name (if applicable)","ar":"اسم العريس (إن وجد)"},
+      {"key":"studio.entrance.style","label":"Entrance style","ar":"أسلوب الدخول","options":["romantic","high_energy","traditional_arabic","dabke","cinematic","remix","ai_assisted","other"]},
+      {"key":"studio.entrance.songs","label":"Songs to include","ar":"الأغاني المطلوبة","type":"textarea"},
+      {"key":"studio.entrance.combineSongs","label":"Combine multiple songs?","ar":"دمج أكثر من أغنية؟","type":"boolean"},
+      {"key":"studio.entrance.intro","label":"Custom intro / outro","ar":"المقدمة والخاتمة المخصصة","type":"textarea"},
+      {"key":"studio.entrance.announcements","label":"Names / personalized announcements","ar":"الأسماء والإعلانات المخصصة","type":"textarea"},
+      {"key":"studio.entrance.effects","label":"Specific sound effects","ar":"المؤثرات الصوتية المطلوبة","type":"textarea"},
+      {"key":"studio.entrance.transitions","label":"Timing, transitions and music-change moments","ar":"التوقيت والانتقالات ولحظات تغيير الموسيقى","type":"textarea"},
+      {"key":"studio.entrance.vision","label":"Describe your dream entrance","ar":"صف دخول أحلامك","type":"textarea"}
+    ]},
+    {"id":"references","title":"References & additional details","ar":"المراجع والتفاصيل الإضافية","fields":[
+      {"key":"references.archiveCategory","label":"Music Archive category reference","ar":"تصنيف مرجعي من الأرشيف"},
+      {"key":"references.archiveAlbum","label":"Music Archive album reference","ar":"ألبوم مرجعي من الأرشيف"},
+      {"key":"references.archiveTrack","label":"Music Archive track reference","ar":"مقطع مرجعي من الأرشيف"},
+      {"key":"references.archiveChanges","label":"How should this archive track be customized? (eligibility subject to review)","ar":"كيف تريد تخصيص المقطع؟ (يخضع للمراجعة)","type":"textarea"},
+      {"key":"references.images","label":"Reference image links (one HTTPS link per line)","ar":"روابط الصور المرجعية (رابط في كل سطر)","type":"links","private":true},
+      {"key":"references.documents","label":"Event document / existing file links (one HTTPS link per line)","ar":"روابط مستندات الفعالية (رابط في كل سطر)","type":"links","private":true},
+      {"key":"additional.specialRequests","label":"Special requests","ar":"طلبات خاصة","type":"textarea"},
+      {"key":"additional.notes","label":"Additional notes","ar":"ملاحظات إضافية","type":"textarea"}
+    ]}
+  ]
+}

@@ -70,3 +70,13 @@ test('admin configuration and usage routes reject customers and expose no provid
  const get=await fetch(base+'/config',{headers:{Authorization:'Bearer admin'}});assert.equal(get.status,200);assert.doesNotMatch(await get.text(),/never-expose-this|OPENAI_API_KEY/);
  const save=await fetch(base+'/config',{method:'PUT',headers:{Authorization:'Bearer admin','Content-Type':'application/json'},body:JSON.stringify(defaults({}))});assert.equal(save.status,200);assert.equal((await save.json()).item.revision,1);
 });
+
+test('OpenRouter settings enforce free selection and verified rates independently of client prices',async()=>{
+ const {store}=fixture();const access=[];
+ const service=createAiConfiguration({store,env:{OPENAI_API_KEY:'openai-private',OPENROUTER_API_KEY:'router-private'},fetchImpl:async url=>{access.push(url);return Response.json(url.endsWith('/api/v1/models')?{data:[{id:'vendor/paid',architecture:{output_modalities:['text']},supported_parameters:['structured_outputs'],pricing:{prompt:'0.000001',completion:'0.000002'}}]}:{});}});
+ const body=await service.load();assert.equal(body.chat.provider,'openrouter');assert.equal(body.chat.model,'openrouter/free');
+ body.chat.providerRates={textInput:999,textCached:0,textOutput:999};const saved=await service.save(body,'admin');assert.deepEqual(saved.chat.providerRates,{textInput:0,textCached:0,textOutput:0});
+ await assert.rejects(service.save({...saved,chat:{...saved.chat,model:'vendor/paid'}},'admin'),{status:400});
+ const paid=await service.save({...saved,chat:{...saved.chat,model:'vendor/paid',freeOnly:false}},'admin');assert.equal(paid.chat.providerRates.textInput,1);
+ const description=await service.describe();assert.equal(description.providers.openrouter.configured,true);assert.doesNotMatch(JSON.stringify(description),/router-private|openai-private/);
+});

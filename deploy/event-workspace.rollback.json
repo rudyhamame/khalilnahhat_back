@@ -1,0 +1,8 @@
+{
+  "services": {
+    "rh-khalil-api": {
+      "image": "rh-khalil-archive:20261026",
+      "pull_policy": "never"
+    }
+  }
+}

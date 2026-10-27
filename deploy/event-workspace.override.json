@@ -1,0 +1,9 @@
+{
+  "services": {
+    "rh-khalil-api": {
+      "image": "rh-khalil-event-workspace:20261026",
+      "pull_policy": "never",
+      "env_file": ["/srv/rh/secrets/portfolio-ai.env"]
+    }
+  }
+}

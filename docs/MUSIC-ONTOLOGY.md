@@ -151,3 +151,7 @@ node scripts/verify-music-ontology.cjs
 ```
 
 The browser verifier uses a disposable MongoDB replica set and actual API, creates a draft through Admin, edits a shared work, plays a generated WAV through the existing player, checks playback continuity while exploring/filtering, and captures desktop/mobile layouts. No real account, production database or uploaded file is used. Evidence is under frontend `artifacts/music-ontology-20261028`.
+
+## Music instrumentation and musician credits — 28 October 2026
+
+Music exposes **Instruments, Key and Musicians** through the shared Melody entity. `instrumentIds` references controlled `instrument` vocabulary entities; `musicianCredits` references artist/person entities with explicit PERFORMER, COMPOSER, ARRANGER or OTHER roles. The canonical work key remains `melody.key`, distinct from recording-specific key. Admin edits these values; VP2 explores and filters them using canonical `instrument` and `musician` query fields. The shared Melody schema also permits the same attributed information on Song works. Existing values are not inferred or backfilled. Omitted new fields in older work-edit requests retain their stored values; explicit empty arrays clear them. No live migration is required.

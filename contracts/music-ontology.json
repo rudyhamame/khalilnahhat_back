@@ -32,7 +32,8 @@
     "artist",
     "concept",
     "rhythm",
-    "genre"
+    "genre",
+    "instrument"
   ],
   "creditRoles": [
     "LYRICIST",
@@ -63,6 +64,14 @@
     "bpmScope",
     "publicationStatus",
     "archivalStatus",
-    "lyricArtist"
+    "lyricArtist",
+    "instrument",
+    "musician"
+  ],
+  "musicianRoles": [
+    "PERFORMER",
+    "COMPOSER",
+    "ARRANGER",
+    "OTHER"
   ]
 }

@@ -22,13 +22,14 @@ function matches(r,f={}){
  if(f.language&&l?.language?.id!==f.language||f.dialect&&l?.dialect?.id!==f.dialect)return false;
  if(!has(l?.regions,f.region)||(!has(l?.concepts,f.concept)&&l?.primaryConcept?.id!==f.concept)||!has(m?.genres,f.genre))return false;
  if(f.lyricArtist&&!has(l?.artistCredits,f.lyricArtist))return false;
- if(f.artist&&!has([...(r.credits||[]),...(w?.credits||[]),...(l?.artistCredits||[])],f.artist))return false;
+ if(!has(m?.instruments,f.instrument)||!has(m?.musicianCredits,f.musician))return false;
+ if(f.artist&&!has([...(r.credits||[]),...(w?.credits||[]),...(m?.musicianCredits||[]),...(l?.artistCredits||[])],f.artist))return false;
  if(f.rhythm&&m?.rhythm?.id!==f.rhythm)return false;
  const scoped=f.bpmScope==='recording'?r.recordingMetadata:m;
  if(f.bpmMin!==undefined&&(scoped?.bpm==null||scoped.bpm<Number(f.bpmMin)))return false;
  if(f.bpmMax!==undefined&&(scoped?.bpm==null||scoped.bpm>Number(f.bpmMax)))return false;
  if(f.key&&scoped?.key!==f.key)return false;
- if(f.q){const q=norm(f.q);const hay=[r.title,w?.title,r.artist,...(r.credits||[]).map(c=>c.artist?.name),...(w?.credits||[]).map(c=>c.artist?.name),...(l?.artistCredits||[]).map(c=>c.artist?.name),...(m?.genres||[]).map(g=>g.name)].filter(Boolean).join(' ');if(!norm(hay).includes(q))return false;}
+ if(f.q){const q=norm(f.q);const hay=[r.title,w?.title,r.artist,...(r.credits||[]).map(c=>c.artist?.name),...(w?.credits||[]).map(c=>c.artist?.name),...(m?.musicianCredits||[]).map(c=>c.artist?.name),...(m?.instruments||[]).map(i=>i.name),...(l?.artistCredits||[]).map(c=>c.artist?.name),...(m?.genres||[]).map(g=>g.name)].filter(Boolean).join(' ');if(!norm(hay).includes(q))return false;}
  return true;
 }
 function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>value,previewUrl=value=>value,ownedAsset=()=>false}={}){
@@ -70,7 +71,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    let melodyId=value.melodyId,lyricsId=value.type==='SONG'?value.lyricsId:null;
    if(melodyId&&value.melody)fail('Choose either an existing melody or new melody metadata.');
    if(melodyId&&!await Melody.exists({externalId:melodyId}).session(session))fail('Melody not found.');
-   if(!melodyId){const m=V.melody.parse(value.melody||{});await references(m.genreIds,'genre',session);if(m.rhythmId)await references([m.rhythmId],'rhythm',session);m.states=V.metadataStates(m,m.states);melodyId=makeId('melody');await Melody.create([{...m,externalId:melodyId,provenance:provenance(m.provenance,actor)}],{session});}
+   if(!melodyId){const m=V.melody.parse(value.melody||{});if(old){const previous=await Melody.findOne({externalId:old.melodyId}).session(session).lean();for(const field of ['instrumentIds','musicianCredits'])if(!Object.hasOwn(input.melody||{},field)){m[field]=previous?.[field]||[];if(previous?.states?.[field])m.states[field]=previous.states[field];}}await references(m.genreIds,'genre',session);await references(m.instrumentIds,'instrument',session);await creditsCheck(m.musicianCredits,session);if(m.rhythmId)await references([m.rhythmId],'rhythm',session);m.states=V.metadataStates(m,m.states);melodyId=makeId('melody');await Melody.create([{...m,externalId:melodyId,provenance:provenance(m.provenance,actor)}],{session});}
    if(value.type==='SONG'){
     if(lyricsId&&value.lyrics)fail('Choose either existing lyrics or new lyrics metadata.');
     if(lyricsId&&!await Lyrics.exists({externalId:lyricsId}).session(session))fail('Lyrics not found.');
@@ -123,7 +124,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
   const mm=new Map(melodies.map(m=>[m.externalId,m])),lm=new Map(lyrics.map(l=>[l.externalId,l]));
   const mapped=works.map(w=>{
    const m=mm.get(w.melodyId),l=lm.get(w.lyricsId);
-   return [w.externalId,{...w,id:w.externalId,_id:undefined,credits:creditNames(w.credits||[],vs),melody:m?{...m,id:m.externalId,_id:undefined,rhythm:entity('rhythm',m.rhythmId),genres:(m.genreIds||[]).map(id=>entity('genre',id)).filter(Boolean)}:null,lyrics:w.type==='SONG'&&l?{...l,id:l.externalId,_id:undefined,language:entity('language',l.languageId),dialect:entity('dialect',l.dialectId),regions:(l.regionIds||[]).map(id=>entity('region',id)).filter(Boolean),primaryConcept:entity('concept',l.primaryConceptId),concepts:(l.conceptIds||[]).map(id=>entity('concept',id)).filter(Boolean),artistCredits:creditNames(l.artistCredits||[],vs)}:null}];
+   return [w.externalId,{...w,id:w.externalId,_id:undefined,credits:creditNames(w.credits||[],vs),melody:m?{...m,id:m.externalId,_id:undefined,rhythm:entity('rhythm',m.rhythmId),genres:(m.genreIds||[]).map(id=>entity('genre',id)).filter(Boolean),instruments:(m.instrumentIds||[]).map(id=>entity('instrument',id)).filter(Boolean),musicianCredits:creditNames(m.musicianCredits||[],vs)}:null,lyrics:w.type==='SONG'&&l?{...l,id:l.externalId,_id:undefined,language:entity('language',l.languageId),dialect:entity('dialect',l.dialectId),regions:(l.regionIds||[]).map(id=>entity('region',id)).filter(Boolean),primaryConcept:entity('concept',l.primaryConceptId),concepts:(l.conceptIds||[]).map(id=>entity('concept',id)).filter(Boolean),artistCredits:creditNames(l.artistCredits||[],vs)}:null}];
   });return {works:new Map(mapped),vocabulary:vs};
  }
  async function hydrate(rows,{admin=false}={}){
@@ -131,7 +132,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
   const assets=await AudioAsset.find({externalId:{$in:rows.map(r=>r.audioAssetId).filter(Boolean)}}).lean();const am=new Map(assets.map(a=>[a.externalId,a]));
   return rows.map(r=>{
    const w=works.get(r.workId)||null,a=am.get(r.audioAssetId),deliver=url=>admin?previewUrl(deliveryUrl(url)):deliveryUrl(url);
-   const artist=[...new Set([...(r.credits||[]),...(w?.credits||[]),...(w?.lyrics?.artistCredits||[])].map(c=>vocabulary.get(c.artistId)?.name).filter(Boolean))].join(', ')||(!r.workId?r.artist||'':'');
+   const artist=[...new Set([...(r.credits||[]),...(w?.credits||[]),...(w?.melody?.musicianCredits||[]),...(w?.lyrics?.artistCredits||[])].map(c=>vocabulary.get(c.artistId)?.name).filter(Boolean))].join(', ')||(!r.workId?r.artist||'':'');
    return {id:r.externalId,title:r.title,description:r.description||'',recordingType:r.recordingType||null,workId:r.workId||null,work:w,ontologyStatus:r.workId?'MAPPED':'UNMAPPED',recordingMetadata:r.recordingMetadata||{bpm:null,key:null,states:{bpm:'UNKNOWN',key:'UNKNOWN'}},credits:creditNames(r.credits||[],vocabulary),sourceRecordingIds:r.sourceRecordingIds||[],sourceWorkIds:r.sourceWorkIds||[],publicationStatus:r.publicationStatus||(r.published!==false?'PUBLISHED':'DRAFT'),archivalStatus:r.archivalStatus||'ACTIVE',revision:r.ontologyRevision||0,versionLabel:r.versionLabel||'',productionNotes:r.productionNotes||'',provenance:r.provenance||null,audio:{assetId:r.audioAssetId||null,url:deliver(r.audioUrl||a?.url||''),durationSeconds:r.duration?String(r.duration).split(':').reduce((t,n)=>t*60+Number(n),0):(a?.durationSeconds??null)},audioUrl:deliver(r.audioUrl||''),coverImage:deliver(r.coverImage||r.image||''),artist,duration:r.duration||'',date:r.date||'',releaseDate:r.date||'',createdAt:r.createdAt,updatedAt:r.updatedAt,albumId:r.albumId||'',sortOrder:r.sortOrder||0,published:r.published!==false,...(admin?{storedAudioUrl:r.audioUrl||'',storedCoverImage:r.coverImage||r.image||''}:{})};
   });
  }

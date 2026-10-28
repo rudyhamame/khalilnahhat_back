@@ -7,6 +7,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY src ./src
+COPY contracts ./contracts
+COPY scripts/music-ontology-migrate.js ./scripts/music-ontology-migrate.js
+RUN node -e "require('./src/music-ontology/models'); require('./src/music-ontology/validation')"
 ENV NODE_ENV=production YT_DLP_PATH=/opt/yt-dlp/bin/yt-dlp FFMPEG_PATH=/usr/bin/ffmpeg YOUTUBE_PROCESSING_MODE=server MUSIC_ARCHIVE_STORAGE_PROVIDER=cloudinary
 USER node
 CMD ["npm", "start"]

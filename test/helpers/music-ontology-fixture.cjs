@@ -17,7 +17,8 @@ async function fixture(){
  const genre=await service.saveVocabulary({kind:'genre',name:'Arabic Pop'},null,'qa');
  const artist=await service.saveVocabulary({kind:'artist',name:'Khalil'},null,'qa');
  const song=await service.saveWork({title:'Evening Song',type:'SONG',melody:{bpm:100,key:'D minor',genreIds:[genre.externalId]},lyrics:{languageId:language.externalId,artistCredits:[{artistId:artist.externalId,role:'VOCALIST'}],conceptIds:[]}},null,'qa');
- const music=await service.saveWork({title:'Night Instrumental',type:'MUSIC',melody:{bpm:120,key:'A minor'}},null,'qa');
+ const instrument=await service.saveVocabulary({kind:'instrument',name:'Piano'},null,'qa');
+ const music=await service.saveWork({title:'Night Instrumental',type:'MUSIC',melody:{bpm:120,key:'A minor',instrumentIds:[instrument.externalId],musicianCredits:[{artistId:artist.externalId,role:'PERFORMER'}]}},null,'qa');
  const samples=22050*20,buffer=Buffer.alloc(44+samples*2);buffer.write('RIFF',0);buffer.writeUInt32LE(buffer.length-8,4);buffer.write('WAVEfmt ',8);buffer.writeUInt32LE(16,16);buffer.writeUInt16LE(1,20);buffer.writeUInt16LE(1,22);buffer.writeUInt32LE(22050,24);buffer.writeUInt32LE(44100,28);buffer.writeUInt16LE(2,32);buffer.writeUInt16LE(16,34);buffer.write('data',36);buffer.writeUInt32LE(samples*2,40);for(let i=0;i<samples;i++)buffer.writeInt16LE(Math.round(Math.sin(i/22050*440*Math.PI*2)*1000),44+i*2);
  const asset=await require('../../src/music-archive-files').saveLocalFile({buffer,mimetype:'audio/wav',originalname:'qa-tone.wav'});
  const ids=[];for(const type of ['MIX','REMIX','COVER','PRODUCTION'])ids.push(await service.saveRecording({title:`${type} · Evening collection`,recordingType:type,workId:type==='MIX'?music:song,audioUrl:asset.url,durationSeconds:20,publicationStatus:'PUBLISHED',recordingMetadata:{bpm:type==='REMIX'?128:null},credits:[{artistId:artist.externalId,role:'PRODUCER'}],...(type==='REMIX'?{sourceRecordingIds:[ids[0]]}:{})},null,'qa'));

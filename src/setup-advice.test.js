@@ -6,3 +6,10 @@ test('setup advice is authenticated, validates guest input and only uses server 
 test('invalid advice cannot become an order and duplicated catalogue IDs are removed',()=>{assert.throws(()=>sanitizeAdvice({},catalog));assert.deepEqual(sanitizeAdvice({explanation:'Review first',equipment:[{id:'speaker',quantity:1},{id:'speaker',quantity:2}]},catalog).equipment.map(x=>x.quantity),[1]);});
 const mapRow={lat:'43',lon:'-79',class:'building',type:'commercial',display_name:'Example hall, Toronto',address:{city:'Toronto',neighbourhood:'Example neighbourhood'},geojson:{type:'Polygon',coordinates:[[[-79.0001,42.9999],[-78.9999,42.9999],[-78.9999,43.0001],[-79.0001,43.0001],[-79.0001,42.9999]]]}};
 test('venue map context caches requests, keeps owners separate, and never labels outlines as blueprints',async()=>{let calls=0;const service=createVenueContext({fetchImpl:async url=>{calls++;return Response.json(String(url).includes('nominatim')?[mapRow]:{elements:[]});}});const result=await service.lookup('owner','123 Example Road, Toronto');assert.equal(result.floorPlanVerified,false);assert.equal(result.outline.length,5);assert.match(service.forAdvice('owner',result.id).area,/Toronto/);assert.equal(service.forAdvice('other',result.id),null);assert.equal((await service.lookup('owner','123 Example Road, Toronto')).id,result.id);assert.equal(calls,2);await assert.rejects(service.lookup('owner','456 Other Road, Toronto'),error=>error.status===429);assert.equal(venueView({...mapRow,class:'boundary'}).outline,null);assert.equal(venueView({...mapRow,geojson:{type:'Polygon',coordinates:[[[-80,43],[-79,43],[-79,44],[-80,43]]]}}).outline,null);});
+
+test('area estimates are clamped, ordered and never marked verified',()=>{
+ const {sanitizeArea}=require('./setup-advice');
+ const result=sanitizeArea({widthM:200,depthM:2,areaM2Low:900,areaM2High:300,confidence:'high',basis:'Typical hall'});
+ assert.deepEqual([result.widthM,result.depthM,result.areaM2Low,result.areaM2High,result.confidence,result.verified],[60,4,300,900,'low',false]);
+ assert.throws(()=>sanitizeArea({widthM:'x'}));
+});

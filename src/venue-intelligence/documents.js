@@ -14,19 +14,19 @@ async function pinnedRead(input,{lookup=dns.lookup,limit=8*1024*1024,redirects=3
  const url=new URL(input);if(url.protocol!=='https:'||url.username||url.password||url.port&&url.port!=='443')throw new Error('Only public HTTPS documents can be retrieved.');
  const host=url.hostname.replace(/^\[|\]$/g,'');const addresses=await lookup(host,{all:true});if(!addresses.length||addresses.some(a=>!publicIp(a.address)))throw new Error('Private or reserved source address is blocked.');const address=addresses[0];
  const result=await new Promise((resolve,reject)=>{const request=https.get(url,{autoSelectFamily:false,headers:{'User-Agent':ua,'Accept':'text/html,application/pdf,text/plain'},lookup:(_host,_options,done)=>done(null,address.address,address.family),timeout:12000},response=>{const chunks=[];let size=0;response.on('data',chunk=>{size+=chunk.length;if(size>limit){response.destroy(new Error('Source document exceeds retrieval limit.'));return;}chunks.push(chunk);});response.on('error',reject);response.on('end',()=>resolve({status:response.statusCode,headers:response.headers,buffer:Buffer.concat(chunks),url:url.href}));});request.on('timeout',()=>request.destroy(new Error('Source retrieval timed out.')));request.on('error',reject);});
- if([301,302,303,307,308].includes(result.status)){if(!redirects||!result.headers.location)throw new Error('Source redirect limit reached.');return pinnedRead(new URL(result.headers.location,url).href,{lookup,limit,redirects:redirects-1});}
+ if([301,302,303,307,308].includes(result.status)){if(!redirects)return result;if(!result.headers.location)throw new Error('Source redirect limit reached.');return pinnedRead(new URL(result.headers.location,url).href,{lookup,limit,redirects:redirects-1});}
  if(result.status<200||result.status>=300)throw new Error(`Source returned HTTP ${result.status}.`);return result;
 }
 function createDocumentReader({read=pinnedRead}={}){
  const robots=new Map(),queues=new Map(),lastReads=new Map();
  const scheduledRead=(url,delay=1000,options={})=>{const origin=new URL(url).origin;const work=(queues.get(origin)||Promise.resolve()).catch(()=>{}).then(async()=>{const remaining=delay-(Date.now()-(lastReads.get(origin)||0));if(remaining>0)await new Promise(resolve=>setTimeout(resolve,remaining));lastReads.set(origin,Date.now());return read(url,options);});queues.set(origin,work);return work;};
- return async input=>{
+ return async function document(input,depth=0){
   const url=new URL(input);let policy=robots.get(url.origin);
   if(!policy){try{const result=await scheduledRead(url.origin+'/robots.txt',1000,{limit:128000});policy=robotsParser(url.origin+'/robots.txt',result.buffer.toString());robots.set(url.origin,policy);}catch(error){if(!/HTTP 404|HTTP 410/.test(error.message))throw new Error('Source crawling permission could not be checked.');policy=robotsParser(url.origin+'/robots.txt','');robots.set(url.origin,policy);}}
   if(policy.isDisallowed(url.href,ua))throw new Error('Source disallows automated retrieval.');
   const crawlDelay=policy.getCrawlDelay(ua)||0;if(crawlDelay>30)throw new Error('Source requires a crawl delay outside this interactive research window.');
-  const response=await scheduledRead(url.href,Math.max(1000,crawlDelay*1000));
-  if(new URL(response.url).origin!==url.origin)throw new Error('Cross-site source redirects require a separately checked URL.');
+  const response=await scheduledRead(url.href,Math.max(1000,crawlDelay*1000),{redirects:0});
+  if([301,302,303,307,308].includes(response.status)){if(depth>=3||!response.headers.location)throw new Error('Source redirect limit reached.');return document(new URL(response.headers.location,url).href,depth+1);}
   if(/noai|noarchive/i.test(response.headers['x-robots-tag']||''))throw new Error('Source restricts automated reuse.');
   let text,title,links=[];const contentType=response.headers['content-type']||'';
   if(contentType.includes('application/pdf')){

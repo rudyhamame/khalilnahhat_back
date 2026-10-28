@@ -25,9 +25,16 @@ function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
  return {models,validate,configured:()=>Boolean(env.OPENROUTER_API_KEY),async request(body,{signal}={}){
   if(!env.OPENROUTER_API_KEY)throw failure(503,'Configure OPENROUTER_API_KEY in Render before using OpenRouter.');
   await validate(body.config);
-  const response=await fetchImpl('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENROUTER_API_KEY}`,'Content-Type':'application/json','X-Title':'Echo Event Entertainment'},signal,body:JSON.stringify({model:body.config.model,messages:[{role:'system',content:body.instructions},...body.input],max_tokens:body.max_output_tokens,response_format:{type:'json_schema',json_schema:{name:body.text.format.name,strict:true,schema:body.text.format.schema}},stream:false,provider:{require_parameters:true,allow_fallbacks:false,...(body.config.freeOnly!==false?{max_price:{prompt:0,completion:0,request:0}}:{})}})});
-  if(!response.ok)return response;
-  const data=await response.json(),choice=data.choices?.[0];
+  const request={model:body.config.model,messages:[{role:'system',content:body.instructions},...body.input],max_tokens:body.max_output_tokens,response_format:{type:'json_schema',json_schema:{name:body.text.format.name,strict:true,schema:body.text.format.schema}},stream:false,provider:{require_parameters:true,allow_fallbacks:false,...(body.config.freeOnly!==false?{max_price:{prompt:0,completion:0,request:0}}:{})}};
+  let data;
+  for(let attempt=0;attempt<2;attempt++){
+   const response=await fetchImpl('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENROUTER_API_KEY}`,'Content-Type':'application/json','X-Title':'Echo Event Entertainment'},signal,body:JSON.stringify(request)});
+   if(!response.ok)return response;
+   data=await response.json();
+   if(data.choices?.[0]?.finish_reason!=='length'||attempt||body.config.freeOnly===false)break;
+   request.max_tokens=Math.min(Math.max((request.max_tokens||600)*2,1600),4096);
+  }
+  const choice=data.choices?.[0];
   if(data.error||!choice||!['stop','tool_calls'].includes(choice.finish_reason))throw failure(502,'OpenRouter did not complete the booking reply.');
   const message=choice.message;
   if(!message?.refusal&&typeof message?.content!=='string')throw failure(502,'OpenRouter returned an invalid booking reply.');

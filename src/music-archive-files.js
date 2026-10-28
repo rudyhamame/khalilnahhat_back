@@ -30,7 +30,7 @@ async function saveLocalFile(file, {AssetModel=Asset,directory=root} = {}) {
   const url = prefix+id;
   return {url,previewUrl:previewUrl(url),duration:''};
 }
-function registerArchiveFiles(app,{publicSongs,Album,Category,AssetModel=Asset,directory=root}) {
+function registerArchiveFiles(app,{publicSongs,Collection,AssetModel=Asset,directory=root}) {
   app.get(`${prefix}:id`, async (req,res,next) => {
     const url = prefix+req.params.id;
     if (!localAssetPattern.test(url)) return res.status(404).end();
@@ -39,8 +39,7 @@ function registerArchiveFiles(app,{publicSongs,Album,Category,AssetModel=Asset,d
         const songs = await publicSongs();
         let published = songs.some(song=>song.audioUrl===url || song.coverImage===url);
         if (!published) {
-          const album = await Album.findOne({coverImage:url,published:true});
-          published = Boolean(album && await Category.exists({externalId:album.categoryId,published:true}));
+          published = Boolean(await Collection.exists({coverImage:url,published:true}));
         }
         if (!published) return res.status(404).end();
       }

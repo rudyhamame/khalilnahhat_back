@@ -8,9 +8,8 @@ const archiveFiles = require('./music-archive-files');
 
 const common = { externalId: { type: String, unique: true, required: true }, title: String, description: String,
   published: { type: Boolean, default: false }, sortOrder: { type: Number, default: 0 } };
-const Category = mongoose.models.MusicCategory || mongoose.model('MusicCategory', new mongoose.Schema(common, { timestamps: true }));
-const Album = mongoose.models.MusicAlbum || mongoose.model('MusicAlbum', new mongoose.Schema({ ...common,
-  categoryId: { type: String, index: true }, year: Number, coverImage: String }, { timestamps: true }));
+const Collection = mongoose.models.MusicCollection || mongoose.model('MusicCollection', new mongoose.Schema({ ...common,
+  coverImage: String, recordingIds: { type: [String], default: [] } }, { timestamps: true }));
 const text = z.string().trim().max(4000);
 const base = { title: z.string().trim().min(1).max(240), description: text.default(''), published: z.boolean().default(false), sortOrder: z.number().int().min(0).max(1000000).default(0) };
 function ownedAsset(value) {
@@ -20,9 +19,8 @@ function ownedAsset(value) {
 }
 const asset = z.string().max(2048).refine(ownedAsset, 'Choose a file uploaded to this website.');
 const inputs = {
-  categories: z.object(base).strict(),
-  albums: z.object({ ...base, categoryId: z.string().min(1).max(120), year: z.number().int().min(1900).max(2200).nullable().default(null), coverImage: asset.default('') }).strict(),
-  songs: z.object({ ...base, albumId: z.string().max(120).default(''), artist: z.string().trim().max(240).default('DJ Khalil'),
+  collections: z.object({ ...base, coverImage: asset.default(''), recordingIds: z.array(z.string().min(1).max(120)).max(5000).default([]) }).strict(),
+  songs: z.object({ ...base, artist: z.string().trim().max(240).default('DJ Khalil'),
     date: z.string().regex(/^$|^\d{4}-\d{2}-\d{2}$/).refine(value => !value || (!Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value), 'Choose a valid date.').default(''), audioUrl: asset.refine(value => Boolean(value) && (archiveFiles.localAssetPattern.test(value) || /\/video\/(upload|authenticated)\//.test(value)), 'Upload an audio file.'),
     coverImage: asset.default(''), duration: z.string().max(30).default('') }).strict(),
 };
@@ -38,42 +36,39 @@ function deliveryUrl(value) {
 function serialize(row) {
   const r = row.toObject ? row.toObject() : row;
   return { id: r.externalId, title: r.title, description: r.description || '', published: r.published !== false,
-    sortOrder: r.sortOrder || 0, categoryId: r.categoryId || '', albumId: r.albumId || '', year: r.year || null,
+    sortOrder: r.sortOrder || 0, recordingIds: r.recordingIds || [],
     artist: r.artist || 'DJ Khalil', date: r.date || (r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 10) : ''),
     audioUrl: deliveryUrl(r.audioUrl), coverImage: deliveryUrl(r.coverImage || r.image), duration: r.duration || '', createdAt: r.createdAt };
 }
-function visibleSongs(songs, albums, categories) {
-  const categoryIds = new Set(categories.filter(c => c.published !== false).map(c => c.externalId));
-  const albumIds = new Set(albums.filter(a => a.published !== false && categoryIds.has(a.categoryId)).map(a => a.externalId));
-  return songs.filter(s => s.published !== false && s.archivalStatus !== 'ARCHIVED' && (!s.workId || s.publicationStatus === 'PUBLISHED') && (!s.albumId || albumIds.has(s.albumId)));
+function visibleSongs(songs) {
+  return songs.filter(s => s.published !== false && s.archivalStatus !== 'ARCHIVED' && (!s.workId || s.publicationStatus === 'PUBLISHED'));
 }
 async function publicSongs(ArchiveModel = ArchiveItem) {
-  const [songs, albums, categories] = await Promise.all([ArchiveModel.find().sort({ sortOrder: 1, createdAt: -1 }), Album.find(), Category.find()]);
-  return visibleSongs(songs, albums, categories);
+  return visibleSongs(await ArchiveModel.find().sort({ sortOrder: 1, createdAt: -1 }));
 }
 
-function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, AlbumModel = Album, CategoryModel = Category, cloudinaryClient = cloudinary, requireCloudinary = process.env.RENDER === 'true' || process.env.MUSIC_ARCHIVE_STORAGE_PROVIDER === 'cloudinary', useCloudinary = Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) } = {}) {
-  const models = { categories: CategoryModel, albums: AlbumModel, songs: ArchiveModel };
+function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, CollectionModel = Collection, cloudinaryClient = cloudinary, requireCloudinary = process.env.RENDER === 'true' || process.env.MUSIC_ARCHIVE_STORAGE_PROVIDER === 'cloudinary', useCloudinary = Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) } = {}) {
+  const models = { collections: CollectionModel, songs: ArchiveModel };
   const ontology = ArchiveModel === ArchiveItem ? require('./music-ontology/routes').registerMusicOntology(app, { requireAdmin, service: require('./music-ontology/service').createService({ deliveryUrl, previewUrl: archiveFiles.previewUrl, ownedAsset }) }) : null;
   async function catalog(admin, { includeOntology = true } = {}) {
-    const [categories, albums, songs] = await Promise.all(Object.values(models).map(model => model.find().sort({ sortOrder: 1, createdAt: -1 })));
-    const visible = admin ? songs : visibleSongs(songs, albums, categories).filter(song => song.audioUrl);
-    const cs = admin ? categories : categories.filter(c => c.published !== false);
-    const as = admin ? albums : albums.filter(a => a.published !== false && cs.some(c => c.externalId === a.categoryId));
+    const [collections, songs] = await Promise.all(Object.values(models).map(model => model.find().sort({ sortOrder: 1, createdAt: -1 })));
+    const visible = admin ? songs : visibleSongs(songs).filter(song => song.audioUrl);
+    const shown = admin ? collections : collections.filter(c => c.published !== false);
+    const visibleIds = new Set(visible.map(s => s.externalId));
     const adminAssets = row => admin ? { storedAudioUrl: row.audioUrl || '', storedCoverImage: row.coverImage || row.image || '' } : {};
     const present = row => { const item = serialize(row); return admin ? {...item,audioUrl:archiveFiles.previewUrl(item.audioUrl),coverImage:archiveFiles.previewUrl(item.coverImage)} : item; };
     const canonical = ontology && includeOntology ? await ontology.hydrate(visible, {admin}) : null;
     const byId = new Map((canonical || []).map(r => [r.id, r]));
-    return { ...(canonical ? { recordings: canonical, ontologyVersion: 1 } : {}), categories: cs.map(present), albums: as.map(a => ({ ...present(a), ...adminAssets(a), songCount: visible.filter(s => s.albumId === a.externalId).length })), songs: visible.map(s => ({ ...present(s), ...adminAssets(s), ...(canonical ? byId.get(s.externalId) : {}) })) };
+    return { ...(canonical ? { recordings: canonical, ontologyVersion: 1 } : {}), collections: shown.map(c => { const item = { ...present(c), ...adminAssets(c) }; return { ...item, recordingIds: admin ? item.recordingIds : item.recordingIds.filter(id => visibleIds.has(id)), songCount: item.recordingIds.filter(id => visibleIds.has(id)).length }; }), songs: visible.map(s => ({ ...present(s), ...adminAssets(s), ...(canonical ? byId.get(s.externalId) : {}) })) };
   }
   app.get('/api/music-archive/playback', async (_req, res) => { const data = await catalog(false, {includeOntology:false}); res.set('Cache-Control','no-store').json({songs:data.songs}); });
   app.get('/api/music-archive', async (_req, res) => res.set('Cache-Control', 'no-store').json(await catalog(false)));
   app.get('/api/admin/music-archive', requireAdmin, async (_req, res) => res.set('Cache-Control', 'no-store').json(await catalog(true)));
   for (const [kind, model] of Object.entries(models)) {
     const validateParent = async (data) => {
-      if (kind === 'albums' && data.categoryId && !await CategoryModel.exists({ externalId: data.categoryId })) return 'Choose an existing category.';
-      if (kind === 'songs' && data.albumId && !await AlbumModel.exists({ externalId: data.albumId })) return 'Choose an existing album.';
-      return '';
+      if (kind !== 'collections' || !data.recordingIds) return '';
+      data.recordingIds = [...new Set(data.recordingIds)];
+      return await ArchiveModel.countDocuments({ externalId: { $in: data.recordingIds } }) === data.recordingIds.length ? '' : 'Choose existing recordings.';
     };
     app.post(`/api/admin/music-archive/${kind}`, requireAdmin, async (req, res) => {
       if(kind === 'songs' && ontology) return res.status(409).json({message:'Create recordings through the Music Archive ontology editor.',code:'MUSIC_ONTOLOGY_REQUIRED'});
@@ -98,8 +93,6 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, A
       res.json({ item: serialize(row) });
     });
     app.delete(`/api/admin/music-archive/${kind}/:id`, requireAdmin, async (req, res) => {
-      if (kind === 'categories' && await AlbumModel.exists({ categoryId: req.params.id })) return res.status(409).json({ message: 'Move or delete the albums in this category first.' });
-      if (kind === 'albums' && await ArchiveModel.exists({ albumId: req.params.id })) return res.status(409).json({ message: 'Move or delete the songs in this album first.' });
       if (kind === 'songs' && await model.exists({externalId:req.params.id,workId:{$exists:true,$ne:''}})) return res.status(409).json({message:'Archive this recording through the ontology editor; its references and files are preserved.'});
       const row = kind === 'songs' && ontology ? await ontology.deleteLegacy(req.params.id) : await model.findOneAndDelete({ externalId: req.params.id });
       if (!row) return res.status(404).json({ message: 'This item no longer exists.' });
@@ -132,6 +125,6 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, A
       res.status(201).json({ url: result.secure_url, previewUrl: deliveryUrl(result.secure_url), duration: result.duration ? `${Math.floor(result.duration / 60)}:${String(Math.floor(result.duration % 60)).padStart(2, '0')}` : '' });
     } catch (error) { console.error('Music archive upload failed:', error); res.status(502).json({ message: 'The file could not be uploaded. Try again.' }); }
   });
-  archiveFiles.registerArchiveFiles(app,{publicSongs:async()=>(await catalog(false,{includeOntology:false})).songs,Album:AlbumModel,Category:CategoryModel});
+  archiveFiles.registerArchiveFiles(app,{publicSongs:async()=>(await catalog(false,{includeOntology:false})).songs,Collection:CollectionModel});
 }
-module.exports = { registerMusicArchive, publicSongs, serialize, visibleSongs, deliveryUrl, inputs, Category, Album, ownedAsset, ontologyService: () => require('./music-ontology/service').createService({deliveryUrl,previewUrl:archiveFiles.previewUrl,ownedAsset}) };
+module.exports = { registerMusicArchive, publicSongs, serialize, visibleSongs, deliveryUrl, inputs, Collection, ownedAsset, ontologyService: () => require('./music-ontology/service').createService({deliveryUrl,previewUrl:archiveFiles.previewUrl,ownedAsset}) };

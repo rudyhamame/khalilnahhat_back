@@ -146,7 +146,6 @@ const liveRequestSchema = new mongoose.Schema(
 const archiveItemSchema = new mongoose.Schema(
   {
     ...require('./music-ontology/models').RecordingFields,
-    albumId: { type: String, default: '', index: true },
     published: { type: Boolean, default: true, index: true },
     sortOrder: { type: Number, default: 0 },
     externalId: { type: String, required: true, unique: true, trim: true },

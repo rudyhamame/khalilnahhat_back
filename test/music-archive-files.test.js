@@ -20,7 +20,7 @@ test('local media is private until published, supports ranges, and becomes priva
   t.after(()=>fs.rm(directory,{recursive:true,force:true}));
   const AssetModel=memoryModel(); let songs=[];
   const stored=await saveLocalFile({buffer:Buffer.from('0123456789'),mimetype:'audio/mpeg',originalname:'track.mp3'},{AssetModel,directory});
-  const app=express(); registerArchiveFiles(app,{AssetModel,directory,publicSongs:async()=>songs,Album:memoryModel(),Category:memoryModel()});
+  const app=express(); registerArchiveFiles(app,{AssetModel,directory,publicSongs:async()=>songs,Collection:memoryModel()});
   const server=app.listen(0,'127.0.0.1'); await new Promise(resolve=>server.once('listening',resolve));
   t.after(()=>new Promise(resolve=>server.close(resolve)));
   const base=`http://127.0.0.1:${server.address().port}`;

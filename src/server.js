@@ -53,6 +53,12 @@ const liveRequestPriceCents = 0;
 const liveRequestCurrency = 'cad';
 
 const DEFAULT_SERVICE_PRICES = [
+  // Service-level prices: the base price of each service. Its equipment is priced separately on the Equipment records.
+  ['service-dj', 'DJ Services', 'Service'],
+  ['service-sound', 'Sound Systems', 'Service'],
+  ['service-lighting', 'Lighting', 'Service'],
+  ['service-video', 'LED Walls & Video', 'Service'],
+  ['service-effects', 'Special Effects', 'Service'],
   ['professional-dj-service', 'Professional DJ Service', 'DJ'],
   ['qsc-k12-2-speaker', 'QSC K12.2 Speaker', 'Sound'],
   ['elite-15-speaker', 'Elite 15-inch Speaker', 'Sound'],

@@ -21,12 +21,10 @@ test('manual and AI produce the same event fields without treating ranges as a n
 });
 test('AI cannot set contact fields, grant permissions, inject unknown keys or confirm orders',()=>{
   const order=core.applyOrderPatch(core.createEventOrder(),[{path:'customer.email',value:'attack@example.invalid'},{path:'studio.rights.confirmed',value:'true'},{path:'status',value:'confirmed'},{path:'__proto__.polluted',value:'yes'}]);
-  assert.equal(order.customer.email,null);assert.equal(order.studio.rights.confirmed,null);assert.equal(order.status,undefined);assert.equal({}.polluted,undefined);
+  assert.equal(order.customer.email,null);assert.equal(order.studio,undefined);assert.equal(order.status,undefined);assert.equal({}.polluted,undefined);
 });
-test('submission validates required details and conditional Studio permission; overnight times are valid',()=>{
+test('submission validates required details; overnight times are valid',()=>{
   const order=completed();assert.deepEqual(core.validateEventOrder(order,{submission:true}),[]);
-  const studio=core.updateOrderField(order,'studio.requested',true);
-  assert.ok(core.validateEventOrder(studio,{submission:true}).includes('studio.rights.confirmed'));
   assert.ok(core.validateEventOrder({...order,event:{...order.event,endTime:'18:00'}},{submission:true}).includes('event.endTime'));
   assert.ok(core.validateEventOrder({...order,event:{...order.event,date:'2000-01-01'}},{submission:true}).includes('event.date'));
 });
@@ -39,4 +37,10 @@ test('server retains full brief, enforces identity and selections, and cannot re
 });
 test('reference links are metadata, not fetched, and non-HTTPS references are rejected',()=>{
   const field=core.fields.find(field=>field.key==='references.documents');assert.equal(core.validValue(field,['https://example.invalid/brief.pdf']),true);assert.equal(core.validValue(field,['javascript:alert(1)']),false);
+});
+
+test('quote questionnaire asks only what the brief lists',()=>{
+  const keys=core.fields.map(field=>field.key).sort();
+  const brief=['customer.fullName','customer.email','customer.phone','customer.contactMethod','customer.company','event.type','event.date','event.startTime','event.endTime','event.guestCount','event.venue.name','event.venue.address','event.venue.city','event.venue.postalCode','event.venue.area','event.venue.setting','event.setup.requirements','services','music.styles','music.otherPreferences','music.djMc','music.entrance','music.customMix','music.announcements','references.images','references.documents','additional.specialRequests','additional.notes'].sort();
+  assert.deepEqual(keys,brief);
 });

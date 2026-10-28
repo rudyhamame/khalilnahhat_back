@@ -1897,6 +1897,10 @@ require('./ai-booking').registerAiBooking(app, {
   configService:aiConfiguration,
   requireAuth: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest }),
 });
+require('./venue-intelligence/routes').registerVenueIntelligence(app, {
+  requireAuth: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest }),
+  service: require('./venue-intelligence/service').createVenueIntelligence({configService:aiConfiguration}),
+});
 require('./booking-conversations').registerBookingConversations(app, {
   requireAuth: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest }),
 });

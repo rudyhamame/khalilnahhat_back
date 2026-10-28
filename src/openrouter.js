@@ -26,19 +26,19 @@ function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
   if(!env.OPENROUTER_API_KEY)throw failure(503,'Configure OPENROUTER_API_KEY in Render before using OpenRouter.');
   await validate(body.config);
   const request={model:body.config.model,messages:[{role:'system',content:body.instructions},...body.input],max_tokens:body.max_output_tokens,response_format:{type:'json_schema',json_schema:{name:body.text.format.name,strict:true,schema:body.text.format.schema}},stream:false,provider:{require_parameters:true,allow_fallbacks:false,...(body.config.freeOnly!==false?{max_price:{prompt:0,completion:0,request:0}}:{})}};
-  let data;
+  let data;let usageKnown=true;const totals={prompt_tokens:0,completion_tokens:0,cached_tokens:0};
   for(let attempt=0;attempt<2;attempt++){
    const response=await fetchImpl('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENROUTER_API_KEY}`,'Content-Type':'application/json','X-Title':'Echo Event Entertainment'},signal,body:JSON.stringify(request)});
    if(!response.ok)return response;
-   data=await response.json();
+   data=await response.json();if(!Number.isInteger(data.usage?.prompt_tokens)||!Number.isInteger(data.usage?.completion_tokens))usageKnown=false;for(const field of ['prompt_tokens','completion_tokens'])totals[field]+=data.usage?.[field]||0;totals.cached_tokens+=data.usage?.prompt_tokens_details?.cached_tokens||0;
    if(data.choices?.[0]?.finish_reason!=='length'||attempt||body.config.freeOnly===false)break;
-   request.max_tokens=Math.min(Math.max((request.max_tokens||600)*2,1600),4096);
+   const nextTokens=Math.min(Math.max((request.max_tokens||600)*2,1600),body.config.maxOutputTokens||4096);if(nextTokens<=request.max_tokens)break;request.max_tokens=nextTokens;
   }
   const choice=data.choices?.[0];
   if(data.error||!choice||!['stop','tool_calls'].includes(choice.finish_reason))throw failure(502,'OpenRouter did not complete the booking reply.');
   const message=choice.message;
   if(!message?.refusal&&typeof message?.content!=='string')throw failure(502,'OpenRouter returned an invalid booking reply.');
-  return new Response(JSON.stringify({status:'completed',output:[{content:[message.refusal?{type:'refusal',refusal:message.refusal}:{type:'output_text',text:message.content}]}],usage:{input_tokens:data.usage?.prompt_tokens,output_tokens:data.usage?.completion_tokens,input_tokens_details:{cached_tokens:data.usage?.prompt_tokens_details?.cached_tokens||0}}}),{headers:{'Content-Type':'application/json'}});
+  return new Response(JSON.stringify({status:'completed',output:[{content:[message.refusal?{type:'refusal',refusal:message.refusal}:{type:'output_text',text:message.content}]}],usage:{input_tokens:usageKnown?totals.prompt_tokens:undefined,output_tokens:usageKnown?totals.completion_tokens:undefined,input_tokens_details:{cached_tokens:usageKnown?totals.cached_tokens:undefined}}}),{headers:{'Content-Type':'application/json'}});
  }};
 }
 module.exports={createOpenRouter};

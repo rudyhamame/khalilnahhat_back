@@ -14,7 +14,7 @@ function assertAcyclic(id,sources,rows){
  const state=new Map([[id,1]]),stack=[{node:id,index:0}];
  while(stack.length){const frame=stack[stack.length-1],children=graph.get(frame.node)||[];if(frame.index>=children.length){state.set(frame.node,2);stack.pop();continue;}const child=children[frame.index++];if(state.get(child)===1)fail('Recording sources cannot form a cycle.');if(state.get(child)!==2){state.set(child,1);stack.push({node:child,index:0});}}
 }
-function matches(r,f={}){
+function matchesWork(r,f={}){
  const w=r.work,l=w?.type==='SONG'?w.lyrics:null,m=w?.melody;
  const has=(items,id)=>!id||items?.some(v=>(typeof v==='string'?v:v.id||v.artistId)===id);
  if(f.recordingType&&r.recordingType!==f.recordingType||f.workType&&w?.type!==f.workType)return false;
@@ -31,6 +31,12 @@ function matches(r,f={}){
  if(f.key&&scoped?.key!==f.key)return false;
  if(f.q){const q=norm(f.q);const hay=[r.title,w?.title,r.artist,...(r.credits||[]).map(c=>c.artist?.name),...(w?.credits||[]).map(c=>c.artist?.name),...(m?.musicianCredits||[]).map(c=>c.artist?.name),...(m?.instruments||[]).map(i=>i.name),...(l?.artistCredits||[]).map(c=>c.artist?.name),...(m?.genres||[]).map(g=>g.name)].filter(Boolean).join(' ');if(!norm(hay).includes(q))return false;}
  return true;
+}
+const amountFor=type=>Object.keys(contract.recordingTypeGroups).find(key=>contract.recordingTypeGroups[key].includes(type))||null;
+function matches(r,f={}){
+ if(f.recordingAmount&&(r.recordingAmount||amountFor(r.recordingType))!==f.recordingAmount)return false;
+ const components=r.componentWorks?.length?r.componentWorks:[r.work];
+ return components.some(work=>matchesWork({...r,work},f));
 }
 function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>value,previewUrl=value=>value,ownedAsset=()=>false}={}){
  const {Work,Lyrics,Melody,Vocabulary,AudioAsset,Version}=models;
@@ -66,7 +72,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    const old=id?await Work.findOne({externalId:id}).session(session):null;
    if(id&&!old)fail('Musical work not found.',404);
    if(old&&value.revision!==old.revision)fail('This work changed. Reload before editing.',409);
-   if(old&&old.type!==value.type)fail('Create a separate work to change Song/Music classification; existing work identity is preserved.');
+   if(old&&old.type!==value.type)fail('Create a separate work to change Lyrical/Instrumental Music classification; existing work identity is preserved.');
    await creditsCheck(value.credits,session);
    let melodyId=value.melodyId,lyricsId=value.type==='SONG'?value.lyricsId:null;
    if(melodyId&&value.melody)fail('Choose either an existing melody or new melody metadata.');
@@ -92,6 +98,9 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    if(old&&v.revision!==(old.ontologyRevision||0))fail('This recording changed. Reload before editing.',409);
    const work=await Work.findOne({externalId:v.workId}).session(session);
    if(!work)fail('Choose an existing musical work.');
+   const componentWorkIds=[...new Set([v.workId,...(v.componentWorkIds??old?.componentWorkIds??[])])];
+   if(componentWorkIds.length>100)fail('Choose at most 100 component works.');
+   if(await Work.countDocuments({externalId:{$in:componentWorkIds}}).session(session)!==componentWorkIds.length)fail('Choose existing recording component works.');
    if(v.audioUrl&&!ownedAsset(v.audioUrl)||v.coverImage&&!ownedAsset(v.coverImage))fail('Choose media uploaded to this website.');
    if(v.audioUrl&&!require('../music-archive-files').localAssetPattern.test(v.audioUrl)&&!/\/video\/(upload|authenticated)\//.test(v.audioUrl))fail('Choose an uploaded audio asset.');
    if(v.publicationStatus==='PUBLISHED'&&(!v.audioUrl||v.archivalStatus!=='ACTIVE'))fail('Published recordings require audio and active archival status.');
@@ -107,7 +116,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    if(v.audioUrl){const existing=await AudioAsset.findOne({url:v.audioUrl}).session(session);audioAssetId=existing?.externalId||`audio-${createHash('sha256').update(v.audioUrl).digest('hex')}`;if(!existing)await AudioAsset.create([{externalId:audioAssetId,url:v.audioUrl,durationSeconds:v.durationSeconds,provenance:provenance(v.provenance,actor)}],{session});}
    const metadata={...v.recordingMetadata,states:V.metadataStates(v.recordingMetadata,v.recordingMetadata.states)};
    const duration=v.durationSeconds==null?'':`${Math.floor(v.durationSeconds/60)}:${String(Math.floor(v.durationSeconds%60)).padStart(2,'0')}`;
-   const data={title:v.title,recordingType:v.recordingType,workId:v.workId,audioAssetId,recordingMetadata:metadata,credits:v.credits,sourceRecordingIds:v.sourceRecordingIds,sourceWorkIds:v.sourceWorkIds,publicationStatus:v.publicationStatus,archivalStatus:v.archivalStatus,versionLabel:v.versionLabel,productionNotes:v.productionNotes,provenance:provenance(v.provenance,actor),ontologyRevision:(old?.ontologyRevision||0)+1,description:v.description,date:v.releaseDate,audioUrl:v.audioUrl,coverImage:v.coverImage,duration,published:v.publicationStatus==='PUBLISHED'&&v.archivalStatus==='ACTIVE',mediaType:'audio'};
+   const data={title:v.title,recordingType:v.recordingType,recordingAmount:amountFor(v.recordingType),componentWorkIds,workId:v.workId,audioAssetId,recordingMetadata:metadata,credits:v.credits,sourceRecordingIds:v.sourceRecordingIds,sourceWorkIds:v.sourceWorkIds,publicationStatus:v.publicationStatus,archivalStatus:v.archivalStatus,versionLabel:v.versionLabel,productionNotes:v.productionNotes,provenance:provenance(v.provenance,actor),ontologyRevision:(old?.ontologyRevision||0)+1,description:v.description,date:v.releaseDate,audioUrl:v.audioUrl,coverImage:v.coverImage,duration,published:v.publicationStatus==='PUBLISHED'&&v.archivalStatus==='ACTIVE',mediaType:'audio'};
    if(migration){for(const key of ['title','description','date','audioUrl','coverImage','duration','mediaType'])delete data[key];data.ontologyMigrationId=migration.runId;await mongoose.connection.collection('musicontologymigrationbackups').insertOne({_id:`${migration.runId}:${recordId}`,runId:migration.runId,recordingId:recordId,before:plain(old),afterRevision:data.ontologyRevision,createdAt:new Date()},{session});}
    let row;
    if(old){old.set(data);row=await old.save({session});}else row=(await ArchiveModel.create([{...data,externalId:recordId,category:'Music Archive',artist:''}],{session}))[0];
@@ -127,12 +136,13 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
   });return {works:new Map(mapped),vocabulary:vs};
  }
  async function hydrate(rows,{admin=false}={}){
-  rows=rows.map(plain);const {works,vocabulary}=await workMap(rows.map(r=>r.workId).filter(Boolean));
+  rows=rows.map(plain);const {works,vocabulary}=await workMap([...new Set(rows.flatMap(r=>[r.workId,...(r.componentWorkIds||[])]).filter(Boolean))]);
   const assets=await AudioAsset.find({externalId:{$in:rows.map(r=>r.audioAssetId).filter(Boolean)}}).lean();const am=new Map(assets.map(a=>[a.externalId,a]));
   return rows.map(r=>{
    const w=works.get(r.workId)||null,a=am.get(r.audioAssetId),deliver=url=>admin?previewUrl(deliveryUrl(url)):deliveryUrl(url);
-   const artist=[...new Set([...(r.credits||[]),...(w?.credits||[]),...(w?.melody?.musicianCredits||[]),...(w?.lyrics?.artistCredits||[])].map(c=>vocabulary.get(c.artistId)?.name).filter(Boolean))].join(', ')||(!r.workId?r.artist||'':'');
-   return {id:r.externalId,title:r.title,description:r.description||'',recordingType:r.recordingType||null,workId:r.workId||null,work:w,ontologyStatus:r.workId?'MAPPED':'UNMAPPED',recordingMetadata:r.recordingMetadata||{bpm:null,key:null,states:{bpm:'UNKNOWN',key:'UNKNOWN'}},credits:creditNames(r.credits||[],vocabulary),sourceRecordingIds:r.sourceRecordingIds||[],sourceWorkIds:r.sourceWorkIds||[],publicationStatus:r.publicationStatus||(r.published!==false?'PUBLISHED':'DRAFT'),archivalStatus:r.archivalStatus||'ACTIVE',revision:r.ontologyRevision||0,versionLabel:r.versionLabel||'',productionNotes:r.productionNotes||'',provenance:r.provenance||null,audio:{assetId:r.audioAssetId||null,url:deliver(r.audioUrl||a?.url||''),durationSeconds:r.duration?String(r.duration).split(':').reduce((t,n)=>t*60+Number(n),0):(a?.durationSeconds??null)},audioUrl:deliver(r.audioUrl||''),coverImage:deliver(r.coverImage||r.image||''),artist,duration:r.duration||'',date:r.date||'',releaseDate:r.date||'',createdAt:r.createdAt,updatedAt:r.updatedAt,sortOrder:r.sortOrder||0,published:r.published!==false,...(admin?{storedAudioUrl:r.audioUrl||'',storedCoverImage:r.coverImage||r.image||''}:{})};
+   const componentWorkIds=[...new Set([r.workId,...(r.componentWorkIds||[])].filter(Boolean))],componentWorks=componentWorkIds.map(id=>works.get(id)).filter(Boolean);
+   const artist=[...new Set([...(r.credits||[]),...componentWorks.flatMap(c=>[...(c.credits||[]),...(c.melody?.musicianCredits||[]),...(c.lyrics?.artistCredits||[])])].map(c=>vocabulary.get(c.artistId)?.name).filter(Boolean))].join(', ')||(!r.workId?r.artist||'':'');
+   return {id:r.externalId,title:r.title,description:r.description||'',recordingType:r.recordingType||null,recordingAmount:r.recordingAmount||amountFor(r.recordingType),componentWorkIds,componentWorks,workId:r.workId||null,work:w,ontologyStatus:r.workId?'MAPPED':'UNMAPPED',recordingMetadata:r.recordingMetadata||{bpm:null,key:null,states:{bpm:'UNKNOWN',key:'UNKNOWN'}},credits:creditNames(r.credits||[],vocabulary),sourceRecordingIds:r.sourceRecordingIds||[],sourceWorkIds:r.sourceWorkIds||[],publicationStatus:r.publicationStatus||(r.published!==false?'PUBLISHED':'DRAFT'),archivalStatus:r.archivalStatus||'ACTIVE',revision:r.ontologyRevision||0,versionLabel:r.versionLabel||'',productionNotes:r.productionNotes||'',provenance:r.provenance||null,audio:{assetId:r.audioAssetId||null,url:deliver(r.audioUrl||a?.url||''),durationSeconds:r.duration?String(r.duration).split(':').reduce((t,n)=>t*60+Number(n),0):(a?.durationSeconds??null)},audioUrl:deliver(r.audioUrl||''),coverImage:deliver(r.coverImage||r.image||''),artist,duration:r.duration||'',date:r.date||'',releaseDate:r.date||'',createdAt:r.createdAt,updatedAt:r.updatedAt,sortOrder:r.sortOrder||0,published:r.published!==false,...(admin?{storedAudioUrl:r.audioUrl||'',storedCoverImage:r.coverImage||r.image||''}:{})};
   });
  }
  async function list(admin=false,filters={}){
@@ -142,6 +152,8 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
  async function preflightRecording(input,id){
   const v=V.recording.parse(input);
   if(!await Work.exists({externalId:v.workId}))fail('Choose an existing musical work.');
+  const componentIds=[...new Set([v.workId,...(v.componentWorkIds||[])])];
+  if(componentIds.length>100||await Work.countDocuments({externalId:{$in:componentIds}})!==componentIds.length)fail('Choose up to 100 existing recording component works.');
   if(v.audioUrl&&!ownedAsset(v.audioUrl)||v.coverImage&&!ownedAsset(v.coverImage))fail('Choose media uploaded to this website.');
   if(v.audioUrl&&!require('../music-archive-files').localAssetPattern.test(v.audioUrl)&&!/\/video\/(upload|authenticated)\//.test(v.audioUrl))fail('Choose an uploaded audio asset.');
   if(v.publicationStatus==='PUBLISHED'&&(!v.audioUrl||v.archivalStatus!=='ACTIVE'))fail('Published recordings require audio and active archival status.');

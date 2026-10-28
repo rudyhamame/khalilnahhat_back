@@ -1,10 +1,13 @@
 {
-  "version": 1,
+  "version": 2,
   "recordingTypes": [
-    "MIX",
-    "REMIX",
     "COVER",
-    "PRODUCTION"
+    "REMIX",
+    "PRODUCTION",
+    "MASHUP",
+    "MEDLEY",
+    "MIX",
+    "LIVE"
   ],
   "workTypes": [
     "SONG",
@@ -66,12 +69,43 @@
     "archivalStatus",
     "lyricArtist",
     "instrument",
-    "musician"
+    "musician",
+    "recordingAmount"
   ],
   "musicianRoles": [
     "PERFORMER",
     "COMPOSER",
     "ARRANGER",
     "OTHER"
-  ]
+  ],
+  "recordingAmounts": [
+    "INDIVIDUAL",
+    "MULTIPLE"
+  ],
+  "recordingTypeGroups": {
+    "INDIVIDUAL": [
+      "COVER",
+      "REMIX",
+      "PRODUCTION",
+      "MASHUP"
+    ],
+    "MULTIPLE": [
+      "MEDLEY",
+      "MIX",
+      "LIVE"
+    ]
+  },
+  "workTypeLabels": {
+    "SONG": "Lyrical Music",
+    "MUSIC": "Instrumental Music"
+  },
+  "recordingTypeLabels": {
+    "COVER": "Cover",
+    "REMIX": "Remix",
+    "PRODUCTION": "Production",
+    "MASHUP": "Mashup",
+    "MEDLEY": "Medley",
+    "MIX": "Mix",
+    "LIVE": "Live"
+  }
 }

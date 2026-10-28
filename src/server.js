@@ -37,7 +37,6 @@ const { registerContent } = require('./content');
 const { DAY_MS, quoteTotals, registerQuoteLifecycle } = require('./quote-lifecycle');
 const { createSessionToken, hashPassword, verifyPassword } = require('./security');
 const { convertYoutubeToWav, normalizeYoutubeUrl } = require('./youtube-audio');
-const { createArchiveHandler } = require('./archive-create');
 const { createYoutubeSessionStore, registerYoutubeSessionRoutes } = require('./youtube-session');
 const {
   sendServiceQuoteNotification,
@@ -1791,21 +1790,10 @@ registerYoutubeSessionRoutes(app, {
   upload: multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024, files: 1, fields: 1 } }).single('sessionFile'),
 });
 
-app.post('/api/archive-items', requireAdmin, createArchiveHandler({
-  schema: archiveItemSchema.extend({
-    youtubeUrl: z.string().trim().max(2048).optional().default('').refine(
-      (value) => !value || Boolean(normalizeYoutubeUrl(value)),
-      'Enter a valid YouTube video link.',
-    ),
-  }),
-  convert: convertArchiveYoutube,
-  upload: uploadAudioBufferToCloudinary,
-  removeUpload: (publicId) => cloudinary.uploader.destroy(publicId, { resource_type: 'video' }),
-  create: (data) => ArchiveItem.create(data),
-  serialize: serializeArchiveItem,
-}));
+app.post('/api/archive-items', requireAdmin, (_request, response) => response.status(409).json({message:'Create recordings through the Music Archive ontology editor.',code:'MUSIC_ONTOLOGY_REQUIRED'}));
 
 app.patch('/api/archive-items/:id', requireAdmin, async (request, response) => {
+  if (await ArchiveItem.exists({externalId:request.params.id,workId:{$exists:true,$ne:''}})) return response.status(409).json({message:'Edit this recording through the Music Archive ontology editor.'});
   const parsed = archiveItemSchema.partial().safeParse(request.body);
 
   if (!parsed.success) {
@@ -1833,7 +1821,8 @@ app.patch('/api/archive-items/:id', requireAdmin, async (request, response) => {
 });
 
 app.delete('/api/archive-items/:id', requireAdmin, async (request, response) => {
-  const deleted = await ArchiveItem.findOneAndDelete({ externalId: request.params.id });
+  if (await ArchiveItem.exists({externalId:request.params.id,workId:{$exists:true,$ne:''}})) return response.status(409).json({message:'Archive this recording through the Music Archive ontology editor.'});
+  const deleted = await require('./music-archive').ontologyService().deleteLegacy(request.params.id);
 
   if (!deleted) {
     return response.status(404).json({

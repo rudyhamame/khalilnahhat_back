@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "recordingTypes": [
+    "MIX",
+    "REMIX",
+    "COVER",
+    "PRODUCTION"
+  ],
+  "workTypes": [
+    "SONG",
+    "MUSIC"
+  ],
+  "publicationStatuses": [
+    "DRAFT",
+    "PUBLISHED",
+    "WITHDRAWN"
+  ],
+  "archivalStatuses": [
+    "ACTIVE",
+    "ARCHIVED"
+  ],
+  "metadataStates": [
+    "MISSING",
+    "UNKNOWN",
+    "NOT_APPLICABLE",
+    "SPECIFIED"
+  ],
+  "vocabularyKinds": [
+    "language",
+    "dialect",
+    "region",
+    "artist",
+    "concept",
+    "rhythm",
+    "genre"
+  ],
+  "creditRoles": [
+    "LYRICIST",
+    "VOCALIST",
+    "PERFORMER",
+    "COMPOSER",
+    "PRODUCER",
+    "MIX_ENGINEER",
+    "MASTERING_ENGINEER",
+    "ARRANGER",
+    "OTHER"
+  ],
+  "keyPattern": "^[A-G](?:#|b)? (?:major|minor)$",
+  "filters": [
+    "q",
+    "recordingType",
+    "workType",
+    "language",
+    "dialect",
+    "region",
+    "artist",
+    "concept",
+    "bpmMin",
+    "bpmMax",
+    "key",
+    "rhythm",
+    "genre",
+    "bpmScope",
+    "publicationStatus",
+    "archivalStatus",
+    "lyricArtist"
+  ]
+}

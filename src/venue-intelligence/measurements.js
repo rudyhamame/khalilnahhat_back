@@ -36,19 +36,19 @@ function evidenceFromExtraction(row,sources,venue){
  const numbers=quote.match(/\d[\d,]*(?:\.\d+)?/g)?.map(n=>Number(n.replaceAll(',','')))||[];
  const fields=['value','width','depth'].filter(k=>row[k]!==null&&row[k]!==undefined);if(!fields.length||!fields.every(k=>Number.isFinite(row[k])&&row[k]>0&&numbers.includes(row[k])))return null;
  const unit=row.unit;const unitText=quote.toLowerCase();if(!({m2:/m²|m2|sq\.?\s*m|square\s*met/,ft2:/ft²|ft2|sq\.?\s*ft|square\s*f(?:ee|oo)t/,m:/\bmet(?:re|er)s?\b|\bm\b/,ft:/\bfeet\b|\bfoot\b|\bft\b/}[unit]?.test(unitText)))return null;
- let valueM2,widthM=null,depthM=null;try{if(row.method==='explicit_dimensions'){widthM=lengthM(row.width,unit);depthM=lengthM(row.depth,unit);valueM2=round(widthM*depthM);}else if(row.method==='published_area')valueM2=areaM2(row.value,unit);else return null;}catch{return null;}
+ let valueM2,widthM=null,depthM=null;try{if(row.method==='explicit_dimensions'){widthM=lengthM(row.width,unit);depthM=lengthM(row.depth,unit);valueM2=/\brectang(?:le|ular)\b/i.test(quote)?round(widthM*depthM):null;}else if(row.method==='published_area')valueM2=areaM2(row.value,unit);else return null;}catch{return null;}
  if(valueM2>100000)return null;
  // Undated or historical property listings cannot establish the current tenant's area.
  const publishedAt=row.publishedAt&&/^\d{4}-\d{2}-\d{2}$/.test(row.publishedAt)&&source.text.includes(row.publishedAt)?row.publishedAt:null;
  if(source.kind==='property'&&(!publishedAt||Date.now()-Date.parse(publishedAt)>3*365.25*86400000))return null;
- return {id:require('node:crypto').randomUUID(),category:row.category,valueM2,widthM:widthM&&round(widthM),depthM:depthM&&round(depthM),unit:'m2',reported:{value:row.value??null,width:row.width??null,depth:row.depth??null,unit},space:scope,level:row.level||null,sourceId:source.id,sourceTitle:source.title,sourceUrl:source.url,publisher:source.publisher,publishedAt,retrievedAt:source.retrievedAt,quote,identityMatch:'address_and_name',buildingUnitMatch:'explicit_space',quality:source.kind,status:source.kind==='official'&&row.method==='explicit_dimensions'?'verified':'documented',method:row.method,assumptions:[],uncertainty:null};
+ return {id:require('node:crypto').randomUUID(),category:row.category,valueM2,widthM,depthM,shape:row.method==='explicit_dimensions'&&valueM2!==null?'rectangle':'unknown',unit:'m2',reported:{value:row.value??null,width:row.width??null,depth:row.depth??null,unit},space:scope,level:row.level||null,sourceId:source.id,sourceTitle:source.title,sourceUrl:source.url,publisher:source.publisher,publishedAt,retrievedAt:source.retrievedAt,quote,identityMatch:'address_and_name',buildingUnitMatch:'explicit_space',quality:source.kind,status:source.kind==='official'&&row.method==='explicit_dimensions'&&valueM2!==null?'verified':'documented',method:row.method,assumptions:[],uncertainty:null};
 }
 function evaluateMeasurements(evidence){
  const measurements=Object.fromEntries(CATEGORIES.map(key=>[key,null])),conflicts=[];
  for(const category of CATEGORIES){const rows=evidence.filter(e=>e.category===category);if(!rows.length)continue;const spaces=new Map();for(const row of rows){const key=norm(row.space)+'|'+(row.level||'');spaces.set(key,[...(spaces.get(key)||[]),row]);}
   // Different rooms/floors are never added or averaged into a venue total.
   if(spaces.size>1){conflicts.push({category,reason:'Sources describe different rooms or floors. Select the specific space.',evidenceIds:rows.map(r=>r.id)});continue;}
-  if(rows.some(a=>rows.some(b=>Math.abs(a.valueM2-b.valueM2)>Math.max(a.valueM2,b.valueM2)*.05))){conflicts.push({category,reason:'Published measurements disagree. No value has been selected.',evidenceIds:rows.map(r=>r.id)});continue;}
+  if(rows.some(a=>rows.some(b=>['valueM2','widthM','depthM'].some(key=>Number.isFinite(a[key])&&Number.isFinite(b[key])&&Math.abs(a[key]-b[key])>Math.max(a[key],b[key])*.05)))){conflicts.push({category,reason:'Published measurements disagree. No value has been selected.',evidenceIds:rows.map(r=>r.id)});continue;}
   measurements[category]=[...rows].sort((a,b)=>(a.status==='verified'?-1:1)-(b.status==='verified'?-1:1)||String(b.publishedAt||b.retrievedAt).localeCompare(String(a.publishedAt||a.retrievedAt)))[0];
  }
  return {measurements,conflicts};
@@ -56,7 +56,7 @@ function evaluateMeasurements(evidence){
 function simulationAdapter(report){
  const m=report.measurements?.event_hall||report.measurements?.venue_usable;
  if(!m)return {readiness:'conceptual_only',level:'conceptual',boundary:null,widthM:null,depthM:null,reason:'The venue’s usable indoor boundary is unknown. A conceptual layout is fictional.'};
- if(m.widthM&&m.depthM)return {readiness:m.status==='verified'?'verified_scale':'estimated_scale',level:m.status==='verified'?'verified':'estimated',widthM:m.widthM,depthM:m.depthM,boundary:[[-m.widthM/2,-m.depthM/2],[m.widthM/2,-m.depthM/2],[m.widthM/2,m.depthM/2],[-m.widthM/2,m.depthM/2]],evidenceIds:[m.id],units:'m',reason:'Rectangle from published room dimensions. Architectural features remain unknown.'};
- return {readiness:'conceptual_only',level:'conceptual',boundary:null,widthM:null,depthM:null,documentedAreaM2:m.valueM2,reason:'Area is documented, but its boundary and dimensions are unknown. No room shape was inferred.'};
+ if(m.widthM&&m.depthM&&m.shape==='rectangle')return {readiness:m.status==='verified'?'verified_scale':'estimated_scale',level:m.status==='verified'?'verified':'estimated',widthM:m.widthM,depthM:m.depthM,boundary:[[-m.widthM/2,-m.depthM/2],[m.widthM/2,-m.depthM/2],[m.widthM/2,m.depthM/2],[-m.widthM/2,m.depthM/2]],evidenceIds:[m.id],units:'m',reason:'Rectangle from published room dimensions. Architectural features remain unknown.'};
+ return {readiness:'conceptual_only',level:'conceptual',boundary:null,widthM:null,depthM:null,documentedAreaM2:m.valueM2,reason:m.valueM2===null?'Published lengths do not establish the room’s shape. No boundary was inferred.':'Area is documented, but its boundary and dimensions are unknown. No room shape was inferred.'};
 }
 module.exports={CATEGORIES,areaM2,lengthM,polygonMetrics,inside,norm,addressMatches,evidenceFromExtraction,evaluateMeasurements,simulationAdapter};

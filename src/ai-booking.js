@@ -89,6 +89,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
   app.get('/api/ai-booking/status',async(_req,res)=>{const config=await policy(res);if(config){res.set('Cache-Control','no-store');res.json({configured:configured('chat',config),voiceConfigured:configured('voice',config),requiresSignIn:true,maxCallSeconds:config.voice.maxCallSeconds,...(configService?{policy:publicPolicy(config)}:{})});}});
   const venueContext=require('./venue-context').createVenueContext({fetchImpl});
   require('./venue-context').registerVenueContext(app,{requireAuth,identity,service:venueContext});
+  require('./event-images').registerEventImages(app,{requireAuth,policy,admitted,headers,fetchImpl,env});
   require('./setup-advice').registerSetupAdvice(app,{venueContext,requireAuth,policy,admitted,identity,headers,openrouter,configService,fetchImpl,pending,loadCatalog:loadSetupCatalog});
   app.post('/api/ai-booking/chat', requireAuth, async (req, res) => {
     const input = inputSchema.safeParse(req.body);

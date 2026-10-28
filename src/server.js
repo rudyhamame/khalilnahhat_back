@@ -1914,6 +1914,7 @@ registerPlanning(app, { requireAuth, serialize: serializeServiceRequest });
 registerMeetings(app, { requireAuth, requireAdmin });
 registerAccount(app, { requireAuth, getFrontendUrl });
 registerContent(app, requireAdmin);
+require('./seasonal-theme').registerSeasonalTheme(app, { requireAdmin });
 registerPayments(app, { requireAuth, requireAdmin, serialize: serializeServiceRequest });
 registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize: serializeServiceRequest });
 

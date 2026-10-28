@@ -1,0 +1,72 @@
+✔ partial JSON replies preserve escaped quotes, newlines, and Unicode without exposing patch data (24.048748ms)
+✔ SSE parsing survives arbitrary UTF-8 chunks and CRLF boundaries (155.264251ms)
+✔ status exposes availability, never credentials (861.831101ms)
+✔ paid chat and voice require sign-in (272.637981ms)
+✔ rejects missing consent and client-supplied system roles (42.30614ms)
+✔ unconfigured provider fails clearly without fake AI output (16.402283ms)
+✔ uses server-owned instructions and validates a review-only draft (243.253709ms)
+AI chat upstream failure {"provider":"openai","model":"gpt-4o-mini","status":401,"body":"sensitive upstream error"}
+✔ provider failures are sanitized; never expose upstream text (154.88183ms)
+✔ a guest range cannot discard a valid reply or invent a guest count (78.12333ms)
+✔ empty summary text preserves the draft for review without claiming submission (57.965404ms)
+✔ AI order updates are allowlisted and private review fields never enter order context (75.020918ms)
+✔ draft normalization clears invalid fields while preserving valid facts (3.427185ms)
+AI booking reply failed {"stage":"provider_json","error":"Error"}
+✔ incomplete replies fail clearly without exposing a partial draft (13.670155ms)
+✔ refusal is a readable reply without a booking draft (22.967816ms)
+AI booking reply failed {"stage":"reply_json","error":"SyntaxError"}
+✔ malformed provider JSON fails closed without leaking content (16.429798ms)
+✔ draft rejects impossible times and unknown service identifiers (2.650444ms)
+✔ voice sessions have server-owned settings and an ownership-checked end (36.14369ms)
+✔ modern chat requests one shared patch and records usage without content (11.482821ms)
+✔ streamed reply arrives before the validated final patch (18.199396ms)
+AI booking reply failed {"stage":"provider_json","error":"Error"}
+✔ stream interruption returns an error event and never a draft patch (15.180011ms)
+AI booking reply failed {"stage":"provider_json","error":"Error"}
+✔ client cancellation aborts upstream generation (41.668042ms)
+✔ voice usage is bounded, owner checked, and labeled as client reported (29.885256ms)
+✔ saved configuration drives models, output limits, voice duration and disabled modes (30.081921ms)
+AI booking reply failed {"stage":"provider_request","error":"Error"}
+✔ pricing rejection happens before any provider request (40.55869ms)
+✔ OpenRouter free chat preserves validated order patches and never calls paid OpenAI (42.680031ms)
+✔ default policy preserves model choices, includes AI, and keeps provider/customer currencies separate (43.846526ms)
+✔ configuration persists, validates mode capabilities, checks access, and rejects stale writes (115.306093ms)
+✔ inaccessible models cannot be saved (5.77123ms)
+✔ paid usage requires current price acceptance and duplicate completions cannot bill twice (8.370025ms)
+✔ failed requests may retry without charging; existing sessions keep their accepted fee (3.932171ms)
+✔ billing transitions require an invoice before payment and cannot record payment twice (121.947472ms)
+✔ admin configuration and usage routes reject customers and expose no provider key (713.005528ms)
+✔ OpenRouter settings enforce free selection and verified rates independently of client prices (11.609628ms)
+✔ OpenAI provider rates come from the catalog while customer prices remain editable (2.774219ms)
+✔ catalog filters unsupported models, preserves prices, and free-only rejects paid models (94.927824ms)
+✔ missing key and incomplete provider output fail closed (6.294594ms)
+✔ setup advice is authenticated, validates guest input and only uses server catalog (650.593768ms)
+✔ invalid advice cannot become an order and duplicated catalogue IDs are removed (1.143988ms)
+✔ venue map context caches requests, keeps owners separate, and never labels outlines as blueprints (17.056049ms)
+✔ area estimates are clamped, ordered and never marked verified (1.928514ms)
+✔ standalone restaurant with published usable area: documented area does not invent a room shape (55.211825ms)
+✔ multi-tenant restaurant: building footprint never becomes tenant or event area (2.942202ms)
+✔ banquet hall official dimensions: deterministic feet conversion and correctly scaled rectangle (2.472778ms)
+✔ only a building footprint: polygon geometry calculates area, perimeter, bounds and metre coordinates (11.163043ms)
+✔ conflicting published areas: preserve evidence and select no indoor area (1.666459ms)
+✔ no discoverable dimensions: all missing categories remain null (1.883656ms)
+✔ similarly named businesses: address mismatch and unsupported quoted numbers reject measurements (0.747219ms)
+✔ multi-floor venue: distinct floors and rooms cannot be added or averaged into a venue total (0.787918ms)
+✔ outdated property listings and undated leasing records cannot establish current tenant dimensions (7.103929ms)
+✔ geometry rejects self intersections, invalid or open rings, and subtracts holes deterministically (11.72694ms)
+✔ two published lengths without a documented rectangular shape cannot invent an indoor polygon or area (4.367083ms)
+✔ real isolated MongoDB save/restore, owner scoping, stale edit rejection and manual preservation through refresh (5193.506463ms)
+✔ ambiguous branches require selection, progress reflects skipped operations, and no source text is persisted (65.986424ms)
+✔ saved manual verified measurements survive refresh, save/restore is scoped to the authenticated owner (37.18161ms)
+✔ cache reuses saved research honestly and explicit refresh researches again (10.347378ms)
+✔ manual exterior polygon is calculated and never becomes an indoor simulation boundary (9.719495ms)
+✔ private source targets are rejected before any network request (36.582153ms)
+✔ API denies unauthenticated callers, validates inputs, and isolates jobs across accounts (325.964661ms)
+ℹ tests 58
+ℹ suites 0
+ℹ pass 58
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 13059.651462

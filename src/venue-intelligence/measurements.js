@@ -26,7 +26,7 @@ function evidenceFromExtraction(row,sources,venue){
  const source=sources.find(s=>s.id===row.sourceId);if(!source||!CATEGORIES.includes(row.category))return null;
  const quote=String(row.quote||'').trim(),identityQuote=String(row.identityQuote||'').trim(),scope=String(row.space||'').trim();
  if(!quote||quote.length>600||!source.text.includes(quote)||!identityQuote||!source.text.includes(identityQuote)||!addressMatches(identityQuote,venue.address))return null;
- const nameWords=norm(venue.name).split(' ').filter(w=>w.length>2);if(!nameWords.length||!nameWords.some(w=>norm(source.text).includes(w)))return null;
+ const nameWords=norm(venue.name).split(' ').filter(w=>w.length>2&&!['the','and','restaurant','cuisine','event','events','hall','venue','inc','ltd'].includes(w));if(!nameWords.length||!nameWords.every(w=>norm(source.text).includes(w)))return null;
  const categoryWords={building_footprint:/building|footprint/i,total_building_floor:/building|total floor/i,venue_gross:/gross|leased|tenant|premises|unit|suite/i,venue_usable:/usable|net (?:floor|area)|usable indoor/i,event_hall:/hall|ballroom|event (?:space|room|area)|banquet|function room/i,seating:/seating|dining/i,stage:/stage/i,dance_floor:/dance/i,circulation:/circulation|corridor/i};
  if(!categoryWords[row.category]?.test(quote))return null;
  if(!scope||row.spaceMatch!==true||row.current!==true||!['official','property'].includes(source.kind))return null;
@@ -37,9 +37,10 @@ function evidenceFromExtraction(row,sources,venue){
  const fields=['value','width','depth'].filter(k=>row[k]!==null&&row[k]!==undefined);if(!fields.length||!fields.every(k=>Number.isFinite(row[k])&&row[k]>0&&numbers.includes(row[k])))return null;
  const unit=row.unit;const unitText=quote.toLowerCase();if(!({m2:/m²|m2|sq\.?\s*m|square\s*met/,ft2:/ft²|ft2|sq\.?\s*ft|square\s*f(?:ee|oo)t/,m:/\bmet(?:re|er)s?\b|\bm\b/,ft:/\bfeet\b|\bfoot\b|\bft\b/}[unit]?.test(unitText)))return null;
  let valueM2,widthM=null,depthM=null;try{if(row.method==='explicit_dimensions'){widthM=lengthM(row.width,unit);depthM=lengthM(row.depth,unit);valueM2=/\brectang(?:le|ular)\b/i.test(quote)?round(widthM*depthM):null;}else if(row.method==='published_area')valueM2=areaM2(row.value,unit);else return null;}catch{return null;}
- if(valueM2>100000)return null;
+ if(valueM2!==null&&(!Number.isFinite(valueM2)||valueM2<=0||valueM2>100000))return null;
  // Undated or historical property listings cannot establish the current tenant's area.
  const publishedAt=row.publishedAt&&/^\d{4}-\d{2}-\d{2}$/.test(row.publishedAt)&&source.text.includes(row.publishedAt)?row.publishedAt:null;
+ if(publishedAt&&(!Number.isFinite(Date.parse(publishedAt))||Date.parse(publishedAt)>Date.now()+86400000))return null;
  if(source.kind==='property'&&(!publishedAt||Date.now()-Date.parse(publishedAt)>3*365.25*86400000))return null;
  return {id:require('node:crypto').randomUUID(),category:row.category,valueM2,widthM,depthM,shape:row.method==='explicit_dimensions'&&valueM2!==null?'rectangle':'unknown',unit:'m2',reported:{value:row.value??null,width:row.width??null,depth:row.depth??null,unit},space:scope,level:row.level||null,sourceId:source.id,sourceTitle:source.title,sourceUrl:source.url,publisher:source.publisher,publishedAt,retrievedAt:source.retrievedAt,quote,identityMatch:'address_and_name',buildingUnitMatch:'explicit_space',quality:source.kind,status:source.kind==='official'&&row.method==='explicit_dimensions'&&valueM2!==null?'verified':'documented',method:row.method,assumptions:[],uncertainty:null};
 }

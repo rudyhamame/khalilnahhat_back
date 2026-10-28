@@ -59,3 +59,12 @@ The legacy `POST /api/ai-booking/venue-area` returns HTTP 410 directing clients 
 Focused fixtures exercise all ten requested scenarios, owner isolation, stale manual writes, source-text nonpersistence, private-source rejection, unit conversions and polygon calculations. Frontend adapter tests cover exact axes/scale, manual precedence, explicit concepts and nonrectangular floor area. Browser QA uses clearly labeled synthetic fixtures (never real claimed venue measurements) for candidate confirmation, polling, explicit simulation import, Geoman tracing, manual save and mobile layout.
 
 For production, build/deploy the updated API Docker image and frontend together, then configure authorized providers. The local Vite service ordinarily proxies `/api` to Render, so changing source alone does not add server routes to that running API. Missing credentials are a real configuration requirement; this implementation does not claim a completed live Ruby's venue research or invent dimensions for the example.
+
+### Verified in this workspace (2026-10-28)
+
+- 58 focused backend checks pass, including all ten venue scenarios, existing AI policy/chat/stream handling, and real save/restore against a separate temporary local MongoDB instance. No production database was used by these tests.
+- Five simulation adapter checks pass. Frontend production build and scoped lint pass. Browser fixtures confirm location selection, progress polling, no unsolicited resize, exact 20 × 12 metre import, Geoman tracing, manual save and a 390 px dialog layout; no page JavaScript errors occurred.
+- The three existing event-order rendering assertions (`Full name`, `draft-studioChoice` in English/Arabic) reproduce unchanged when the new Venue Intelligence provider code is removed in an isolated baseline copy.
+- Bounded public HTTPS document retrieval was smoke-checked against example.com. This is a transport check, not evidence about the example venue.
+- Evidence: backend `artifacts/venue-intelligence-20261028/backend-tests.log`; frontend `artifacts/venue-intelligence-20261028/` contains build/lint/adapter logs and clearly labeled synthetic browser QA evidence.
+- The local environment has no configured identification, licensed search or satellite provider variables. The Render API has not been deployed or reconfigured by this task. Municipal/Solar connectors and image-only floor-plan interpretation remain explicitly unavailable.

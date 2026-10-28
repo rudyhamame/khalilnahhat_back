@@ -1,0 +1,1241 @@
+{
+"version":1,
+"items":[
+{
+"id":"levantine-syrian-general",
+"language":"Arabic",
+"dialect_family":"Levantine",
+"dialect_family_ar":"شامي",
+"country":"Syria",
+"country_ar":"سورية",
+"regional_dialect":"General",
+"regional_dialect_ar":"عام",
+"display_name":"Syrian (General)",
+"display_name_ar":"سورية (عام)",
+"aliases":[
+"Standard",
+"Any",
+"Common"
+]
+},
+{
+"id":"levantine-syrian-damascene",
+"language":"Arabic",
+"dialect_family":"Levantine",
+"dialect_family_ar":"شامي",
+"country":"Syria",
+"country_ar":"سورية",
+"regional_dialect":"Damascene",
+"regional_dialect_ar":"دمشقية",
+"display_name":"Syrian (Damascene)",
+"display_name_ar":"سورية (دمشقية)",
+"aliases":[
+"Damascus",
+"Shami",
+"دمشق"
+]
+},
+{
+"id":"levantine-syrian-aleppine",
+"language":"Arabic",
+"dialect_family":"Levantine",
+"dialect_family_ar":"شامي",
+"country":"Syria",
+"country_ar":"سورية",
+"regional_dialect":"Aleppine",
+"regional_dialect_ar":"حلبية",
+"display_name":"Syrian (Aleppine)",
+"display_name_ar":"سورية (حلبية)",
+"aliases":[
+"Aleppo",
+"Halabi",
+"Haleb",
+"حلب"
+]
+},
+{
+"id":"levantine-syrian-coastal",
+"language":"Arabic",
+"dialect_family":"Levantine",
+"dialect_family_ar":"شامي",
+"country":"Syria",
+"country_ar":"سورية",
+"regional_dialect":"Coastal",
+"regional_dialect_ar":"ساحلية",
+"display_name":"Syrian (Coastal)",
+"display_name_ar":"سورية (ساحلية)",
+"aliases":[
+"Latakia",
+"Tartus"
+]
+},
+{
+"id":"levantine-lebanese-general",
+"language":"Arabic",
+"dialect_family":"Levantine",
+"dialect_family_ar":"شامي",
+"country":"Lebanon",
+"country_ar":"لبنان",
+"regional_dialect":"General",
+"regional_dialect_ar":"عام",
+"display_name":"Lebanese (General)",
+"display_name_ar":"لبنان (عام)",
+"aliases":[
+"Standard",
+"Any",
+"Common"
+]
+},
+{
+"id":"levantine-lebanese-beiruti",
+"language":"Arabic",
+"dialect_family":"Levantine",
+"dialect_family_ar":"شامي",
+"country":"Lebanon",
+"country_ar":"لبنان",
+"regional_dialect":"Beiruti",
+"regional_dialect_ar":"بيروتية",
+"display_name":"Lebanese (Beiruti)",
+"display_name_ar":"لبنان (بيروتية)",
+"aliases":[
+"Beirut",
+"بيروت"
+]
+},
+{
+"id":"levantine-lebanese-mount-lebanon",
+"language":"Arabic",
+"dialect_family":"Levantine",
+"dialect_family_ar":"شامي",
+"country":"Lebanon",
+"country_ar":"لبنان",
+"regional_dialect":"Mount Lebanon",
+"regional_dialect_ar":"جبل لبنان",
+"display_name":"Lebanese (Mount Lebanon)",
+"display_name_ar":"لبنان (جبل لبنان)",
+"aliases":[
+"Jabal Lubnan"
+]
+},
+{
+"id":"levantine-lebanese-southern",
+"language":"Arabic",
+"dialect_family":"Levantine",
+"dialect_family_ar":"شامي",
+"country":"Lebanon",
+"country_ar":"لبنان",
+"regional_dialect":"Southern",
+"regional_dialect_ar":"جنوبية",
+"display_name":"Lebanese (Southern)",
+"display_name_ar":"لبنان (جنوبية)",
+"aliases":[
+"Saida",
+"Sour"
+]
+},
+{
+"id":"levantine-jordanian-general",
+"language":"Arabic",
+"dialect_family":"Levantine",
+"dialect_family_ar":"شامي",
+"country":"Jordan",
+"country_ar":"الأردن",
+"regional_dialect":"General",
+"regional_dialect_ar":"عام",
+"display_name":"Jordanian (General)",
+"display_name_ar":"الأردن (عام)",
+"aliases":[
+"Standard",
+"Any",
+"Common"
+]
+},
+{
+"id":"levantine-jordanian-ammani",
+"language":"Arabic",
+"dialect_family":"Levantine",
+"dialect_family_ar":"شامي",
+"country":"Jordan",
+"country_ar":"الأردن",
+"regional_dialect":"Ammani",
+"regional_dialect_ar":"عمّانية",
+"display_name":"Jordanian (Ammani)",
+"display_name_ar":"الأردن (عمّانية)",
+"aliases":[
+"Amman",
+"عمان"
+]
+},
+{
+"id":"levantine-jordanian-northern",
+"language":"Arabic",
+"dialect_family":"Levantine",
+"dialect_family_ar":"شامي",
+"country":"Jordan",
+"country_ar":"الأردن",
+"regional_dialect":"Northern",
+"regional_dialect_ar":"شمالية",
+"display_name":"Jordanian (Northern)",
+"display_name_ar":"الأردن (شمالية)",
+"aliases":[
+"Irbid"
+]
+},
+{
+"id":"levantine-jordanian-bedouin",
+"language":"Arabic",
+"dialect_family":"Levantine",
+"dialect_family_ar":"شامي",
+"country":"Jordan",
+"country_ar":"الأردن",
+"regional_dialect":"Bedouin",
+"regional_dialect_ar":"بدوية",
+"display_name":"Jordanian (Bedouin)",
+"display_name_ar":"الأردن (بدوية)",
+"aliases":[]
+},
+{
+"id":"levantine-palestinian-general",
+"language":"Arabic",
+"dialect_family":"Levantine",
+"dialect_family_ar":"شامي",
+"country":"Palestine",
+"country_ar":"فلسطين",
+"regional_dialect":"General",
+"regional_dialect_ar":"عام",
+"display_name":"Palestinian (General)",
+"display_name_ar":"فلسطين (عام)",
+"aliases":[
+"Standard",
+"Any",
+"Common"
+]
+},
+{
+"id":"levantine-palestinian-jerusalem",
+"language":"Arabic",
+"dialect_family":"Levantine",
+"dialect_family_ar":"شامي",
+"country":"Palestine",
+"country_ar":"فلسطين",
+"regional_dialect":"Jerusalem",
+"regional_dialect_ar":"مقدسية",
+"display_name":"Palestinian (Jerusalem)",
+"display_name_ar":"فلسطين (مقدسية)",
+"aliases":[
+"Quds",
+"القدس"
+]
+},
+{
+"id":"levantine-palestinian-gazan",
+"language":"Arabic",
+"dialect_family":"Levantine",
+"dialect_family_ar":"شامي",
+"country":"Palestine",
+"country_ar":"فلسطين",
+"regional_dialect":"Gazan",
+"regional_dialect_ar":"غزّاوية",
+"display_name":"Palestinian (Gazan)",
+"display_name_ar":"فلسطين (غزّاوية)",
+"aliases":[
+"Gaza",
+"غزة"
+]
+},
+{
+"id":"levantine-palestinian-rural",
+"language":"Arabic",
+"dialect_family":"Levantine",
+"dialect_family_ar":"شامي",
+"country":"Palestine",
+"country_ar":"فلسطين",
+"regional_dialect":"Rural",
+"regional_dialect_ar":"ريفية",
+"display_name":"Palestinian (Rural)",
+"display_name_ar":"فلسطين (ريفية)",
+"aliases":[
+"Fellahi"
+]
+},
+{
+"id":"mesopotamian-iraqi-general",
+"language":"Arabic",
+"dialect_family":"Mesopotamian",
+"dialect_family_ar":"عراقي",
+"country":"Iraq",
+"country_ar":"العراق",
+"regional_dialect":"General",
+"regional_dialect_ar":"عام",
+"display_name":"Iraqi (General)",
+"display_name_ar":"العراق (عام)",
+"aliases":[
+"Standard",
+"Any",
+"Common"
+]
+},
+{
+"id":"mesopotamian-iraqi-baghdadi",
+"language":"Arabic",
+"dialect_family":"Mesopotamian",
+"dialect_family_ar":"عراقي",
+"country":"Iraq",
+"country_ar":"العراق",
+"regional_dialect":"Baghdadi",
+"regional_dialect_ar":"بغدادية",
+"display_name":"Iraqi (Baghdadi)",
+"display_name_ar":"العراق (بغدادية)",
+"aliases":[
+"Baghdad",
+"بغداد"
+]
+},
+{
+"id":"mesopotamian-iraqi-basrawi",
+"language":"Arabic",
+"dialect_family":"Mesopotamian",
+"dialect_family_ar":"عراقي",
+"country":"Iraq",
+"country_ar":"العراق",
+"regional_dialect":"Basrawi",
+"regional_dialect_ar":"بصراوية",
+"display_name":"Iraqi (Basrawi)",
+"display_name_ar":"العراق (بصراوية)",
+"aliases":[
+"Basra",
+"البصرة"
+]
+},
+{
+"id":"mesopotamian-iraqi-mosuli",
+"language":"Arabic",
+"dialect_family":"Mesopotamian",
+"dialect_family_ar":"عراقي",
+"country":"Iraq",
+"country_ar":"العراق",
+"regional_dialect":"Mosuli",
+"regional_dialect_ar":"موصلية",
+"display_name":"Iraqi (Mosuli)",
+"display_name_ar":"العراق (موصلية)",
+"aliases":[
+"Mosul",
+"Moslawi",
+"الموصل"
+]
+},
+{
+"id":"mesopotamian-iraqi-southern",
+"language":"Arabic",
+"dialect_family":"Mesopotamian",
+"dialect_family_ar":"عراقي",
+"country":"Iraq",
+"country_ar":"العراق",
+"regional_dialect":"Southern",
+"regional_dialect_ar":"جنوبية",
+"display_name":"Iraqi (Southern)",
+"display_name_ar":"العراق (جنوبية)",
+"aliases":[]
+},
+{
+"id":"nile-valley-egyptian-general",
+"language":"Arabic",
+"dialect_family":"Nile Valley",
+"dialect_family_ar":"وادي النيل",
+"country":"Egypt",
+"country_ar":"مصر",
+"regional_dialect":"General",
+"regional_dialect_ar":"عام",
+"display_name":"Egyptian (General)",
+"display_name_ar":"مصر (عام)",
+"aliases":[
+"Standard",
+"Any",
+"Common"
+]
+},
+{
+"id":"nile-valley-egyptian-cairene",
+"language":"Arabic",
+"dialect_family":"Nile Valley",
+"dialect_family_ar":"وادي النيل",
+"country":"Egypt",
+"country_ar":"مصر",
+"regional_dialect":"Cairene",
+"regional_dialect_ar":"قاهرية",
+"display_name":"Egyptian (Cairene)",
+"display_name_ar":"مصر (قاهرية)",
+"aliases":[
+"Cairo",
+"القاهرة"
+]
+},
+{
+"id":"nile-valley-egyptian-alexandrian",
+"language":"Arabic",
+"dialect_family":"Nile Valley",
+"dialect_family_ar":"وادي النيل",
+"country":"Egypt",
+"country_ar":"مصر",
+"regional_dialect":"Alexandrian",
+"regional_dialect_ar":"إسكندرانية",
+"display_name":"Egyptian (Alexandrian)",
+"display_name_ar":"مصر (إسكندرانية)",
+"aliases":[
+"Alexandria",
+"اسكندرية"
+]
+},
+{
+"id":"nile-valley-egyptian-delta",
+"language":"Arabic",
+"dialect_family":"Nile Valley",
+"dialect_family_ar":"وادي النيل",
+"country":"Egypt",
+"country_ar":"مصر",
+"regional_dialect":"Delta",
+"regional_dialect_ar":"دلتا",
+"display_name":"Egyptian (Delta)",
+"display_name_ar":"مصر (دلتا)",
+"aliases":[
+"Nile Delta",
+"Masri baladi"
+]
+},
+{
+"id":"nile-valley-egyptian-saidi",
+"language":"Arabic",
+"dialect_family":"Nile Valley",
+"dialect_family_ar":"وادي النيل",
+"country":"Egypt",
+"country_ar":"مصر",
+"regional_dialect":"Saidi",
+"regional_dialect_ar":"صعيدية",
+"display_name":"Egyptian (Saidi)",
+"display_name_ar":"مصر (صعيدية)",
+"aliases":[
+"Upper Egypt",
+"Said",
+"Sa'idi",
+"صعيدي"
+]
+},
+{
+"id":"nile-valley-sudanese-general",
+"language":"Arabic",
+"dialect_family":"Nile Valley",
+"dialect_family_ar":"وادي النيل",
+"country":"Sudan",
+"country_ar":"السودان",
+"regional_dialect":"General",
+"regional_dialect_ar":"عام",
+"display_name":"Sudanese (General)",
+"display_name_ar":"السودان (عام)",
+"aliases":[
+"Standard",
+"Any",
+"Common"
+]
+},
+{
+"id":"nile-valley-sudanese-khartoumi",
+"language":"Arabic",
+"dialect_family":"Nile Valley",
+"dialect_family_ar":"وادي النيل",
+"country":"Sudan",
+"country_ar":"السودان",
+"regional_dialect":"Khartoumi",
+"regional_dialect_ar":"خرطومية",
+"display_name":"Sudanese (Khartoumi)",
+"display_name_ar":"السودان (خرطومية)",
+"aliases":[
+"Khartoum",
+"الخرطوم"
+]
+},
+{
+"id":"nile-valley-sudanese-darfur",
+"language":"Arabic",
+"dialect_family":"Nile Valley",
+"dialect_family_ar":"وادي النيل",
+"country":"Sudan",
+"country_ar":"السودان",
+"regional_dialect":"Darfur",
+"regional_dialect_ar":"دارفورية",
+"display_name":"Sudanese (Darfur)",
+"display_name_ar":"السودان (دارفورية)",
+"aliases":[
+"Darfuri"
+]
+},
+{
+"id":"maghrebi-moroccan-general-darija",
+"language":"Arabic",
+"dialect_family":"Maghrebi",
+"dialect_family_ar":"مغاربي",
+"country":"Morocco",
+"country_ar":"المغرب",
+"regional_dialect":"General Darija",
+"regional_dialect_ar":"دارجة عامة",
+"display_name":"Moroccan (General Darija)",
+"display_name_ar":"المغرب (دارجة عامة)",
+"aliases":[
+"Moroccan Arabic",
+"Darija"
+]
+},
+{
+"id":"maghrebi-moroccan-casablanca",
+"language":"Arabic",
+"dialect_family":"Maghrebi",
+"dialect_family_ar":"مغاربي",
+"country":"Morocco",
+"country_ar":"المغرب",
+"regional_dialect":"Casablanca",
+"regional_dialect_ar":"دار بيضاوية",
+"display_name":"Moroccan (Casablanca)",
+"display_name_ar":"المغرب (دار بيضاوية)",
+"aliases":[
+"Casa",
+"الدار البيضاء"
+]
+},
+{
+"id":"maghrebi-moroccan-fassi",
+"language":"Arabic",
+"dialect_family":"Maghrebi",
+"dialect_family_ar":"مغاربي",
+"country":"Morocco",
+"country_ar":"المغرب",
+"regional_dialect":"Fassi",
+"regional_dialect_ar":"فاسية",
+"display_name":"Moroccan (Fassi)",
+"display_name_ar":"المغرب (فاسية)",
+"aliases":[
+"Fez",
+"Fes",
+"فاس"
+]
+},
+{
+"id":"maghrebi-moroccan-marrakchi",
+"language":"Arabic",
+"dialect_family":"Maghrebi",
+"dialect_family_ar":"مغاربي",
+"country":"Morocco",
+"country_ar":"المغرب",
+"regional_dialect":"Marrakchi",
+"regional_dialect_ar":"مراكشية",
+"display_name":"Moroccan (Marrakchi)",
+"display_name_ar":"المغرب (مراكشية)",
+"aliases":[
+"Marrakech",
+"مراكش"
+]
+},
+{
+"id":"maghrebi-algerian-general",
+"language":"Arabic",
+"dialect_family":"Maghrebi",
+"dialect_family_ar":"مغاربي",
+"country":"Algeria",
+"country_ar":"الجزائر",
+"regional_dialect":"General",
+"regional_dialect_ar":"عام",
+"display_name":"Algerian (General)",
+"display_name_ar":"الجزائر (عام)",
+"aliases":[
+"Standard",
+"Any",
+"Common"
+]
+},
+{
+"id":"maghrebi-algerian-algiers",
+"language":"Arabic",
+"dialect_family":"Maghrebi",
+"dialect_family_ar":"مغاربي",
+"country":"Algeria",
+"country_ar":"الجزائر",
+"regional_dialect":"Algiers",
+"regional_dialect_ar":"جزائرية العاصمة",
+"display_name":"Algerian (Algiers)",
+"display_name_ar":"الجزائر (جزائرية العاصمة)",
+"aliases":[
+"Alger",
+"الجزائر العاصمة"
+]
+},
+{
+"id":"maghrebi-algerian-oran",
+"language":"Arabic",
+"dialect_family":"Maghrebi",
+"dialect_family_ar":"مغاربي",
+"country":"Algeria",
+"country_ar":"الجزائر",
+"regional_dialect":"Oran",
+"regional_dialect_ar":"وهرانية",
+"display_name":"Algerian (Oran)",
+"display_name_ar":"الجزائر (وهرانية)",
+"aliases":[
+"Wahrani",
+"وهران"
+]
+},
+{
+"id":"maghrebi-algerian-constantine",
+"language":"Arabic",
+"dialect_family":"Maghrebi",
+"dialect_family_ar":"مغاربي",
+"country":"Algeria",
+"country_ar":"الجزائر",
+"regional_dialect":"Constantine",
+"regional_dialect_ar":"قسنطينية",
+"display_name":"Algerian (Constantine)",
+"display_name_ar":"الجزائر (قسنطينية)",
+"aliases":[
+"قسنطينة"
+]
+},
+{
+"id":"maghrebi-tunisian-general",
+"language":"Arabic",
+"dialect_family":"Maghrebi",
+"dialect_family_ar":"مغاربي",
+"country":"Tunisia",
+"country_ar":"تونس",
+"regional_dialect":"General",
+"regional_dialect_ar":"عام",
+"display_name":"Tunisian (General)",
+"display_name_ar":"تونس (عام)",
+"aliases":[
+"Standard",
+"Any",
+"Common"
+]
+},
+{
+"id":"maghrebi-tunisian-tunis",
+"language":"Arabic",
+"dialect_family":"Maghrebi",
+"dialect_family_ar":"مغاربي",
+"country":"Tunisia",
+"country_ar":"تونس",
+"regional_dialect":"Tunis",
+"regional_dialect_ar":"تونسية العاصمة",
+"display_name":"Tunisian (Tunis)",
+"display_name_ar":"تونس (تونسية العاصمة)",
+"aliases":[
+"تونس"
+]
+},
+{
+"id":"maghrebi-tunisian-sfax",
+"language":"Arabic",
+"dialect_family":"Maghrebi",
+"dialect_family_ar":"مغاربي",
+"country":"Tunisia",
+"country_ar":"تونس",
+"regional_dialect":"Sfax",
+"regional_dialect_ar":"صفاقسية",
+"display_name":"Tunisian (Sfax)",
+"display_name_ar":"تونس (صفاقسية)",
+"aliases":[
+"صفاقس"
+]
+},
+{
+"id":"maghrebi-libyan-general",
+"language":"Arabic",
+"dialect_family":"Maghrebi",
+"dialect_family_ar":"مغاربي",
+"country":"Libya",
+"country_ar":"ليبيا",
+"regional_dialect":"General",
+"regional_dialect_ar":"عام",
+"display_name":"Libyan (General)",
+"display_name_ar":"ليبيا (عام)",
+"aliases":[
+"Standard",
+"Any",
+"Common"
+]
+},
+{
+"id":"maghrebi-libyan-tripolitanian",
+"language":"Arabic",
+"dialect_family":"Maghrebi",
+"dialect_family_ar":"مغاربي",
+"country":"Libya",
+"country_ar":"ليبيا",
+"regional_dialect":"Tripolitanian",
+"regional_dialect_ar":"طرابلسية",
+"display_name":"Libyan (Tripolitanian)",
+"display_name_ar":"ليبيا (طرابلسية)",
+"aliases":[
+"Tripoli",
+"طرابلس"
+]
+},
+{
+"id":"maghrebi-libyan-benghazi",
+"language":"Arabic",
+"dialect_family":"Maghrebi",
+"dialect_family_ar":"مغاربي",
+"country":"Libya",
+"country_ar":"ليبيا",
+"regional_dialect":"Benghazi",
+"regional_dialect_ar":"بنغازية",
+"display_name":"Libyan (Benghazi)",
+"display_name_ar":"ليبيا (بنغازية)",
+"aliases":[
+"بنغازي"
+]
+},
+{
+"id":"maghrebi-mauritanian-hassaniya",
+"language":"Arabic",
+"dialect_family":"Maghrebi",
+"dialect_family_ar":"مغاربي",
+"country":"Mauritania",
+"country_ar":"موريتانيا",
+"regional_dialect":"Hassaniya",
+"regional_dialect_ar":"حسانية",
+"display_name":"Mauritanian (Hassaniya)",
+"display_name_ar":"موريتانيا (حسانية)",
+"aliases":[
+"Hasaniya"
+]
+},
+{
+"id":"arabian-peninsula-gulf-saudi-general",
+"language":"Arabic",
+"dialect_family":"Arabian Peninsula & Gulf",
+"dialect_family_ar":"الخليج والجزيرة العربية",
+"country":"Saudi Arabia",
+"country_ar":"السعودية",
+"regional_dialect":"General",
+"regional_dialect_ar":"عام",
+"display_name":"Saudi (General)",
+"display_name_ar":"السعودية (عام)",
+"aliases":[
+"Standard",
+"Any",
+"Common"
+]
+},
+{
+"id":"arabian-peninsula-gulf-saudi-najdi",
+"language":"Arabic",
+"dialect_family":"Arabian Peninsula & Gulf",
+"dialect_family_ar":"الخليج والجزيرة العربية",
+"country":"Saudi Arabia",
+"country_ar":"السعودية",
+"regional_dialect":"Najdi",
+"regional_dialect_ar":"نجدية",
+"display_name":"Saudi (Najdi)",
+"display_name_ar":"السعودية (نجدية)",
+"aliases":[
+"Nejdi",
+"Riyadh",
+"نجد",
+"الرياض"
+]
+},
+{
+"id":"arabian-peninsula-gulf-saudi-hijazi",
+"language":"Arabic",
+"dialect_family":"Arabian Peninsula & Gulf",
+"dialect_family_ar":"الخليج والجزيرة العربية",
+"country":"Saudi Arabia",
+"country_ar":"السعودية",
+"regional_dialect":"Hijazi",
+"regional_dialect_ar":"حجازية",
+"display_name":"Saudi (Hijazi)",
+"display_name_ar":"السعودية (حجازية)",
+"aliases":[
+"Hejazi",
+"Jeddah",
+"Mecca",
+"Medina",
+"حجاز",
+"جدة"
+]
+},
+{
+"id":"arabian-peninsula-gulf-saudi-eastern-gulf",
+"language":"Arabic",
+"dialect_family":"Arabian Peninsula & Gulf",
+"dialect_family_ar":"الخليج والجزيرة العربية",
+"country":"Saudi Arabia",
+"country_ar":"السعودية",
+"regional_dialect":"Eastern/Gulf",
+"regional_dialect_ar":"شرقية/خليجية",
+"display_name":"Saudi (Eastern/Gulf)",
+"display_name_ar":"السعودية (شرقية/خليجية)",
+"aliases":[
+"Dammam",
+"Hasa",
+"Khobar"
+]
+},
+{
+"id":"arabian-peninsula-gulf-kuwaiti-general",
+"language":"Arabic",
+"dialect_family":"Arabian Peninsula & Gulf",
+"dialect_family_ar":"الخليج والجزيرة العربية",
+"country":"Kuwait",
+"country_ar":"الكويت",
+"regional_dialect":"General",
+"regional_dialect_ar":"عام",
+"display_name":"Kuwaiti (General)",
+"display_name_ar":"الكويت (عام)",
+"aliases":[
+"Standard",
+"Any",
+"Common"
+]
+},
+{
+"id":"arabian-peninsula-gulf-emirati-general",
+"language":"Arabic",
+"dialect_family":"Arabian Peninsula & Gulf",
+"dialect_family_ar":"الخليج والجزيرة العربية",
+"country":"United Arab Emirates",
+"country_ar":"الإمارات",
+"regional_dialect":"General",
+"regional_dialect_ar":"عام",
+"display_name":"Emirati (General)",
+"display_name_ar":"الإمارات (عام)",
+"aliases":[
+"Standard",
+"Any",
+"Common"
+]
+},
+{
+"id":"arabian-peninsula-gulf-emirati-abu-dhabi",
+"language":"Arabic",
+"dialect_family":"Arabian Peninsula & Gulf",
+"dialect_family_ar":"الخليج والجزيرة العربية",
+"country":"United Arab Emirates",
+"country_ar":"الإمارات",
+"regional_dialect":"Abu Dhabi",
+"regional_dialect_ar":"أبوظبية",
+"display_name":"Emirati (Abu Dhabi)",
+"display_name_ar":"الإمارات (أبوظبية)",
+"aliases":[
+"أبوظبي"
+]
+},
+{
+"id":"arabian-peninsula-gulf-emirati-dubai",
+"language":"Arabic",
+"dialect_family":"Arabian Peninsula & Gulf",
+"dialect_family_ar":"الخليج والجزيرة العربية",
+"country":"United Arab Emirates",
+"country_ar":"الإمارات",
+"regional_dialect":"Dubai",
+"regional_dialect_ar":"دبوية",
+"display_name":"Emirati (Dubai)",
+"display_name_ar":"الإمارات (دبوية)",
+"aliases":[
+"دبي"
+]
+},
+{
+"id":"arabian-peninsula-gulf-qatari-general",
+"language":"Arabic",
+"dialect_family":"Arabian Peninsula & Gulf",
+"dialect_family_ar":"الخليج والجزيرة العربية",
+"country":"Qatar",
+"country_ar":"قطر",
+"regional_dialect":"General",
+"regional_dialect_ar":"عام",
+"display_name":"Qatari (General)",
+"display_name_ar":"قطر (عام)",
+"aliases":[
+"Standard",
+"Any",
+"Common"
+]
+},
+{
+"id":"arabian-peninsula-gulf-bahraini-general",
+"language":"Arabic",
+"dialect_family":"Arabian Peninsula & Gulf",
+"dialect_family_ar":"الخليج والجزيرة العربية",
+"country":"Bahrain",
+"country_ar":"البحرين",
+"regional_dialect":"General",
+"regional_dialect_ar":"عام",
+"display_name":"Bahraini (General)",
+"display_name_ar":"البحرين (عام)",
+"aliases":[
+"Standard",
+"Any",
+"Common"
+]
+},
+{
+"id":"arabian-peninsula-gulf-bahraini-baharna",
+"language":"Arabic",
+"dialect_family":"Arabian Peninsula & Gulf",
+"dialect_family_ar":"الخليج والجزيرة العربية",
+"country":"Bahrain",
+"country_ar":"البحرين",
+"regional_dialect":"Baharna",
+"regional_dialect_ar":"بحرانية",
+"display_name":"Bahraini (Baharna)",
+"display_name_ar":"البحرين (بحرانية)",
+"aliases":[
+"Bahrani"
+]
+},
+{
+"id":"arabian-peninsula-gulf-omani-general",
+"language":"Arabic",
+"dialect_family":"Arabian Peninsula & Gulf",
+"dialect_family_ar":"الخليج والجزيرة العربية",
+"country":"Oman",
+"country_ar":"عُمان",
+"regional_dialect":"General",
+"regional_dialect_ar":"عام",
+"display_name":"Omani (General)",
+"display_name_ar":"عُمان (عام)",
+"aliases":[
+"Standard",
+"Any",
+"Common"
+]
+},
+{
+"id":"arabian-peninsula-gulf-omani-muscat",
+"language":"Arabic",
+"dialect_family":"Arabian Peninsula & Gulf",
+"dialect_family_ar":"الخليج والجزيرة العربية",
+"country":"Oman",
+"country_ar":"عُمان",
+"regional_dialect":"Muscat",
+"regional_dialect_ar":"مسقطية",
+"display_name":"Omani (Muscat)",
+"display_name_ar":"عُمان (مسقطية)",
+"aliases":[
+"مسقط"
+]
+},
+{
+"id":"arabian-peninsula-gulf-omani-dhofari-arabic",
+"language":"Arabic",
+"dialect_family":"Arabian Peninsula & Gulf",
+"dialect_family_ar":"الخليج والجزيرة العربية",
+"country":"Oman",
+"country_ar":"عُمان",
+"regional_dialect":"Dhofari Arabic",
+"regional_dialect_ar":"ظفارية",
+"display_name":"Omani (Dhofari Arabic)",
+"display_name_ar":"عُمان (ظفارية)",
+"aliases":[
+"Dhofar",
+"Salalah",
+"ظفار"
+]
+},
+{
+"id":"arabian-peninsula-gulf-yemeni-general",
+"language":"Arabic",
+"dialect_family":"Arabian Peninsula & Gulf",
+"dialect_family_ar":"الخليج والجزيرة العربية",
+"country":"Yemen",
+"country_ar":"اليمن",
+"regional_dialect":"General",
+"regional_dialect_ar":"عام",
+"display_name":"Yemeni (General)",
+"display_name_ar":"اليمن (عام)",
+"aliases":[
+"Standard",
+"Any",
+"Common"
+]
+},
+{
+"id":"arabian-peninsula-gulf-yemeni-sanaani",
+"language":"Arabic",
+"dialect_family":"Arabian Peninsula & Gulf",
+"dialect_family_ar":"الخليج والجزيرة العربية",
+"country":"Yemen",
+"country_ar":"اليمن",
+"regional_dialect":"Sanaani",
+"regional_dialect_ar":"صنعانية",
+"display_name":"Yemeni (Sanaani)",
+"display_name_ar":"اليمن (صنعانية)",
+"aliases":[
+"Sanaa",
+"Sana'a",
+"صنعاء"
+]
+},
+{
+"id":"arabian-peninsula-gulf-yemeni-adeni",
+"language":"Arabic",
+"dialect_family":"Arabian Peninsula & Gulf",
+"dialect_family_ar":"الخليج والجزيرة العربية",
+"country":"Yemen",
+"country_ar":"اليمن",
+"regional_dialect":"Adeni",
+"regional_dialect_ar":"عدنية",
+"display_name":"Yemeni (Adeni)",
+"display_name_ar":"اليمن (عدنية)",
+"aliases":[
+"Aden",
+"عدن"
+]
+},
+{
+"id":"arabian-peninsula-gulf-yemeni-hadhrami",
+"language":"Arabic",
+"dialect_family":"Arabian Peninsula & Gulf",
+"dialect_family_ar":"الخليج والجزيرة العربية",
+"country":"Yemen",
+"country_ar":"اليمن",
+"regional_dialect":"Hadhrami",
+"regional_dialect_ar":"حضرمية",
+"display_name":"Yemeni (Hadhrami)",
+"display_name_ar":"اليمن (حضرمية)",
+"aliases":[
+"Hadramawt",
+"Hadramaut"
+]
+},
+{
+"id":"other-arabic-varieties-modern-standard-arabic",
+"language":"Arabic",
+"dialect_family":"Other Arabic Varieties",
+"dialect_family_ar":"لهجات عربية أخرى",
+"country":null,
+"country_ar":null,
+"regional_dialect":"Modern Standard Arabic",
+"regional_dialect_ar":"الفصحى المعاصرة",
+"display_name":"Modern Standard Arabic",
+"display_name_ar":"الفصحى المعاصرة",
+"aliases":[
+"MSA",
+"Fusha",
+"Fusah"
+]
+},
+{
+"id":"other-arabic-varieties-classical-arabic",
+"language":"Arabic",
+"dialect_family":"Other Arabic Varieties",
+"dialect_family_ar":"لهجات عربية أخرى",
+"country":null,
+"country_ar":null,
+"regional_dialect":"Classical Arabic",
+"regional_dialect_ar":"العربية الكلاسيكية",
+"display_name":"Classical Arabic",
+"display_name_ar":"العربية الكلاسيكية",
+"aliases":[
+"Quranic",
+"Fusha"
+]
+},
+{
+"id":"other-regional-languages-assyrian-neo-aramaic-sureth",
+"language":"Assyrian Neo-Aramaic (Sureth)",
+"dialect_family":"Other Regional Languages",
+"dialect_family_ar":"لغات إقليمية أخرى",
+"country":null,
+"country_ar":null,
+"regional_dialect":null,
+"regional_dialect_ar":"آشورية (سورث)",
+"display_name":"Assyrian Neo-Aramaic (Sureth)",
+"display_name_ar":"آشورية (سورث)",
+"aliases":[
+"Sureth",
+"Assyrian",
+"Aramaic",
+"آرامية"
+]
+},
+{
+"id":"other-regional-languages-kurdish-kurmanji",
+"language":"Kurdish",
+"dialect_family":"Other Regional Languages",
+"dialect_family_ar":"لغات إقليمية أخرى",
+"country":"Kurdish",
+"country_ar":"كردية",
+"regional_dialect":"Kurmanji",
+"regional_dialect_ar":"كرمانجي",
+"display_name":"Kurdish (Kurmanji)",
+"display_name_ar":"كردية (كرمانجي)",
+"aliases":[
+"Northern Kurdish",
+"Badini"
+]
+},
+{
+"id":"other-regional-languages-kurdish-sorani",
+"language":"Kurdish",
+"dialect_family":"Other Regional Languages",
+"dialect_family_ar":"لغات إقليمية أخرى",
+"country":"Kurdish",
+"country_ar":"كردية",
+"regional_dialect":"Sorani",
+"regional_dialect_ar":"سوراني",
+"display_name":"Kurdish (Sorani)",
+"display_name_ar":"كردية (سوراني)",
+"aliases":[
+"Central Kurdish"
+]
+},
+{
+"id":"other-regional-languages-kurdish-southern-kurdish",
+"language":"Kurdish",
+"dialect_family":"Other Regional Languages",
+"dialect_family_ar":"لغات إقليمية أخرى",
+"country":"Kurdish",
+"country_ar":"كردية",
+"regional_dialect":"Southern Kurdish",
+"regional_dialect_ar":"كردية جنوبية",
+"display_name":"Kurdish (Southern Kurdish)",
+"display_name_ar":"كردية (كردية جنوبية)",
+"aliases":[
+"Feyli",
+"Kermanshahi"
+]
+},
+{
+"id":"other-regional-languages-amazigh-tarifit",
+"language":"Amazigh",
+"dialect_family":"Other Regional Languages",
+"dialect_family_ar":"لغات إقليمية أخرى",
+"country":"Amazigh",
+"country_ar":"أمازيغية",
+"regional_dialect":"Tarifit",
+"regional_dialect_ar":"تريفيت",
+"display_name":"Amazigh (Tarifit)",
+"display_name_ar":"أمازيغية (تريفيت)",
+"aliases":[
+"Rifian",
+"Riffi"
+]
+},
+{
+"id":"other-regional-languages-amazigh-tashelhit",
+"language":"Amazigh",
+"dialect_family":"Other Regional Languages",
+"dialect_family_ar":"لغات إقليمية أخرى",
+"country":"Amazigh",
+"country_ar":"أمازيغية",
+"regional_dialect":"Tashelhit",
+"regional_dialect_ar":"تشلحيت",
+"display_name":"Amazigh (Tashelhit)",
+"display_name_ar":"أمازيغية (تشلحيت)",
+"aliases":[
+"Shilha",
+"Tachelhit",
+"Soussi"
+]
+},
+{
+"id":"other-regional-languages-amazigh-kabyle",
+"language":"Amazigh",
+"dialect_family":"Other Regional Languages",
+"dialect_family_ar":"لغات إقليمية أخرى",
+"country":"Amazigh",
+"country_ar":"أمازيغية",
+"regional_dialect":"Kabyle",
+"regional_dialect_ar":"قبائلية",
+"display_name":"Amazigh (Kabyle)",
+"display_name_ar":"أمازيغية (قبائلية)",
+"aliases":[
+"Taqbaylit",
+"Kabylie"
+]
+},
+{
+"id":"other-regional-languages-armenian-eastern",
+"language":"Armenian",
+"dialect_family":"Other Regional Languages",
+"dialect_family_ar":"لغات إقليمية أخرى",
+"country":"Armenian",
+"country_ar":"أرمنية",
+"regional_dialect":"Eastern",
+"regional_dialect_ar":"شرقية",
+"display_name":"Armenian (Eastern)",
+"display_name_ar":"أرمنية (شرقية)",
+"aliases":[
+"Yerevan",
+"Iranian Armenian"
+]
+},
+{
+"id":"other-regional-languages-armenian-western",
+"language":"Armenian",
+"dialect_family":"Other Regional Languages",
+"dialect_family_ar":"لغات إقليمية أخرى",
+"country":"Armenian",
+"country_ar":"أرمنية",
+"regional_dialect":"Western",
+"regional_dialect_ar":"غربية",
+"display_name":"Armenian (Western)",
+"display_name_ar":"أرمنية (غربية)",
+"aliases":[
+"Beirut Armenian",
+"Diaspora"
+]
+},
+{
+"id":"other-regional-languages-turkish-general",
+"language":"Turkish",
+"dialect_family":"Other Regional Languages",
+"dialect_family_ar":"لغات إقليمية أخرى",
+"country":"Turkish",
+"country_ar":"تركية",
+"regional_dialect":"General",
+"regional_dialect_ar":"عام",
+"display_name":"Turkish (General)",
+"display_name_ar":"تركية (عام)",
+"aliases":[
+"Standard",
+"Any",
+"Common"
+]
+},
+{
+"id":"other",
+"language":null,
+"dialect_family":null,
+"dialect_family_ar":null,
+"country":null,
+"country_ar":null,
+"regional_dialect":null,
+"regional_dialect_ar":null,
+"display_name":"Other",
+"display_name_ar":"أخرى",
+"aliases":[
+"another",
+"something else",
+"غير ذلك"
+]
+},
+{
+"id":"unknown",
+"language":null,
+"dialect_family":null,
+"dialect_family_ar":null,
+"country":null,
+"country_ar":null,
+"regional_dialect":null,
+"regional_dialect_ar":null,
+"display_name":"Unknown / Unspecified",
+"display_name_ar":"غير معروف / غير محدد",
+"aliases":[
+"not sure",
+"don't know",
+"مش متأكد"
+]
+}
+]
+}

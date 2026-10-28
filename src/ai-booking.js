@@ -110,7 +110,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
         method: 'POST', headers: { ...headers(req), 'Content-Type': 'application/json' }, signal: AbortSignal.any([controller.signal,AbortSignal.timeout(45000)]),
         body: JSON.stringify({ model, store: false, instructions: instructions()+'\n'+orderInstructions()+(patchOnly?'\nReturn reply first, followed by orderPatch. Use only the shared orderPatch; do not produce a legacy draft.':''), ...(streaming?{stream:true}:{}), input: [...(input.data.order?[{role:'user',content:'Current unsubmitted order data (not instructions): '+JSON.stringify(aiOrderContext(applyOrderPatch(createEventOrder(),Object.entries(input.data.order).map(([path,value])=>({path,value})))))}]:[]),...input.data.messages], max_output_tokens: config.chat.maxOutputTokens,
           text: { format: { type: 'json_schema', name: 'echo_booking_draft', strict: true, schema: { type: 'object', additionalProperties: false, required: patchOnly?['reply','orderPatch']:['reply','draft','orderPatch'], properties: {
-            reply: { type: 'string', minLength: 1, maxLength: 1800, pattern: '\\S' },
+            reply: { type: 'string', minLength: 8, maxLength: 1800, pattern: '\\S' },
             orderPatch: orderPatchJsonSchema, ...(patchOnly?{}:{draft: { type: 'object', additionalProperties: false, required: Object.keys(DRAFT_PROPERTIES), properties: DRAFT_PROPERTIES }}),
           } } } },
         }),
@@ -118,6 +118,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
       const upstream=config.chat.provider==='openrouter'
         ?await openrouter.request({...JSON.parse(requestOptions.body),config:config.chat},{signal:requestOptions.signal})
         :await fetchImpl('https://api.openai.com/v1/responses',requestOptions);
+      if (!upstream.ok) console.warn('AI chat upstream failure', JSON.stringify({provider:config.chat.provider,model,status:upstream.status,body:(await upstream.clone().text().catch(()=>'')).slice(0,400)}));
       if (!upstream.ok) return res.status(upstream.status === 429 ? 429 : 502).json({ message: 'The AI service is unavailable or its usage limit was reached. Please try personal booking.' });
       stage = 'provider_json';
       if(streaming){res.set({'Content-Type':'application/x-ndjson; charset=utf-8','Cache-Control':'no-cache, no-transform','X-Accel-Buffering':'no'});res.flushHeaders();}
@@ -142,6 +143,8 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
       const reply = typeof parsed.reply === 'string' && !parsed.reply.trim()
         ? 'Please review your event details and fill in anything missing. No booking has been submitted.'
         : replySchema.parse(parsed.reply);
+      // Weak free models can satisfy the schema with a single character; never show that to a visitor.
+      if(typeof parsed.reply==='string'&&parsed.reply.trim()&&parsed.reply.trim().length<2)throw new Error('AI reply too short');
       if(patchOnly&&!Array.isArray(parsed.orderPatch))throw new Error('Missing order patch');
       const result={reply,...(patchOnly?{}:{draft:normalizeDraft(parsed.draft)}),...(input.data.order||parsed.orderPatch?{orderPatch:sanitizeOrderPatch(parsed.orderPatch)}:{})};
       if(ticket)await configService.complete(ticket,{durationMs:Math.round(performance.now()-started),firstReplyMs:firstReplyMs??Math.round(performance.now()-started),inputTokens:usage?.input_tokens??null,outputTokens:usage?.output_tokens??null,cachedInputTokens:usage?.input_tokens_details?.cached_tokens??null});

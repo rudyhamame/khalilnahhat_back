@@ -121,8 +121,8 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, A
     const file = req.file;
     if (file && !file.size) return res.status(400).json({message:'Choose a file that contains audio or an image.'});
     const audio = file && /^audio\/(mpeg|mp3|wav|x-wav|wave|ogg|mp4|x-m4a|aac|x-aac|flac|x-flac|webm)$/.test(file.mimetype);
-    const image = file && /^image\/(jpeg|png|webp)$/.test(file.mimetype);
-    if (!audio && !image) return res.status(400).json({ message: 'Choose an MP3, WAV, M4A, Ogg, AAC, FLAC, WebM audio file or a JPG, PNG, WebP image.' });
+    const image = file && /^image\/(?!svg)[a-z0-9.+-]+$/i.test(file.mimetype);
+    if (!audio && !image) return res.status(400).json({ message: 'Choose an MP3, WAV, M4A, Ogg, AAC, FLAC, WebM audio file or an image (JPG, PNG, WebP, GIF, AVIF, HEIC, TIFF, BMP…). SVG is not accepted.' });
     if (image && file.size > 10 * 1024 * 1024) return res.status(400).json({ message: 'Cover images must be under 10 MB.' });
     if (requireCloudinary && !useCloudinary) return res.status(503).json({ message: 'Cloudinary storage is not configured. Contact the administrator; your file has not been saved.' });
     try {

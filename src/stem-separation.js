@@ -110,7 +110,7 @@ function registerStemSeparation(app,{requireAdmin}) {
         if(!track||!validateSource(track.audioUrl))return res.status(404).json({message:'This published recording is unavailable.'});
         const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);
         let response;
-        try {response=await fetch(new URL(`/api/player/stems/${encodeURIComponent(match[1])}${match[2]?`/audio/${match[2]}`:''}`,base),{method:req.method,headers:{Authorization:`Bearer ${process.env.STEM_WORKER_TOKEN||''}`,...(req.headers.range?{Range:req.headers.range}:{})},signal:controller.signal,redirect:'error'});} finally {clearTimeout(timer);}
+        try {response=await fetch(new URL(`/api/player/stems/${encodeURIComponent(match[1])}${match[2]?`/audio/${match[2]}`:''}`,base),{method:req.method,headers:{'User-Agent':'khalil-api-worker/1.0',Authorization:`Bearer ${process.env.STEM_WORKER_TOKEN||''}`,...(req.headers.range?{Range:req.headers.range}:{})},signal:controller.signal,redirect:'error'});} finally {clearTimeout(timer);}
         res.status(response.status);
         for(const name of ['content-type','content-length','content-range','accept-ranges','cache-control'])if(response.headers.has(name))res.set(name,response.headers.get(name));
         if(!response.body||req.method==='HEAD')return res.end();

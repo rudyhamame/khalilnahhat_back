@@ -155,3 +155,22 @@ The browser verifier uses a disposable MongoDB replica set and actual API, creat
 ## Music instrumentation and musician credits — 28 October 2026
 
 Music exposes **Instruments, Key and Musicians** through the shared Melody entity. `instrumentIds` references controlled `instrument` vocabulary entities; `musicianCredits` references artist/person entities with explicit PERFORMER, COMPOSER, ARRANGER or OTHER roles. The canonical work key remains `melody.key`, distinct from recording-specific key. Admin edits these values; VP2 explores and filters them using canonical `instrument` and `musician` query fields. The shared Melody schema also permits the same attributed information on Song works. Existing values are not inferred or backfilled. Omitted new fields in older work-edit requests retain their stored values; explicit empty arrays clear them. No live migration is required.
+
+
+## Recording classification and components (2026-10-28)
+
+Contract version 2 uses these displayed names, keeping existing stored work identities:
+- `SONG`: **Lyrical Music** — Melody + Lyrics.
+- `MUSIC`: **Instrumental Music** — Melody only; lyrics remain forbidden.
+
+Recording amount and production type are separate classifications:
+- `INDIVIDUAL`: Cover, Remix, Production, Mashup.
+- `MULTIPLE`: Medley, Mix, Live.
+
+The server derives `recordingAmount` from `recordingType` and rejects an explicitly contradictory pair. Older clients may omit the amount. Existing rows derive it at read time without a database migration.
+
+`componentWorkIds` links the actual musical works performed in the recording. It includes the primary `workId`, supports both component types, and is distinct from provenance `sourceWorkIds` / `sourceRecordingIds`. The API returns hydrated `componentWorks`; existing clients retain the primary `work` response. Missing component links on an update preserve existing links. New clients send the explicit full list. References are distinct, limited to 100 and validated inside the write transaction. Existing single-work recordings expose their primary work as the sole component.
+
+Filters examine every linked component. Work-scoped filters must match the same component. Public work endpoints admit any component linked to a public recording. Components are reusable work identities, not duplicated melody/lyrics values. Version snapshots include the amount and component links. No existing data is automatically reclassified or migrated.
+
+Deployment: deploy the API with contract version 2 before using the updated editor writes and `recordingAmount` filter.

@@ -62,4 +62,12 @@ function registerArchiveFiles(app,{publicSongs,Collection,AssetModel=Asset,direc
     } catch (error) { if (error.code==='ENOENT') return res.status(404).end(); next(error); }
   });
 }
-module.exports={localAssetPattern,previewUrl,validPreview,saveLocalFile,registerArchiveFiles};
+async function readLocalAudio(url,maxBytes){
+ if(!localAssetPattern.test(url))throw Error('Invalid audio source.');
+ const id=url.slice(prefix.length),asset=await Asset.findOne({externalId:id}).lean();
+ if(!asset||!/^audio\/|^video\//.test(asset.mime||''))throw Error('Audio asset not found.');
+ const filename=path.join(root,id),stat=await fsp.stat(filename);
+ if(stat.size>maxBytes)throw Object.assign(Error('Choose recording audio under 25 MB for transcription.'),{status:400});
+ return {buffer:await fsp.readFile(filename),originalname:asset.originalName,mimetype:asset.mime,size:stat.size};
+}
+module.exports={localAssetPattern,previewUrl,validPreview,saveLocalFile,registerArchiveFiles,readLocalAudio};

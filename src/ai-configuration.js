@@ -4,7 +4,7 @@ const {z}=require('zod');
 const crypto=require('node:crypto');
 const CHECKED='2026-10-29';
 const catalog=[
- {id:'gpt-transcribe',mode:'stt',label:'GPT-Transcribe',rates:{audioMinute:0.0045}},
+ {id:'whisper-1',mode:'stt',label:'Whisper · timed lyrics',deprecated:true,timestamps:true,rates:{audioMinute:0.006}},
  {id:'gpt-4o-mini',mode:'chat',label:'GPT-4o Mini',deprecated:true,rates:{textInput:0.15,textCached:0.075,textOutput:0.6}},
  {id:'gpt-4.1-mini',mode:'chat',label:'GPT-4.1 Mini',deprecated:true,rates:{textInput:0.4,textCached:0.1,textOutput:1.6}},
  {id:'gpt-5.6-luna',mode:'chat',label:'GPT-5.6 Luna',rates:{textInput:0.2,textCached:0.02,textOutput:1.2}},
@@ -14,8 +14,8 @@ const catalog=[
 const money=z.number().finite().min(0).max(100000);
 const rates=z.object({textInput:money,textCached:money,textOutput:money,audioInput:money.optional(),audioCached:money.optional(),audioOutput:money.optional()}).strict();
 const modeSchema=kind=>z.object({enabled:z.boolean(),model:z.string().trim().min(1).max(200).refine(id=>kind==='chat'||catalog.some(item=>item.mode===kind&&item.id===id),'Choose a supported model for this mode.'),providerRates:rates,maxOutputTokens:z.number().int().min(256).max(4096),requestsPer10Min:z.number().int().min(1).max(kind==='chat'?200:20)}).strict();
-const sttDefaults=()=>({enabled:true,model:'gpt-transcribe',providerRates:{audioMinute:0.0045},requestsPer10Min:6});
-const sttSchema=z.object({enabled:z.boolean(),model:z.enum(['gpt-transcribe']),providerRates:z.object({audioMinute:money}).strict(),requestsPer10Min:z.number().int().min(1).max(20)}).strict();
+const sttDefaults=()=>({enabled:true,model:'whisper-1',providerRates:{audioMinute:0.006},requestsPer10Min:6});
+const sttSchema=z.object({enabled:z.boolean(),model:z.literal('whisper-1'),providerRates:z.object({audioMinute:money}).strict(),requestsPer10Min:z.number().int().min(1).max(20)}).strict();
 const configSchema=z.object({stt:sttSchema.optional(),revision:z.number().int().min(0),chat:modeSchema('chat').extend({provider:z.enum(['openai','openrouter']).default('openai'),freeOnly:z.boolean().default(true)}),voice:modeSchema('voice').extend({maxCallSeconds:z.number().int().min(30).max(900)}),customerPricing:z.object({policy:z.enum(['included','manual_invoice']),currency:z.enum(['CAD','USD']),chatReplyCents:z.number().int().min(0).max(100000),voiceSessionCents:z.number().int().min(0).max(100000)}).strict()}).strict().superRefine((config,ctx)=>{
  for(const mode of ['chat','voice']){
   const r=config[mode].providerRates;
@@ -59,7 +59,7 @@ function providerEstimate(config,mode,metrics){
 function createAiConfiguration({store=mongoStore,env=process.env,fetchImpl=fetch}={}){
  const openrouter=createOpenRouter({env,fetchImpl});
  let cached=null,until=0,inflight=null;
- const load=async()=>{if(cached&&Date.now()<until)return structuredClone(cached);if(!inflight)inflight=store.getConfig().then(item=>{const value=item?.value||defaults(env);cached={...value,stt:{...sttDefaults(),...value.stt},chat:{provider:'openai',freeOnly:true,...value.chat}};until=Date.now()+5000;return cached;}).finally(()=>{inflight=null;});return structuredClone(await inflight);};
+ const load=async()=>{if(cached&&Date.now()<until)return structuredClone(cached);if(!inflight)inflight=store.getConfig().then(item=>{const value=item?.value||defaults(env);cached={...value,stt:{...sttDefaults(),...value.stt,model:'whisper-1',providerRates:{audioMinute:0.006}},chat:{provider:'openai',freeOnly:true,...value.chat}};until=Date.now()+5000;return cached;}).finally(()=>{inflight=null;});return structuredClone(await inflight);};
  return {
   load,
   async describe(){let extra=[],catalogError='';try{extra=await openrouter.models();}catch{catalogError='OpenRouter catalog unavailable. Reload to retry.';}return {item:await load(),catalog:[...catalog,...extra],providers:{openai:{configured:Boolean(env.OPENAI_API_KEY)},openrouter:{configured:Boolean(env.OPENROUTER_API_KEY)}},catalogError};},

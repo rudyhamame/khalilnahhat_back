@@ -16,6 +16,7 @@ const Vocabulary=model('MusicVocabulary',{kind:{type:String,enum:contract.vocabu
 const AudioAsset=model('MusicAudioAsset',{url:{type:String,required:true,unique:true},mime:String,durationSeconds:Number,originalName:String,provenance});
 const Version=model('MusicRecordingVersion',{recordingId:{type:String,index:true,required:true},number:Number,snapshot:Schema.Types.Mixed,changedBy:String},[[{recordingId:1,number:1},{unique:true}]]);
 const RecordingFields={
+ lyricsTiming:{audioUrl:String,workId:String,model:String,lines:{type:[{_id:false,start:Number,end:Number,text:String}],default:undefined}},
  recordingType:{type:String,enum:contract.recordingTypes,index:true},workId:{type:String,index:true},recordingAmount:{type:String,enum:contract.recordingAmounts,index:true},componentWorkIds:{type:[String],index:true},audioAssetId:String,
  recordingMetadata:{bpm:Number,key:String,bpms:{type:[Number],default:undefined},keys:{type:[String],default:undefined},genreIds:{type:[String],default:undefined},states:{type:Map,of:state}},credits:[credit],sourceRecordingIds:{type:[String],index:true},sourceWorkIds:{type:[String],index:true},
  publicationStatus:{type:String,enum:contract.publicationStatuses,index:true},archivalStatus:{type:String,enum:contract.archivalStatuses,index:true},

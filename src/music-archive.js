@@ -36,7 +36,7 @@ function deliveryUrl(value) {
 function serialize(row) {
   const r = row.toObject ? row.toObject() : row;
   return { id: r.externalId, title: r.title, description: r.description || '', published: r.published !== false,
-    sortOrder: r.sortOrder || 0, recordingIds: r.recordingIds || [],
+    lyricsTiming:r.lyricsTiming?.audioUrl===r.audioUrl&&[r.workId,...(r.componentWorkIds||[])].includes(r.lyricsTiming?.workId)?{workId:r.lyricsTiming.workId,model:r.lyricsTiming.model,lines:r.lyricsTiming.lines}:null,sortOrder: r.sortOrder || 0, recordingIds: r.recordingIds || [],
     artist: r.artist || 'DJ Khalil', date: r.date || (r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 10) : ''),
     audioUrl: deliveryUrl(r.audioUrl), coverImage: deliveryUrl(r.coverImage || r.image), duration: r.duration || '', createdAt: r.createdAt };
 }

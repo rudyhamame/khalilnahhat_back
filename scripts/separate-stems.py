@@ -35,7 +35,7 @@ def main():
     report('Separating vocals, drums, bass and other music')
     with torch.inference_mode():
         stems = apply_model(model, ((mix-mean)/std)[None], device='cpu',
-            shifts=0, split=True, overlap=.25, progress=True, num_workers=0)[0]
+            shifts=0, split=True, segment=3, overlap=.25, progress=True, num_workers=0)[0]
     stems = stems * std + mean / len(model.sources)
     # One common gain preserves the balance between stems and avoids clipping.
     stems /= max(1., float(stems.abs().max()) / .98)

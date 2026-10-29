@@ -1,6 +1,6 @@
 # Local music separation
 
-The player left column offers Vocals, Drums, Bass and Other music. Separate song starts one cached Demucs HTDemucs job; Use split channels loads its four sample-aligned FLACs. The original audio remains the transport clock but its output gain is zero in split mode. Four AudioBufferSources start together and follow play/pause, buffering, seek, speed and track changes. The existing equalizer and master volume process the selected mix.
+The mixer offers Vocals, Drums, Bass and Other music. Playback automatically starts one cached Demucs HTDemucs job when the server advertises support, then loads its four sample-aligned FLACs. The original audio remains the transport clock but its output gain is zero in split mode. Four AudioBufferSources start together and follow play/pause, buffering, seek, speed and track changes. The existing equalizer and master volume process the selected mix.
 
 Setup (CPU, Python 3.12 and ffmpeg):
 
@@ -14,3 +14,20 @@ Only published archive songs can be resolved. Local development also resolves th
 The Vite `/api/player/stems` proxy uses the Render API by default. Set `VITE_STEM_PROXY_TARGET=http://127.0.0.1:4310` only when deliberately running the optional local separator. Production needs the separator and persistent storage on its API host, or an explicitly configured worker; local files are not automatically deployed.
 
 Verify: `node --test test/stem-separation.test.js`; frontend `node --test src/lib/stemMix.test.js` plus standard lint/build. Do not treat synthetic tests as listening verification of separation quality.
+
+
+## Render processing image
+
+The live API was inspected on 2026-10-28: it uses Free (0.1 CPU, 512 MB). Its previous image omitted both the separation script and Demucs. Public status also advertised `canSeparate` only for local requests, so the browser could never start production processing.
+
+The Dockerfile now always packages the script and provides opt-in CPU Torch 2.5.1 / torchaudio 2.5.1, Demucs 4.0.1 and predownloaded HTDemucs weights. The cache directory is writable by the unprivileged node user. Runtime uses `/opt/stems/bin/python` in production and keeps the local virtualenv default in development. `.runtime` is excluded from the Docker context.
+
+On a provisioned instance, set `INSTALL_STEM_SEPARATOR=1` and `STEM_AUTOMATIC_ENABLED=1` in Render, then rebuild. Render translates environment variables to Docker build arguments. Public automatic requests can only resolve currently published, server-owned catalog entries; callers cannot supply source URLs. One job runs at a time and cached sources are reused. Existing source, download, recording-duration and process-time limits remain. The default image stays lightweight until processing is explicitly enabled. Optional `STEM_CACHE_DIR` can point to persistent storage; no paid disk has been added. Without a persistent cache, restarts/redeployments can require reprocessing.
+
+Render currently lists 1 CPU / 2 GB at $25/month and 2 CPU / 4 GB at $85/month. Those costs were read from the service Compute page; no plan was changed. The 2 GB tier is a candidate, not a measured guarantee for the current model and maximum 10-minute source. A compute/disk purchase requires the owner's choice and checkout. No enabled production separation is claimed until its image, resource capacity, processing and ready channel response are confirmed.
+
+## Separate OVH worker
+
+The user selected the existing OVH host for processing. `scripts/stem-worker.js` is a standalone service with no database or media-account credentials: it resolves the public Render catalog, requires a strong bearer token for all stem requests, and runs only one bounded separation job. The Render API validates that an item is still published before proxying status, POST and ranged audio to `STEM_WORKER_URL`. Clients retain same-origin `/api/player/stems` URLs. `STEM_WORKER_TOKEN` is shared privately between these two services and never sent to the browser.
+
+Worker resources and cache are isolated under `/srv/rh/khalil-stems`. This explicitly authorized worker supersedes the retired local helper restriction for separation only; the booking/library API remains on Render. No paid compute or new tunnel is needed. The existing `khalil-api.mctoshs.ca` tunnel route goes to loopback port 4310 and exposes only the token-protected worker; unrelated applications are unchanged.

@@ -6,3 +6,8 @@ data
 uploads
 test
 *.env
+
+.runtime
+artifacts
+__pycache__
+.venv

@@ -1,0 +1,10 @@
+const express=require('express');
+const {timingSafeEqual}=require('node:crypto');
+if(!process.env.STEM_WORKER_TOKEN||process.env.STEM_WORKER_TOKEN.length<32)throw new Error('A strong worker token is required.');
+process.env.STEM_WORKER_MODE='1';
+process.env.STEM_AUTOMATIC_ENABLED='1';
+const app=express();app.disable('x-powered-by');
+app.get('/health',(_req,res)=>res.json({ok:true,service:'khalil-stem-worker'}));
+app.use((req,res,next)=>{const got=Buffer.from(req.headers.authorization||''),wanted=Buffer.from(`Bearer ${process.env.STEM_WORKER_TOKEN}`);if(got.length!==wanted.length||!timingSafeEqual(got,wanted))return res.sendStatus(401);next();});
+require('../src/stem-separation').registerStemSeparation(app,{requireAdmin:(_req,res)=>res.sendStatus(403)});
+app.listen(Number(process.env.PORT||4310),'0.0.0.0');

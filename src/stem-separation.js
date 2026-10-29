@@ -5,8 +5,13 @@ const { spawn } = require('node:child_process');
 const { publicSongs, deliveryUrl } = require('./music-archive');
 
 const CHANNELS = ['vocals', 'drums', 'bass', 'other'];
-const ROOT = path.resolve(__dirname, '..', '.runtime', 'stems');
-const PYTHON = process.env.STEM_PYTHON || path.resolve(__dirname, '..', '.runtime', 'stem-cpu', 'bin', 'python');
+const ROOT = process.env.STEM_CACHE_DIR ? path.resolve(process.env.STEM_CACHE_DIR) : path.resolve(__dirname, '..', '.runtime', 'stems');
+const PYTHON = process.env.STEM_PYTHON || (process.env.NODE_ENV === 'production' ? '/opt/stems/bin/python' : path.resolve(__dirname, '..', '.runtime', 'stem-cpu', 'bin', 'python'));
+const SCRIPT = path.resolve(__dirname, '../scripts/separate-stems.py');
+const automaticEnabled = () => process.env.STEM_AUTOMATIC_ENABLED === '1';
+async function separatorAvailable() {
+  try { await Promise.all([fs.access(PYTHON),fs.access(SCRIPT)]); return true; } catch { return false; }
+}
 const jobs = new Map();
 let activeJob = null;
 let remoteCatalog;
@@ -18,11 +23,11 @@ function validateSource(url) {
   catch { return false; }
 }
 async function resolveTrack(id, local) {
-  const songs = await publicSongs();
+  const songs = process.env.STEM_WORKER_MODE==='1' ? [] : await publicSongs();
   const song = songs.find(row => row.externalId === id && row.audioUrl);
   if (song) return {id, audioUrl:deliveryUrl(song.audioUrl)};
   // Local development uses the same published library as the existing player.
-  if (!local) return null;
+  if (!local && process.env.STEM_WORKER_MODE!=='1') return null;
   if (!remoteCatalog || Date.now()-remoteCatalogTime > 60000) {
     const responses = await Promise.all(['music-archive','player/playlist'].map(route =>
       fetch(`https://echo-khalil-api.onrender.com/api/${route}`, {signal:AbortSignal.timeout(15000)})));
@@ -49,7 +54,7 @@ async function download(url, destination) {
 }
 function separate(input, directory, job) {
   return new Promise((resolve, reject) => {
-    const child = spawn(PYTHON, [path.resolve(__dirname, '../scripts/separate-stems.py'), input, directory],
+    const child = spawn(PYTHON, [SCRIPT, input, directory],
       {env:{...process.env, PYTHONUNBUFFERED:'1'}, stdio:['ignore','pipe','pipe']});
     const timer = setTimeout(() => { child.kill('SIGTERM'); }, 30*60*1000);
     let output = '', errors = '';
@@ -89,18 +94,41 @@ async function startJob(track, key) {
     await fs.unlink(input).catch(()=>{});
   } catch(error) {
     console.error('Stem separation failed:',error.message);
-    Object.assign(job,{status:'error',stage:'Separation failed. Check the local separator setup and try again.'});
+    Object.assign(job,{status:'error',stage:'Channel preparation failed. Original audio remains available.'});
   } finally { activeJob=null; }
 }
 function registerStemSeparation(app,{requireAdmin}) {
-  const authorize = (req,res,next) => localRequest(req) ? next() : requireAdmin(req,res,next);
+  if(process.env.STEM_WORKER_URL){
+    const base=new URL(process.env.STEM_WORKER_URL);
+    if(base.protocol!=='https:')throw new Error('STEM_WORKER_URL must use HTTPS.');
+    app.use('/api/player/stems',async(req,res)=>{
+      try {
+        if(!['GET','POST','HEAD'].includes(req.method))return res.sendStatus(405);
+        const match=req.path.match(/^\/([^/]+)(?:\/audio\/(vocals|drums|bass|other))?$/);
+        if(!match||req.method==='POST'&&match[2])return res.sendStatus(404);
+        const track=await resolveTrack(decodeURIComponent(match[1]),false);
+        if(!track||!validateSource(track.audioUrl))return res.status(404).json({message:'This published recording is unavailable.'});
+        const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);
+        let response;
+        try {response=await fetch(new URL(`/api/player/stems/${encodeURIComponent(match[1])}${match[2]?`/audio/${match[2]}`:''}`,base),{method:req.method,headers:{Authorization:`Bearer ${process.env.STEM_WORKER_TOKEN||''}`,...(req.headers.range?{Range:req.headers.range}:{})},signal:controller.signal,redirect:'error'});} finally {clearTimeout(timer);}
+        res.status(response.status);
+        for(const name of ['content-type','content-length','content-range','accept-ranges','cache-control'])if(response.headers.has(name))res.set(name,response.headers.get(name));
+        if(!response.body||req.method==='HEAD')return res.end();
+        const stream=require('node:stream').Readable.fromWeb(response.body);res.on('close',()=>{controller.abort();stream.destroy();});stream.on('error',()=>res.destroy());stream.pipe(res);
+      } catch(error){console.error('Stem worker:',error.name);if(!res.headersSent)res.status(503).json({message:'Channel processing is temporarily unavailable. Original audio remains available.'});}
+    });
+    return;
+  }
+  const authorize = (req,res,next) => localRequest(req)||automaticEnabled() ? next() : requireAdmin(req,res,next);
   app.get('/api/player/stems/:id',async(req,res)=>{
     const track=await resolveTrack(req.params.id,localRequest(req));
     if(!track || !validateSource(track.audioUrl)) return res.status(404).json({message:'This published recording is unavailable.'});
     const key=keyFor(track.audioUrl), manifest=await readManifest(key), job=jobs.get(key);
-    const ready=Boolean(manifest);
-    res.set('Cache-Control','no-store').json({status:ready?'ready':job?.status||'idle',stage:ready?'Separated channels ready':job?.stage||'',
-      duration:manifest?.duration,canSeparate:localRequest(req),
+    const ready=Boolean(manifest),available=await separatorAvailable();
+    const canSeparate=available&&(localRequest(req)||automaticEnabled());
+    const unavailableStage=!available?'The server audio separator is not installed.':!canSeparate?'Automatic channel preparation is not enabled on the server.':'';
+    res.set('Cache-Control','no-store').json({status:ready?'ready':job?.status||(canSeparate?'idle':'unavailable'),stage:ready?'Separated channels ready':job?.stage||unavailableStage,
+      duration:manifest?.duration,canSeparate,separatorAvailable:available,
       channels:ready?CHANNELS.map(name=>({name,url:`/api/player/stems/${encodeURIComponent(track.id||track.externalId||req.params.id)}/audio/${name}`})):[]});
   });
   app.post('/api/player/stems/:id',authorize,async(req,res)=>{
@@ -109,8 +137,8 @@ function registerStemSeparation(app,{requireAdmin}) {
     const key=keyFor(track.audioUrl);
     if(await readManifest(key)) return res.json({status:'ready'});
     if(jobs.get(key)?.status==='processing') return res.status(202).json({status:'processing'});
-    if(activeJob) return res.status(409).json({message:'Another recording is separating. Please try again when it finishes.'});
-    try {await fs.access(PYTHON);} catch {return res.status(503).json({message:'The audio separator is not installed on this server yet.'});}
+    if(!await separatorAvailable()) return res.status(503).json({message:'The server audio separator is not installed.'});
+    if(activeJob) return res.status(409).json({message:'Another recording is separating. This recording will retry automatically.'});
     // Reserve synchronously before starting asynchronous download/inference.
     activeJob=key;
     void startJob(track,key);

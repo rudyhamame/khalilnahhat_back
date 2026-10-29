@@ -29,8 +29,8 @@ function registerMusicOntology(app,{requireAdmin,service=createService()}={}){
  }
  app.get(`${admin}/recordings/:id/versions`,requireAdmin,wrap(async(req,res)=>res.json({items:(await service.models.Version.find({recordingId:req.params.id}).sort({number:-1}).lean()).map(entity)})));
  app.delete(`${admin}/recordings/:id`,requireAdmin,wrap(async(req,res)=>{
-  const schema=z.object({revision:z.number().int().positive()}).strict();const {revision}=schema.parse(req.body);
-  await service.transaction(async session=>{const row=await ArchiveItem.findOne({externalId:req.params.id}).session(session);if(!row)return res.status(404).json({message:'Recording not found.'});if(row.ontologyRevision!==revision)throw Object.assign(new Error('Recording changed. Reload before archiving.'),{status:409});row.archivalStatus='ARCHIVED';row.publicationStatus='WITHDRAWN';row.published=false;row.ontologyRevision++;await row.save({session});await service.models.Version.create([{externalId:`version-${require('crypto').randomUUID()}`,recordingId:row.externalId,number:row.ontologyRevision,snapshot:row.toObject(),changedBy:actor(req)}],{session});});if(!res.headersSent)res.json({ok:true});
+  const schema=z.object({revision:z.number().int().nonnegative()}).strict();const {revision}=schema.parse(req.body);
+  await service.transaction(async session=>{const row=await ArchiveItem.findOne({externalId:req.params.id}).session(session);if(!row)return res.status(404).json({message:'Recording not found.'});if((row.ontologyRevision??0)!==revision)throw Object.assign(new Error('Recording changed. Reload before archiving.'),{status:409});row.archivalStatus='ARCHIVED';row.publicationStatus='WITHDRAWN';row.published=false;row.ontologyRevision=(row.ontologyRevision??0)+1;await row.save({session});await service.models.Version.create([{externalId:`version-${require('crypto').randomUUID()}`,recordingId:row.externalId,number:row.ontologyRevision,snapshot:row.toObject(),changedBy:actor(req)}],{session});});if(!res.headersSent)res.json({ok:true});
  }));
  return service;
 }

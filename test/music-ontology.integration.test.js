@@ -49,5 +49,21 @@ test('ontology HTTP, transactions, references, legacy compatibility and reversib
  await t.test('rollback refuses a recording edited after migration',async()=>{
   const migration=require('../src/music-ontology/migration');await ArchiveItem.create({externalId:'edited-legacy',title:'Legacy edit guard',category:'Legacy',audioUrl:make('MIX').audioUrl});await migration.migrate([{recordingId:'edited-legacy',recordingType:'COVER',workId:work.id}],{service,runId:'edited-migration',apply:true});await write('recordings',{...make('COVER'),title:'Newer explicit edit',revision:1},'edited-legacy');await assert.rejects(()=>migration.rollback('edited-migration',{apply:true,service}),/changed after migration/);assert.equal((await ArchiveItem.findOne({externalId:'edited-legacy'})).title,'Newer explicit edit');
  });
+ await t.test('unmapped revision-zero recordings can be archived with concurrency protection',async()=>{
+  const row=await ArchiveItem.create({externalId:'legacy-delete-zero',title:'Legacy delete',category:'Legacy',audioUrl:make('MIX').audioUrl,published:true});
+  const endpoint='/admin/music-ontology/recordings/'+row.externalId;
+  assert.equal((await req(endpoint)).body.item.revision,0);
+  assert.equal((await req(endpoint,'DELETE',{revision:-1})).status,400);
+  assert.equal((await req(endpoint,'DELETE',{})).status,400);
+  assert.equal((await req(endpoint,'DELETE',{revision:0},false)).status,401);
+  assert.equal((await req(endpoint,'DELETE',{revision:1})).status,409);
+  const result=await req(endpoint,'DELETE',{revision:0});
+  assert.equal(result.status,200,JSON.stringify(result.body));
+  const archived=await ArchiveItem.findOne({externalId:row.externalId});
+  assert.equal(archived.archivalStatus,'ARCHIVED');assert.equal(archived.publicationStatus,'WITHDRAWN');assert.equal(archived.published,false);assert.equal(archived.ontologyRevision,1);assert.equal(archived.audioUrl,row.audioUrl);
+  assert.equal((await req('/music-ontology/recordings/'+row.externalId)).status,404);
+  assert.equal((await req(endpoint,'DELETE',{revision:0})).status,409);
+  assert.equal(await M.Version.countDocuments({recordingId:row.externalId}),1);
+ });
  await t.test('revision conflicts prevent stale overwrite; archive retains identity and sources',async()=>{assert.equal((await req('/admin/music-ontology/recordings/'+mix.id,'PUT',{...make('MIX',music.id),revision:0})).status,409);assert.equal((await req('/admin/music-ontology/recordings/'+mix.id,'DELETE',{revision:mix.revision})).status,200);assert.equal((await req('/music-ontology/recordings/'+mix.id)).status,404);assert.ok(await ArchiveItem.exists({externalId:mix.id}));assert.deepEqual((await ArchiveItem.findOne({externalId:remix.id})).sourceRecordingIds,[mix.id]);assert.equal((await req('/admin/music-ontology/recordings/'+mix.id+'/versions')).body.items.length,2);assert.equal((await req('/music-archive')).body.songs.some(r=>r.id===mix.id),false);});
 });

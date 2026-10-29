@@ -36,7 +36,7 @@ function deliveryUrl(value) {
 function serialize(row) {
   const r = row.toObject ? row.toObject() : row;
   return { id: r.externalId, title: r.title, description: r.description || '', published: r.published !== false,
-    lyricsTiming:r.lyricsTiming?.audioUrl===r.audioUrl&&[r.workId,...(r.componentWorkIds||[])].includes(r.lyricsTiming?.workId)?{workId:r.lyricsTiming.workId,model:r.lyricsTiming.model,lines:r.lyricsTiming.lines}:null,sortOrder: r.sortOrder || 0, recordingIds: r.recordingIds || [],
+    lyricsTiming:r.lyricsTiming&&r.lyricsTiming.audioUrl===r.audioUrl&&[r.workId,...(r.componentWorkIds||[])].includes(r.lyricsTiming?.workId)?{workId:r.lyricsTiming.workId,model:r.lyricsTiming.model,lines:r.lyricsTiming.lines}:null,sortOrder: r.sortOrder || 0, recordingIds: r.recordingIds || [],
     artist: r.artist || 'DJ Khalil', date: r.date || (r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 10) : ''),
     audioUrl: deliveryUrl(r.audioUrl), coverImage: deliveryUrl(r.coverImage || r.image), duration: r.duration || '', createdAt: r.createdAt };
 }
@@ -61,9 +61,15 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, C
     const byId = new Map((canonical || []).map(r => [r.id, r]));
     return { ...(canonical ? { recordings: canonical, ontologyVersion: 1 } : {}), collections: shown.map(c => { const item = { ...present(c), ...adminAssets(c) }; return { ...item, recordingIds: admin ? item.recordingIds : item.recordingIds.filter(id => visibleIds.has(id)), songCount: item.recordingIds.filter(id => visibleIds.has(id)).length }; }), songs: visible.map(s => ({ ...present(s), ...adminAssets(s), ...(canonical ? byId.get(s.externalId) : {}) })) };
   }
-  app.get('/api/music-archive/playback', async (_req, res) => { const data = await catalog(false, {includeOntology:false}); res.set('Cache-Control','no-store').json({songs:data.songs}); });
-  app.get('/api/music-archive', async (_req, res) => res.set('Cache-Control', 'no-store').json(await catalog(false)));
-  app.get('/api/admin/music-archive', requireAdmin, async (_req, res) => res.set('Cache-Control', 'no-store').json(await catalog(true)));
+  const readCatalog=handler=>async(req,res)=>{
+    try{await handler(req,res);}catch(error){
+      console.error('Music archive catalog failed',JSON.stringify({name:error.name,code:error.code||null}));
+      res.status(500).json({code:'ARCHIVE_REFRESH_FAILED',message:'The music archive could not refresh. If you just saved a recording, it may already be saved. Refresh the list before saving it again.'});
+    }
+  };
+  app.get('/api/music-archive/playback', readCatalog(async (_req, res) => { const data = await catalog(false, {includeOntology:false}); res.set('Cache-Control','no-store').json({songs:data.songs}); }));
+  app.get('/api/music-archive', readCatalog(async (_req, res) => res.set('Cache-Control', 'no-store').json(await catalog(false))));
+  app.get('/api/admin/music-archive', requireAdmin, readCatalog(async (_req, res) => res.set('Cache-Control', 'no-store').json(await catalog(true))));
   for (const [kind, model] of Object.entries(models)) {
     const validateParent = async (data) => {
       if (kind !== 'collections' || !data.recordingIds) return '';

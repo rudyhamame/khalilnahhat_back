@@ -1883,6 +1883,14 @@ registerAiConfiguration(app,{
   requireAdmin: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, adminCheck: isAdminUser }),
   service:aiConfiguration,
 });
+require('./lyrics-concept').registerLyricsConcept(app,{
+  requireAdmin: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, adminCheck: isAdminUser }),
+  configService:aiConfiguration,
+});
+require('./lyrics-transcription').registerLyricsTranscription(app,{
+  requireAdmin: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, adminCheck: isAdminUser }),
+  configService:aiConfiguration,
+});
 const {mongoBillingStore,createAiBilling,registerAiBilling}=require('./ai-billing');
 registerAiBilling(app, {
   requireAdmin: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, adminCheck: isAdminUser }),

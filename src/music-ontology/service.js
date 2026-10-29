@@ -92,7 +92,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
      await references(l.regionIds,'region',session);await references(l.conceptIds,'concept',session);if(l.primaryConceptId)await references([l.primaryConceptId],'concept',session);await creditsCheck(l.artistCredits,session);if(l.completeness==='COMPLETE'&&(!l.text||!l.languageId))fail('Complete lyrics require text and a language.');l.states=V.metadataStates(l,l.states);lyricsId=makeId('lyrics');await Lyrics.create([{...l,externalId:lyricsId,provenance:provenance(l.provenance,actor)}],{session});}
    }
    // Work revisions use new component identities, preserving reused components and provenance.
-   const data={title:value.title,type:value.type,description:value.description,credits:value.credits,melodyId,lyricsId,provenance:provenance(value.provenance,actor),revision:(old?.revision||0)+1};
+   const data={title:value.title,type:value.type,workKind:value.workKind,description:value.description,credits:value.credits,melodyId,lyricsId,provenance:provenance(value.provenance,actor),revision:(old?.revision||0)+1};
    if(old){old.set(data);await old.save({session});return old.externalId;}
    const row=(await Work.create([{...data,externalId:makeId('work')}],{session}))[0];return row.externalId;
   });

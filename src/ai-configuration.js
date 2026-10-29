@@ -2,8 +2,9 @@ const {createOpenRouter}=require('./openrouter');
 const mongoose=require('mongoose');
 const {z}=require('zod');
 const crypto=require('node:crypto');
-const CHECKED='2026-10-27';
+const CHECKED='2026-10-29';
 const catalog=[
+ {id:'gpt-transcribe',mode:'stt',label:'GPT-Transcribe',rates:{audioMinute:0.0045}},
  {id:'gpt-4o-mini',mode:'chat',label:'GPT-4o Mini',deprecated:true,rates:{textInput:0.15,textCached:0.075,textOutput:0.6}},
  {id:'gpt-4.1-mini',mode:'chat',label:'GPT-4.1 Mini',deprecated:true,rates:{textInput:0.4,textCached:0.1,textOutput:1.6}},
  {id:'gpt-5.6-luna',mode:'chat',label:'GPT-5.6 Luna',rates:{textInput:0.2,textCached:0.02,textOutput:1.2}},
@@ -13,7 +14,9 @@ const catalog=[
 const money=z.number().finite().min(0).max(100000);
 const rates=z.object({textInput:money,textCached:money,textOutput:money,audioInput:money.optional(),audioCached:money.optional(),audioOutput:money.optional()}).strict();
 const modeSchema=kind=>z.object({enabled:z.boolean(),model:z.string().trim().min(1).max(200).refine(id=>kind==='chat'||catalog.some(item=>item.mode===kind&&item.id===id),'Choose a supported model for this mode.'),providerRates:rates,maxOutputTokens:z.number().int().min(256).max(4096),requestsPer10Min:z.number().int().min(1).max(kind==='chat'?200:20)}).strict();
-const configSchema=z.object({revision:z.number().int().min(0),chat:modeSchema('chat').extend({provider:z.enum(['openai','openrouter']).default('openai'),freeOnly:z.boolean().default(true)}),voice:modeSchema('voice').extend({maxCallSeconds:z.number().int().min(30).max(900)}),customerPricing:z.object({policy:z.enum(['included','manual_invoice']),currency:z.enum(['CAD','USD']),chatReplyCents:z.number().int().min(0).max(100000),voiceSessionCents:z.number().int().min(0).max(100000)}).strict()}).strict().superRefine((config,ctx)=>{
+const sttDefaults=()=>({enabled:true,model:'gpt-transcribe',providerRates:{audioMinute:0.0045},requestsPer10Min:6});
+const sttSchema=z.object({enabled:z.boolean(),model:z.enum(['gpt-transcribe']),providerRates:z.object({audioMinute:money}).strict(),requestsPer10Min:z.number().int().min(1).max(20)}).strict();
+const configSchema=z.object({stt:sttSchema.optional(),revision:z.number().int().min(0),chat:modeSchema('chat').extend({provider:z.enum(['openai','openrouter']).default('openai'),freeOnly:z.boolean().default(true)}),voice:modeSchema('voice').extend({maxCallSeconds:z.number().int().min(30).max(900)}),customerPricing:z.object({policy:z.enum(['included','manual_invoice']),currency:z.enum(['CAD','USD']),chatReplyCents:z.number().int().min(0).max(100000),voiceSessionCents:z.number().int().min(0).max(100000)}).strict()}).strict().superRefine((config,ctx)=>{
  for(const mode of ['chat','voice']){
   const r=config[mode].providerRates;
   if(r.textCached>r.textInput)ctx.addIssue({code:'custom',path:[mode,'providerRates','textCached'],message:'Cached input rate cannot exceed input rate.'});
@@ -25,7 +28,7 @@ function defaults(env=process.env){
  const chatProvider=env.OPENROUTER_API_KEY?'openrouter':'openai';
  const chatModel=chatProvider==='openrouter'?'openrouter/free':env.OPENAI_BOOKING_CHAT_MODEL||'gpt-4o-mini',voiceModel=env.OPENAI_BOOKING_VOICE_MODEL||'gpt-realtime-2.1-mini';
  const entry=(mode,id)=>catalog.find(item=>item.mode===mode&&item.id===id)||catalog.find(item=>item.mode===mode);
- return {revision:0,chat:{provider:chatProvider,freeOnly:true,enabled:true,model:chatModel,providerRates:chatProvider==='openrouter'?{textInput:0,textCached:0,textOutput:0}:{...entry('chat',chatModel).rates},maxOutputTokens:chatProvider==='openrouter'?4096:2400,requestsPer10Min:20},voice:{enabled:true,model:voiceModel,providerRates:{...entry('voice',voiceModel).rates},maxOutputTokens:1200,requestsPer10Min:3,maxCallSeconds:300},customerPricing:{policy:'included',currency:'CAD',chatReplyCents:0,voiceSessionCents:0}};
+ return {revision:0,stt:sttDefaults(),chat:{provider:chatProvider,freeOnly:true,enabled:true,model:chatModel,providerRates:chatProvider==='openrouter'?{textInput:0,textCached:0,textOutput:0}:{...entry('chat',chatModel).rates},maxOutputTokens:chatProvider==='openrouter'?4096:2400,requestsPer10Min:20},voice:{enabled:true,model:voiceModel,providerRates:{...entry('voice',voiceModel).rates},maxOutputTokens:1200,requestsPer10Min:3,maxCallSeconds:300},customerPricing:{policy:'included',currency:'CAD',chatReplyCents:0,voiceSessionCents:0}};
 }
 const configModel=mongoose.models.EchoAiConfiguration||mongoose.model('EchoAiConfiguration',new mongoose.Schema({_id:String,value:mongoose.Schema.Types.Mixed,updatedBy:String},{timestamps:true}));
 const usageModel=mongoose.models.EchoAiUsage||mongoose.model('EchoAiUsage',new mongoose.Schema({_id:String,owner:{type:String,index:true},mode:String,model:String,revision:Number,state:String,billingStatus:String,customerCents:Number,currency:String,providerUsdEstimate:{type:Number,default:null},metrics:mongoose.Schema.Types.Mixed,invoiceId:String,reference:String,paymentMethod:String,updatedBy:String},{timestamps:true}));
@@ -48,6 +51,7 @@ const mongoStore={
 };
 const error=(status,message)=>Object.assign(new Error(message),{status});
 function providerEstimate(config,mode,metrics){
+ if(mode==='stt')return Number.isFinite(metrics.durationSeconds)&&metrics.durationSeconds>=0?Number((metrics.durationSeconds/60*config.stt.providerRates.audioMinute).toFixed(8)):null;
  if(mode==='voice'||!Number.isInteger(metrics.inputTokens)||!Number.isInteger(metrics.outputTokens))return null;
  const r=config.chat.providerRates,cached=Math.min(metrics.inputTokens,Math.max(0,metrics.cachedInputTokens||0));
  return Number((((metrics.inputTokens-cached)*r.textInput+cached*r.textCached+metrics.outputTokens*r.textOutput)/1e6).toFixed(8));
@@ -55,13 +59,15 @@ function providerEstimate(config,mode,metrics){
 function createAiConfiguration({store=mongoStore,env=process.env,fetchImpl=fetch}={}){
  const openrouter=createOpenRouter({env,fetchImpl});
  let cached=null,until=0,inflight=null;
- const load=async()=>{if(cached&&Date.now()<until)return structuredClone(cached);if(!inflight)inflight=store.getConfig().then(item=>{const value=item?.value||defaults(env);cached={...value,chat:{provider:'openai',freeOnly:true,...value.chat}};until=Date.now()+5000;return cached;}).finally(()=>{inflight=null;});return structuredClone(await inflight);};
+ const load=async()=>{if(cached&&Date.now()<until)return structuredClone(cached);if(!inflight)inflight=store.getConfig().then(item=>{const value=item?.value||defaults(env);cached={...value,stt:{...sttDefaults(),...value.stt},chat:{provider:'openai',freeOnly:true,...value.chat}};until=Date.now()+5000;return cached;}).finally(()=>{inflight=null;});return structuredClone(await inflight);};
  return {
   load,
   async describe(){let extra=[],catalogError='';try{extra=await openrouter.models();}catch{catalogError='OpenRouter catalog unavailable. Reload to retry.';}return {item:await load(),catalog:[...catalog,...extra],providers:{openai:{configured:Boolean(env.OPENAI_API_KEY)},openrouter:{configured:Boolean(env.OPENROUTER_API_KEY)}},catalogError};},
   async save(body,owner){
-   const parsed=configSchema.safeParse(body);if(!parsed.success)throw error(400,parsed.error.issues[0]?.message||'Invalid AI configuration.');
-   const old=await load();if(old.revision!==body.revision)throw error(409,'Configuration changed. Reload before saving.');
+   const old=await load();
+   const parsed=configSchema.safeParse({...body,stt:body.stt??old.stt});if(!parsed.success)throw error(400,parsed.error.issues[0]?.message||'Invalid AI configuration.');
+   parsed.data.stt.providerRates={...catalog.find(item=>item.mode==='stt'&&item.id===parsed.data.stt.model).rates};
+   if(old.revision!==body.revision)throw error(409,'Configuration changed. Reload before saving.');
    if(parsed.data.chat.provider==='openrouter'){
     const model=await openrouter.validate(parsed.data.chat);
     parsed.data.chat.providerRates={...model.rates};
@@ -72,16 +78,16 @@ function createAiConfiguration({store=mongoStore,env=process.env,fetchImpl=fetch
     const model=catalog.find(item=>item.mode===mode&&item.id===parsed.data[mode].model);
     parsed.data[mode].providerRates={...model.rates};
    }
-   for(const mode of ['chat','voice'])if(!(mode==='chat'&&parsed.data.chat.provider==='openrouter')&&parsed.data[mode].enabled&&(old[mode].model!==body[mode].model||(old[mode].provider||'openai')!==(parsed.data[mode].provider||'openai')||!old.revision)){
+   for(const mode of ['chat','voice','stt'])if(!(mode==='chat'&&parsed.data.chat.provider==='openrouter')&&parsed.data[mode].enabled&&(old[mode].model!==parsed.data[mode].model||(old[mode].provider||'openai')!==(parsed.data[mode].provider||'openai')||!old.revision)){
     if(!env.OPENAI_API_KEY)throw error(503,'Configure the provider API key on the server before enabling a model.');
-    const response=await fetchImpl(`https://api.openai.com/v1/models/${encodeURIComponent(body[mode].model)}`,{headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},signal:AbortSignal.timeout(10000)});
-    if(!response.ok)throw error(400,`The configured OpenAI account cannot access ${body[mode].model}.`);
+    const response=await fetchImpl(`https://api.openai.com/v1/models/${encodeURIComponent(parsed.data[mode].model)}`,{headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},signal:AbortSignal.timeout(10000)});
+    if(!response.ok)throw error(400,`The configured OpenAI account cannot access ${parsed.data[mode].model}.`);
    }
    const item=await store.saveConfig(parsed.data,owner);if(!item)throw error(409,'Configuration changed. Reload before saving.');
    cached=item.value;until=Date.now()+5000;return structuredClone(cached);
   },
   async reserve({owner,mode,requestId,config,pricingConsentRevision}){
-   const fee=config.customerPricing.policy==='manual_invoice'?config.customerPricing[mode==='chat'?'chatReplyCents':'voiceSessionCents']:0;
+   const fee=mode!=='stt'&&config.customerPricing.policy==='manual_invoice'?config.customerPricing[mode==='chat'?'chatReplyCents':'voiceSessionCents']:0;
    if(fee&&pricingConsentRevision!==config.revision)throw error(402,'Review and accept the current AI price before continuing.');
    if(fee&&!z.uuid().safeParse(requestId).success)throw error(400,'A unique request ID is required for paid AI usage.');
    const id=crypto.createHash('sha256').update(`${owner}:${mode}:${requestId||crypto.randomUUID()}`).digest('hex');

@@ -3,7 +3,6 @@
   "recordingTypes": [
     "COVER",
     "REMIX",
-    "PRODUCTION",
     "MASHUP",
     "MEDLEY",
     "MIX",
@@ -86,7 +85,6 @@
     "INDIVIDUAL": [
       "COVER",
       "REMIX",
-      "PRODUCTION",
       "MASHUP"
     ],
     "MULTIPLE": [
@@ -102,7 +100,6 @@
   "recordingTypeLabels": {
     "COVER": "Cover",
     "REMIX": "Remix",
-    "PRODUCTION": "Production",
     "MASHUP": "Mashup",
     "MEDLEY": "Medley",
     "MIX": "Mix",

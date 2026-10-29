@@ -34,7 +34,7 @@ erDiagram
   MELODY }o--o{ VOCABULARY_ENTITY : rhythm_genre
 ```
 
-Recording is the produced audio artifact. `MIX | REMIX | COVER | PRODUCTION` describes its workflow, independently of work classification or legal ownership. `SONG | MUSIC` describes the underlying work. Material inputs are lyrics, melody and attributed sources; formal relationships describe work and recording structure; efficient activities are represented through production credits/notes; the intended completed recording is the workflow output. These are not claims that a digital file is identical to philosophical purpose or that a remix automatically creates a new composition.
+Recording is the produced audio artifact. `MIX | REMIX | COVER | MASHUP | MEDLEY | LIVE` describes its workflow, independently of work classification or legal ownership. `SONG | MUSIC` describes the underlying work. Material inputs are lyrics, melody and attributed sources; formal relationships describe work and recording structure; efficient activities are represented through production credits/notes; the intended completed recording is the workflow output. These are not claims that a digital file is identical to philosophical purpose or that a remix automatically creates a new composition.
 
 ### Physical MongoDB schema
 

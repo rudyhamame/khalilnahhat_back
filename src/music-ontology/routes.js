@@ -29,9 +29,22 @@ function registerMusicOntology(app,{requireAdmin,service=createService()}={}){
  }
  app.get(`${admin}/recordings/:id/versions`,requireAdmin,wrap(async(req,res)=>res.json({items:(await service.models.Version.find({recordingId:req.params.id}).sort({number:-1}).lean()).map(entity)})));
  app.delete(`${admin}/recordings/:id`,requireAdmin,wrap(async(req,res)=>{
-  const schema=z.object({revision:z.number().int().nonnegative()}).strict();const {revision}=schema.parse(req.body);
-  await service.transaction(async session=>{const row=await ArchiveItem.findOne({externalId:req.params.id}).session(session);if(!row)return res.status(404).json({message:'Recording not found.'});if((row.ontologyRevision??0)!==revision)throw Object.assign(new Error('Recording changed. Reload before archiving.'),{status:409});row.archivalStatus='ARCHIVED';row.publicationStatus='WITHDRAWN';row.published=false;row.ontologyRevision=(row.ontologyRevision??0)+1;await row.save({session});await service.models.Version.create([{externalId:`version-${require('crypto').randomUUID()}`,recordingId:row.externalId,number:row.ontologyRevision,snapshot:row.toObject(),changedBy:actor(req)}],{session});});if(!res.headersSent)res.json({ok:true});
+  const schema=z.object({revision:z.number().int().nonnegative(),permanent:z.literal(true)}).strict();
+  const {revision}=schema.parse(req.body);
+  await service.transaction(async session=>{
+   await require('mongoose').connection.collection('musicontologylocks').updateOne({_id:'source-graph'},{$inc:{revision:1}},{upsert:true,session});
+   const row=await ArchiveItem.findOne({externalId:req.params.id}).session(session);
+   if(!row)throw Object.assign(new Error('Recording not found.'),{status:404});
+   if((row.ontologyRevision??0)!==revision)throw Object.assign(new Error('Recording changed. Reload before deleting.'),{status:409});
+   if(await ArchiveItem.exists({externalId:{$ne:row.externalId},sourceRecordingIds:row.externalId}).session(session))throw Object.assign(new Error('This recording is used as a source. Remove its source reference from other recordings before deleting it.'),{status:409});
+   await require('../music-archive').Collection.updateMany({recordingIds:row.externalId},{$pull:{recordingIds:row.externalId}},{session});
+   await service.models.Version.deleteMany({recordingId:row.externalId}).session(session);
+   const deleted=await ArchiveItem.deleteOne({_id:row._id,externalId:row.externalId,ontologyRevision:row.ontologyRevision}).session(session);
+   if(deleted.deletedCount!==1||await ArchiveItem.exists({externalId:row.externalId}).session(session))throw Object.assign(new Error('Permanent deletion could not be confirmed.'),{status:409});
+  });
+  res.json({ok:true,deleted:true,id:req.params.id});
  }));
+
  return service;
 }
 module.exports={registerMusicOntology};

@@ -68,7 +68,7 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, C
     const validateParent = async (data) => {
       if (kind !== 'collections' || !data.recordingIds) return '';
       data.recordingIds = [...new Set(data.recordingIds)];
-      return await ArchiveModel.countDocuments({ externalId: { $in: data.recordingIds } }) === data.recordingIds.length ? '' : 'Choose existing recordings.';
+      return await ArchiveModel.countDocuments({ externalId: { $in: data.recordingIds }, archivalStatus: { $ne: 'ARCHIVED' } }) === data.recordingIds.length ? '' : 'Choose existing active recordings. Deleted recordings cannot be added to a collection.';
     };
     app.post(`/api/admin/music-archive/${kind}`, requireAdmin, async (req, res) => {
       if(kind === 'songs' && ontology) return res.status(409).json({message:'Create recordings through the Music Archive ontology editor.',code:'MUSIC_ONTOLOGY_REQUIRED'});

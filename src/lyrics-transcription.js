@@ -2,6 +2,7 @@ const multer=require('multer');
 const path=require('node:path');
 
 const MAX_BYTES=25*1024*1024;
+const languages=new Set(['ar','en','fr','es','de','it','pt','tr','fa','ur','hi','ru','uk','el','he','nl','pl','zh','ja','ko']);
 const formats=new Set(['.mp3','.mp4','.mpeg','.mpga','.m4a','.wav','.webm']);
 
 // Admin tool: transcription drafts are returned for review, never saved as lyrics automatically.
@@ -24,6 +25,8 @@ function registerLyricsTranscription(app,{requireAdmin,configService,fetchImpl=f
    if(!env.OPENAI_API_KEY)return res.status(503).json({message:'Configure OPENAI_API_KEY on the server to use speech-to-text.'});
    const file=req.file,extension=path.extname(file?.originalname||'').toLowerCase();
    if(!file?.size||!formats.has(extension))return res.status(400).json({message:'Choose an MP3, MP4, MPEG, MPGA, M4A, WAV or WebM audio file.'});
+   const language=req.body?.language||'';
+   if(typeof language!=='string'||language&&!languages.has(language))return res.status(400).json({message:'Choose a supported language or automatic detection.'});
    if(active.has(owner))return res.status(409).json({message:'A transcription is already running. Wait for it to finish.'});
    const now=Date.now(),windowMs=10*60*1000;
    for(const [id,times] of requests)if(!times.some(time=>now-time<windowMs))requests.delete(id);
@@ -33,6 +36,7 @@ function registerLyricsTranscription(app,{requireAdmin,configService,fetchImpl=f
    const body=new FormData();
    body.append('file',new Blob([file.buffer],{type:file.mimetype||'application/octet-stream'}),`audio${extension}`);
    body.append('model',config.stt.model);
+   if(language)body.append('languages[]',language);
    ticket=await configService.reserve({owner,mode:'stt',config});
    const response=await fetchImpl('https://api.openai.com/v1/audio/transcriptions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},body,signal:AbortSignal.any([AbortSignal.timeout(180000),cancelled.signal])});
    if(!response.ok){await configService.fail(ticket);ticket=null;return res.status(response.status===429?429:502).json({message:response.status===429?'The transcription service is busy or has reached its usage limit.':'The audio could not be transcribed. Check the model and provider account in ECHO AI Configuration.'});}

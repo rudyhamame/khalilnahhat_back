@@ -8,6 +8,7 @@ const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status
 const makeId=kind=>`${kind}-${randomUUID()}`;
 const plain=row=>row?.toObject?row.toObject({flattenMaps:true}):row;
 const norm=name=>name.normalize('NFKC').trim().toLocaleLowerCase().replace(/\s+/g,' ');
+const recordingMetadata=(value={})=>{value=value||{};const bpms=value.bpms??(value.bpm==null?[]:[value.bpm]),keys=value.keys??(value.key?[value.key]:[]);return {...value,bpms,keys,genreIds:value.genreIds||[],bpm:bpms[0]??null,key:keys[0]??null};};
 const creditNames=(credits,vocabulary)=>credits.map(c=>({...c,artist:vocabulary.get(c.artistId)||null}));
 function assertAcyclic(id,sources,rows){
  const graph=new Map(rows.map(row=>[row.externalId,row.sourceRecordingIds||[]]));graph.set(id,sources);
@@ -20,16 +21,16 @@ function matchesWork(r,f={}){
  if(f.recordingType&&r.recordingType!==f.recordingType||f.workType&&w?.type!==f.workType)return false;
  if(f.publicationStatus&&r.publicationStatus!==f.publicationStatus||f.archivalStatus&&r.archivalStatus!==f.archivalStatus)return false;
  if(f.language&&l?.language?.id!==f.language||f.dialect&&l?.dialect?.id!==f.dialect)return false;
- if(!has(l?.regions,f.region)||(!has(l?.concepts,f.concept)&&l?.primaryConcept?.id!==f.concept)||!has(m?.genres,f.genre))return false;
+ if(!has(l?.regions,f.region)||(!has(l?.concepts,f.concept)&&l?.primaryConcept?.id!==f.concept)||(!has(m?.genres,f.genre)&&!has(r.recordingMetadata?.genreIds,f.genre)))return false;
  if(f.lyricArtist&&!has(l?.artistCredits,f.lyricArtist))return false;
  if(!has(m?.instruments,f.instrument)||!has(m?.musicianCredits,f.musician))return false;
  if(f.artist&&!has([...(r.credits||[]),...(w?.credits||[]),...(m?.musicianCredits||[]),...(l?.artistCredits||[])],f.artist))return false;
  if(f.rhythm&&m?.rhythm?.id!==f.rhythm)return false;
  const scoped=f.bpmScope==='recording'?r.recordingMetadata:m;
- if(f.bpmMin!==undefined&&(scoped?.bpm==null||scoped.bpm<Number(f.bpmMin)))return false;
- if(f.bpmMax!==undefined&&(scoped?.bpm==null||scoped.bpm>Number(f.bpmMax)))return false;
- if(f.key&&scoped?.key!==f.key)return false;
- if(f.q){const q=norm(f.q);const hay=[r.title,w?.title,r.artist,...(r.credits||[]).map(c=>c.artist?.name),...(w?.credits||[]).map(c=>c.artist?.name),...(m?.musicianCredits||[]).map(c=>c.artist?.name),...(m?.instruments||[]).map(i=>i.name),...(l?.artistCredits||[]).map(c=>c.artist?.name),...(m?.genres||[]).map(g=>g.name)].filter(Boolean).join(' ');if(!norm(hay).includes(q))return false;}
+ const bpms=scoped?.bpms??(scoped?.bpm==null?[]:[scoped.bpm]),keys=scoped?.keys??(scoped?.key?[scoped.key]:[]);
+ if((f.bpmMin!==undefined||f.bpmMax!==undefined)&&!bpms.some(bpm=>(f.bpmMin===undefined||bpm>=Number(f.bpmMin))&&(f.bpmMax===undefined||bpm<=Number(f.bpmMax))))return false;
+ if(f.key&&!keys.includes(f.key))return false;
+ if(f.q){const q=norm(f.q);const hay=[r.title,w?.title,r.artist,...(r.credits||[]).map(c=>c.artist?.name),...(w?.credits||[]).map(c=>c.artist?.name),...(m?.musicianCredits||[]).map(c=>c.artist?.name),...(m?.instruments||[]).map(i=>i.name),...(l?.artistCredits||[]).map(c=>c.artist?.name),...(m?.genres||[]).map(g=>g.name),...(r.recordingMetadata?.genres||[]).map(g=>g.name)].filter(Boolean).join(' ');if(!norm(hay).includes(q))return false;}
  return true;
 }
 const amountFor=type=>Object.keys(contract.recordingTypeGroups).find(key=>contract.recordingTypeGroups[key].includes(type))||null;
@@ -114,7 +115,13 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    await mongoose.connection.collection('musicontologylocks').updateOne({_id:'source-graph'},{$inc:{revision:1}},{upsert:true,session});
    let audioAssetId='';
    if(v.audioUrl){const existing=await AudioAsset.findOne({url:v.audioUrl}).session(session);audioAssetId=existing?.externalId||`audio-${createHash('sha256').update(v.audioUrl).digest('hex')}`;if(!existing)await AudioAsset.create([{externalId:audioAssetId,url:v.audioUrl,durationSeconds:v.durationSeconds,provenance:provenance(v.provenance,actor)}],{session});}
-   const metadata={...v.recordingMetadata,states:V.metadataStates(v.recordingMetadata,v.recordingMetadata.states)};
+   const incoming={...v.recordingMetadata};
+   // Older editors only send scalar fields; retain additional entries when those fields are unchanged.
+   for(const [field,scalar] of [['bpms','bpm'],['keys','key']])if(incoming[field]===undefined&&old?.recordingMetadata?.[scalar]===incoming[scalar])incoming[field]=old.recordingMetadata[field];
+   if(incoming.genreIds===undefined)incoming.genreIds=old?.recordingMetadata?.genreIds||[];
+   const metadata=recordingMetadata(incoming);
+   await references(metadata.genreIds,'genre',session);
+   metadata.states=V.metadataStates(metadata,metadata.states);
    const duration=v.durationSeconds==null?'':`${Math.floor(v.durationSeconds/60)}:${String(Math.floor(v.durationSeconds%60)).padStart(2,'0')}`;
    const data={title:v.title,recordingType:v.recordingType,recordingAmount:amountFor(v.recordingType),componentWorkIds,workId:v.workId,audioAssetId,recordingMetadata:metadata,credits:v.credits,sourceRecordingIds:v.sourceRecordingIds,sourceWorkIds:v.sourceWorkIds,publicationStatus:v.publicationStatus,archivalStatus:v.archivalStatus,versionLabel:v.versionLabel,productionNotes:v.productionNotes,provenance:provenance(v.provenance,actor),ontologyRevision:(old?.ontologyRevision||0)+1,description:v.description,date:v.releaseDate,audioUrl:v.audioUrl,coverImage:v.coverImage,duration,published:v.publicationStatus==='PUBLISHED'&&v.archivalStatus==='ACTIVE',mediaType:'audio'};
    if(migration){for(const key of ['title','description','date','audioUrl','coverImage','duration','mediaType'])delete data[key];data.ontologyMigrationId=migration.runId;await mongoose.connection.collection('musicontologymigrationbackups').insertOne({_id:`${migration.runId}:${recordId}`,runId:migration.runId,recordingId:recordId,before:plain(old),afterRevision:data.ontologyRevision,createdAt:new Date()},{session});}
@@ -142,7 +149,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    const w=works.get(r.workId)||null,a=am.get(r.audioAssetId),deliver=url=>admin?previewUrl(deliveryUrl(url)):deliveryUrl(url);
    const componentWorkIds=[...new Set([r.workId,...(r.componentWorkIds||[])].filter(Boolean))],componentWorks=componentWorkIds.map(id=>works.get(id)).filter(Boolean);
    const artist=[...new Set([...(r.credits||[]),...componentWorks.flatMap(c=>[...(c.credits||[]),...(c.melody?.musicianCredits||[]),...(c.lyrics?.artistCredits||[])])].map(c=>vocabulary.get(c.artistId)?.name).filter(Boolean))].join(', ')||(!r.workId?r.artist||'':'');
-   return {id:r.externalId,title:r.title,description:r.description||'',recordingType:contract.recordingTypes.includes(r.recordingType)?r.recordingType:null,recordingAmount:r.recordingAmount||amountFor(r.recordingType),componentWorkIds,componentWorks,workId:r.workId||null,work:w,ontologyStatus:r.workId?'MAPPED':'UNMAPPED',recordingMetadata:r.recordingMetadata||{bpm:null,key:null,states:{bpm:'UNKNOWN',key:'UNKNOWN'}},credits:creditNames(r.credits||[],vocabulary),sourceRecordingIds:r.sourceRecordingIds||[],sourceWorkIds:r.sourceWorkIds||[],publicationStatus:r.publicationStatus||(r.published!==false?'PUBLISHED':'DRAFT'),archivalStatus:r.archivalStatus||'ACTIVE',revision:r.ontologyRevision||0,versionLabel:r.versionLabel||'',productionNotes:r.productionNotes||'',provenance:r.provenance||null,audio:{assetId:r.audioAssetId||null,url:deliver(r.audioUrl||a?.url||''),durationSeconds:r.duration?String(r.duration).split(':').reduce((t,n)=>t*60+Number(n),0):(a?.durationSeconds??null)},audioUrl:deliver(r.audioUrl||''),coverImage:deliver(r.coverImage||r.image||''),artist,duration:r.duration||'',date:r.date||'',releaseDate:r.date||'',createdAt:r.createdAt,updatedAt:r.updatedAt,sortOrder:r.sortOrder||0,published:r.published!==false,...(admin?{storedAudioUrl:r.audioUrl||'',storedCoverImage:r.coverImage||r.image||''}:{})};
+   return {id:r.externalId,title:r.title,description:r.description||'',recordingType:contract.recordingTypes.includes(r.recordingType)?r.recordingType:null,recordingAmount:r.recordingAmount||amountFor(r.recordingType),componentWorkIds,componentWorks,workId:r.workId||null,work:w,ontologyStatus:r.workId?'MAPPED':'UNMAPPED',recordingMetadata:{...recordingMetadata(r.recordingMetadata),genres:(r.recordingMetadata?.genreIds||[]).map(id=>vocabulary.get(id)).filter(v=>v?.kind==='genre').map(v=>({...v,id:v.externalId}))},credits:creditNames(r.credits||[],vocabulary),sourceRecordingIds:r.sourceRecordingIds||[],sourceWorkIds:r.sourceWorkIds||[],publicationStatus:r.publicationStatus||(r.published!==false?'PUBLISHED':'DRAFT'),archivalStatus:r.archivalStatus||'ACTIVE',revision:r.ontologyRevision||0,versionLabel:r.versionLabel||'',productionNotes:r.productionNotes||'',provenance:r.provenance||null,audio:{assetId:r.audioAssetId||null,url:deliver(r.audioUrl||a?.url||''),durationSeconds:r.duration?String(r.duration).split(':').reduce((t,n)=>t*60+Number(n),0):(a?.durationSeconds??null)},audioUrl:deliver(r.audioUrl||''),coverImage:deliver(r.coverImage||r.image||''),artist,duration:r.duration||'',date:r.date||'',releaseDate:r.date||'',createdAt:r.createdAt,updatedAt:r.updatedAt,sortOrder:r.sortOrder||0,published:r.published!==false,...(admin?{storedAudioUrl:r.audioUrl||'',storedCoverImage:r.coverImage||r.image||''}:{})};
   });
  }
  async function list(admin=false,filters={}){
@@ -161,7 +168,8 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
   if(await ArchiveModel.countDocuments({externalId:{$in:v.sourceRecordingIds}})!==v.sourceRecordingIds.length)fail('Choose existing source recordings.');
   if(await Work.countDocuments({externalId:{$in:v.sourceWorkIds}})!==v.sourceWorkIds.length)fail('Choose existing source works.');
   assertAcyclic(id||'__new_recording__',v.sourceRecordingIds,await ArchiveModel.find({}).lean());
-  V.metadataStates(v.recordingMetadata,v.recordingMetadata.states);
+  await references(v.recordingMetadata.genreIds||[],'genre',null);
+  V.metadataStates(recordingMetadata(v.recordingMetadata),v.recordingMetadata.states);
   return v;
  }
  async function deleteLegacy(id){return transaction(async session=>{await mongoose.connection.collection('musicontologylocks').updateOne({_id:'source-graph'},{$inc:{revision:1}},{upsert:true,session});const row=await ArchiveModel.findOne({externalId:id}).session(session);if(!row)return null;if(row.workId)fail('Archive this recording through the ontology editor.',409);if(await ArchiveModel.exists({sourceRecordingIds:id}).session(session))fail('This recording is used as a source; retain its identity and media.',409);return ArchiveModel.findOneAndDelete({externalId:id}).session(session);});}

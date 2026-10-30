@@ -217,7 +217,7 @@
       "projector",
       "led-screen"
     ],
-    "isActive": true,
+    "isActive": false,
     "sortOrder": 5
   }
 ]

@@ -8,7 +8,7 @@ Daemon will be stopped at the end of the build
 > Task :app:preBuild UP-TO-DATE
 > Task :app:preDebugBuild UP-TO-DATE
 > Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
-> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugBuildConfig UP-TO-DATE
 > Task :app:generateDebugResources UP-TO-DATE
 > Task :app:packageDebugResources UP-TO-DATE
 > Task :app:processDebugNavigationResources UP-TO-DATE
@@ -38,7 +38,7 @@ w: file:///home/rudy/projects/echo-dj/android/app/src/main/java/ca/echo/dj/ui/St
 w: file:///home/rudy/projects/echo-dj/android/app/src/main/java/ca/echo/dj/ui/StudioActivity.kt:258:116 'val systemWindowInsetBottom: Int' is deprecated. Deprecated in Java.
 
 > Task :app:javaPreCompileDebug UP-TO-DATE
-> Task :app:compileDebugJavaWithJavac
+> Task :app:compileDebugJavaWithJavac UP-TO-DATE
 > Task :app:generateDebugAssets UP-TO-DATE
 > Task :app:mergeDebugAssets UP-TO-DATE
 > Task :app:compressDebugAssets UP-TO-DATE
@@ -81,7 +81,7 @@ w: file:///home/rudy/projects/echo-dj/android/app/src/main/java/ca/echo/dj/ui/St
 > Task :app:preDebugAndroidTestBuild SKIPPED
 > Task :app:mergeDebugAndroidTestManifest UP-TO-DATE
 > Task :app:processDebugAndroidTestManifest UP-TO-DATE
-> Task :app:generateDebugAndroidTestBuildConfig
+> Task :app:generateDebugAndroidTestBuildConfig UP-TO-DATE
 > Task :app:generateDebugAndroidTestResources UP-TO-DATE
 > Task :app:packageDebugAndroidTestResources UP-TO-DATE
 > Task :app:processDebugAndroidTestNavigationResources UP-TO-DATE
@@ -89,7 +89,7 @@ w: file:///home/rudy/projects/echo-dj/android/app/src/main/java/ca/echo/dj/ui/St
 > Task :app:generateDebugAndroidTestRFile UP-TO-DATE
 > Task :app:compileDebugAndroidTestKotlin
 > Task :app:javaPreCompileDebugAndroidTest UP-TO-DATE
-> Task :app:compileDebugAndroidTestJavaWithJavac
+> Task :app:compileDebugAndroidTestJavaWithJavac UP-TO-DATE
 > Task :app:generateDebugAndroidTestAssets UP-TO-DATE
 > Task :app:mergeDebugAndroidTestAssets UP-TO-DATE
 > Task :app:compressDebugAndroidTestAssets UP-TO-DATE
@@ -105,16 +105,16 @@ w: file:///home/rudy/projects/echo-dj/android/app/src/main/java/ca/echo/dj/ui/St
 > Task :app:compileDebugAndroidTestNavigationResources UP-TO-DATE
 > Task :app:mergeDebugAndroidTestResources UP-TO-DATE
 > Task :app:processDebugAndroidTestResources UP-TO-DATE
-> Task :app:dexBuilderDebugAndroidTest
-> Task :app:mergeProjectDexDebugAndroidTest
+> Task :app:dexBuilderDebugAndroidTest UP-TO-DATE
+> Task :app:mergeProjectDexDebugAndroidTest UP-TO-DATE
 > Task :app:mergeDebugAndroidTestJniLibFolders UP-TO-DATE
 > Task :app:mergeDebugAndroidTestNativeLibs NO-SOURCE
 > Task :app:stripDebugAndroidTestDebugSymbols NO-SOURCE
 > Task :app:validateSigningDebugAndroidTest UP-TO-DATE
 > Task :app:writeDebugAndroidTestSigningConfigVersions UP-TO-DATE
-> Task :app:packageDebugAndroidTest
+> Task :app:packageDebugAndroidTest UP-TO-DATE
 > Task :app:createDebugAndroidTestApkListingFileRedirect UP-TO-DATE
-> Task :app:assembleDebugAndroidTest
+> Task :app:assembleDebugAndroidTest UP-TO-DATE
 
 [Incubating] Problems report is available at: file:///home/rudy/projects/echo-dj/android/build/reports/problems/problems-report.html
 
@@ -124,6 +124,6 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/9.5.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD SUCCESSFUL in 2m 17s
-76 actionable tasks: 16 executed, 60 up-to-date
+BUILD SUCCESSFUL in 1m 47s
+76 actionable tasks: 9 executed, 67 up-to-date
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.5.0/userguide/configuration_cache_enabling.html

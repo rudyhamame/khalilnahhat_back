@@ -1,0 +1,89 @@
+{
+  "generatedAt": "2026-10-30T05:10:15.059144+00:00",
+  "backendAdministrator": {
+    "tests": 30,
+    "pass": 30,
+    "fail": 0,
+    "database": "isolated ephemeral replica set"
+  },
+  "backendRegression": {
+    "tests": 248,
+    "pass": 242,
+    "fail": 6,
+    "failures": "Same six pre-existing failures documented in AI_ADMINISTRATOR.md"
+  },
+  "frontend": {
+    "tests": 52,
+    "pass": 52,
+    "build": "pass",
+    "targetedOxlint": "pass"
+  },
+  "android": {
+    "framework": "native Kotlin",
+    "package": "ca.echo.dj",
+    "version": "0.3.0",
+    "versionCode": 10,
+    "assembleDebug": "pass",
+    "assembleDebugAndroidTest": "pass",
+    "lintDebug": "pass",
+    "jvmTests": {
+      "tests": 4,
+      "pass": 4
+    },
+    "physicalDevice": "Samsung SM_G781W",
+    "installation": "updated existing app using install -r; no app data cleared",
+    "instrumentation": {
+      "tests": 5,
+      "pass": 5,
+      "skipped": 0,
+      "classes": [
+        "AiAdministratorTest",
+        "AdministratorApiTest"
+      ],
+      "coverage": [
+        "email/password form and email keyboard",
+        "signed-out administrator guard",
+        "encrypted draft roundtrip",
+        "actual API client using injected HTTPS transport: admin sign-in, bearer command submission, email payload",
+        "normal customer rejection"
+      ],
+      "livePasswordLoginTested": false,
+      "realMicrophoneTested": false,
+      "physicalPushDeliveryTested": false,
+      "existingManualModulesLiveNavigationTested": false
+    },
+    "apk": "/home/rudy/projects/echo-dj/dist/Echo-DJ-0.3.0-debug.apk",
+    "apkBytes": 62455062,
+    "sha256": "ee5c87fe78b9685329423b1170950735aecef2dc6743aa1fb69c5e93cde644ff",
+    "privateFirebaseKeyAbsentFromApk": true
+  },
+  "firebase": {
+    "projectId": "echo-dj",
+    "account": "khalilnahhatdj@gmail.com",
+    "plan": "Spark",
+    "billingEnabled": false,
+    "httpV1Enabled": true,
+    "serverRole": "roles/firebasecloudmessaging.admin",
+    "privateKeyLocation": "outside repository, mode 0600; local backend configured",
+    "liveValidateOnlyHttpStatus": 200,
+    "notificationSent": false
+  },
+  "retiredTransport": {
+    "localWebhook404": true,
+    "localAccountLink404": true,
+    "historicalTasksApprovalsAuditsDeleted": false,
+    "dependenciesRemaining": false
+  },
+  "deployment": {
+    "sourceDeployed": false,
+    "alwaysOnWorkerProvisioned": false,
+    "paidResourcesPurchased": false,
+    "androidDefaultApiHostChanged": false
+  },
+  "remaining": [
+    "Deploy matching backend to Android API host and privately configure its FCM credential",
+    "Provision or verify an existing always-on worker; sleeping free web service is insufficient",
+    "Physical authenticated login, task/approval, push/deep-link/locked-screen, microphone and manual-navigation QA",
+    "Scheduled report scheduler unsupported"
+  ]
+}

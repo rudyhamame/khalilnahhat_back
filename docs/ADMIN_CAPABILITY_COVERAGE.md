@@ -24,6 +24,6 @@ Updated 2026-10-30. Scope: existing OpenAI Administrator, Web Admin Dashboard an
 
 ## Validation and blockers
 
-Backend: 248 tests, 242 pass, 6 pre-existing failures reproduced previously on baseline. Administrator-specific integration: 30/30 pass. Frontend: 52/52 pass, production build passes. Android app/instrumentation builds and four JVM tests pass. Live Firebase credential check validates authorization without sending a notification. See [Android validation/deployment](ANDROID_ADMINISTRATOR.md) and [validation evidence](../artifacts/android-administrator/validation.json).
+Backend: 248 tests, 242 pass, 6 pre-existing failures reproduced previously on baseline. Administrator-specific integration: 30/30 pass. Frontend: 52/52 pass, production build passes. Android app/instrumentation builds, lint, four JVM tests and five Samsung device instrumentation tests pass. Device API transport tests use a deterministic HTTPS substitute; real password authentication, voice and live push remain unverified. Live Firebase credential check validates authorization without sending a notification. See [Android validation/deployment](ANDROID_ADMINISTRATOR.md) and [validation evidence](../artifacts/android-administrator/validation.json).
 
 Remaining production blockers: deployment to the API host used by Android, configuring its private FCM credential, verifying an always-on worker, and physical authenticated task/approval/notification checks. No paid hosting, model billing configuration, production data purge or second AI engine was introduced.

@@ -21,9 +21,14 @@ def main():
     parser.add_argument('input')
     parser.add_argument('output')
     args = parser.parse_args()
-    torch.set_num_threads(max(1, int(os.environ.get('STEM_THREADS', '2'))))
+    torch.set_num_threads(max(1, int(os.environ.get('STEM_THREADS', '1'))))
     report('Loading separation model')
     model = get_model('htdemucs').cpu().eval()
+    # HTDemucs otherwise pads even short windows to its training length,
+    # defeating the segment memory bound. Use its supported variable-length mode.
+    for network in getattr(model, 'models', [model]):
+        if hasattr(network, 'use_train_segment'):
+            network.use_train_segment = False
     report('Reading recording')
     directory = Path(args.output)
     directory.mkdir(parents=True, exist_ok=True)

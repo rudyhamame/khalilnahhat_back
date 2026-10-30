@@ -1,7 +1,7 @@
 {
   "checkedAt": "2026-10-30T05:25:36.997594+00:00",
-  "version": "0.3.2",
-  "versionCode": 12,
+  "version": "0.3.3",
+  "versionCode": 13,
   "rootCause": "Current persisted Android session rejected by /auth/me with 401",
   "changes": [
     "Notification enable explicitly revalidates administrator session",
@@ -14,7 +14,7 @@
   "dataCleared": false,
   "livePushVerified": false,
   "userReauthentication": "awaiting response",
-  "sha256": "3b3d24c25c65e25ff12fbea5c93515bc5a746c75752eb63bf5047d912f2265d5",
+  "sha256": "2ac9959ba466b472acd1e779776545bd474006aabd90c49675db592a7199607b",
   "currentSessionRechecked": {
     "account": 200,
     "overview": 200,
@@ -25,5 +25,8 @@
     "reason": "Push token already registered to another installation"
   },
   "revisedDiagnosis": "New sign-in is valid; registration conflict requires token recovery",
-  "updatedAt": "2026-10-30T05:37:31.702455+00:00"
+  "updatedAt": "2026-10-30T05:37:31.702455+00:00",
+  "liveRegistrationStatus": 200,
+  "providerConfigured": false,
+  "recovery": "Refresh conflicting phone token once; synchronize installation UUID creation"
 }

@@ -40,9 +40,11 @@ function createTranslator({instructions,tools,voice,maxOutputTokens}){
     return [];
    }
    if(event.type==='response.create'){
-    // Alibaba accepts text context through session instructions. A first response needs a committed audio turn; defer the proactive greeting until then.
-    const extra=[state.context,typeof event.response?.instructions==='string'?event.response.instructions:''].filter(Boolean).join('\n');
+    // Alibaba accepts text context through session instructions. An opening response (the browser sends its greeting as instructions) speaks first on its own; later replies wait for a committed audio turn.
+    const opening=typeof event.response?.instructions==='string'&&event.response.instructions.trim()!=='';
+    const extra=[state.context,opening?event.response.instructions:''].filter(Boolean).join('\n');
     state.context='';
+    if(opening)state.hasConversation=true;
     return [...(extra?[sessionUpdate({instructions:`${instructions}\n${extra}`.slice(0,30000),tools,voice,maxOutputTokens})]:[]),...(state.hasConversation?[{type:'response.create'}]:[])];
    }
    return [];

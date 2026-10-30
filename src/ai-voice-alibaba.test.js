@@ -10,15 +10,16 @@ test('session.update uses nested tool format, PCM and server VAD',()=>{
  assert.equal(session.input_audio_format,'pcm');assert.equal(session.turn_detection.type,'server_vad');
  assert.deepEqual(session.tools[0],{type:'function',function:{name:'update_event_draft',description:'d',parameters:{type:'object'}}});
 });
-test('browser opening instruction is retained while first response waits for committed audio',()=>{
+test('browser opening instruction speaks first; later replies wait for committed audio',()=>{
  const t=make();
  assert.deepEqual(t.toUpstream({type:'conversation.item.create',item:{type:'message',role:'user',content:[{type:'input_text',text:'CTX'}]}}),[]);
  const out=t.toUpstream({type:'response.create',response:{instructions:'GREET'}});
  assert.equal(out[0].type,'session.update');assert.match(out[0].session.instructions,/BASE\nCTX\nGREET/);
- assert.equal(out.length,1);
- assert.deepEqual(t.toUpstream({type:'response.create'}),[]);
- t.toClient({type:'input_audio_buffer.committed'});
- assert.deepEqual(t.toUpstream({type:'response.create'}),[{type:'response.create'}]);
+ assert.deepEqual(out[1],{type:'response.create'});assert.equal(out.length,2);
+ const later=make();
+ assert.deepEqual(later.toUpstream({type:'response.create'}),[]);
+ later.toClient({type:'input_audio_buffer.committed'});
+ assert.deepEqual(later.toUpstream({type:'response.create'}),[{type:'response.create'}]);
 });
 test('function calls surface on response.done and tool output is forwarded',()=>{
  const t=make();

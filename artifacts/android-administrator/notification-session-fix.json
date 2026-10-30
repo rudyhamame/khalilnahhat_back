@@ -14,5 +14,16 @@
   "dataCleared": false,
   "livePushVerified": false,
   "userReauthentication": "awaiting response",
-  "sha256": "3b3d24c25c65e25ff12fbea5c93515bc5a746c75752eb63bf5047d912f2265d5"
+  "sha256": "3b3d24c25c65e25ff12fbea5c93515bc5a746c75752eb63bf5047d912f2265d5",
+  "currentSessionRechecked": {
+    "account": 200,
+    "overview": 200,
+    "aiAdministrator": 200
+  },
+  "registrationFailure": {
+    "status": 409,
+    "reason": "Push token already registered to another installation"
+  },
+  "revisedDiagnosis": "New sign-in is valid; registration conflict requires token recovery",
+  "updatedAt": "2026-10-30T05:37:31.702455+00:00"
 }

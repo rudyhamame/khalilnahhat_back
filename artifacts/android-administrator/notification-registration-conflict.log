@@ -1,0 +1,75 @@
+INSTRUMENTATION_STATUS: class=ca.echo.dj.AdministratorSessionTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+ca.echo.dj.AdministratorSessionTest:
+INSTRUMENTATION_STATUS: test=registerCurrentAdministratorForTaskNotifications
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: echo_registration_error=This push token is already registered to another installation.
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: echo_registration_status=409
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=ca.echo.dj.AdministratorSessionTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Notification registration must accept administrator session expected:<200> but was:<409>
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.failNotEquals(Assert.java:835)
+	at org.junit.Assert.assertEquals(Assert.java:120)
+	at ca.echo.dj.AdministratorSessionTest$registerCurrentAdministratorForTaskNotifications$1.invokeSuspend(AdministratorSessionTest.kt:28)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:99)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:95)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:69)
+	at kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source:1)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:47)
+	at kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source:1)
+	at ca.echo.dj.AdministratorSessionTest.registerCurrentAdministratorForTaskNotifications(AdministratorSessionTest.kt:20)
+
+INSTRUMENTATION_STATUS: stream=
+Error in registerCurrentAdministratorForTaskNotifications(ca.echo.dj.AdministratorSessionTest):
+java.lang.AssertionError: Notification registration must accept administrator session expected:<200> but was:<409>
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.failNotEquals(Assert.java:835)
+	at org.junit.Assert.assertEquals(Assert.java:120)
+	at ca.echo.dj.AdministratorSessionTest$registerCurrentAdministratorForTaskNotifications$1.invokeSuspend(AdministratorSessionTest.kt:28)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:99)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:95)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:69)
+	at kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source:1)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:47)
+	at kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source:1)
+	at ca.echo.dj.AdministratorSessionTest.registerCurrentAdministratorForTaskNotifications(AdministratorSessionTest.kt:20)
+
+INSTRUMENTATION_STATUS: test=registerCurrentAdministratorForTaskNotifications
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_RESULT: stream=
+
+Time: 1.549
+There was 1 failure:
+1) registerCurrentAdministratorForTaskNotifications(ca.echo.dj.AdministratorSessionTest)
+java.lang.AssertionError: Notification registration must accept administrator session expected:<200> but was:<409>
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.failNotEquals(Assert.java:835)
+	at org.junit.Assert.assertEquals(Assert.java:120)
+	at ca.echo.dj.AdministratorSessionTest$registerCurrentAdministratorForTaskNotifications$1.invokeSuspend(AdministratorSessionTest.kt:28)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:99)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:95)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:69)
+	at kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source:1)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:47)
+	at kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source:1)
+	at ca.echo.dj.AdministratorSessionTest.registerCurrentAdministratorForTaskNotifications(AdministratorSessionTest.kt:20)
+
+FAILURES!!!
+Tests run: 1,  Failures: 1
+
+
+INSTRUMENTATION_CODE: -1

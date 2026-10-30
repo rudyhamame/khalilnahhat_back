@@ -15,9 +15,10 @@ function createAlibaba({env=process.env,fetchImpl=fetch}={}){
   async request(body,{signal}={}){
    if(!env.DASHSCOPE_API_KEY)throw failure(503,'Configure DASHSCOPE_API_KEY on the server before using Alibaba Cloud.');
    const schema=body.text?.format?.schema;
-   // Current Qwen models support schema enforcement; older aliases use JSON Object mode.
+   // Singapore's schema mode can produce degenerate replies despite a completed response.
+   // JSON Object mode keeps the schema in the prompt; callers validate the returned fields.
    const instructions=`${body.instructions||''}\nReturn ONLY one valid JSON object, no markdown.${schema?` It must match this JSON Schema: ${JSON.stringify(schema)}`:''}`;
-   const format=schema&&body.config.model==='qwen3.7-plus'?{type:'json_schema',json_schema:{name:body.text.format.name||'echo_reply',strict:true,schema}}:{type:'json_object'};
+   const format={type:'json_object'};
    const payload={model:body.config.model,messages:[{role:'system',content:instructions},...body.input],max_tokens:Math.min(body.max_output_tokens||2000,8192),response_format:format,stream:false};
    const response=await fetchImpl(`${base()}/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${env.DASHSCOPE_API_KEY}`,'Content-Type':'application/json'},signal,body:JSON.stringify(payload)});
    if(!response.ok)return response;

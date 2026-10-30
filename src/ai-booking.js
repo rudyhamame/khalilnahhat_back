@@ -106,7 +106,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
     const controller=new AbortController();
     const disconnected=()=>{if(!res.writableEnded)controller.abort();};
     res.on('close',disconnected);
-    const emit=event=>{if(!res.destroyed)res.write(JSON.stringify(event)+'\n');};
+    const emit=event=>{if(!res.destroyed){if(!res.headersSent){res.set({'Content-Type':'application/x-ndjson; charset=utf-8','Cache-Control':'no-cache, no-transform','X-Accel-Buffering':'no'});res.flushHeaders();}res.write(JSON.stringify(event)+'\n');}};
     const model=config.chat.model;
     try {
       if(configService)ticket=await configService.reserve({owner:identity(req),mode:'chat',requestId:input.data.requestId,pricingConsentRevision:input.data.pricingConsentRevision,config});
@@ -125,7 +125,6 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
       if (!upstream.ok) console.warn('AI chat upstream failure', JSON.stringify({provider:config.chat.provider,model,status:upstream.status,body:(await upstream.clone().text().catch(()=>'')).slice(0,400)}));
       if (!upstream.ok) return res.status(upstream.status === 429 ? 429 : 502).json({ message: 'The AI service is unavailable or its usage limit was reached. Please try personal booking.' });
       stage = 'provider_json';
-      if(streaming){res.set({'Content-Type':'application/x-ndjson; charset=utf-8','Cache-Control':'no-cache, no-transform','X-Accel-Buffering':'no'});res.flushHeaders();}
       const data = streaming&&upstream.headers.get('content-type')?.includes('text/event-stream')
         ?await consumeResponseStream(upstream.body,delta=>{firstReplyMs??=Math.round(performance.now()-started);emit({type:'reply.delta',delta});})
         :await upstream.json();

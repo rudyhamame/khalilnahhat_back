@@ -12,6 +12,7 @@ function fake(){
  Voucher.findOne=async q=>docs.find(v=>v.code===q.code)||null;
  Voucher.find=()=>({sort:()=>({limit:async()=>[...docs].filter(v=>v.active&&v.announce)})});
  Voucher.findOneAndUpdate=async(q)=>{const d=docs.find(v=>String(v._id)===String(q._id));if(!d||!d.active||(d.maxRedemptions&&d.redeemed>=d.maxRedemptions))return null;d.redeemed++;return d;};
+ Voucher.findByIdAndUpdate=async(id,update)=>{const d=docs.find(v=>String(v._id)===String(id));if(!d)return null;Object.assign(d,update.$set);return d;};
  Voucher.updateOne=async q=>{const d=docs.find(v=>String(v._id)===String(q._id));if(d&&d.redeemed>0)d.redeemed--;};
  Redemption.countDocuments=async q=>redemptions.filter(r=>String(r.voucherId)===String(q.voucherId)&&String(r.userId)===String(q.userId)).length;
  Redemption.create=async data=>{redemptions.push(data);return data;};
@@ -47,5 +48,20 @@ test('admin API validates input and the public announcement shows only an active
  assert.equal(announcement.voucher.code,'SAVE50');assert.equal(announcement.voucher.amountCents,5000);
  const check=await (await post('/api/vouchers/validate',{code:'save50'})).json();assert.equal(check.valid,true);
  assert.equal((await post('/api/vouchers/validate',{code:'WRONG1'})).status,400);
+ server.close();
+});
+
+test('editing a voucher changes its discount, dates and limits, and validates the changes',async()=>{
+ fake();
+ const app=express();app.use(express.json());
+ vouchers.registerVouchers(app,{requireAdmin:(_q,_s,n)=>n(),requireAuth:(q,_s,n)=>{q.authUser={_id:new mongoose.Types.ObjectId()};n();}});
+ const server=await new Promise(r=>{const s=app.listen(0,()=>r(s));});const base=`http://127.0.0.1:${server.address().port}`;
+ const created=await (await fetch(base+'/api/admin/vouchers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:'EDIT10',kind:'percent',percent:10})})).json();
+ const patch=body=>fetch(`${base}/api/admin/vouchers/${created.item.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ const ok=await patch({kind:'amount',amountCents:2500,percent:0,endsAt:'2027-05-02T23:59:59-05:00',maxRedemptions:5,announce:true});
+ assert.equal(ok.status,200);const item=(await ok.json()).item;
+ assert.equal(item.kind,'amount');assert.equal(item.amountCents,2500);assert.equal(item.maxRedemptions,5);assert.equal(item.announce,true);assert.match(item.endsAt,/^2027-05-0[23]/);
+ assert.equal((await patch({percent:150})).status,400);
+ assert.equal((await patch({startsAt:'2028-01-01',endsAt:'2027-01-01'})).status,400);
  server.close();
 });

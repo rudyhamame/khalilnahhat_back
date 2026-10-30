@@ -9,6 +9,13 @@ function createStore(){const auditCounts=new WeakMap();return {
  async create(value){try{return (await Task.create(value)).toObject();}catch(e){if(e.code!==11000)throw e;return Task.findOne({owner:value.owner,requestId:value.requestId}).lean();}},
  get:id=>Task.findById(id).lean(),
  conversation:(owner,sessionId,task)=>Task.find({owner,sessionId,_id:{$ne:task._id},createdAt:{$lte:task.createdAt}}).sort({createdAt:-1,_id:-1}).limit(12).select('_id command state result error actions').lean(),
+ async conversations(owner){return Task.aggregate([{$match:{owner}},{$sort:{createdAt:1,_id:1}},{$group:{_id:{$cond:[{$in:['$sessionId',[null,'']]},'dashboard',{$ifNull:['$sessionId','dashboard']}]},title:{$first:'$command'},createdAt:{$first:'$createdAt'},updatedAt:{$max:'$updatedAt'},lastCommand:{$last:'$command'},state:{$last:'$state'},messageCount:{$sum:1}}},{$sort:{updatedAt:-1}},{$limit:100},{$project:{title:{$substrCP:[{$ifNull:['$title','Untitled chat']},0,100]},createdAt:1,updatedAt:1,state:1,messageCount:1}}]);},
+ async messages(owner,sessionId,before){
+  const query={owner,sessionId:sessionId==='dashboard'?{$in:[sessionId,null,'']}:sessionId};
+  if(before){const anchor=await Task.findOne({...query,_id:before}).select('createdAt').lean();if(!anchor)return null;query.$or=[{createdAt:{$lt:anchor.createdAt}},{createdAt:anchor.createdAt,_id:{$lt:anchor._id}}];}
+  const rows=await Task.find(query).sort({createdAt:-1,_id:-1}).limit(31).select('sessionId requestId command state result error pending actions.id actions.name actions.state actions.error cancelRequested createdAt updatedAt').lean();
+  const hasMore=rows.length>30;return {items:rows.slice(0,30).reverse(),hasMore};
+ },
  list:owner=>Task.find({owner}).sort({createdAt:-1}).limit(100).select('owner sessionId requestId command source state error createdAt updatedAt cancelRequested').lean(),
  async lock(token){try{return await Control.findOneAndUpdate({_id:'worker',$or:[{leaseUntil:{$lt:new Date()}},{leaseToken:token},{leaseUntil:{$exists:false}}]},{$set:{leaseToken:token,leaseUntil:new Date(Date.now()+300000)}},{upsert:true,returnDocument:'after'}).lean();}catch(e){if(e.code===11000)return null;throw e;}},
  async unlock(token){await Control.updateOne({_id:'worker',leaseToken:token},{$set:{leaseUntil:new Date(0)}});},

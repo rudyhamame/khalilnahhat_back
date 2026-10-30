@@ -18,6 +18,12 @@ function registerAiAdministrator(app,{requireAdmin,authorize,configService,env=p
  const owned=async(req)=>{const task=await store.get(req.params.id);if(!task||task.owner!==owner(req))throw failure(404,'Task not found.');return task;};
  const admitted=async who=>{if(await store.Task.countDocuments({owner:who,createdAt:{$gte:new Date(Date.now()-600000)}})>=30)throw failure(429,'Administrator task limit reached. Wait ten minutes.');};
  app.get(base,requireAdmin,guard(async(req,res)=>{const config=await configService.load();return res.json({tasks:(await store.list(owner(req))).map(publicTask),control:await store.control(),capabilities:registry.list(),inventory:registry.inventory(),model:{provider:'openai',model:env.OPENAI_ADMIN_MODEL||(config.chat.provider==='openai'?config.chat.model:env.OPENAI_BOOKING_CHAT_MODEL||'gpt-4o-mini'),configured:!!env.OPENAI_API_KEY},worker:{mode:env.ECHO_ADMIN_WORKER_MODE==='external'?'external':'api-process',sleepWarning:env.RENDER==='true',androidPush:push.configured()},permissions:{identity:owner(req),role:'administrator',permanentDeletion:false,privilegeChanges:false,customerMessages:false}});}));
+ app.get(`${base}/conversations`,requireAdmin,guard(async(req,res)=>res.json({items:redact(await store.conversations(owner(req)))})));
+ app.get(`${base}/conversations/:sessionId/messages`,requireAdmin,guard(async(req,res)=>{
+  const sessionId=z.string().min(1).max(160).parse(req.params.sessionId);const before=z.uuid().optional().parse(req.query.before);
+  const result=await store.messages(owner(req),sessionId,before);if(!result)throw failure(404,'Conversation page not found.');
+  res.json({...result,items:result.items.map(publicTask),nextBefore:result.hasMore?result.items[0]?._id:null});
+ }));
  app.post(`${base}/tasks`,requireAdmin,guard(async(req,res)=>{await admitted(owner(req));res.status(202).json({item:publicTask(await engine.submit(owner(req),req.body,req.get('x-echo-client')==='android'?'android':'dashboard'))});}));
  app.get(`${base}/tasks/:id`,requireAdmin,guard(async(req,res)=>res.json({item:publicTask(await owned(req))})));
  app.post(`${base}/tasks/:id/approve`,requireAdmin,guard(async(req,res)=>{await owned(req);const {digest}=z.object({digest:z.string().regex(/^[a-f0-9]{64}$/)}).strict().parse(req.body);res.json({item:publicTask(await engine.approve(req.params.id,owner(req),digest))});}));

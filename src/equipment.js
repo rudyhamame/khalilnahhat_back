@@ -77,7 +77,7 @@ function registerEquipmentRoutes(app, requireAdmin) {
 
   app.get('/api/equipment', async (_req, res) => {
     await ensureSeed();
-    const items = await Equipment.find({ isActive: true, category: { $ne: 'dj' } }).sort({ sortOrder: 1 });
+    const items = await Equipment.find({ isActive: true }).sort({ sortOrder: 1 });
     res.json({ items: items.map(publicView) });
   });
 

@@ -58,6 +58,7 @@ const DEFAULT_SERVICE_PRICES = [
   ['service-lighting', 'Lighting', 'Service'],
   ['service-video', 'LED Walls & Video', 'Service'],
   ['service-effects', 'Special Effects', 'Service'],
+  ['service-corporate', 'Corporate Events', 'Service'],
   ['professional-dj-service', 'Professional DJ Service', 'DJ'],
   ['qsc-k12-2-speaker', 'QSC K12.2 Speaker', 'Sound'],
   ['elite-15-speaker', 'Elite 15-inch Speaker', 'Sound'],
@@ -1913,6 +1914,7 @@ require('./event-drafts').registerEventDrafts(app, {
 require('./archive-player').registerArchivePlayer(app, { requireAdmin });
 require('./stem-separation').registerStemSeparation(app, { requireAdmin });
 require('./music-archive').registerMusicArchive(app, { requireAdmin });
+require('./setup-catalog').registerSetupCatalog(app, { requireAdmin });
 require('./live-recordings').registerLiveRecordings(app, requireAdmin);
 require('./live-suggestions').registerLiveSuggestions(app, { getLiveStreamConfig });
 require('./live-comments').registerLiveComments(app, { getLiveStreamConfig });

@@ -682,6 +682,7 @@ function serializeLiveStreamConfig(config) {
     webrtcRoomName: config?.webrtcRoomName || '',
     broadcastMode: config?.broadcastMode || defaultLiveStreamConfig.broadcastMode,
     broadcastSource: config?.broadcastSource || '',
+    goal: config?.goal || 'broadcast',
   };
 }
 
@@ -1383,6 +1384,17 @@ app.patch('/api/live-stream', requireAdmin, async (request, response) => {
   return response.json({
     item: serializeLiveStreamConfig(config),
   });
+});
+
+// The goal ECHO is on air for (Broadcast, DJing in an Event, DJing in Home Studio, Chilling-out Mix Time, Echo Radio Music). Independent of the stream source.
+app.put('/api/live-stream/goal', requireAdmin, async (request, response) => {
+  const goal = request.body?.goal;
+  if (!['broadcast', 'event', 'home-studio', 'chill-mix', 'radio'].includes(goal)) {
+    return response.status(400).json({ message: 'Choose a valid on-air goal.' });
+  }
+  await getLiveStreamConfig();
+  const config = await LiveStreamConfig.findOneAndUpdate({ key: defaultLiveStreamConfig.key }, { $set: { goal } }, { new: true });
+  return response.json({ item: serializeAdminLiveStreamConfig(config) });
 });
 
 app.get('/api/live-stream/admin', requireAdmin, async (_request, response) => {

@@ -3,8 +3,8 @@ const { OAuth2Client } = require('google-auth-library');
 const { createSessionToken, hashPassword } = require('./security');
 
 function registerGoogleAuth(app, { User, serializeUser, isAdminUser, clientId = process.env.GOOGLE_CLIENT_ID || '', allowedOrigins = [], adminGoogleEmail = '', verifyToken, now = Date.now }) {
-  const adminEmail = adminGoogleEmail.trim().toLowerCase();
-  const canUseAdminGoogle = (user, email) => Boolean(adminEmail) && email === adminEmail && user.email?.toLowerCase() === adminEmail && isAdminUser(user);
+  const adminEmails = new Set(adminGoogleEmail.split(',').map(item => item.trim().toLowerCase()).filter(Boolean));
+  const canUseAdminGoogle = (user, email) => adminEmails.has(email) && user.email?.toLowerCase() === email && isAdminUser(user);
   const verifier = new OAuth2Client();
   const verify = verifyToken || (async credential => (await verifier.verifyIdToken({ idToken: credential, audience: clientId })).getPayload());
   const challenges = new Map(), attempts = new Map();

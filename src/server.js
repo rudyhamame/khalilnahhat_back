@@ -9,7 +9,7 @@ const cloudinary = require('cloudinary').v2;
 const { AccessToken, RoomServiceClient, WebhookReceiver, IngressClient } = require('livekit-server-sdk');
 const { z } = require('zod');
 const { connectToDatabase, MONGODB_DB_NAME } = require('./db');
-const { ADMIN_USERNAME, defaultLiveStreamConfig } = require('./default-data');
+const { ADMIN_USERNAME, ADMIN_USERNAMES, ADMIN_GOOGLE_EMAILS, defaultLiveStreamConfig } = require('./default-data');
 const {
   ArchiveItem,
   Booking,
@@ -399,7 +399,7 @@ function createReference(prefix) {
 }
 
 function isAdminUser(user) {
-  return Boolean(user) && user.username?.toLowerCase() === ADMIN_USERNAME;
+  return Boolean(user) && ADMIN_USERNAMES.has(user.username?.toLowerCase());
 }
 
 function serializeUser(user) {
@@ -955,7 +955,7 @@ app.get('/api/auth/me', async (request, response) => {
 
 require('./google-auth').registerGoogleAuth(app, {
   User, serializeUser, isAdminUser,
-  adminGoogleEmail: 'khalilnahhatdj@gmail.com',
+  adminGoogleEmail: ADMIN_GOOGLE_EMAILS.join(','),
   allowedOrigins: [...configuredCorsOrigins, getFrontendUrl()],
 });
 
@@ -1001,7 +1001,8 @@ app.post('/api/auth/signup', async (request, response) => {
   }
 
   const normalizedUsername = parsed.data.username?.toLowerCase() || `client-${crypto.randomUUID()}`;
-  if (normalizedUsername === ADMIN_USERNAME) return response.status(400).json({ message: 'That username is reserved. Please choose another.' });
+  // Admin usernames are reserved at sign-up so nobody can claim one.
+  if (ADMIN_USERNAMES.has(normalizedUsername)) return response.status(400).json({ message: 'That username is reserved. Please choose another.' });
 
   if (await User.findOne({ username: normalizedUsername })) {
     return response.status(409).json({

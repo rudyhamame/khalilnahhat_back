@@ -85,8 +85,11 @@ function bridgeAlibabaVoice({client,env=process.env,model,voice=env.DASHSCOPE_VO
  const close=()=>{if(closed)return;closed=true;try{upstream.close();}catch{/* Already closed. */}try{client.close();}catch{/* Already closed. */}onClose();};
  upstream.on('open',()=>send(upstream,translator.open()));
  upstream.on('message',raw=>{let event;try{event=JSON.parse(raw.toString());}catch{return;}if(event.type==='session.updated'&&!ready){ready=true;for(const pending of queued.splice(0))send(upstream,pending);send(client,{type:'bridge.ready'});}for(const out of translator.toClient(event))send(client,out);});
- upstream.on('error',()=>{send(client,{type:'error',error:{message:'The AI voice service could not connect.'}});close();});
- upstream.on('close',close);
+ // Log why Alibaba ended the call (never the key) and tell the browser, so a drop is diagnosable.
+ const fail=(reason,message)=>{console.error('[alibaba-voice]',reason);send(client,{type:'error',error:{message}});close();};
+ upstream.on('unexpected-response',(request,response)=>fail(`handshake HTTP ${response.statusCode}`,`Alibaba rejected the voice connection (HTTP ${response.statusCode}). Check the API key, region and model access.`));
+ upstream.on('error',error=>fail(`socket error ${error?.message||''}`,'The AI voice service could not connect.'));
+ upstream.on('close',(code,reason)=>{if(!closed&&code!==1000)console.error('[alibaba-voice]',`closed ${code} ${String(reason||'')}`);if(!closed&&code!==1000)send(client,{type:'error',error:{message:`Alibaba ended the call (${code}${reason?.length?`: ${String(reason).slice(0,160)}`:''}).`}});close();});
  client.on('message',raw=>{
   let event;try{event=JSON.parse(raw.toString());}catch{return;}
   for(const out of translator.toUpstream(event)){if(ready)send(upstream,out);else if(queued.length<MAX_QUEUED)queued.push(out);}

@@ -41,7 +41,7 @@ test('reference links are metadata, not fetched, and non-HTTPS references are re
 
 test('quote questionnaire asks only what the brief lists plus language and dialect',()=>{
   const keys=core.fields.map(field=>field.key).sort();
-  const brief=['customer.fullName','customer.email','customer.phone','customer.contactMethod','customer.company','event.type','event.date','event.startTime','event.endTime','event.guestCount','event.venue.name','event.venue.address','event.venue.city','event.venue.postalCode','event.venue.area','event.venue.setting','event.setup.requirements','services','music.styles','music.otherLanguage','music.dialects','music.otherPreferences','music.djMc','music.entrance','music.customMix','music.announcements','references.images','references.documents','additional.specialRequests','additional.notes'].sort();
+  const brief=['customer.fullName','customer.email','customer.phone','customer.contactMethod','customer.company','event.type','event.date','event.startTime','event.endTime','event.guestCount','event.venue.name','event.venue.address','event.venue.city','event.venue.postalCode','event.venue.country','event.venue.addressDetails','event.venue.area','event.venue.setting','event.setup.requirements','services','music.styles','music.otherLanguage','music.dialects','music.otherPreferences','music.djMc','music.entrance','music.customMix','music.announcements','references.images','references.documents','additional.specialRequests','additional.notes'].sort();
   assert.deepEqual(keys,brief);
 });
 

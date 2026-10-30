@@ -132,6 +132,20 @@
      "private": true
     },
     {
+     "key": "event.venue.country",
+     "label": "Country",
+     "ar": "الدولة",
+     "maxLength": 80,
+     "private": true
+    },
+    {
+     "key": "event.venue.addressDetails",
+     "label": "Address details",
+     "ar": "تفاصيل العنوان",
+     "maxLength": 300,
+     "private": true
+    },
+    {
      "key": "event.venue.area",
      "label": "Is the venue inside the GTA (Greater Toronto Area)?",
      "ar": "هل المكان داخل تورونتو الكبرى (GTA)؟",

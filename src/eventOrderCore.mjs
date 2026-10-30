@@ -88,3 +88,16 @@ export function orderToLegacy(order) {
 export function aiOrderContext(order) {
   return Object.fromEntries(aiFields.map(field=>[field.key,getPath(order,field.key)]).filter(([,value])=>isAnswered(value)));
 }
+
+// Opening line for a voice call: greet, say what the assistant is for, recap the draft, then offer help with what is still empty.
+export function voiceGreetingInstructions(order, ar = false) {
+  const text = value => (Array.isArray(value) ? value.join(', ') : String(value)).slice(0, 80);
+  const label = field => (ar && field.ar) || field.label;
+  const filled = aiFields.filter(field => isAnswered(getPath(order, field.key))).slice(0, 10).map(field => `${label(field)}: ${text(getPath(order, field.key))}`);
+  const open = missingOrderFields(order).filter(field => aiFields.includes(field)).slice(0, 4).map(label);
+  const draft = filled.length ? filled.join('; ') : (ar ? 'لا توجد تفاصيل بعد' : 'nothing filled in yet');
+  const left = open.length ? open.join('; ') : (ar ? 'لا شيء مهم ناقص' : 'nothing important is missing');
+  return ar
+    ? `ابدأ الكلام فوراً دون انتظار العميل، بالعربية، في ثلاث أو أربع جمل قصيرة جداً وبنبرة دافئة: (١) تحية موجزة. (٢) جملة واحدة تعرّف بدورك: مساعد الحجز الآلي لإيكو الذي يساعد في تعبئة طلب الفعالية. (٣) ملخص مختصر لمسودة الحجز الحالية: ${draft}. (٤) اسأل إن كان يريد مساعدة في الحقول التي لم تُعبأ بعد، وسمِّ أهمها: ${left}. لا تذكر أرقاماً أو بيانات لم تُذكر هنا، ولا تطل. استخدم update_event_draft لتحديث المسودة فقط.`
+    : `Start speaking right away without waiting for the customer, in three or four very short sentences with a warm tone: (1) a brief greeting. (2) One sentence on your role: Echo’s AI booking assistant, here to help fill in the event request. (3) A brief summary of the current booking draft: ${draft}. (4) Ask whether they would like help with the fields still empty, naming the most important: ${left}. Do not invent details beyond these, and keep it under about fifteen seconds. Use update_event_draft for draft changes only.`;
+}

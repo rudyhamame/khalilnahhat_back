@@ -101,4 +101,4 @@ function registerContent(app, requireAdmin) {
   });
 }
 
-module.exports = { MediaItem, Testimonial, registerContent };
+module.exports = { MediaItem, Testimonial, registerContent, testimonialFields, mediaFields };

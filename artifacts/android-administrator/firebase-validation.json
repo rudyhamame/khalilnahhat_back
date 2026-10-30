@@ -1,0 +1,9 @@
+{
+  "checkedAt": "2026-10-30T05:00:38.803Z",
+  "project": "echo-dj",
+  "validateOnly": true,
+  "httpStatus": 200,
+  "authenticated": true,
+  "errorCode": null,
+  "physicalDeliveryTested": false
+}

@@ -30,7 +30,7 @@ const CLIENT_FIELDS = '_id username firstName lastName email phoneNumber emailVe
 function clientView(u) {
   return { id: String(u._id), username: u.username, firstName: u.firstName, lastName: u.lastName,
     name: `${u.firstName} ${u.lastName}`.trim(), email: u.email, phoneNumber: u.phoneNumber || '',
-    isAdmin: Boolean(u.isAdmin || u.username === 'khalilnahhat'), emailVerified: Boolean(u.emailVerified), createdAt: u.createdAt, adminNotes: u.adminNotes || '' };
+    isAdmin: Boolean(u.isAdmin || u.username === 'khalilnahhat'), emailVerified: Boolean(u.emailVerified), createdAt: u.createdAt, adminNotes: u.get?.('adminNotes') || u.adminNotes || '' };
 }
 const fileView = d => ({ id: String(d._id), name: d.name, bytes: d.bytes, mime: d.mime, clientId: d.clientId ? String(d.clientId) : '', requestId: d.requestId, note: d.note, archived: d.archived, createdAt: d.createdAt });
 const validId = value => mongoose.isValidObjectId(value);

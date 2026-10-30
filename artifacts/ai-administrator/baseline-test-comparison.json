@@ -1,0 +1,23 @@
+{
+  "at": "2026-10-30T04:22:57.397Z",
+  "baseline": "git archive HEAD (unchanged source, separate temporary directory)",
+  "files": [
+    "src/ai-configuration.test.js",
+    "src/equipment-stock.test.js",
+    "test/music-archive.test.js",
+    "test/music-ontology-delete.test.js",
+    "test/music-ontology.integration.test.js",
+    "test/music-ontology.test.js"
+  ],
+  "tests": 27,
+  "passed": 21,
+  "failed": 6,
+  "failures": [
+    "Configuration expects two access checks; current STT adds a third.",
+    "Equipment fixture mock no longer matches existing filters.",
+    "Collection fixture memory model does not match the current query.",
+    "Recording deletion fixture expects old soft-delete behavior.",
+    "Ontology integration still sends discontinued PRODUCTION recording type.",
+    "Ontology unit test still expects PRODUCTION recording type."
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "generatedAt": "2026-10-30T05:04:18.257674+00:00",
+  "backend": {
+    "tests": 248,
+    "pass": 242,
+    "fail": 6,
+    "skipped": 0
+  },
+  "frontendStandard": {
+    "tests": 52,
+    "pass": 52,
+    "fail": 0,
+    "skipped": 0
+  },
+  "frontendExpanded": {
+    "tests": 113,
+    "pass": 110,
+    "fail": 3,
+    "skipped": 0
+  },
+  "backendBaseline": {
+    "tests": 27,
+    "pass": 21,
+    "fail": 6,
+    "skipped": 0
+  },
+  "frontendBaseline": {
+    "tests": 11,
+    "pass": 8,
+    "fail": 3,
+    "skipped": 0
+  },
+  "administratorLive": {
+    "tests": 30,
+    "pass": 30,
+    "fail": 0,
+    "skipped": 0
+  },
+  "administratorAndroid": {
+    "tests": 30,
+    "pass": 30,
+    "fail": 0
+  }
+}

@@ -1922,12 +1922,18 @@ require('./live-comments').registerLiveComments(app, { getLiveStreamConfig });
 registerEquipmentRoutes(app, requireAdmin);
 require('./equipment-3d').registerEquipment3D(app,{requireAdmin});
 registerPlanning(app, { requireAuth, serialize: serializeServiceRequest });
+require('./simulation-drafts').registerSimulationDrafts(app,{requireAuth});
 registerMeetings(app, { requireAuth, requireAdmin });
 registerAccount(app, { requireAuth, getFrontendUrl });
 registerContent(app, requireAdmin);
 require('./seasonal-theme').registerSeasonalTheme(app, { requireAdmin });
 registerPayments(app, { requireAuth, requireAdmin, serialize: serializeServiceRequest });
 registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize: serializeServiceRequest });
+
+const aiAdministrator=require('./ai-admin/routes').registerAiAdministrator(app,{
+ requireAdmin,configService:aiConfiguration,
+ authorize:async owner=>{if(!require('mongoose').isValidObjectId(owner))return null;const user=await User.findById(owner);return isAdminUser(user)&&user.sessionToken?user:null;},
+});
 
 app.use((_request, response) => {
   response.status(404).json({
@@ -1937,6 +1943,7 @@ app.use((_request, response) => {
 
 async function startServer(port = PORT) {
   await connectToDatabase();
+  if(process.env.ECHO_ADMIN_WORKER_MODE!=='external')await aiAdministrator.start();
 
   return app.listen(port, '0.0.0.0', () => {
     console.log(`Khalil app API listening on http://localhost:${port}`);

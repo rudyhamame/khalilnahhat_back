@@ -1,0 +1,28 @@
+# OPTIONAL template: creating this service incurs Render worker charges.
+# No service is created by keeping this file in the repository.
+# Copy all required existing API secrets through a private environment group.
+services:
+  - type: worker
+    name: echo-administrator-worker
+    runtime: docker
+    plan: starter
+    dockerCommand: node scripts/ai-administrator-worker.js
+    envVars:
+      - key: ECHO_ADMIN_WORKER_MODE
+        value: external
+      - key: MONGODB_URI
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: FCM_PROJECT_ID
+        sync: false
+      - key: FCM_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: MUSIC_ARCHIVE_STORAGE_PROVIDER
+        value: cloudinary
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false

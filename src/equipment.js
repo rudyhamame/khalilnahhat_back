@@ -128,4 +128,4 @@ function registerEquipmentRoutes(app, requireAdmin) {
   });
 }
 
-module.exports = { Equipment, registerEquipmentRoutes, publicView, ensureSeed };
+module.exports = { Equipment, registerEquipmentRoutes, publicView, ensureSeed, createSchema, updateSchema };

@@ -8,7 +8,10 @@
     "start": "node src/server.js",
     "check": "node --check src/server.js",
     "test:music-ontology": "node --test test/music-ontology.test.js test/music-ontology.integration.test.js test/music-archive.test.js test/music-archive-files.test.js",
-    "music-ontology:audit": "node scripts/music-ontology-migrate.js audit"
+    "music-ontology:audit": "node scripts/music-ontology-migrate.js audit",
+    "test:ai-administrator": "node --test test/ai-administrator.integration.test.js",
+    "ai-administrator:worker": "node scripts/ai-administrator-worker.js",
+    "ai-administrator:audit": "node scripts/audit-admin-capabilities.js"
   },
   "keywords": [
     "express",

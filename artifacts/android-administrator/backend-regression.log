@@ -1,0 +1,452 @@
+✔ all-time totals include more than 100 requests, keep currencies separate and reveal only client fields (2944.448032ms)
+✔ invoice snapshots persist accepted charges and client identity; retries never double invoice (171.556177ms)
+✔ partial payments reconcile account balances, concurrent retries do not duplicate receipts and overpayment is rejected (144.918731ms)
+✔ competing invoices and payments cannot reuse charges or exceed the balance (89.231953ms)
+✔ voiding uncollected invoices preserves history, clears balance and prevents re-invoicing (92.790614ms)
+(node:1259062) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ invoice selection rejects mixed accounts/currencies, failed or included usage and duplicate lines atomically (193.049929ms)
+✔ account list paginates without excluding old clients from search (241.779715ms)
+✔ billing APIs are admin-only and client billing routes do not exist (476.885412ms)
+✔ recognizes local sessions without an external check (2.497686ms)
+✔ recognizes the existing Render session when it is absent locally (82.549869ms)
+✔ rejects expired or absent sessions and fails closed on upstream outages (2.013766ms)
+✔ partial JSON replies preserve escaped quotes, newlines, and Unicode without exposing patch data (4.082517ms)
+✔ SSE parsing survives arbitrary UTF-8 chunks and CRLF boundaries (44.778172ms)
+✔ status exposes availability, never credentials (237.67547ms)
+✔ paid chat and voice require sign-in (76.716183ms)
+✔ rejects missing consent and client-supplied system roles (51.56377ms)
+✔ unconfigured provider fails clearly without fake AI output (28.359622ms)
+✔ uses server-owned instructions and validates a review-only draft (121.414772ms)
+AI chat upstream failure {"provider":"openai","model":"gpt-4o-mini","status":401,"body":"sensitive upstream error"}
+✔ provider failures are sanitized; never expose upstream text (26.708879ms)
+✔ a guest range cannot discard a valid reply or invent a guest count (15.224391ms)
+✔ empty summary text preserves the draft for review without claiming submission (29.975642ms)
+✔ AI order updates are allowlisted and private review fields never enter order context (23.85383ms)
+✔ draft normalization clears invalid fields while preserving valid facts (2.511689ms)
+AI booking reply failed {"stage":"provider_json","error":"Error"}
+✔ incomplete replies fail clearly without exposing a partial draft (14.840219ms)
+✔ refusal is a readable reply without a booking draft (27.450143ms)
+AI booking reply failed {"stage":"reply_json","error":"SyntaxError"}
+✔ malformed provider JSON fails closed without leaking content (12.79951ms)
+✔ draft rejects impossible times and unknown service identifiers (2.605481ms)
+✔ voice sessions have server-owned settings and an ownership-checked end (15.701869ms)
+✔ modern chat requests one shared patch and records usage without content (7.004868ms)
+✔ streamed reply arrives before the validated final patch (20.609848ms)
+AI booking reply failed {"stage":"provider_json","error":"Error"}
+✔ stream interruption returns an error event and never a draft patch (8.994493ms)
+AI booking reply failed {"stage":"provider_json","error":"Error"}
+✔ client cancellation aborts upstream generation (27.352423ms)
+✔ voice usage is bounded, owner checked, and labeled as client reported (17.098559ms)
+✔ saved configuration drives models, output limits, voice duration and disabled modes (29.61ms)
+AI booking reply failed {"stage":"provider_request","error":"Error"}
+✔ pricing rejection happens before any provider request (18.616362ms)
+✔ OpenRouter free chat preserves validated order patches and never calls paid OpenAI (14.009545ms)
+✔ default policy preserves model choices, includes AI, and keeps provider/customer currencies separate (8.897838ms)
+✖ configuration persists, validates mode capabilities, checks access, and rejects stale writes (33.867661ms)
+✔ inaccessible models cannot be saved (5.440728ms)
+✔ paid usage requires current price acceptance and duplicate completions cannot bill twice (6.484507ms)
+✔ failed requests may retry without charging; existing sessions keep their accepted fee (10.836713ms)
+✔ billing transitions require an invoice before payment and cannot record payment twice (9.682187ms)
+✔ admin configuration and usage routes reject customers and expose no provider key (167.841431ms)
+✔ OpenRouter settings enforce free selection and verified rates independently of client prices (6.309061ms)
+✔ OpenAI provider rates come from the catalog while customer prices remain editable (1.762611ms)
+✔ chat and voice transcripts are retrievable only by their owner (229.997111ms)
+✔ retries do not duplicate saved messages (35.018002ms)
+✔ history rejects missing authentication, missing consent, arbitrary roles and oversized messages (34.060688ms)
+✔ storage errors remain distinct from an empty history and do not leak transcripts (19.8846ms)
+✔ only confirmed stock is published, zero is unavailable and minimum order quantity is respected (4.900014ms)
+✔ public equipment data contains quantity/status but never internal price or inventory controls (2.121081ms)
+✔ price items link explicitly to the same equipment and non-equipment services have no fabricated stock (1.674739ms)
+TypeError: Cannot read properties of undefined (reading '$ne')
+    at /home/rudy/projects/khalil-back/src/equipment-stock.test.js:29:148
+    at Array.filter (<anonymous>)
+    at Object.sort (/home/rudy/projects/khalil-back/src/equipment-stock.test.js:29:46)
+    at /home/rudy/projects/khalil-back/src/equipment.js:82:60
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+✖ quantity editing requires admin, rejects invalid counts and updates the public equipment result (349.312377ms)
+✔ incomplete drafts are private, persist and resume without submitting (309.135041ms)
+✔ stale saves and deletes cannot overwrite another device (72.725493ms)
+✔ invalid values and supplied account identifiers are rejected (23.36229ms)
+✔ new order has unknown answers, explicit Toronto time and separate post-booking planning (4.024382ms)
+✔ canonical JSON contract and helpers are identical in frontend and backend (9.153934ms)
+✔ manual and AI produce the same event fields without treating ranges as a number (5.090555ms)
+✔ AI cannot set contact fields, grant permissions, inject unknown keys or confirm orders (0.563899ms)
+✔ submission validates required details; overnight times are valid (55.940791ms)
+✔ server retains full brief, enforces identity and selections, and cannot receive client pricing/status (22.919354ms)
+✔ reference links are metadata, not fetched, and non-HTTPS references are rejected (0.933225ms)
+✔ quote questionnaire asks only what the brief lists plus language and dialect (0.724453ms)
+✔ dialect catalog has unique ids matching the contract, with English and Arabic names (11.57363ms)
+✔ Google sign-in stays disabled without a configured client ID (142.750611ms)
+✔ new Google clients receive a normal non-admin Echo session without a local password (140.635411ms)
+✔ returning Google clients keep their account and library identity even if their email changes (17.229395ms)
+✔ a single Gmail account matches the existing client without creating a second owner (15.055325ms)
+✔ Google login rejects invalid signature (19.746831ms)
+✔ Google login rejects wrong nonce (17.839502ms)
+✔ Google login rejects unverified email (13.850454ms)
+✔ Google login rejects missing subject (16.169228ms)
+✔ Google login rejects ambiguous email (13.843949ms)
+✔ Google login rejects email linked to another Google identity (11.406256ms)
+✔ Google login rejects administrator by flag (24.004048ms)
+✔ Google login rejects administrator by reserved username (15.675228ms)
+✔ Google login rejects returning administrator (17.816469ms)
+✔ Google login rejects third-party email collision (13.515455ms)
+✔ nonces expire and cannot be replayed (117.550121ms)
+(node:1259412) [MONGOOSE] Warning: Mongoose: `Document.prototype.validateSync()` is deprecated and will be removed in Mongoose 10. Use `Document.prototype.validate()` instead.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1259412) [MONGOOSE] Warning: Mongoose: `Document.prototype.validateSync()` is deprecated and will be removed in Mongoose 10. Use `Document.prototype.validate()` instead.
+✔ untrusted origins and missing challenges never reach token verification (12.300408ms)
+✔ Google-only profiles allow missing phone and surname; password accounts still require them (395.562671ms)
+✔ rate limits are bounded per client behind the hosting proxy (109.634374ms)
+✔ approved verified Google account links the existing admin and returns to the same identity (17.424166ms)
+✔ Google admin protection rejects unverified approved admin (9.233957ms)
+✔ Google admin protection rejects another admin email (9.597896ms)
+✔ Google admin protection rejects changed returning admin email (9.166813ms)
+✔ Google admin protection rejects changed stored admin email (9.913827ms)
+✔ Google admin protection rejects ambiguous approved admin email (13.954663ms)
+✔ Google admin protection rejects approved admin already linked elsewhere (9.985343ms)
+✔ Google admin protection rejects email changes during link (9.929787ms)
+✔ Google admin protection rejects reserved identity changes during link (9.675367ms)
+✔ allowlisted email alone never promotes an ordinary client to administrator (9.190078ms)
+✔ catalog filters unsupported models, preserves prices, and free-only rejects paid models (56.934169ms)
+✔ missing key and incomplete provider output fail closed (4.418772ms)
+✔ public defaults, admin-only saves, validation, persistence and stale-write protection (189.19445ms)
+✔ audio settings reference only published archive recordings and retain old configurations (55.680756ms)
+✔ setup advice is authenticated, validates guest input and only uses server catalog (112.031518ms)
+✔ invalid advice cannot become an order and duplicated catalogue IDs are removed (0.588763ms)
+✔ venue map context caches requests, keeps owners separate, and never labels outlines as blueprints (4.04833ms)
+✔ area estimates are clamped, ordered and never marked verified (0.66314ms)
+✔ standalone restaurant with published usable area: documented area does not invent a room shape (9.84986ms)
+✔ multi-tenant restaurant: building footprint never becomes tenant or event area (0.585834ms)
+✔ banquet hall official dimensions: deterministic feet conversion and correctly scaled rectangle (0.870727ms)
+✔ only a building footprint: polygon geometry calculates area, perimeter, bounds and metre coordinates (1.976916ms)
+✔ conflicting published areas: preserve evidence and select no indoor area (0.382113ms)
+✔ no discoverable dimensions: all missing categories remain null (0.393272ms)
+✔ similarly named businesses: address mismatch and unsupported quoted numbers reject measurements (0.43264ms)
+✔ multi-floor venue: distinct floors and rooms cannot be added or averaged into a venue total (0.42932ms)
+✔ outdated property listings and undated leasing records cannot establish current tenant dimensions (0.742281ms)
+✔ geometry rejects self intersections, invalid or open rings, and subtracts holes deterministically (2.693685ms)
+✔ two published lengths without a documented rectangular shape cannot invent an indoor polygon or area (0.641349ms)
+✔ no geocoder keys: existing Photon provider identifies real OSM candidates and caches repeat lookups (71.233117ms)
+✔ missing business name falls back to address search, marks address-only candidates and rejects malformed coordinates (1103.000629ms)
+✔ explicit Nominatim configuration retains priority; disabling the public default fails clearly (2.6555ms)
+✔ Photon rate limits are explicit failures and never fabricate a venue (2.925932ms)
+✔ real isolated MongoDB save/restore, owner scoping, stale edit rejection and manual preservation through refresh (728.257298ms)
+✔ ambiguous branches require selection, progress reflects skipped operations, and no source text is persisted (10.271303ms)
+✔ saved manual verified measurements survive refresh, save/restore is scoped to the authenticated owner (13.741253ms)
+✔ cache reuses saved research honestly and explicit refresh researches again (6.293338ms)
+✔ manual exterior polygon is calculated and never becomes an indoor simulation boundary (6.561028ms)
+✔ private source targets are rejected before any network request (7.355309ms)
+✔ API denies unauthenticated callers, validates inputs, and isolates jobs across accounts (78.082759ms)
+◇ injected env (4) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+▶ AI Administrator: real editor adapters, durable approvals, verification, authentication and recovery
+  ✔ unauthorized tool invocation denied by normal admin guard (14.231998ms)
+  ✔ create lyrical work using real editor; typed approval required (249.238815ms)
+  ✔ create draft recording; manual API reads same persisted record (184.583043ms)
+  ✔ draft metadata patch preserves title, work and unrelated fields (173.645424ms)
+  ✔ instrumental, vocabulary, references, genres, languages, artists and shared metadata (1206.674424ms)
+(node:1259606) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✔ collections create, reorder and publication approval (280.627904ms)
+  ✔ publish requires approval and owned audio reference; read verification confirms public state (544.811312ms)
+  ✔ timed lyric rows, vocabulary edits and inferred recording fields preserve shared rules (395.767013ms)
+  ✔ duplicate analysis and proposal do not modify records (284.164521ms)
+  ✔ idempotent task submission and safe retry do not duplicate creations (130.89129ms)
+  ✔ repeated model tool-call identities never repeat an actual mutation (123.275879ms)
+  ✔ approval bound to initiator and exact digest; stale target rejected (128.265686ms)
+(node:1259606) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+  ✔ restart resumes approved action using durable input, receipt and audit (152.390459ms)
+  ✔ crash during write never replays an uncertain mutation (96.965417ms)
+  ✔ emergency stop and cancellation; revoked authority blocks future execution (51.850607ms)
+  ✔ Responses API function call format and natural language model handoff (8.823542ms)
+  ✔ non-Music read adapters call actual administrative services (70.215234ms)
+(node:1259606) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+(node:1259606) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+  ✔ actual equipment and testimonial edits use approval and verification (302.088493ms)
+(node:1259606) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+(node:1259606) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+(node:1259606) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+  ✔ customer, equipment, media creation and approved pricing use real existing handlers (1206.527427ms)
+  ✔ catalog event/service creation and patch use manual catalog handlers (537.591216ms)
+(node:1259606) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+  ✔ shared event draft, homepage playlist and theme verify persisted revisions (467.192893ms)
+(node:1259606) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+(node:1259606) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+  ✔ confirmed booking plans and internal notes preserve prior fields (524.609341ms)
+  ✔ venue dimensions remain account-owned and update through existing venue service (157.280373ms)
+  ✔ simulation layouts share manual editor state, preserve patches, reject stale writes and isolate owners (330.230017ms)
+(node:1259606) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+  ✔ Android authenticated push uses durable receipts, generic payloads and session revalidation (1614.208151ms)
+(node:1259606) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+  ✔ Android API uses the same tasks and approvals; customers and retired routes are denied (244.004998ms)
+  ✔ background polling completes without any browser or HTTP connection (124.771392ms)
+  ✔ every registered read capability has a real handler and bounded result (238.976795ms)
+  ✔ HTTP task ownership, auth, runtime inventory and denied credentials (21.305955ms)
+✔ AI Administrator: real editor adapters, durable approvals, verification, authentication and recovery (13487.744204ms)
+Archive creation failed: Error: unavailable
+    at convert (/home/rudy/projects/khalil-back/test/archive-create.test.js:62:80)
+    at /home/rudy/projects/khalil-back/src/archive-create.js:29:29
+    at invoke (/home/rudy/projects/khalil-back/test/archive-create.test.js:22:11)
+    at TestContext.<anonymous> (/home/rudy/projects/khalil-back/test/archive-create.test.js:63:23)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1306:25)
+    at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
+    at Test.postRun (node:internal/test_runner/test:1447:19)
+    at Test.run (node:internal/test_runner/test:1372:12)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:897:7)
+Archive creation failed: Error: unavailable
+    at convert (/home/rudy/projects/khalil-back/test/archive-create.test.js:62:80)
+    at /home/rudy/projects/khalil-back/src/archive-create.js:29:29
+    at invoke (/home/rudy/projects/khalil-back/test/archive-create.test.js:22:11)
+    at TestContext.<anonymous> (/home/rudy/projects/khalil-back/test/archive-create.test.js:64:23)
+    at async Test.run (node:internal/test_runner/test:1313:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:897:7)
+Archive creation failed: Error: database unavailable
+    at create (/home/rudy/projects/khalil-back/test/archive-create.test.js:69:67)
+    at /home/rudy/projects/khalil-back/src/archive-create.js:38:26
+    at async invoke (/home/rudy/projects/khalil-back/test/archive-create.test.js:22:5)
+    at async TestContext.<anonymous> (/home/rudy/projects/khalil-back/test/archive-create.test.js:70:17)
+    at async Test.run (node:internal/test_runner/test:1313:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:897:7)
+✔ YouTube URLs are restricted to individual HTTP(S) videos and normalized (1.712311ms)
+✔ converts and uploads audio before creating an archive record (2.705408ms)
+✔ invalid or conflicting sources never convert or save (1.992553ms)
+✔ ordinary file-backed tracks keep the existing create flow (0.265177ms)
+✔ failed conversion creates no archive record and permits a retry (1.730118ms)
+✔ failed database save removes the new upload (0.917248ms)
+✔ concurrent conversions are bounded and become available after completion (0.660962ms)
+Archive creation failed: Error: Sign in to confirm
+    at convert (/home/rudy/projects/khalil-back/test/archive-create.test.js:117:82)
+    at /home/rudy/projects/khalil-back/src/archive-create.js:29:29
+    at invoke (/home/rudy/projects/khalil-back/test/archive-create.test.js:22:11)
+    at TestContext.<anonymous> (/home/rudy/projects/khalil-back/test/archive-create.test.js:118:26)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1306:25)
+    at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
+    at Test.postRun (node:internal/test_runner/test:1447:19)
+    at Test.run (node:internal/test_runner/test:1372:12)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:897:7) {
+  code: 'YOUTUBE_AUTH_REQUIRED'
+}
+Archive creation failed: Error: Sign in to confirm you are not a bot
+    at convert (/home/rudy/projects/khalil-back/test/archive-create.test.js:132:82)
+    at /home/rudy/projects/khalil-back/src/archive-create.js:29:29
+    at invoke (/home/rudy/projects/khalil-back/test/archive-create.test.js:22:11)
+    at TestContext.<anonymous> (/home/rudy/projects/khalil-back/test/archive-create.test.js:133:26)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1306:25)
+    at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
+    at Test.postRun (node:internal/test_runner/test:1447:19)
+    at Test.run (node:internal/test_runner/test:1372:12)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:897:7) {
+  code: 'YOUTUBE_PUBLIC_ACCESS_BLOCKED'
+}
+Archive creation failed: Error: offline
+    at convert (/home/rudy/projects/khalil-back/test/archive-create.test.js:142:82)
+    at /home/rudy/projects/khalil-back/src/archive-create.js:29:29
+    at invoke (/home/rudy/projects/khalil-back/test/archive-create.test.js:22:11)
+    at TestContext.<anonymous> (/home/rudy/projects/khalil-back/test/archive-create.test.js:143:26)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1306:25)
+    at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
+    at Test.postRun (node:internal/test_runner/test:1447:19)
+    at Test.run (node:internal/test_runner/test:1372:12)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:897:7) {
+  code: 'YOUTUBE_WORKER_UNAVAILABLE'
+}
+✔ converter uses a canonical single-video URL, reads WAV and removes temporary files (62.746458ms)
+✔ YouTube sign-in failures are explicit and never save an empty track (1.035785ms)
+✔ missing audio source never creates a track (0.398454ms)
+✔ public-access blocks never create an archive row or require connecting an account (0.632724ms)
+✔ offline private audio worker preserves retry and creates no archive item (0.542121ms)
+✔ playlist accepts selected uploaded music and preserves administrator order (1.393637ms)
+✔ playlist refuses missing, duplicate, external or another account audio (0.501846ms)
+✔ Cloudinary URL validation forbids HTTP, lookalike hosts and image resources (0.228017ms)
+✔ playlist payload is bounded and does not accept arbitrary track URLs (2.74568ms)
+WebRTC go-live failed: Not configured
+✔ missing media configuration does not publish a false live status (4.561843ms)
+✔ stale phone cannot stop a replacement broadcast (1.888268ms)
+✔ starting claims the offline singleton atomically (0.881212ms)
+✔ concurrent go-live loser receives no publishing token (1.899243ms)
+✔ end clears only the expected room and deletes that room (0.640991ms)
+✔ unsigned webhook cannot change live status (0.78905ms)
+✔ viewer leaving does not end the broadcaster (0.498801ms)
+✔ verified broadcaster departure clears only its exact room (0.460231ms)
+WebRTC go-live failed: Recording unavailable
+✔ LiveKit webhook verifies the original webhook+json bytes and rejects tampering (275.42295ms)
+✔ recording setup failure releases only its own live claim and returns no token (1.247398ms)
+✔ browser and phone cannot claim or end a waiting OBS session (0.404721ms)
+✔ comments persist and public output excludes session internals (5.771105ms)
+✔ offline and stale-session comments cannot leak into a new live (1.743883ms)
+✔ comments reject invalid input and limit submission bursts (4.929839ms)
+✔ recordings accept only MP4 objects belonging to the exact room (1.28918ms)
+✔ archive responses expose status but no private storage identifiers (0.364913ms)
+✔ private multipart view exposes count/size but no asset identifiers (1.030954ms)
+✔ preview and download routes require admin and reject missing or invalid parts (1.214485ms)
+✔ signed preview URL is inline, authenticated, bounded and cannot choose another recording (14.295109ms)
+✔ missing Cloudinary asset in nested SDK 404 proceeds to private upload; other errors never do (0.982382ms)
+✔ delete is admin-only, atomic, recoverable and cannot remove active/saving media (0.800822ms)
+✔ name and link requests require no email and preserve selected track metadata (4.271889ms)
+✔ offline requests never enter the audience queue (0.298163ms)
+✔ rate limit prevents repeated submissions and validates bounded HTTPS-only links (2.16775ms)
+✔ client mutations cannot grant admin, replace credentials or change usernames (4.673119ms)
+✔ client responses exclude passwords, session and reset secrets (0.315347ms)
+✔ private storage list exposes no public Cloudinary URL or storage identifier (0.408462ms)
+✔ draft file previews are signed and expire; path traversal is rejected (1.911489ms)
+✔ local media is private until published, supports ranges, and becomes private when hidden (86.489987ms)
+✔ only published, active recordings are visible; legacy tracks survive (1.850378ms)
+✔ archive input rejects arbitrary URLs, unknown fields and malformed values (4.116773ms)
+✖ collections: admin CRUD, draft isolation, manual membership/order and reorder work through real HTTP handlers (161.387951ms)
+✔ Cloudinary-required uploads fail closed when credentials are missing (47.472911ms)
+✔ uploads require admin, reject executable/image impostor types and store allowed audio as authenticated media (29.477721ms)
+✖ recording deletion accepts legacy revision zero and rejects invalid or stale revisions (129.920762ms)
+✖ ontology HTTP, transactions, references, legacy compatibility and reversible migration (2467.469709ms)
+✖ controlled classifications, positive BPM, key notation and credit roles (4.705136ms)
+✔ metadata states distinguish empty, unknown, not applicable and specified (1.314109ms)
+✔ source derivations reject self reference and indirect cycles (0.694281ms)
+✔ canonical filters preserve scope, Song-only lyrics and combined unique results (0.737334ms)
+✔ legacy mapping never invents work identity or canonical work BPM (1.181123ms)
+✔ authoritative contract matches its synchronized checksum (1.107423ms)
+✔ Music instruments and musicians use identities and performance roles (2.404523ms)
+✔ OBS prepare reserves offline, enables recording, and returns admin-only RTMP credentials (2.34028ms)
+✔ OBS becomes live only after actual media, and disconnect revokes the key (1.671784ms)
+✔ OBS setup never replaces an active browser/Android broadcast or another pending OBS (1.431604ms)
+✔ recording failure does not issue a key or leave an offline reservation (0.605351ms)
+✔ stale end and old OBS webhook leave a newer session untouched (0.584431ms)
+✔ failed key revocation retains reservation and retries instead of admitting another broadcaster (0.669566ms)
+✔ unused OBS connection expires, revoking its key (0.577755ms)
+✔ public serialization excludes all OBS connection secrets, including bootstrap (2.248021ms)
+✔ provider not_found releases an expired ingress instead of leaving the session stuck (0.812297ms)
+✔ connected OBS without published media expires and cannot keep a false live status (0.618258ms)
+✔ email login matches existing mixed-case email literally and rejects ambiguous accounts (1.610967ms)
+✔ legacy username API remains available for existing clients (1.090706ms)
+✔ event dates reject calendar rollover, past dates and malformed times (29.738161ms)
+✔ all quotation details survive parsing (0.712313ms)
+✔ quote equipment minimums and identity are enforced on the server (1.551907ms)
+✔ an accepted quote must still be valid before deposit recording (0.21967ms)
+✔ quote totals preserve quantities, tax and deposit limit (0.320974ms)
+✔ segment planning reserves headroom below account limit and rejects missing media facts (1.194457ms)
+✔ asset names are deterministic and distinguish each part without overwriting the legacy recording (0.255185ms)
+✔ real MP4 stream-copy segmentation preserves audio/video, stays under limit, retains original (1263.359709ms)
+✔ recording storage requires explicit HTTPS provider settings and never infers a local container (1.476614ms)
+✔ B2 regional endpoint, bucket and credentials are preserved for both recording clients (0.36263ms)
+✔ LiveKit receives the configured bucket and region without creating a provider bucket (503.730639ms)
+✔ stem downloads cannot target arbitrary servers or non-audio assets (1.145098ms)
+✔ cache identity changes with the audio source; stem paths use only fixed channel names (1.62445ms)
+✔ testimonial replies validate, persist server timestamps and require admin middleware (14.26304ms)
+✔ public testimonials return only published reviews with saved responses (4.505214ms)
+✔ only YouTube/Google cookie domains are retained and expired or malformed sessions are rejected (3.724826ms)
+✔ saved session status exposes label and access state, never credential contents; sign-out removes credentials (36.657624ms)
+✔ all session operations require administrator authentication and changes reject an active conversion (1.315643ms)
+✔ public access reports verification and blocks without a saved account (24.132448ms)
+✔ worker authenticates before conversion; rejects non-YouTube and malformed requests (91.920211ms)
+✔ private worker bounds concurrency and recovers after a failed download (21.547151ms)
+✔ worker client rejects offline, untrusted and malformed audio responses (12.272372ms)
+✔ worker client deadline bounds an unresponsive worker (45.398399ms)
+✔ configured conversion uses the private worker instead of the hosted downloader or cookies (23.736905ms)
+ℹ tests 248
+ℹ suites 0
+ℹ pass 242
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 51460.835708
+
+✖ failing tests:
+
+test at src/ai-configuration.test.js:27:1
+✖ configuration persists, validates mode capabilities, checks access, and rejects stale writes (33.867661ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  3 !== 2
+  
+      at TestContext.<anonymous> (/home/rudy/projects/khalil-back/src/ai-configuration.test.js:29:149)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:897:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 3,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/equipment-stock.test.js:25:1
+✖ quantity editing requires admin, rejects invalid counts and updates the public equipment result (349.312377ms)
+  SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+      at JSON.parse (<anonymous>)
+      at parseJSONFromBytes (node:internal/deps/undici/undici:4337:19)
+      at successSteps (node:internal/deps/undici/undici:6985:27)
+      at readAllBytes (node:internal/deps/undici/undici:5908:13)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+test at test/music-archive.test.js:16:1
+✖ collections: admin CRUD, draft isolation, manual membership/order and reorder work through real HTTP handlers (161.387951ms)
+  TypeError: Cannot read properties of undefined (reading 'recordingIds')
+      at TestContext.<anonymous> (/home/rudy/projects/khalil-back/test/music-archive.test.js:31:22)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:897:7)
+
+test at test/music-ontology-delete.test.js:7:1
+✖ recording deletion accepts legacy revision zero and rejects invalid or stale revisions (129.920762ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  400 !== 409
+  
+      at TestContext.<anonymous> (/home/rudy/projects/khalil-back/test/music-ontology-delete.test.js:21:9)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 400,
+    expected: 409,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/music-ontology.integration.test.js:3:1
+✖ ontology HTTP, transactions, references, legacy compatibility and reversible migration (2467.469709ms)
+  AssertionError [ERR_ASSERTION]: {"message":"Invalid option: expected one of \"COVER\"|\"REMIX\"|\"MASHUP\"|\"MEDLEY\"|\"MIX\"|\"LIVE\""}
+  
+  400 !== 201
+  
+      at write (/home/rudy/projects/khalil-back/test/music-ontology.integration.test.js:23:130)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (/home/rudy/projects/khalil-back/test/music-ontology.integration.test.js:36:19)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 400,
+    expected: 201,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/music-ontology.test.js:5:1
+✖ controlled classifications, positive BPM, key notation and credit roles (4.705136ms)
+  ZodError: [
+    {
+      "code": "invalid_value",
+      "values": [
+        "COVER",
+        "REMIX",
+        "MASHUP",
+        "MEDLEY",
+        "MIX",
+        "LIVE"
+      ],
+      "path": [
+        "recordingType"
+      ],
+      "message": "Invalid option: expected one of \"COVER\"|\"REMIX\"|\"MASHUP\"|\"MEDLEY\"|\"MIX\"|\"LIVE\""
+    }
+  ]
+      at TestContext.<anonymous> (/home/rudy/projects/khalil-back/test/music-ontology.test.js:7:82)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1306:25)
+      at Test.start (node:internal/test_runner/test:1177:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)

@@ -1,0 +1,8 @@
+{
+  "at": "2026-10-30T04:24:32.064Z",
+  "provider": "OpenAI Responses API",
+  "model": "gpt-4o-mini",
+  "database": "isolated ephemeral MongoDB replica set",
+  "operation": "Authorized recording search through the same real registry and engine",
+  "passed": true
+}

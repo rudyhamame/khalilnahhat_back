@@ -1,0 +1,4870 @@
+{
+  "capabilities": [
+    {
+      "name": "music_recordings_search",
+      "domain": "Music Archive",
+      "description": "Search all recordings, including unpublished drafts. Returns exact IDs and revisions; use these before editing.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/admin/music-ontology/recordings"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "music_recording_get",
+      "domain": "Music Archive",
+      "description": "Read one recording and its current revision.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/admin/music-ontology/recordings/:id"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "music_recording_save",
+      "domain": "Music Archive",
+      "description": "Create (id null) or patch existing recording (id from get/search). body is JSON using the existing editor schema; existing values are preserved. Never invent IDs, audio, lyrics or credits. Published/shared changes require approval. Use work melody/lyrics for BPM, key, genre, languages and credits; recording values are inferred.",
+      "policy": "DRAFT_AUTO_ELSE_APPROVAL",
+      "mutation": true,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "body": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "id",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "editorSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "lyricsTiming": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "audioUrl": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048
+                  },
+                  "workId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "model": {
+                    "type": "string",
+                    "enum": [
+                      "whisper-1"
+                    ]
+                  },
+                  "lines": {
+                    "minItems": 1,
+                    "maxItems": 3000,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "start": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 86400
+                        },
+                        "end": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "maximum": 86400
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        }
+                      },
+                      "required": [
+                        "start",
+                        "end",
+                        "text"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "audioUrl",
+                  "workId",
+                  "model",
+                  "lines"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          },
+          "recordingType": {
+            "type": "string",
+            "enum": [
+              "COVER",
+              "REMIX",
+              "MASHUP",
+              "MEDLEY",
+              "MIX",
+              "LIVE"
+            ]
+          },
+          "recordingAmount": {
+            "type": "string",
+            "enum": [
+              "INDIVIDUAL",
+              "MULTIPLE"
+            ]
+          },
+          "componentWorkIds": {
+            "default": [],
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            }
+          },
+          "workId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "audioUrl": {
+            "default": "",
+            "type": "string",
+            "maxLength": 2048
+          },
+          "coverImage": {
+            "default": "",
+            "type": "string",
+            "maxLength": 2048
+          },
+          "durationSeconds": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 86400
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": {
+            "default": "",
+            "type": "string",
+            "maxLength": 8000
+          },
+          "releaseDate": {
+            "default": "",
+            "type": "string",
+            "pattern": "^$|^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "recordingMetadata": {
+            "default": {
+              "bpm": null,
+              "key": null,
+              "states": {}
+            },
+            "type": "object",
+            "properties": {
+              "bpm": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "key": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 240,
+                    "pattern": "^[A-G](?:#|b)? (?:major|minor)$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "bpms": {
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 1000
+                }
+              },
+              "keys": {
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 240,
+                  "pattern": "^[A-G](?:#|b)? (?:major|minor)$"
+                }
+              },
+              "genreIds": {
+                "default": [],
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                }
+              },
+              "states": {
+                "default": {},
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": [
+                    "MISSING",
+                    "UNKNOWN",
+                    "NOT_APPLICABLE",
+                    "SPECIFIED"
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "credits": {
+            "default": [],
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "artistId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "LYRICIST",
+                    "VOCALIST",
+                    "PERFORMER",
+                    "COMPOSER",
+                    "PRODUCER",
+                    "MIX_ENGINEER",
+                    "MASTERING_ENGINEER",
+                    "ARRANGER",
+                    "OTHER"
+                  ]
+                },
+                "detail": {
+                  "default": "",
+                  "type": "string",
+                  "maxLength": 240
+                }
+              },
+              "required": [
+                "artistId",
+                "role"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "sourceRecordingIds": {
+            "default": [],
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            }
+          },
+          "sourceWorkIds": {
+            "default": [],
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            }
+          },
+          "publicationStatus": {
+            "default": "DRAFT",
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "PUBLISHED",
+              "WITHDRAWN"
+            ]
+          },
+          "archivalStatus": {
+            "default": "ACTIVE",
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "ARCHIVED"
+            ]
+          },
+          "versionLabel": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          },
+          "productionNotes": {
+            "default": "",
+            "type": "string",
+            "maxLength": 8000
+          },
+          "provenance": {
+            "default": {
+              "source": "",
+              "note": ""
+            },
+            "type": "object",
+            "properties": {
+              "source": {
+                "default": "",
+                "type": "string",
+                "maxLength": 2048
+              },
+              "note": {
+                "default": "",
+                "type": "string",
+                "maxLength": 8000
+              }
+            },
+            "additionalProperties": false
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "title",
+          "recordingType",
+          "workId"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "POST/PUT",
+        "path": "/api/admin/music-ontology/recordings"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "music_works_search",
+      "domain": "Music Archive",
+      "description": "Search all works, including unpublished drafts. Returns exact IDs and revisions; use these before editing.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/admin/music-ontology/works"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "music_work_get",
+      "domain": "Music Archive",
+      "description": "Read one work and its current revision.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/admin/music-ontology/works/:id"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "music_work_save",
+      "domain": "Music Archive",
+      "description": "Create (id null) or patch existing work (id from get/search). body is JSON using the existing editor schema; existing values are preserved. Never invent IDs, audio, lyrics or credits. Published/shared changes require approval. Use work melody/lyrics for BPM, key, genre, languages and credits; recording values are inferred.",
+      "policy": "APPROVAL_REQUIRED",
+      "mutation": true,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "body": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "id",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "editorSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "SONG",
+              "MUSIC"
+            ]
+          },
+          "workKind": {
+            "default": "ORIGINAL",
+            "type": "string",
+            "enum": [
+              "ORIGINAL",
+              "COVER",
+              "REMIX",
+              "MASHUP",
+              "MEDLEY",
+              "MIX",
+              "LIVE"
+            ]
+          },
+          "description": {
+            "default": "",
+            "type": "string",
+            "maxLength": 8000
+          },
+          "melodyId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "lyricsId": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "melody": {
+            "type": "object",
+            "properties": {
+              "bpm": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "key": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 240,
+                    "pattern": "^[A-G](?:#|b)? (?:major|minor)$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "rhythmId": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "genreIds": {
+                "default": [],
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                }
+              },
+              "instrumentIds": {
+                "default": [],
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                }
+              },
+              "musicianCredits": {
+                "default": [],
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "artistId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "PERFORMER",
+                        "COMPOSER",
+                        "ARRANGER",
+                        "OTHER"
+                      ]
+                    },
+                    "detail": {
+                      "default": "",
+                      "type": "string",
+                      "maxLength": 240
+                    }
+                  },
+                  "required": [
+                    "artistId",
+                    "role"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "timeSignature": {
+                "default": "",
+                "type": "string",
+                "maxLength": 240,
+                "pattern": "^$|^\\d{1,2}\\/(?:1|2|4|8|16|32)$"
+              },
+              "mode": {
+                "default": "",
+                "type": "string",
+                "maxLength": 240
+              },
+              "description": {
+                "default": "",
+                "type": "string",
+                "maxLength": 8000
+              },
+              "influences": {
+                "default": [],
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 240
+                }
+              },
+              "states": {
+                "default": {},
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": [
+                    "MISSING",
+                    "UNKNOWN",
+                    "NOT_APPLICABLE",
+                    "SPECIFIED"
+                  ]
+                }
+              },
+              "provenance": {
+                "default": {
+                  "source": "",
+                  "note": ""
+                },
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 2048
+                  },
+                  "note": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 8000
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
+          "lyrics": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "languageId": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "dialectId": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "regionIds": {
+                    "default": [],
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    }
+                  },
+                  "artistCredits": {
+                    "default": [],
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "artistId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "LYRICIST",
+                            "VOCALIST",
+                            "PERFORMER",
+                            "COMPOSER",
+                            "PRODUCER",
+                            "MIX_ENGINEER",
+                            "MASTERING_ENGINEER",
+                            "ARRANGER",
+                            "OTHER"
+                          ]
+                        },
+                        "detail": {
+                          "default": "",
+                          "type": "string",
+                          "maxLength": 240
+                        }
+                      },
+                      "required": [
+                        "artistId",
+                        "role"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "primaryConceptId": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "conceptIds": {
+                    "default": [],
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    }
+                  },
+                  "releaseYear": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1000,
+                        "maximum": 2100
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "conceptLabel": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 240
+                  },
+                  "conceptSummary": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "text": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 100000
+                  },
+                  "script": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 240
+                  },
+                  "translationRefs": {
+                    "default": [],
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 2048,
+                      "format": "uri"
+                    }
+                  },
+                  "notes": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "completeness": {
+                    "default": "INCOMPLETE",
+                    "type": "string",
+                    "enum": [
+                      "INCOMPLETE",
+                      "COMPLETE"
+                    ]
+                  },
+                  "states": {
+                    "default": {},
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "maxLength": 80
+                    },
+                    "additionalProperties": {
+                      "type": "string",
+                      "enum": [
+                        "MISSING",
+                        "UNKNOWN",
+                        "NOT_APPLICABLE",
+                        "SPECIFIED"
+                      ]
+                    }
+                  },
+                  "provenance": {
+                    "default": {
+                      "source": "",
+                      "note": ""
+                    },
+                    "type": "object",
+                    "properties": {
+                      "source": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 2048
+                      },
+                      "note": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 8000
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "credits": {
+            "default": [],
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "artistId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "LYRICIST",
+                    "VOCALIST",
+                    "PERFORMER",
+                    "COMPOSER",
+                    "PRODUCER",
+                    "MIX_ENGINEER",
+                    "MASTERING_ENGINEER",
+                    "ARRANGER",
+                    "OTHER"
+                  ]
+                },
+                "detail": {
+                  "default": "",
+                  "type": "string",
+                  "maxLength": 240
+                }
+              },
+              "required": [
+                "artistId",
+                "role"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "provenance": {
+            "default": {
+              "source": "",
+              "note": ""
+            },
+            "type": "object",
+            "properties": {
+              "source": {
+                "default": "",
+                "type": "string",
+                "maxLength": 2048
+              },
+              "note": {
+                "default": "",
+                "type": "string",
+                "maxLength": 8000
+              }
+            },
+            "additionalProperties": false
+          },
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "title",
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "POST/PUT",
+        "path": "/api/admin/music-ontology/works"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "music_vocabulary_search",
+      "domain": "Music Archive",
+      "description": "Search all vocabulary, including unpublished drafts. Returns exact IDs and revisions; use these before editing.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/admin/music-ontology/vocabulary"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "music_vocabulary_get",
+      "domain": "Music Archive",
+      "description": "Read one vocabulary and its current revision.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/admin/music-ontology/vocabulary/:id"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "music_vocabulary_save",
+      "domain": "Music Archive",
+      "description": "Create (id null) or patch existing vocabulary (id from get/search). body is JSON using the existing editor schema; existing values are preserved. Never invent IDs, audio, lyrics or credits. Published/shared changes require approval. Use work melody/lyrics for BPM, key, genre, languages and credits; recording values are inferred.",
+      "policy": "APPROVAL_REQUIRED",
+      "mutation": true,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "body": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "id",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "editorSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "language",
+              "dialect",
+              "region",
+              "artist",
+              "concept",
+              "rhythm",
+              "genre",
+              "instrument"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          },
+          "parentId": {
+            "default": "",
+            "type": "string",
+            "maxLength": 160
+          },
+          "isoCode": {
+            "default": "",
+            "type": "string",
+            "maxLength": 20
+          },
+          "description": {
+            "default": "",
+            "type": "string",
+            "maxLength": 8000
+          },
+          "provenance": {
+            "default": {
+              "source": "",
+              "note": ""
+            },
+            "type": "object",
+            "properties": {
+              "source": {
+                "default": "",
+                "type": "string",
+                "maxLength": 2048
+              },
+              "note": {
+                "default": "",
+                "type": "string",
+                "maxLength": 8000
+              }
+            },
+            "additionalProperties": false
+          },
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "kind",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "POST/PUT",
+        "path": "/api/admin/music-ontology/vocabulary"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "music_collections_search",
+      "domain": "Music Archive",
+      "description": "Read collections and their recording IDs from the existing Music Archive catalog.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/admin/music-archive"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "music_collection_save",
+      "domain": "Music Archive",
+      "description": "Create a collection/playlist (id null, title required) or edit a collection, reorder recordingIds and assign an existing uploaded cover. Publication and existing collections require approval.",
+      "policy": "DRAFT_AUTO_ELSE_APPROVAL",
+      "mutation": true,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "body": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 240
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 4000
+              },
+              "published": {
+                "type": "boolean"
+              },
+              "sortOrder": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "coverImage": {
+                "type": "string",
+                "maxLength": 2048
+              },
+              "recordingIds": {
+                "maxItems": 5000,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "POST/PATCH",
+        "path": "/api/admin/music-archive/collections"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "music_duplicates",
+      "domain": "Music Archive",
+      "description": "Detect possible duplicate recording titles or stored audio assets; only reports candidates, never deletes.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "route": null,
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "events_search",
+      "domain": "Production",
+      "description": "Read production live-session music queue; booking events are in bookings_search and catalog_search.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/admin/sessions"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "bookings_search",
+      "domain": "Customers & Bookings",
+      "description": "Read booking requests, statuses and quotes.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/service-requests/admin"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "customers_search",
+      "domain": "Customers & Bookings",
+      "description": "Search customer records; private credential fields are always redacted.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/admin/clients"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "enquiries_search",
+      "domain": "Customers & Bookings",
+      "description": "Read enquiries.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/admin/enquiries"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "confirmed_bookings",
+      "domain": "Customers & Bookings",
+      "description": "Read confirmed bookings.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/bookings/confirmed"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "transactions_report",
+      "domain": "Customers & Bookings",
+      "description": "Read payment records, not payment credentials.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/transactions"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "equipment_search",
+      "domain": "Equipment",
+      "description": "Read equipment, stock, media and reusable 3D assets.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/equipment/admin"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "catalog_search",
+      "domain": "Website Catalog",
+      "description": "Read events and services in the website catalog.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/admin/setup-catalog"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "testimonials_search",
+      "domain": "Website",
+      "description": "Read testimonials and their replies.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/content/testimonials/admin"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "media_search",
+      "domain": "Website",
+      "description": "Read website media.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/content/media/admin"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "live_archive_search",
+      "domain": "Production",
+      "description": "Read recorded broadcasts.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/admin/live-recordings"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "meetings_search",
+      "domain": "Meetings",
+      "description": "Read meeting schedule.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/meetings/admin"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "theme_read",
+      "domain": "Application Administration",
+      "description": "Read seasonal theme configuration.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/seasonal-theme"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "ai_configuration_read",
+      "domain": "Application Administration",
+      "description": "Read AI configuration, model catalog and configured flags. Never exposes API keys.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/ai-booking/admin/config"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "application_report",
+      "domain": "Application Administration",
+      "description": "Read application operational totals.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/admin/overview"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "equipment_update",
+      "domain": "Equipment",
+      "description": "Update existing equipment through its validated editor. Pricing, stock and visibility require approval.",
+      "policy": "APPROVAL_REQUIRED",
+      "mutation": true,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "body": {
+            "type": "object",
+            "properties": {
+              "modelJobId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "category": {
+                "type": "string",
+                "minLength": 1
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "brandModel": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "imageUrl": {
+                "type": "string"
+              },
+              "priceCents": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "minQuantity": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "quantityOwned": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "stockTracked": {
+                "type": "boolean"
+              },
+              "isActive": {
+                "type": "boolean"
+              },
+              "sortOrder": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "PATCH",
+        "path": "/api/equipment/:id"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "testimonial_update",
+      "domain": "Website",
+      "description": "Edit a testimonial or approve its public reply/publication. Does not send email.",
+      "policy": "APPROVAL_REQUIRED",
+      "mutation": true,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "body": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "eventType": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              },
+              "textAr": {
+                "type": "string",
+                "maxLength": 2000
+              },
+              "reply": {
+                "type": "string",
+                "maxLength": 2000
+              },
+              "imageUrl": {
+                "type": "string",
+                "maxLength": 500
+              },
+              "isPublished": {
+                "type": "boolean"
+              },
+              "sortOrder": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "PATCH",
+        "path": "/api/content/testimonials/:id"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "media_update",
+      "domain": "Website",
+      "description": "Edit website media visibility, labels and existing media URLs.",
+      "policy": "APPROVAL_REQUIRED",
+      "mutation": true,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "body": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "mix",
+                  "video",
+                  "photo"
+                ]
+              },
+              "category": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "titleAr": {
+                "type": "string",
+                "maxLength": 160
+              },
+              "coverUrl": {
+                "type": "string",
+                "maxLength": 500
+              },
+              "mediaUrl": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "durationSec": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "downloadable": {
+                "type": "boolean"
+              },
+              "isPublished": {
+                "type": "boolean"
+              },
+              "sortOrder": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "PATCH",
+        "path": "/api/content/media/:id"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "booking_note",
+      "domain": "Customers & Bookings",
+      "description": "Update internal booking note only; no customer message or booking confirmation.",
+      "policy": "APPROVAL_REQUIRED",
+      "mutation": true,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "body": {
+            "type": "object",
+            "properties": {
+              "adminNote": {
+                "type": "string",
+                "maxLength": 6000
+              }
+            },
+            "required": [
+              "adminNote"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "PATCH",
+        "path": "/api/admin/service-requests/:id/note"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "equipment_create",
+      "domain": "Equipment",
+      "description": "Create equipment with an explicit slug, name and category using the existing stock/pricing/model service. Requires approval.",
+      "policy": "APPROVAL_REQUIRED",
+      "mutation": true,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "modelJobId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "category": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "brandModel": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "priceCents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "minQuantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "quantityOwned": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "stockTracked": {
+            "type": "boolean"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "slug",
+          "category",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "POST",
+        "path": "/api/equipment"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "testimonial_create",
+      "domain": "Website",
+      "description": "Create a testimonial using administrator-supplied text. Never invent a customer review; publication requires approval.",
+      "policy": "APPROVAL_REQUIRED",
+      "mutation": true,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "eventType": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "textAr": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "reply": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "imageUrl": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "isPublished": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "name",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "POST",
+        "path": "/api/content/testimonials"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "media_create",
+      "domain": "Website",
+      "description": "Create a media entry referencing an existing uploaded asset or supplied supported link. Requires approval.",
+      "policy": "APPROVAL_REQUIRED",
+      "mutation": true,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "mix",
+              "video",
+              "photo"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "titleAr": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "coverUrl": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "mediaUrl": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "durationSec": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "downloadable": {
+            "type": "boolean"
+          },
+          "isPublished": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "kind",
+          "title",
+          "mediaUrl"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "POST",
+        "path": "/api/content/media"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "customer_create",
+      "domain": "Customers & Bookings",
+      "description": "Create a normal customer record; no password, session or administrator privilege may be supplied. Requires approval.",
+      "policy": "APPROVAL_REQUIRED",
+      "mutation": true,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "format": "email",
+            "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "phoneNumber": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "adminNotes": {
+            "type": "string",
+            "maxLength": 6000
+          },
+          "username": {
+            "type": "string",
+            "pattern": "^[a-z0-9_.-]{3,60}$"
+          }
+        },
+        "required": [
+          "firstName",
+          "lastName",
+          "email",
+          "username"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "POST",
+        "path": "/api/admin/clients"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "customer_update",
+      "domain": "Customers & Bookings",
+      "description": "Update customer contact details or internal notes with approval. Never changes credentials or privileges.",
+      "policy": "APPROVAL_REQUIRED",
+      "mutation": true,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "body": {
+            "type": "object",
+            "properties": {
+              "firstName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "lastName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "email": {
+                "type": "string",
+                "maxLength": 254,
+                "format": "email",
+                "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+              },
+              "phoneNumber": {
+                "type": "string",
+                "maxLength": 60
+              },
+              "adminNotes": {
+                "type": "string",
+                "maxLength": 6000
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "PATCH",
+        "path": "/api/admin/clients/:id"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "prices_read",
+      "domain": "Application Administration",
+      "description": "Read current service prices and linked equipment stock.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/prices"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "price_update",
+      "domain": "Application Administration",
+      "description": "Patch an existing service price in cents, three-letter currency or availability. Always requires explicit approval.",
+      "policy": "APPROVAL_REQUIRED",
+      "mutation": true,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "body": {
+            "type": "object",
+            "properties": {
+              "amountCents": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "currency": {
+                "type": "string",
+                "pattern": "^[A-Z]{3}$"
+              },
+              "isActive": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "PATCH",
+        "path": "/api/prices/:id"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "booking_quote_proposal",
+      "domain": "Customers & Bookings",
+      "description": "Prepare a quotation proposal from real booking line items and explicit unit prices using the shared quote total calculation. Does not publish, email, confirm or reserve. Proposal is stored with the task.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "items": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "serviceId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "unitPrice": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "serviceId",
+                "unitPrice"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "taxPercent": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 30
+          },
+          "depositAmount": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "items",
+          "taxPercent",
+          "depositAmount"
+        ],
+        "additionalProperties": false
+      },
+      "route": null,
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "event_draft_read",
+      "domain": "Events",
+      "description": "Read the initiating administrator account event/simulation draft. Never reads another customer draft.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/ai-booking/event-draft"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "venues_search",
+      "domain": "Venue Simulator",
+      "description": "Read venue reports owned by the initiating administrator.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/ai-booking/venue-intelligence/records"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "player_playlist_read",
+      "domain": "Music Archive",
+      "description": "Read the homepage player playlist and order.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/admin/player-playlist"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "theme_update",
+      "domain": "Application Administration",
+      "description": "Patch seasonal theme settings with current revision and approval. Audio must reference published recordings.",
+      "policy": "APPROVAL_REQUIRED",
+      "mutation": true,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "lights": {
+            "type": "boolean"
+          },
+          "snow": {
+            "type": "boolean"
+          },
+          "audio": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "archiveIds": {
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                }
+              }
+            },
+            "required": [
+              "enabled",
+              "archiveIds"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "PUT",
+        "path": "/api/seasonal-theme"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "player_playlist_update",
+      "domain": "Music Archive",
+      "description": "Set homepage player recordings, order and enabled state. Requires existing uploaded audio and approval.",
+      "policy": "APPROVAL_REQUIRED",
+      "mutation": true,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "archiveIds": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        },
+        "required": [
+          "enabled",
+          "archiveIds"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "PUT",
+        "path": "/api/admin/player-playlist"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "event_draft_save",
+      "domain": "Events",
+      "description": "Patch this administrator account event plan. Does not submit a booking or affect another customer. Updates use exact shared field paths and values; existing fields are preserved.",
+      "policy": "APPROVAL_REQUIRED",
+      "mutation": true,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "updates": {
+            "minItems": 1,
+            "maxItems": 40,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "enum": [
+                    "customer.fullName",
+                    "customer.email",
+                    "customer.phone",
+                    "customer.contactMethod",
+                    "customer.company",
+                    "event.type",
+                    "event.date",
+                    "event.startTime",
+                    "event.endTime",
+                    "event.guestCount",
+                    "event.venue.name",
+                    "event.venue.address",
+                    "event.venue.city",
+                    "event.venue.postalCode",
+                    "event.venue.area",
+                    "event.venue.setting",
+                    "event.setup.requirements",
+                    "services",
+                    "music.styles",
+                    "music.otherLanguage",
+                    "music.dialects",
+                    "music.otherPreferences",
+                    "music.djMc",
+                    "music.entrance",
+                    "music.customMix",
+                    "music.announcements",
+                    "references.images",
+                    "references.documents",
+                    "additional.specialRequests",
+                    "additional.notes"
+                  ]
+                },
+                "value": {}
+              },
+              "required": [
+                "path",
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "updates"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "PUT",
+        "path": "/api/ai-booking/event-draft"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "simulation_draft_read",
+      "domain": "Venue Simulator",
+      "description": "Read the initiating administrator account saved 3D room, equipment selection and positions.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "GET",
+        "path": "/api/ai-booking/simulation-draft"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "simulation_draft_save",
+      "domain": "Venue Simulator",
+      "description": "Create or patch this administrator account saved 3D simulation layout. Dimensions are conceptual unless a source note says otherwise. References existing equipment and reusable models; does not book stock.",
+      "policy": "APPROVAL_REQUIRED",
+      "mutation": true,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "patch": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "widthM": {
+                "type": "number",
+                "minimum": 3,
+                "maximum": 200
+              },
+              "depthM": {
+                "type": "number",
+                "minimum": 3,
+                "maximum": 200
+              },
+              "guestCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100000
+              },
+              "lights": {
+                "type": "boolean"
+              },
+              "party": {
+                "type": "boolean"
+              },
+              "grid": {
+                "type": "boolean"
+              },
+              "equipment": {
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "quantity": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 10000
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "quantity"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "positions": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                      "minimum": -200,
+                      "maximum": 200
+                    },
+                    "z": {
+                      "type": "number",
+                      "minimum": -200,
+                      "maximum": 200
+                    },
+                    "rotation": {
+                      "type": "number",
+                      "minimum": -1000,
+                      "maximum": 1000
+                    }
+                  },
+                  "required": [
+                    "x",
+                    "z",
+                    "rotation"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "boundary": {
+                "anyOf": [
+                  {
+                    "minItems": 3,
+                    "maxItems": 2000,
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "number",
+                          "minimum": -200,
+                          "maximum": 200
+                        },
+                        {
+                          "type": "number",
+                          "minimum": -200,
+                          "maximum": 200
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "holes": {
+                "maxItems": 30,
+                "type": "array",
+                "items": {
+                  "minItems": 3,
+                  "maxItems": 2000,
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "type": "number",
+                        "minimum": -200,
+                        "maximum": 200
+                      },
+                      {
+                        "type": "number",
+                        "minimum": -200,
+                        "maximum": 200
+                      }
+                    ]
+                  }
+                }
+              },
+              "sourceNote": {
+                "type": "string",
+                "maxLength": 1000
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "patch"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "PUT",
+        "path": "/api/ai-booking/simulation-draft"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "catalog_save",
+      "domain": "Website Catalog",
+      "description": "Create (create true) or patch an event/service catalog option. Supply explicit slug id, kind and body. Service category must exist. Requires approval because it changes public booking choices.",
+      "policy": "APPROVAL_REQUIRED",
+      "mutation": true,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "event",
+              "service"
+            ]
+          },
+          "create": {
+            "type": "boolean"
+          },
+          "body": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "nameAr": {
+                "type": "string",
+                "maxLength": 160
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 2000
+              },
+              "descriptionAr": {
+                "type": "string",
+                "maxLength": 2000
+              },
+              "imageUrl": {
+                "type": "string",
+                "maxLength": 2048
+              },
+              "category": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "bookingType": {
+                "type": "string",
+                "enum": [
+                  "wedding",
+                  "engagement",
+                  "birthday",
+                  "corporate",
+                  "party",
+                  "graduation",
+                  "other"
+                ]
+              },
+              "equipmentIds": {
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                }
+              },
+              "isActive": {
+                "type": "boolean"
+              },
+              "sortOrder": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "create",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "POST/PUT",
+        "path": "/api/admin/setup-catalog"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "booking_planning_update",
+      "domain": "Customers & Bookings",
+      "description": "Patch a confirmed booking event timeline, music plan and special requests. Preserves existing planning fields, does not email the customer. Requires approval.",
+      "policy": "APPROVAL_REQUIRED",
+      "mutation": true,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "body": {
+            "type": "object",
+            "properties": {
+              "brideName": {
+                "type": "string",
+                "maxLength": 3000
+              },
+              "groomName": {
+                "type": "string",
+                "maxLength": 3000
+              },
+              "timeline": {
+                "type": "string",
+                "maxLength": 3000
+              },
+              "partyEntrances": {
+                "type": "string",
+                "maxLength": 3000
+              },
+              "entranceSongs": {
+                "type": "string",
+                "maxLength": 3000
+              },
+              "firstDance": {
+                "type": "string",
+                "maxLength": 3000
+              },
+              "parentDances": {
+                "type": "string",
+                "maxLength": 3000
+              },
+              "dinnerMusic": {
+                "type": "string",
+                "maxLength": 3000
+              },
+              "cakeCutting": {
+                "type": "string",
+                "maxLength": 3000
+              },
+              "announcements": {
+                "type": "string",
+                "maxLength": 3000
+              },
+              "mustPlay": {
+                "type": "string",
+                "maxLength": 3000
+              },
+              "doNotPlay": {
+                "type": "string",
+                "maxLength": 3000
+              },
+              "musicLinks": {
+                "type": "string",
+                "maxLength": 3000
+              },
+              "specialRequests": {
+                "type": "string",
+                "maxLength": 3000
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "PUT",
+        "path": "/api/admin/service-requests/:id/planning"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "venue_dimensions_update",
+      "domain": "Venue Simulator",
+      "description": "Update an existing administrator-owned venue room dimensions or polygon with a source note. Never claims AI-estimated measurements are verified. Human approval required.",
+      "policy": "APPROVAL_REQUIRED",
+      "mutation": true,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "manual": {
+            "type": "object",
+            "properties": {
+              "widthM": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 200
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "depthM": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 200
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "verifiedByUser": {
+                "default": false,
+                "type": "boolean"
+              },
+              "note": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "geometry": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "Polygon"
+                  },
+                  "coordinates": {
+                    "minItems": 1,
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "minItems": 4,
+                      "maxItems": 2000,
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "prefixItems": [
+                          {
+                            "type": "number",
+                            "minimum": -180,
+                            "maximum": 180
+                          },
+                          {
+                            "type": "number",
+                            "minimum": -85,
+                            "maximum": 85
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "type",
+                  "coordinates"
+                ]
+              },
+              "geometryScope": {
+                "type": "string",
+                "enum": [
+                  "building_footprint",
+                  "indoor_room"
+                ]
+              }
+            },
+            "required": [
+              "note"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "manual"
+        ],
+        "additionalProperties": false
+      },
+      "route": {
+        "method": "PUT",
+        "path": "/api/ai-booking/venue-intelligence/records/:id/manual"
+      },
+      "testStatus": "real-handler integration passed"
+    },
+    {
+      "name": "music_classification_proposal",
+      "domain": "Music Archive",
+      "description": "Return a classification proposal and supporting rationale for human review; does not alter metadata.",
+      "policy": "AUTO",
+      "mutation": false,
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recordingId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "proposal": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          }
+        },
+        "required": [
+          "recordingId",
+          "proposal",
+          "rationale"
+        ],
+        "additionalProperties": false
+      },
+      "route": null,
+      "testStatus": "real-handler integration passed"
+    }
+  ],
+  "runtimeRoutes": [
+    {
+      "method": "GET",
+      "path": "/api/service-requests/admin",
+      "capabilities": [
+        "bookings_search"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/service-requests/:id/quote",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/prices",
+      "capabilities": [
+        "prices_read"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/prices/:id",
+      "capabilities": [
+        "price_update"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/live-sessions",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/live-sessions/upload-audio",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/live-stream/upload-poster",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/live-sessions/upload-cover",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/live-sessions/:id",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/live-sessions/:id",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "Deletion denied by default"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/live-stream",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/live-stream/admin",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/live-requests/:id/to-wav",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/live-requests/admin",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/live-requests/:id",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "Deletion denied by default"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/live-requests/:id/review",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/live-stream/mux",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/live-stream/obs",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/live-stream/obs/prepare",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/live-stream/obs/end",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/live-stream/webrtc/go-live",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/live-stream/webrtc/end",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/youtube-session",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/youtube-session",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/youtube-session",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "Deletion denied by default"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/youtube-session/check",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/archive-items",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/archive-items/:id",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/archive-items/:id",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "Deletion denied by default"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/overview",
+      "capabilities": [
+        "application_report"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/clients",
+      "capabilities": [
+        "customers_search"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/clients",
+      "capabilities": [
+        "customer_create"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/clients/:id",
+      "capabilities": [
+        "customer_update"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/clients/:id/requests",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/enquiries",
+      "capabilities": [
+        "enquiries_search"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/service-requests/:id/note",
+      "capabilities": [
+        "booking_note"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/service-requests/:id/planning",
+      "capabilities": [
+        "booking_planning_update"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/archive",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/sessions",
+      "capabilities": [
+        "events_search"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/storage",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/storage/:id",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/storage/:id/download",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/storage/upload",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/ai-booking/admin/config",
+      "capabilities": [
+        "ai_configuration_read"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "PUT",
+      "path": "/api/ai-booking/admin/config",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/ai-booking/admin/usage",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/ai-booking/admin/usage/:id",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/music-ontology/lyrics-concept",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/music-ontology/lyrics-transcription/status",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/music-ontology/lyrics-transcription",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/ai-booking/admin/billing/accounts",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/ai-booking/admin/billing/usage",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/ai-booking/admin/billing/invoices",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/ai-booking/admin/billing/invoices/:id",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/ai-booking/admin/billing/invoices",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/ai-booking/admin/billing/invoices/:id",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/ai-booking/venue-intelligence/configuration",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/ai-booking/venue-intelligence/research",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/ai-booking/venue-intelligence/research/:id",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/ai-booking/venue-intelligence/research/:id/select",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/ai-booking/venue-intelligence/records",
+      "capabilities": [
+        "venues_search"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/ai-booking/venue-intelligence/records/:id",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "PUT",
+      "path": "/api/ai-booking/venue-intelligence/records/:id/manual",
+      "capabilities": [
+        "venue_dimensions_update"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/ai-booking/venue-intelligence/tiles/:z/:x/:y",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/ai-booking/event-draft",
+      "capabilities": [
+        "event_draft_read"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "PUT",
+      "path": "/api/ai-booking/event-draft",
+      "capabilities": [
+        "event_draft_save"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/ai-booking/event-draft",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "Deletion denied by default"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/player-playlist",
+      "capabilities": [
+        "player_playlist_read"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/player-playlist",
+      "capabilities": [
+        "player_playlist_update"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/music-ontology/recordings",
+      "capabilities": [
+        "music_recordings_search"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/music-ontology/recordings/:id",
+      "capabilities": [
+        "music_recording_get"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/music-ontology/works",
+      "capabilities": [
+        "music_works_search"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/music-ontology/works/:id",
+      "capabilities": [
+        "music_work_get"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/music-ontology/vocabulary",
+      "capabilities": [
+        "music_vocabulary_search"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/music-ontology/vocabulary/:id",
+      "capabilities": [
+        "music_vocabulary_get"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/music-ontology/vocabulary",
+      "capabilities": [
+        "music_vocabulary_save"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/music-ontology/vocabulary/:id",
+      "capabilities": [
+        "music_vocabulary_save"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/music-ontology/works",
+      "capabilities": [
+        "music_work_save"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/music-ontology/works/:id",
+      "capabilities": [
+        "music_work_save"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/music-ontology/recordings",
+      "capabilities": [
+        "music_recording_save"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/music-ontology/recordings/:id",
+      "capabilities": [
+        "music_recording_save"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/music-ontology/recordings/:id/versions",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/music-ontology/recordings/:id",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "Deletion denied by default"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/music-archive",
+      "capabilities": [
+        "music_collections_search"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/music-archive/collections",
+      "capabilities": [
+        "music_collection_save"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/music-archive/collections/:id",
+      "capabilities": [
+        "music_collection_save"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/music-archive/collections/:id",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "Deletion denied by default"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/music-archive/collections/order",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/music-archive/songs",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/music-archive/songs/:id",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/music-archive/songs/:id",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "Deletion denied by default"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/music-archive/songs/order",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/music-archive/upload",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/setup-catalog",
+      "capabilities": [
+        "catalog_search"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/setup-catalog",
+      "capabilities": [
+        "catalog_save"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/setup-catalog/:kind/:id",
+      "capabilities": [
+        "catalog_save"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/live-recordings",
+      "capabilities": [
+        "live_archive_search"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/live-recordings/:id/download",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/live-recordings/:id/preview",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/live-recordings/:id/retry",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/live-recordings/:id",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "Deletion denied by default"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/live-recordings/:id/restore",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/live-recordings/:id/publish",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/equipment/admin",
+      "capabilities": [
+        "equipment_search"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/equipment",
+      "capabilities": [
+        "equipment_create"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/equipment/:id",
+      "capabilities": [
+        "equipment_update"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/equipment/:id",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "Deletion denied by default"
+    },
+    {
+      "method": "POST",
+      "path": "/api/equipment/:id/photo",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/equipment-3d/config",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/equipment-3d/jobs",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/equipment-3d/jobs",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/equipment-3d/jobs/:id",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/equipment-3d/jobs/:id/texture",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/equipment-3d/jobs/:id/store",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/ai-booking/simulation-draft",
+      "capabilities": [
+        "simulation_draft_read"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "PUT",
+      "path": "/api/ai-booking/simulation-draft",
+      "capabilities": [
+        "simulation_draft_save"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/meetings/slots",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/meetings/slots/:id",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "Deletion denied by default"
+    },
+    {
+      "method": "GET",
+      "path": "/api/meetings/admin",
+      "capabilities": [
+        "meetings_search"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/content/testimonials/admin",
+      "capabilities": [
+        "testimonials_search"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/content/testimonials",
+      "capabilities": [
+        "testimonial_create"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/content/testimonials/:id",
+      "capabilities": [
+        "testimonial_update"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/content/testimonials/:id",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "Deletion denied by default"
+    },
+    {
+      "method": "GET",
+      "path": "/api/content/media/admin",
+      "capabilities": [
+        "media_search"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/content/media",
+      "capabilities": [
+        "media_create"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/content/media/:id",
+      "capabilities": [
+        "media_update"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/content/media/:id",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "Deletion denied by default"
+    },
+    {
+      "method": "POST",
+      "path": "/api/content/upload",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/content/gallery/upload",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/seasonal-theme",
+      "capabilities": [
+        "theme_read"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "PUT",
+      "path": "/api/seasonal-theme",
+      "capabilities": [
+        "theme_update"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/service-requests/:id/payments",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/service-requests/:id/payments/:paymentId/void",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/bookings/confirmed",
+      "capabilities": [
+        "confirmed_bookings"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/transactions",
+      "capabilities": [
+        "transactions_report"
+      ],
+      "coverage": "integrated",
+      "reason": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/service-requests/:id/extend",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    },
+    {
+      "method": "POST",
+      "path": "/api/service-requests/:id/cancel",
+      "capabilities": [],
+      "coverage": "unsupported",
+      "reason": "No tested adapter; use the manual dashboard."
+    }
+  ],
+  "generatedAt": "2026-10-30T04:58:15.906Z",
+  "method": "Source scan plus explicit generated-route inventory; runtime route inventory returned by registry.",
+  "routes": [
+    {
+      "module": "ai-billing.js",
+      "method": "GET",
+      "path": "${admin}/accounts",
+      "line": 152
+    },
+    {
+      "module": "ai-billing.js",
+      "method": "GET",
+      "path": "${admin}/usage",
+      "line": 153
+    },
+    {
+      "module": "ai-billing.js",
+      "method": "GET",
+      "path": "${admin}/invoices",
+      "line": 154
+    },
+    {
+      "module": "ai-billing.js",
+      "method": "GET",
+      "path": "${admin}/invoices/:id",
+      "line": 155
+    },
+    {
+      "module": "ai-billing.js",
+      "method": "POST",
+      "path": "${admin}/invoices",
+      "line": 156
+    },
+    {
+      "module": "ai-billing.js",
+      "method": "PATCH",
+      "path": "${admin}/invoices/:id",
+      "line": 157
+    },
+    {
+      "module": "ai-configuration.js",
+      "method": "GET",
+      "path": "/api/ai-booking/admin/config",
+      "line": 119
+    },
+    {
+      "module": "ai-configuration.js",
+      "method": "PUT",
+      "path": "/api/ai-booking/admin/config",
+      "line": 120
+    },
+    {
+      "module": "ai-configuration.js",
+      "method": "GET",
+      "path": "/api/ai-booking/admin/usage",
+      "line": 121
+    },
+    {
+      "module": "ai-configuration.js",
+      "method": "PATCH",
+      "path": "/api/ai-booking/admin/usage/:id",
+      "line": 122
+    },
+    {
+      "module": "archive-player.js",
+      "method": "GET",
+      "path": "/api/admin/player-playlist",
+      "line": 21
+    },
+    {
+      "module": "archive-player.js",
+      "method": "PUT",
+      "path": "/api/admin/player-playlist",
+      "line": 25
+    },
+    {
+      "module": "content.js",
+      "method": "GET",
+      "path": "${base}/admin",
+      "line": 51
+    },
+    {
+      "module": "content.js",
+      "method": "PATCH",
+      "path": "${base}/:id",
+      "line": 56
+    },
+    {
+      "module": "content.js",
+      "method": "DELETE",
+      "path": "${base}/:id",
+      "line": 64
+    },
+    {
+      "module": "content.js",
+      "method": "POST",
+      "path": "/api/content/upload",
+      "line": 77
+    },
+    {
+      "module": "content.js",
+      "method": "POST",
+      "path": "/api/content/gallery/upload",
+      "line": 90
+    },
+    {
+      "module": "equipment-3d.js",
+      "method": "GET",
+      "path": "/api/admin/equipment-3d/config",
+      "line": 37
+    },
+    {
+      "module": "equipment-3d.js",
+      "method": "GET",
+      "path": "/api/admin/equipment-3d/jobs",
+      "line": 38
+    },
+    {
+      "module": "equipment-3d.js",
+      "method": "POST",
+      "path": "/api/admin/equipment-3d/jobs",
+      "line": 42
+    },
+    {
+      "module": "equipment-3d.js",
+      "method": "GET",
+      "path": "/api/admin/equipment-3d/jobs/:id",
+      "line": 59
+    },
+    {
+      "module": "equipment-3d.js",
+      "method": "POST",
+      "path": "/api/admin/equipment-3d/jobs/:id/texture",
+      "line": 77
+    },
+    {
+      "module": "equipment-3d.js",
+      "method": "POST",
+      "path": "/api/admin/equipment-3d/jobs/:id/store",
+      "line": 89
+    },
+    {
+      "module": "equipment.js",
+      "method": "GET",
+      "path": "/api/equipment/admin",
+      "line": 86
+    },
+    {
+      "module": "equipment.js",
+      "method": "POST",
+      "path": "/api/equipment",
+      "line": 91
+    },
+    {
+      "module": "equipment.js",
+      "method": "PATCH",
+      "path": "/api/equipment/:id",
+      "line": 104
+    },
+    {
+      "module": "equipment.js",
+      "method": "DELETE",
+      "path": "/api/equipment/:id",
+      "line": 112
+    },
+    {
+      "module": "equipment.js",
+      "method": "POST",
+      "path": "/api/equipment/:id/photo",
+      "line": 117
+    },
+    {
+      "module": "event-drafts.js",
+      "method": "GET",
+      "path": "/api/ai-booking/event-draft",
+      "line": 24
+    },
+    {
+      "module": "event-drafts.js",
+      "method": "PUT",
+      "path": "/api/ai-booking/event-draft",
+      "line": 25
+    },
+    {
+      "module": "event-drafts.js",
+      "method": "DELETE",
+      "path": "/api/ai-booking/event-draft",
+      "line": 38
+    },
+    {
+      "module": "live-broadcast.js",
+      "method": "POST",
+      "path": "/api/live-stream/webrtc/go-live",
+      "line": 26
+    },
+    {
+      "module": "live-broadcast.js",
+      "method": "POST",
+      "path": "/api/live-stream/webrtc/end",
+      "line": 55
+    },
+    {
+      "module": "live-recordings.js",
+      "method": "GET",
+      "path": "/api/admin/live-recordings",
+      "line": 116
+    },
+    {
+      "module": "live-recordings.js",
+      "method": "GET",
+      "path": "/api/admin/live-recordings/:id/${route}",
+      "line": 117
+    },
+    {
+      "module": "live-recordings.js",
+      "method": "POST",
+      "path": "/api/admin/live-recordings/:id/retry",
+      "line": 125
+    },
+    {
+      "module": "live-recordings.js",
+      "method": "DELETE",
+      "path": "/api/admin/live-recordings/:id",
+      "line": 130
+    },
+    {
+      "module": "live-recordings.js",
+      "method": "POST",
+      "path": "/api/admin/live-recordings/:id/restore",
+      "line": 136
+    },
+    {
+      "module": "live-recordings.js",
+      "method": "POST",
+      "path": "/api/admin/live-recordings/:id/publish",
+      "line": 142
+    },
+    {
+      "module": "lyrics-concept.js",
+      "method": "POST",
+      "path": "/api/admin/music-ontology/lyrics-concept",
+      "line": 9
+    },
+    {
+      "module": "lyrics-transcription.js",
+      "method": "GET",
+      "path": "/api/admin/music-ontology/lyrics-transcription/status",
+      "line": 14
+    },
+    {
+      "module": "lyrics-transcription.js",
+      "method": "POST",
+      "path": "/api/admin/music-ontology/lyrics-transcription",
+      "line": 18
+    },
+    {
+      "module": "meetings.js",
+      "method": "POST",
+      "path": "/api/meetings/slots",
+      "line": 71
+    },
+    {
+      "module": "meetings.js",
+      "method": "DELETE",
+      "path": "/api/meetings/slots/:id",
+      "line": 82
+    },
+    {
+      "module": "meetings.js",
+      "method": "GET",
+      "path": "/api/meetings/admin",
+      "line": 92
+    },
+    {
+      "module": "mobile-admin.js",
+      "method": "GET",
+      "path": "/api/admin/overview",
+      "line": 44
+    },
+    {
+      "module": "mobile-admin.js",
+      "method": "GET",
+      "path": "/api/admin/clients",
+      "line": 54
+    },
+    {
+      "module": "mobile-admin.js",
+      "method": "POST",
+      "path": "/api/admin/clients",
+      "line": 60
+    },
+    {
+      "module": "mobile-admin.js",
+      "method": "PATCH",
+      "path": "/api/admin/clients/:id",
+      "line": 69
+    },
+    {
+      "module": "mobile-admin.js",
+      "method": "GET",
+      "path": "/api/admin/clients/:id/requests",
+      "line": 79
+    },
+    {
+      "module": "mobile-admin.js",
+      "method": "GET",
+      "path": "/api/admin/enquiries",
+      "line": 83
+    },
+    {
+      "module": "mobile-admin.js",
+      "method": "PATCH",
+      "path": "/api/admin/service-requests/:id/note",
+      "line": 87
+    },
+    {
+      "module": "mobile-admin.js",
+      "method": "PUT",
+      "path": "/api/admin/service-requests/:id/planning",
+      "line": 93
+    },
+    {
+      "module": "mobile-admin.js",
+      "method": "GET",
+      "path": "/api/admin/archive",
+      "line": 100
+    },
+    {
+      "module": "mobile-admin.js",
+      "method": "GET",
+      "path": "/api/admin/sessions",
+      "line": 104
+    },
+    {
+      "module": "mobile-admin.js",
+      "method": "GET",
+      "path": "/api/admin/storage",
+      "line": 108
+    },
+    {
+      "module": "mobile-admin.js",
+      "method": "PATCH",
+      "path": "/api/admin/storage/:id",
+      "line": 113
+    },
+    {
+      "module": "mobile-admin.js",
+      "method": "GET",
+      "path": "/api/admin/storage/:id/download",
+      "line": 119
+    },
+    {
+      "module": "mobile-admin.js",
+      "method": "POST",
+      "path": "/api/admin/storage/upload",
+      "line": 136
+    },
+    {
+      "module": "music-archive.js",
+      "method": "GET",
+      "path": "/api/admin/music-archive",
+      "line": 72
+    },
+    {
+      "module": "music-archive.js",
+      "method": "POST",
+      "path": "/api/admin/music-archive/${kind}",
+      "line": 79
+    },
+    {
+      "module": "music-archive.js",
+      "method": "PATCH",
+      "path": "/api/admin/music-archive/${kind}/:id",
+      "line": 89
+    },
+    {
+      "module": "music-archive.js",
+      "method": "DELETE",
+      "path": "/api/admin/music-archive/${kind}/:id",
+      "line": 101
+    },
+    {
+      "module": "music-archive.js",
+      "method": "PUT",
+      "path": "/api/admin/music-archive/${kind}/order",
+      "line": 108
+    },
+    {
+      "module": "music-archive.js",
+      "method": "POST",
+      "path": "/api/admin/music-archive/upload",
+      "line": 119
+    },
+    {
+      "module": "obs-broadcast.js",
+      "method": "GET",
+      "path": "/api/live-stream/obs",
+      "line": 51
+    },
+    {
+      "module": "obs-broadcast.js",
+      "method": "POST",
+      "path": "/api/live-stream/obs/prepare",
+      "line": 56
+    },
+    {
+      "module": "obs-broadcast.js",
+      "method": "POST",
+      "path": "/api/live-stream/obs/end",
+      "line": 90
+    },
+    {
+      "module": "payments.js",
+      "method": "POST",
+      "path": "/api/service-requests/:id/payments",
+      "line": 54
+    },
+    {
+      "module": "payments.js",
+      "method": "POST",
+      "path": "/api/service-requests/:id/payments/:paymentId/void",
+      "line": 100
+    },
+    {
+      "module": "payments.js",
+      "method": "GET",
+      "path": "/api/bookings/confirmed",
+      "line": 124
+    },
+    {
+      "module": "payments.js",
+      "method": "GET",
+      "path": "/api/transactions",
+      "line": 133
+    },
+    {
+      "module": "quote-lifecycle.js",
+      "method": "POST",
+      "path": "/api/service-requests/:id/extend",
+      "line": 69
+    },
+    {
+      "module": "quote-lifecycle.js",
+      "method": "POST",
+      "path": "/api/service-requests/:id/cancel",
+      "line": 85
+    },
+    {
+      "module": "seasonal-theme.js",
+      "method": "PUT",
+      "path": "/api/seasonal-theme",
+      "line": 16
+    },
+    {
+      "module": "server.js",
+      "method": "GET",
+      "path": "/api/service-requests/admin",
+      "line": 1097
+    },
+    {
+      "module": "server.js",
+      "method": "PATCH",
+      "path": "/api/service-requests/:id/quote",
+      "line": 1105
+    },
+    {
+      "module": "server.js",
+      "method": "GET",
+      "path": "/api/prices",
+      "line": 1171
+    },
+    {
+      "module": "server.js",
+      "method": "PATCH",
+      "path": "/api/prices/:id",
+      "line": 1178
+    },
+    {
+      "module": "server.js",
+      "method": "POST",
+      "path": "/api/live-sessions",
+      "line": 1207
+    },
+    {
+      "module": "server.js",
+      "method": "POST",
+      "path": "/api/live-sessions/upload-audio",
+      "line": 1234
+    },
+    {
+      "module": "server.js",
+      "method": "POST",
+      "path": "/api/live-stream/upload-poster",
+      "line": 1265
+    },
+    {
+      "module": "server.js",
+      "method": "POST",
+      "path": "/api/live-sessions/upload-cover",
+      "line": 1289
+    },
+    {
+      "module": "server.js",
+      "method": "PATCH",
+      "path": "/api/live-sessions/:id",
+      "line": 1310
+    },
+    {
+      "module": "server.js",
+      "method": "DELETE",
+      "path": "/api/live-sessions/:id",
+      "line": 1337
+    },
+    {
+      "module": "server.js",
+      "method": "PATCH",
+      "path": "/api/live-stream",
+      "line": 1353
+    },
+    {
+      "module": "server.js",
+      "method": "GET",
+      "path": "/api/live-stream/admin",
+      "line": 1375
+    },
+    {
+      "module": "server.js",
+      "method": "POST",
+      "path": "/api/live-requests/:id/to-wav",
+      "line": 1449
+    },
+    {
+      "module": "server.js",
+      "method": "GET",
+      "path": "/api/live-requests/admin",
+      "line": 1546
+    },
+    {
+      "module": "server.js",
+      "method": "DELETE",
+      "path": "/api/live-requests/:id",
+      "line": 1554
+    },
+    {
+      "module": "server.js",
+      "method": "PATCH",
+      "path": "/api/live-requests/:id/review",
+      "line": 1569
+    },
+    {
+      "module": "server.js",
+      "method": "POST",
+      "path": "/api/live-stream/mux",
+      "line": 1695
+    },
+    {
+      "module": "server.js",
+      "method": "POST",
+      "path": "/api/archive-items",
+      "line": 1794
+    },
+    {
+      "module": "server.js",
+      "method": "PATCH",
+      "path": "/api/archive-items/:id",
+      "line": 1796
+    },
+    {
+      "module": "server.js",
+      "method": "DELETE",
+      "path": "/api/archive-items/:id",
+      "line": 1824
+    },
+    {
+      "module": "setup-catalog.js",
+      "method": "GET",
+      "path": "/api/admin/setup-catalog",
+      "line": 28
+    },
+    {
+      "module": "setup-catalog.js",
+      "method": "POST",
+      "path": "/api/admin/setup-catalog",
+      "line": 41
+    },
+    {
+      "module": "setup-catalog.js",
+      "method": "PUT",
+      "path": "/api/admin/setup-catalog/:kind/:id",
+      "line": 42
+    },
+    {
+      "module": "youtube-session.js",
+      "method": "GET",
+      "path": "/api/admin/youtube-session",
+      "line": 73
+    },
+    {
+      "module": "youtube-session.js",
+      "method": "POST",
+      "path": "/api/admin/youtube-session",
+      "line": 74
+    },
+    {
+      "module": "youtube-session.js",
+      "method": "DELETE",
+      "path": "/api/admin/youtube-session",
+      "line": 86
+    },
+    {
+      "module": "youtube-session.js",
+      "method": "POST",
+      "path": "/api/admin/youtube-session/check",
+      "line": 90
+    },
+    {
+      "module": "music-ontology/routes.js",
+      "method": "POST",
+      "path": "${admin}/vocabulary",
+      "line": 21
+    },
+    {
+      "module": "music-ontology/routes.js",
+      "method": "PUT",
+      "path": "${admin}/vocabulary/:id",
+      "line": 22
+    },
+    {
+      "module": "music-ontology/routes.js",
+      "method": "GET",
+      "path": "${admin}/recordings/:id/versions",
+      "line": 30
+    },
+    {
+      "module": "music-ontology/routes.js",
+      "method": "DELETE",
+      "path": "${admin}/recordings/:id",
+      "line": 31
+    }
+  ],
+  "generatedRoutes": [
+    {
+      "module": "content.js",
+      "path": "/api/content/{testimonials,media}{/admin,/:id}",
+      "method": "CRUD",
+      "note": "Generated crud() routes; includes publication and testimonial replies."
+    },
+    {
+      "module": "music-ontology/routes.js",
+      "path": "/api/admin/music-ontology/{recordings,works,vocabulary}",
+      "method": "CRUD",
+      "note": "Generated route loops; strict ontology schemas, permanent delete denied to AI."
+    },
+    {
+      "module": "music-archive.js",
+      "path": "/api/admin/music-archive/{collections,songs}",
+      "method": "CRUD",
+      "note": "Generated collections routes; legacy song writes rejected by ontology."
+    }
+  ]
+}

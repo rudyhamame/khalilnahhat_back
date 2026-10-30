@@ -22,6 +22,7 @@ COPY src ./src
 COPY contracts ./contracts
 COPY scripts/separate-stems.py ./scripts/separate-stems.py
 COPY scripts/stem-worker.js ./scripts/stem-worker.js
+COPY scripts/ai-administrator-worker.js ./scripts/ai-administrator-worker.js
 RUN mkdir -p /app/.runtime/stems && chown -R node:node /app/.runtime
 COPY scripts/music-ontology-migrate.js ./scripts/music-ontology-migrate.js
 RUN node -e "require('./src/music-ontology/models'); require('./src/music-ontology/validation')"

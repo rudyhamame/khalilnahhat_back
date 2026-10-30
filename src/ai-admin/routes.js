@@ -1,0 +1,31 @@
+const {z}=require('zod');
+const {createRouteAdapter,failure}=require('./route-adapter');
+const {createRegistry}=require('./registry');
+const {createStore}=require('./store');
+const {createEchoAdminAgent}=require('./agent');
+const {createEngine}=require('./engine');
+const {createPush}=require('./push');
+const {redact}=require('./redact');
+const publicTask=task=>{const {input,leaseToken,leaseUntil,...value}=task;return redact(value);};
+function registerAiAdministrator(app,{requireAdmin,authorize,configService,env=process.env}){
+ const store=createStore(),registry=createRegistry({invoke:createRouteAdapter(app),app});
+ const agent=createEchoAdminAgent({registry,configService,env});const engine=createEngine({store,registry,agent,authorize});
+ const push=createPush({store,env,authorize});let pushTimer=null,notifying=false;
+ const start=async()=>{await push.init();await engine.start();if(!pushTimer){pushTimer=setInterval(async()=>{if(notifying)return;notifying=true;try{await push.tick();}catch(error){console.error('Administrator notification:',error.name);}finally{notifying=false;}},5000);pushTimer.unref?.();}};
+ const base='/api/admin/ai-administrator';
+ const guard=fn=>async(req,res)=>{res.set('Cache-Control','no-store');try{await fn(req,res);}catch(error){res.status(error instanceof z.ZodError?400:[400,401,403,404,409,422,429,503].includes(error.status)?error.status:503).json({message:error instanceof z.ZodError?error.issues[0].message:error.status?error.message:'AI Administrator is temporarily unavailable.'});}};
+ const owner=req=>String(req.user._id||req.user.id);
+ const owned=async(req)=>{const task=await store.get(req.params.id);if(!task||task.owner!==owner(req))throw failure(404,'Task not found.');return task;};
+ const admitted=async who=>{if(await store.Task.countDocuments({owner:who,createdAt:{$gte:new Date(Date.now()-600000)}})>=30)throw failure(429,'Administrator task limit reached. Wait ten minutes.');};
+ app.get(base,requireAdmin,guard(async(req,res)=>{const config=await configService.load();return res.json({tasks:(await store.list(owner(req))).map(publicTask),control:await store.control(),capabilities:registry.list(),inventory:registry.inventory(),model:{provider:'openai',model:env.OPENAI_ADMIN_MODEL||(config.chat.provider==='openai'?config.chat.model:env.OPENAI_BOOKING_CHAT_MODEL||'gpt-4o-mini'),configured:!!env.OPENAI_API_KEY},worker:{mode:env.ECHO_ADMIN_WORKER_MODE==='external'?'external':'api-process',sleepWarning:env.RENDER==='true',androidPush:push.configured()},permissions:{identity:owner(req),role:'administrator',permanentDeletion:false,privilegeChanges:false,customerMessages:false}});}));
+ app.post(`${base}/tasks`,requireAdmin,guard(async(req,res)=>{await admitted(owner(req));res.status(202).json({item:publicTask(await engine.submit(owner(req),req.body,req.get('x-echo-client')==='android'?'android':'dashboard'))});}));
+ app.get(`${base}/tasks/:id`,requireAdmin,guard(async(req,res)=>res.json({item:publicTask(await owned(req))})));
+ app.post(`${base}/tasks/:id/approve`,requireAdmin,guard(async(req,res)=>{await owned(req);const {digest}=z.object({digest:z.string().regex(/^[a-f0-9]{64}$/)}).strict().parse(req.body);res.json({item:publicTask(await engine.approve(req.params.id,owner(req),digest))});}));
+ for(const action of ['cancel','retry'])app.post(`${base}/tasks/:id/${action}`,requireAdmin,guard(async(req,res)=>{await owned(req);res.json({item:publicTask(await engine[action](req.params.id,owner(req)))});}));
+ app.put(`${base}/control`,requireAdmin,guard(async(req,res)=>{const {paused}=z.object({paused:z.boolean()}).strict().parse(req.body);res.json({item:await engine.pause(paused,owner(req))});}));
+ app.put(`${base}/devices`,requireAdmin,guard(async(req,res)=>res.json({item:await push.register(owner(req),req.user,req.body)})));
+ app.delete(`${base}/devices/:id`,requireAdmin,guard(async(req,res)=>res.json({item:await push.revoke(owner(req),req.params.id)})));
+ const service={engine,registry,store,push,start,stop(){engine.stop();clearInterval(pushTimer);pushTimer=null;}};
+ app.locals.aiAdministrator=service;return service;
+}
+module.exports={registerAiAdministrator,publicTask};

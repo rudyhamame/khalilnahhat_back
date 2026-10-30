@@ -1915,6 +1915,7 @@ require('./archive-player').registerArchivePlayer(app, { requireAdmin });
 require('./stem-separation').registerStemSeparation(app, { requireAdmin });
 require('./music-archive').registerMusicArchive(app, { requireAdmin });
 require('./setup-catalog').registerSetupCatalog(app, { requireAdmin });
+require('./availability').registerAvailability(app);
 require('./live-recordings').registerLiveRecordings(app, requireAdmin);
 require('./live-suggestions').registerLiveSuggestions(app, { getLiveStreamConfig });
 require('./live-comments').registerLiveComments(app, { getLiveStreamConfig });

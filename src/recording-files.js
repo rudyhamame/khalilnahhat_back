@@ -37,6 +37,7 @@ async function prepareRecordingFiles(filename, directory, limit = DEFAULT_LIMIT)
  throw new Error('Could not split recording within the video size limit. Original retained.');
 }
 function cloudAssetId(roomName, index, count) {
- return `khalil/live-archive/${roomName}${count>1?`/part-${String(index+1).padStart(3,'0')}`:''}`;
+ // Final archive: the Cloudinary "Live" folder (B2 is only the temporary staging bucket LiveKit writes to).
+ return `Live/${roomName}${count>1?`/part-${String(index+1).padStart(3,'0')}`:''}`;
 }
 module.exports={DEFAULT_LIMIT,segmentSeconds,prepareRecordingFiles,cloudAssetId};

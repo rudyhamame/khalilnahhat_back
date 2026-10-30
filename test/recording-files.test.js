@@ -6,8 +6,8 @@ test('segment planning reserves headroom below account limit and rejects missing
  assert.throws(()=>segmentSeconds(0,100,100));assert.throws(()=>segmentSeconds(100,0,100));
 });
 test('asset names are deterministic and distinguish each part without overwriting the legacy recording',()=>{
- assert.equal(cloudAssetId('room',0,1),'khalil/live-archive/room');
- assert.equal(cloudAssetId('room',0,3),'khalil/live-archive/room/part-001');
+ assert.equal(cloudAssetId('room',0,1),'Live/room');
+ assert.equal(cloudAssetId('room',0,3),'Live/room/part-001');
  assert.notEqual(cloudAssetId('room',0,3),cloudAssetId('room',1,3));
 });
 test('real MP4 stream-copy segmentation preserves audio/video, stays under limit, retains original',async()=>{

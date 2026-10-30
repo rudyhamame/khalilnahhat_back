@@ -1,9 +1,10 @@
 const {createAlibaba}=require('./alibaba');
+const {createOllama}=require('./ollama');
 const failure=(status,message)=>Object.assign(new Error(message),{status});
 const router={id:'openrouter/free',provider:'openrouter',mode:'chat',label:'Free models router',free:true,rates:{textInput:0,textCached:0,textOutput:0},source:'https://openrouter.ai/openrouter/free'};
 function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
  let cache=null,until=0,pending=null;
- const alibaba=createAlibaba({env,fetchImpl});
+ const alibaba=createAlibaba({env,fetchImpl}),ollama=createOllama({env,fetchImpl});
  const models=async()=>{
   if(cache&&Date.now()<until)return structuredClone(cache);
   if(!pending)pending=(async()=>{
@@ -24,7 +25,8 @@ function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
   if(config.freeOnly!==false&&!model.free)throw failure(400,'Free-only mode blocks paid models.');
   return model;
  };
- return {models,validate,alibaba,configured:()=>Boolean(env.OPENROUTER_API_KEY),async request(body,{signal}={}){
+ return {models,validate,alibaba,ollama,configured:()=>Boolean(env.OPENROUTER_API_KEY),async request(body,{signal}={}){
+  if(body.config?.provider==='ollama')return ollama.request(body,{signal});
   if(body.config?.provider==='alibaba')return alibaba.request(body,{signal});
   if(!env.OPENROUTER_API_KEY)throw failure(503,'Configure OPENROUTER_API_KEY in Render before using OpenRouter.');
   await validate(body.config);
@@ -45,5 +47,5 @@ function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
  }};
 }
 // The API key a chat provider needs; every chat call site uses this so a new provider only has to be added here.
-const providerKey=(env,provider)=>provider==='openrouter'?env.OPENROUTER_API_KEY:provider==='alibaba'?env.DASHSCOPE_API_KEY:env.OPENAI_API_KEY;
+const providerKey=(env,provider)=>provider==='openrouter'?env.OPENROUTER_API_KEY:provider==='alibaba'?env.DASHSCOPE_API_KEY:provider==='ollama'?env.OLLAMA_API_KEY:env.OPENAI_API_KEY;
 module.exports={createOpenRouter,providerKey};

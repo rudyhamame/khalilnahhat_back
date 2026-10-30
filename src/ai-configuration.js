@@ -20,7 +20,7 @@ const rates=z.object({textInput:money,textCached:money,textOutput:money,audioInp
 const modeSchema=kind=>z.object({enabled:z.boolean(),model:z.string().trim().min(1).max(200).refine(id=>kind==='chat'||catalog.some(item=>item.mode===kind&&item.id===id),'Choose a supported model for this mode.'),providerRates:rates,maxOutputTokens:z.number().int().min(256).max(4096),requestsPer10Min:z.number().int().min(1).max(kind==='chat'?200:20)}).strict();
 const sttDefaults=()=>({enabled:true,provider:'openai',model:'whisper-1',providerRates:{audioMinute:0.006},requestsPer10Min:6});
 const sttSchema=z.object({enabled:z.boolean(),provider:z.enum(['openai','alibaba']).default('openai'),model:z.enum(['whisper-1','qwen3-asr-flash']),providerRates:z.object({audioMinute:money}).strict(),requestsPer10Min:z.number().int().min(1).max(20)}).strict().refine(value=>catalog.some(item=>item.mode==='stt'&&item.id===value.model&&item.provider===value.provider),{message:'Choose a speech-to-text model that belongs to the selected provider.'});
-const configSchema=z.object({stt:sttSchema.optional(),revision:z.number().int().min(0),chat:modeSchema('chat').extend({provider:z.enum(['openai','openrouter','alibaba']).default('openai'),freeOnly:z.boolean().default(true)}),voice:modeSchema('voice').extend({provider:z.enum(['openai','alibaba']).default('openai'),maxCallSeconds:z.number().int().min(30).max(900)}),customerPricing:z.object({policy:z.enum(['included','manual_invoice']),currency:z.enum(['CAD','USD']),chatReplyCents:z.number().int().min(0).max(100000),voiceSessionCents:z.number().int().min(0).max(100000)}).strict()}).strict().superRefine((config,ctx)=>{
+const configSchema=z.object({stt:sttSchema.optional(),revision:z.number().int().min(0),chat:modeSchema('chat').extend({provider:z.enum(['openai','openrouter','alibaba','ollama']).default('openai'),freeOnly:z.boolean().default(true)}),voice:modeSchema('voice').extend({provider:z.enum(['openai','alibaba']).default('openai'),maxCallSeconds:z.number().int().min(30).max(900)}),customerPricing:z.object({policy:z.enum(['included','manual_invoice']),currency:z.enum(['CAD','USD']),chatReplyCents:z.number().int().min(0).max(100000),voiceSessionCents:z.number().int().min(0).max(100000)}).strict()}).strict().superRefine((config,ctx)=>{
  {const voiceModel=catalog.find(item=>item.mode==='voice'&&item.id===config.voice.model);if(voiceModel&&voiceModel.provider!==config.voice.provider)ctx.addIssue({code:'custom',path:['voice','model'],message:'This voice model belongs to a different provider.'});}
  for(const mode of ['chat','voice']){
   const r=config[mode].providerRates;
@@ -56,6 +56,7 @@ const mongoStore={
 };
 const error=(status,message)=>Object.assign(new Error(message),{status});
 function providerEstimate(config,mode,metrics){
+ if(mode==='chat'&&config.chat.provider==='ollama')return null;
  if(mode==='stt')return Number.isFinite(metrics.durationSeconds)&&metrics.durationSeconds>=0?Number((metrics.durationSeconds/60*config.stt.providerRates.audioMinute).toFixed(8)):null;
  if(mode==='voice'||!Number.isInteger(metrics.inputTokens)||!Number.isInteger(metrics.outputTokens))return null;
  const r=config.chat.providerRates,cached=Math.min(metrics.inputTokens,Math.max(0,metrics.cachedInputTokens||0));
@@ -68,7 +69,11 @@ function createAiConfiguration({store=mongoStore,env=process.env,fetchImpl=fetch
  const load=async()=>{if(cached&&Date.now()<until)return structuredClone(cached);if(!inflight)inflight=store.getConfig().then(item=>{const value=item?.value||defaults(env);cached={...value,stt:normalizeStt(value.stt),chat:{provider:'openai',freeOnly:true,...value.chat},voice:{provider:'openai',...value.voice}};until=Date.now()+5000;return cached;}).finally(()=>{inflight=null;});return structuredClone(await inflight);};
  return {
   load,
-  async describe(){let extra=[],catalogError='';try{extra=await openrouter.models();}catch{catalogError='OpenRouter catalog unavailable. Reload to retry.';}return {item:await load(),catalog:[...catalog,...extra,...openrouter.alibaba.models()],providers:{openai:{configured:Boolean(env.OPENAI_API_KEY)},openrouter:{configured:Boolean(env.OPENROUTER_API_KEY)},alibaba:{configured:openrouter.alibaba.configured()}},catalogError};},
+  async describe(){
+   const results=await Promise.allSettled([openrouter.models(),openrouter.ollama.models()]);
+   const catalogError=results.map((result,index)=>result.status==='rejected'?`${index===0?'OpenRouter':'Ollama Cloud'} catalog unavailable. Reload to retry.`:'').filter(Boolean).join(' ');
+   return {item:await load(),catalog:[...catalog,...(results[0].status==='fulfilled'?results[0].value:[]),...openrouter.alibaba.models(),...(results[1].status==='fulfilled'?results[1].value:[])],providers:{openai:{configured:Boolean(env.OPENAI_API_KEY)},openrouter:{configured:Boolean(env.OPENROUTER_API_KEY)},alibaba:{configured:openrouter.alibaba.configured()},ollama:{configured:openrouter.ollama.configured()}},catalogError};
+  },
   async save(body,owner){
    const old=await load();
    const parsed=configSchema.safeParse({...body,stt:body.stt??old.stt});if(!parsed.success)throw error(400,parsed.error.issues[0]?.message||'Invalid AI configuration.');
@@ -78,6 +83,9 @@ function createAiConfiguration({store=mongoStore,env=process.env,fetchImpl=fetch
     const model=await openrouter.validate(parsed.data.chat);
     parsed.data.chat.providerRates={...model.rates};
     if(parsed.data.chat.enabled&&!openrouter.configured())throw error(503,'Configure OPENROUTER_API_KEY in Render before enabling OpenRouter.');
+   }else if(parsed.data.chat.provider==='ollama'){
+    const model=await openrouter.ollama.validate(parsed.data.chat);parsed.data.chat.providerRates={...model.rates};
+    if(parsed.data.chat.enabled&&!openrouter.ollama.configured())throw error(503,'Configure OLLAMA_API_KEY on the API server before enabling Ollama Cloud.');
    }else if(parsed.data.chat.provider==='alibaba'){
     openrouter.alibaba.validate(parsed.data.chat);
     // Prices come from the admin (the Model Studio price list), not from this code.

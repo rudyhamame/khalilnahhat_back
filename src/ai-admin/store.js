@@ -1,13 +1,14 @@
 const mongoose=require('mongoose');
 const {randomUUID}=require('node:crypto');
-const taskSchema=new mongoose.Schema({_id:String,owner:{type:String,required:true,index:true},sessionId:String,requestId:String,command:String,source:String,state:{type:String,index:true},input:[mongoose.Schema.Types.Mixed],actions:[mongoose.Schema.Types.Mixed],audit:[mongoose.Schema.Types.Mixed],result:mongoose.Schema.Types.Mixed,error:String,pending:mongoose.Schema.Types.Mixed,cancelRequested:{type:Boolean,default:false},leaseToken:String,leaseUntil:Date,notification:mongoose.Schema.Types.Mixed,pushPublishedVersion:String},{timestamps:true,versionKey:false});
- taskSchema.index({owner:1,requestId:1},{unique:true});taskSchema.index({state:1,leaseUntil:1,createdAt:1});
+const taskSchema=new mongoose.Schema({_id:String,owner:{type:String,required:true,index:true},sessionId:String,requestId:String,command:String,source:String,contextInitialized:Boolean,state:{type:String,index:true},input:[mongoose.Schema.Types.Mixed],actions:[mongoose.Schema.Types.Mixed],audit:[mongoose.Schema.Types.Mixed],result:mongoose.Schema.Types.Mixed,error:String,pending:mongoose.Schema.Types.Mixed,cancelRequested:{type:Boolean,default:false},leaseToken:String,leaseUntil:Date,notification:mongoose.Schema.Types.Mixed,pushPublishedVersion:String},{timestamps:true,versionKey:false});
+ taskSchema.index({owner:1,sessionId:1,createdAt:-1});taskSchema.index({owner:1,requestId:1},{unique:true});taskSchema.index({state:1,leaseUntil:1,createdAt:1});
 const Task=mongoose.models.EchoAdminTask||mongoose.model('EchoAdminTask',taskSchema);
 const Control=mongoose.models.EchoAdminControl||mongoose.model('EchoAdminControl',new mongoose.Schema({_id:String,paused:{type:Boolean,default:false},updatedBy:String,leaseToken:String,leaseUntil:Date},{timestamps:true}));
 function createStore(){const auditCounts=new WeakMap();return {
  async init(){await Promise.all([Task.init(),Control.init()]);},
  async create(value){try{return (await Task.create(value)).toObject();}catch(e){if(e.code!==11000)throw e;return Task.findOne({owner:value.owner,requestId:value.requestId}).lean();}},
  get:id=>Task.findById(id).lean(),
+ conversation:(owner,sessionId,task)=>Task.find({owner,sessionId,_id:{$ne:task._id},createdAt:{$lte:task.createdAt}}).sort({createdAt:-1,_id:-1}).limit(12).select('_id command state result error actions').lean(),
  list:owner=>Task.find({owner}).sort({createdAt:-1}).limit(100).select('owner sessionId requestId command source state error createdAt updatedAt cancelRequested').lean(),
  async lock(token){try{return await Control.findOneAndUpdate({_id:'worker',$or:[{leaseUntil:{$lt:new Date()}},{leaseToken:token},{leaseUntil:{$exists:false}}]},{$set:{leaseToken:token,leaseUntil:new Date(Date.now()+300000)}},{upsert:true,returnDocument:'after'}).lean();}catch(e){if(e.code===11000)return null;throw e;}},
  async unlock(token){await Control.updateOne({_id:'worker',leaseToken:token},{$set:{leaseUntil:new Date(0)}});},

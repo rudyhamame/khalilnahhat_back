@@ -1,0 +1,56 @@
+npm notice run khalil_back@1.0.0 test:ai-administrator
+npm notice run node --test test/ai-administrator.integration.test.js
+◇ injected env (6) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+▶ AI Administrator: real editor adapters, durable approvals, verification, authentication and recovery
+  ✔ unauthorized tool invocation denied by normal admin guard (179.318396ms)
+  ✔ create lyrical work using real editor; typed approval required (2308.421274ms)
+  ✔ create draft recording; manual API reads same persisted record (2967.110169ms)
+  ✔ draft metadata patch preserves title, work and unrelated fields (1990.855212ms)
+  ✔ instrumental, vocabulary, references, genres, languages, artists and shared metadata (16863.725543ms)
+(node:9550) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✔ collections create, reorder and publication approval (5505.320863ms)
+  ✔ publish requires approval and owned audio reference; read verification confirms public state (9039.225192ms)
+  ✔ timed lyric rows, vocabulary edits and inferred recording fields preserve shared rules (4149.031284ms)
+  ✔ duplicate analysis and proposal do not modify records (2753.201911ms)
+  ✔ idempotent task submission and safe retry do not duplicate creations (2418.393741ms)
+  ✔ repeated model tool-call identities never repeat an actual mutation (1500.898657ms)
+  ✔ approval bound to initiator and exact digest; stale target rejected (3056.982554ms)
+(node:9550) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+  ✔ restart resumes approved action using durable input, receipt and audit (1840.707296ms)
+  ✔ crash during write never replays an uncertain mutation (707.555869ms)
+  ✔ emergency stop and cancellation; revoked authority blocks future execution (367.203226ms)
+  ✔ Responses API function call format and natural language model handoff (59.489797ms)
+  ✔ non-Music read adapters call actual administrative services (1207.100769ms)
+(node:9550) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+(node:9550) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+  ✔ actual equipment and testimonial edits use approval and verification (3345.25998ms)
+(node:9550) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+(node:9550) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+(node:9550) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+  ✔ customer, equipment, media creation and approved pricing use real existing handlers (13472.481407ms)
+  ✔ catalog event/service creation and patch use manual catalog handlers (5408.200014ms)
+(node:9550) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+  ✔ shared event draft, homepage playlist and theme verify persisted revisions (5364.336148ms)
+(node:9550) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+(node:9550) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+  ✔ confirmed booking plans and internal notes preserve prior fields (5656.778383ms)
+  ✔ venue dimensions remain account-owned and update through existing venue service (2040.852072ms)
+  ✔ simulation layouts share manual editor state, preserve patches, reject stale writes and isolate owners (4298.165775ms)
+(node:9550) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+  ✔ Android authenticated push uses durable receipts, generic payloads and session revalidation (14177.577674ms)
+(node:9550) [MONGOOSE] Warning: mongoose: the `new` option for `findOneAndUpdate()` and `findOneAndReplace()` is deprecated. Use `returnDocument: 'after'` instead.
+  ✔ Android API uses the same tasks and approvals; customers and retired routes are denied (2681.145054ms)
+  ✔ background polling completes without any browser or HTTP connection (1811.832893ms)
+  ✔ conversation follows earlier verified results and isolates owners and threads (1051.360839ms)
+  ✔ every registered read capability has a real handler and bounded result (1467.290987ms)
+  ✔ HTTP task ownership, auth, runtime inventory and denied credentials (165.565531ms)
+✔ AI Administrator: real editor adapters, durable approvals, verification, authentication and recovery (141019.974332ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 31
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 146509.947858

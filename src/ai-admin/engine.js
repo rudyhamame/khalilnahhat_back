@@ -2,6 +2,7 @@ const {randomUUID}=require('node:crypto');
 const {z}=require('zod');
 const {failure}=require('./route-adapter');
 const {redact}=require('./redact');
+const {conversationInput}=require('./conversation');
 const commandSchema=z.object({command:z.string().trim().min(1).max(8000),requestId:z.uuid(),sessionId:z.string().max(160).default('dashboard')}).strict();
 const audit=(task,type,detail={})=>task.audit.push({at:new Date().toISOString(),type,...redact(detail)});
 function createEngine({store,registry,agent,authorize}){
@@ -12,6 +13,11 @@ function createEngine({store,registry,agent,authorize}){
  const handle=async task=>{
   try{
    await checkpoint(task);
+   if(!task.contextInitialized&&!task.actions.length){
+    const rows=store.conversation?await store.conversation(task.owner,task.sessionId,task):[];
+    task.input=conversationInput(rows,task.command);task.contextInitialized=true;
+    audit(task,'CONVERSATION_CONTEXT',{previousTasks:task.input.length-1});await store.save(task);
+   }
    // Model outputs and every tool receipt are persisted BEFORE moving to the next step.
    for(let count=0;count<24;count++){
     let action=task.actions.find(item=>!item.delivered);

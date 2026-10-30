@@ -26,6 +26,7 @@ const {
   buildReorderedQueue,
 } = require('./live-request-agent');
 const { eventSchema, normalizeQuoteItems } = require('./quote-validation');
+const vouchers = require('./vouchers');
 const eventOrder = require('./event-order');
 const { Equipment } = require('./equipment');
 const { registerEquipmentRoutes } = require('./equipment');
@@ -355,6 +356,7 @@ const serviceRequestCreateSchema = z.object({
   })).min(1, 'Select at least one service.'),
   event: eventSchema.optional(),
   order: eventOrder.orderSchema.optional(),
+  voucherCode: z.string().trim().max(40).optional(),
 });
 
 const serviceRequestQuoteSchema = z.object({
@@ -433,6 +435,7 @@ function serializeServiceRequest(serviceRequest, includeQuote = true) {
 
   return {
     requestNumber: serviceRequest.requestNumber || '',
+    voucher: serviceRequest.voucher || null,
     event: serviceRequest.event || null,
     order: serviceRequest.order || null,
     id: serviceRequest.externalId || serviceRequest.id,
@@ -1058,7 +1061,15 @@ app.post('/api/service-requests', requireAuth, async (request, response) => {
   }
 
   const user = request.authUser;
-  const serviceRequest = await ServiceRequest.create({
+  // A voucher is claimed before the booking is saved and released again if saving fails.
+  let voucher = null;
+  if (parsed.data.voucherCode) {
+    const claimed = await vouchers.reserve(parsed.data.voucherCode, user);
+    if (claimed.error) return response.status(400).json({ message: claimed.error });
+    voucher = claimed.voucher;
+  }
+  let serviceRequest;
+  try { serviceRequest = await ServiceRequest.create({
     externalId: `service-request-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     userId: user._id,
     customerName: `${user.firstName} ${user.lastName}`.trim(),
@@ -1069,7 +1080,9 @@ app.post('/api/service-requests', requireAuth, async (request, response) => {
     order: parsed.data.order || null,
     requestNumber: `ECHO-${Date.now().toString(36).toUpperCase()}`,
     status: 'pending',
-  });
+    voucher: voucher ? vouchers.snapshot(voucher) : null,
+  }); } catch (error) { if (voucher) await vouchers.release(voucher).catch(() => {}); throw error; }
+  if (voucher) await vouchers.record(voucher, user, serviceRequest).catch((error) => console.error('Voucher redemption record failed:', error));
 
   let notificationSent = false;
 
@@ -1916,6 +1929,7 @@ require('./stem-separation').registerStemSeparation(app, { requireAdmin });
 require('./music-archive').registerMusicArchive(app, { requireAdmin });
 require('./setup-catalog').registerSetupCatalog(app, { requireAdmin });
 require('./availability').registerAvailability(app, { requireAdmin });
+vouchers.registerVouchers(app, { requireAdmin, requireAuth });
 require('./live-recordings').registerLiveRecordings(app, requireAdmin);
 require('./live-suggestions').registerLiveSuggestions(app, { getLiveStreamConfig });
 require('./live-comments').registerLiveComments(app, { getLiveStreamConfig });

@@ -263,6 +263,7 @@ const serviceRequestSchema = new mongoose.Schema(
       default: 'pending',
       trim: true,
     },
+    voucher: { type: new mongoose.Schema({ code: String, title: String, kind: String, amountCents: Number, percent: Number }, { _id: false }), default: null },
     currency: { type: String, default: 'CAD', trim: true },
     validDays: { type: Number, default: 7, min: 1 },
     taxPercent: { type: Number, default: 13, min: 0 },

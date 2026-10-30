@@ -53,7 +53,7 @@ function registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest 
   });
   app.get('/api/admin/clients', requireAdmin, async (req,res) => {
     const q=String(req.query.q || '').trim().slice(0,100);
-    const filter=q ? {$or:['firstName','lastName','email','username'].map(key=>({[key]:{$regex:q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),$options:'i'}}))} : {};
+    const filter={$and:[{isAdmin:{$ne:true}},{username:{$ne:'khalilnahhat'}},...(q ? [{$or:['firstName','lastName','email','username'].map(key=>({[key]:{$regex:q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),$options:'i'}}))}] : [])]};
     const items=await User.find(filter).select(CLIENT_FIELDS).sort({createdAt:-1}).limit(500);
     res.json({items:items.map(clientView)});
   });

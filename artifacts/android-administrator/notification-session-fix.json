@@ -12,7 +12,7 @@
   "instrumentationBuild": "pass",
   "installed": true,
   "dataCleared": false,
-  "livePushVerified": false,
+  "livePushVerified": true,
   "userReauthentication": "awaiting response",
   "sha256": "2ac9959ba466b472acd1e779776545bd474006aabd90c49675db592a7199607b",
   "currentSessionRechecked": {
@@ -25,8 +25,16 @@
     "reason": "Push token already registered to another installation"
   },
   "revisedDiagnosis": "New sign-in is valid; registration conflict requires token recovery",
-  "updatedAt": "2026-10-30T05:37:31.702455+00:00",
+  "updatedAt": "2026-10-30T05:44:04.345514+00:00",
   "liveRegistrationStatus": 200,
-  "providerConfigured": false,
-  "recovery": "Refresh conflicting phone token once; synchronize installation UUID creation"
+  "providerConfigured": true,
+  "recovery": "Refresh conflicting phone token once; synchronize installation UUID creation",
+  "renderCredentialConfigured": true,
+  "renderDeployment": "Live after approved environment update",
+  "liveNotificationType": "task failure",
+  "validationTaskState": "FAILED",
+  "validationTaskSucceeded": false,
+  "validationTaskError": "The model returned invalid tool arguments.",
+  "registrationVerified": true,
+  "deliveryVerified": true
 }

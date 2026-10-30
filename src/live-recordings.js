@@ -42,6 +42,11 @@ async function uploadRecordingPart(filename,publicId){
  return new Promise((resolve,reject)=>{const stream=cloudinary.uploader.upload_large(filename,{resource_type:'video',type:'authenticated',public_id:publicId,overwrite:false,chunk_size:20*1024*1024,timeout:600000},(error,result)=>error?reject(error):resolve(result));stream.on('error',reject);});
 }
 function objectBelongsToRoom(key,roomName){return typeof key==='string'&&key.startsWith(roomName+'/')&&!key.includes('..')&&key.endsWith('.mp4');}
+// The file LiveKit writes to the B2 staging bucket for one room (the server later moves it to Cloudinary's "Live" folder).
+function recordingFile(roomName,config){
+ return new EncodedFileOutput({fileType:EncodedFileType.MP4,filepath:`${roomName}/{publisher_identity}-{time}.mp4`,disableManifest:true,
+  output:{case:'s3',value:new S3Upload({accessKey:process.env.ECHO_RECORDING_ACCESS_KEY,secret:process.env.ECHO_RECORDING_SECRET,endpoint:config.publicEndpoint,bucket:config.bucket,region:config.region,forcePathStyle:true})}});
+}
 async function prepareRecordingRoom(roomName,title,test=false){
  if(!configured())throw Object.assign(new Error('Automatic recording storage is not configured.'),{status:503});
  const config=recordingStorageConfig(),BUCKET=config.bucket;
@@ -51,8 +56,7 @@ async function prepareRecordingRoom(roomName,title,test=false){
  // version lifecycle rules must be configured separately.
  let used=0;for await(const obj of client.listObjectsV2(BUCKET,'',true)){used+=obj.size||0;}
  if(used>1024*1024*1024)throw Object.assign(new Error('Recording staging storage needs attention before another live.'),{status:503});
- const file=new EncodedFileOutput({fileType:EncodedFileType.MP4,filepath:`${roomName}/{publisher_identity}-{time}.mp4`,disableManifest:true,
-  output:{case:'s3',value:new S3Upload({accessKey:process.env.ECHO_RECORDING_ACCESS_KEY,secret:process.env.ECHO_RECORDING_SECRET,endpoint:config.publicEndpoint,bucket:BUCKET,region:config.region,forcePathStyle:true})}});
+ const file=recordingFile(roomName,config);
  const recording=await LiveRecording.create({roomName,title:title||'DJ Khalil — Live',test});
  try {
   await sdk(RoomServiceClient).createRoom({name:roomName,emptyTimeout:180,departureTimeout:15,
@@ -86,6 +90,21 @@ async function transferRecording(row){
   console.error('Live Archive transfer failed:',error.http_code||error.code||error.name);
  }finally{if(directory)await fs.rm(directory,{recursive:true,force:true}).catch(()=>{});}
 }
+// Auto-recording is attached to the room when it is prepared, but LiveKit deletes an empty room after emptyTimeout. If OBS connects
+// later, LiveKit recreates the room WITHOUT recording and the stream is never saved. So recording is also started from the publisher.
+const starting=new Set();
+async function ensureRecording(roomName){
+ if(!configured()||starting.has(roomName))return false;
+ starting.add(roomName);
+ try {
+  const egress=sdk(EgressClient);
+  if((await egress.listEgress({roomName})).length)return false; // already recording, finished, or failed (failures are reported separately)
+  const publisher=(await sdk(RoomServiceClient).listParticipants(roomName)).find(participant=>participant.tracks?.length);
+  if(!publisher)return false;
+  await egress.startParticipantEgress(roomName,publisher.identity,{file:recordingFile(roomName,recordingStorageConfig())},{encodingOptions:EncodingOptionsPreset.H264_720P_30});
+  return true;
+ }finally{starting.delete(roomName);}
+}
 let sweeping=false;
 async function sweepRecordings(){
  if(sweeping||!configured())return;sweeping=true;
@@ -103,6 +122,7 @@ async function sweepRecordings(){
      await LiveRecording.updateOne({_id:row._id},{$set:{objectKey:key,egressId:complete.egressId,status:'recording',duration:Number(file.duration||0)/1e9}});
      row.objectKey=key;await transferRecording(row);
     }else if(jobs.some(job=>[0,1,2].includes(job.status))){await LiveRecording.updateOne({_id:row._id},{$set:{status:'recording'}});}
+    else if(!jobs.length&&await ensureRecording(row.roomName).catch(()=>false)){await LiveRecording.updateOne({_id:row._id},{$set:{status:'recording'}});}
     else if(jobs.some(job=>[4,5].includes(job.status))||Date.now()-row.createdAt.getTime()>5*60*1000){
      const active=await sdk(RoomServiceClient).listRooms([row.roomName]);
      if(active.length)continue;
@@ -162,4 +182,4 @@ function registerLiveRecordings(app,requireAdmin){
  });
  const timer=setInterval(()=>sweepRecordings().catch(()=>{}),15000);timer.unref();
 }
-module.exports={LiveRecording,prepareRecordingRoom,registerLiveRecordings,sweepRecordings,transferRecording,objectBelongsToRoom,view,recordingParts,recordingLink,uploadRecordingPart};
+module.exports={LiveRecording,prepareRecordingRoom,ensureRecording,registerLiveRecordings,sweepRecordings,transferRecording,objectBelongsToRoom,view,recordingParts,recordingLink,uploadRecordingPart};

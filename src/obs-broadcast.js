@@ -3,7 +3,7 @@
 const IDENTITY = 'khalil-obs';
 function registerObsBroadcastRoutes(app, deps) {
   const { requireAdmin, getLiveStreamConfig, LiveStreamConfig, defaults, getConfig,
-    serialize, IngressClient, RoomServiceClient, randomUUID, prepareRecording } = deps;
+    serialize, IngressClient, RoomServiceClient, randomUUID, prepareRecording, ensureRecording } = deps;
   const client = Class => { const c = getConfig(); return new Class(c.wsUrl, c.apiKey, c.apiSecret); };
   const filter = row => ({ key: defaults.key, obsRoomName: row.obsRoomName });
   const change = (row, values, extra = {}) => LiveStreamConfig.findOneAndUpdate({ ...filter(row), ...extra }, values, { new: true });
@@ -39,6 +39,8 @@ function registerObsBroadcastRoutes(app, deps) {
       catch (error) { if (missing(error)) return stop(row); throw error; }
       const publishing = participants.some(p => p.identity === IDENTITY && p.tracks?.length);
       if (!publishing && (row.obsState === 'live' || new Date(row.obsExpiresAt).getTime() <= Date.now())) return stop(row);
+      // Media is flowing: make sure it is being recorded even if LiveKit recreated the room after it timed out empty.
+      if (publishing) Promise.resolve(ensureRecording?.(row.obsRoomName)).catch(() => {});
       if (publishing && row.obsState !== 'live') {
         row = await change(row, { isLive: true, obsState: 'live', statusLabel: 'Live now — DJ Khalil is on air.' },
           { obsState: { $in: ['waiting', 'live'] } }) || await getLiveStreamConfig();

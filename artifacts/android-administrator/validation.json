@@ -21,8 +21,8 @@
   "android": {
     "framework": "native Kotlin",
     "package": "ca.echo.dj",
-    "version": "0.3.1",
-    "versionCode": 11,
+    "version": "0.3.3",
+    "versionCode": 13,
     "assembleDebug": "pass",
     "assembleDebugAndroidTest": "pass",
     "lintDebug": "pass",
@@ -51,15 +51,15 @@
       ],
       "livePasswordLoginTested": true,
       "realMicrophoneTested": false,
-      "physicalPushDeliveryTested": false,
+      "physicalPushDeliveryTested": true,
       "existingManualModulesLiveNavigationTested": true,
       "livePasswordLoginEvidence": "User confirmed dashboard opens after signing in with email/password",
       "manualModulesVerified": 13,
       "signedOutGuard": "Passed on 0.3.0; skipped on signed-in 0.3.1 profile to preserve session"
     },
-    "apk": "/home/rudy/projects/echo-dj/dist/Echo-DJ-0.3.1-debug.apk",
-    "apkBytes": 62319306,
-    "sha256": "2086f1721a0fe8387d67418041feb888f567671bab0e5def72f875b559b4b1fe",
+    "apk": "/home/rudy/projects/echo-dj/dist/Echo-DJ-0.3.3-debug.apk",
+    "apkBytes": 62335690,
+    "sha256": "2ac9959ba466b472acd1e779776545bd474006aabd90c49675db592a7199607b",
     "privateFirebaseKeyAbsentFromApk": true,
     "apiBaseUrl": "https://echo-khalil-api.onrender.com/api",
     "websiteBaseUrl": "https://echo-khalil.onrender.com",
@@ -74,7 +74,10 @@
     "serverRole": "roles/firebasecloudmessaging.admin",
     "privateKeyLocation": "outside repository, mode 0600; local backend configured",
     "liveValidateOnlyHttpStatus": 200,
-    "notificationSent": false
+    "notificationSent": true,
+    "renderCredentialConfigured": true,
+    "physicalNotificationReceived": true,
+    "notificationTypeVerified": "task failure"
   },
   "retiredTransport": {
     "localWebhook404": true,
@@ -83,16 +86,17 @@
     "dependenciesRemaining": false
   },
   "deployment": {
-    "sourceDeployed": false,
+    "sourceDeployed": true,
     "alwaysOnWorkerProvisioned": false,
     "paidResourcesPurchased": false,
     "androidDefaultApiHostChanged": true,
-    "hostCorrection": "Retired hostname now exposes only protected stem worker; app moved to existing canonical Render API."
+    "hostCorrection": "Retired hostname now exposes only protected stem worker; app moved to existing canonical Render API.",
+    "verifiedFrom": "Current authenticated Android API routes and successful private-environment deployment"
   },
   "remaining": [
-    "Deploy new administrator backend to current Render API and privately configure its FCM credential",
-    "Verify an always-on worker; sleeping free web service is insufficient",
-    "Physical real AI task/approval, push/deep-link/locked-screen and microphone QA",
+    "Resolve live AI tool-argument parsing failure; read-only report task failed before any business action",
+    "Verify always-on hosting; Render free service can sleep",
+    "Physical completion/approval notifications, deep-link/locked-screen and microphone QA",
     "Scheduled report scheduler unsupported"
   ]
 }

@@ -1,0 +1,27 @@
+INSTRUMENTATION_STATUS: class=ca.echo.dj.AdministratorSessionTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+ca.echo.dj.AdministratorSessionTest:
+INSTRUMENTATION_STATUS: test=registerCurrentAdministratorForTaskNotifications
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: echo_provider_configured=true
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: echo_registration_status=200
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=ca.echo.dj.AdministratorSessionTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=registerCurrentAdministratorForTaskNotifications
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 1.076
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1

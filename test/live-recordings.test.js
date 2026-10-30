@@ -58,3 +58,26 @@ test('delete is admin-only, atomic, recoverable and cannot remove active/saving 
   r=res();await routes['/api/admin/live-recordings/:id/restore']({params:{id:'012345678901234567890123'}},r);assert.equal(change.$set.deletedAt,null);assert.deepEqual(filter.deletedAt,{$ne:null});
  }finally{LiveRecording.findOneAndUpdate=old;}
 });
+test('recording is started from the publisher when LiveKit recreated the room without it, and never twice',async()=>{
+ const env={ECHO_RECORDING_PUBLIC_ENDPOINT:'https://s3.example.com',ECHO_RECORDING_ACCESS_KEY:'k',ECHO_RECORDING_SECRET:'s',CLOUDINARY_API_SECRET:'c',LIVEKIT_URL:'https://x.livekit.cloud',LIVEKIT_API_KEY:'a',LIVEKIT_API_SECRET:'b'};
+ const saved={};for(const key of Object.keys(env)){saved[key]=process.env[key];process.env[key]=env[key];}
+ const {EgressClient,RoomServiceClient}=require('livekit-server-sdk');
+ const originals=[EgressClient.prototype.listEgress,EgressClient.prototype.startParticipantEgress,RoomServiceClient.prototype.listParticipants];
+ let jobs=[],participants=[];const started=[];
+ EgressClient.prototype.listEgress=async()=>jobs;
+ EgressClient.prototype.startParticipantEgress=async(room,identity,output)=>{started.push([room,identity,Boolean(output.file)]);return {};};
+ RoomServiceClient.prototype.listParticipants=async()=>participants;
+ try {
+  const {ensureRecording}=require('../src/live-recordings');
+  assert.equal(await ensureRecording('room'),false);            // connected but nothing published yet
+  participants=[{identity:'khalil-obs',tracks:[{}]}];
+  assert.equal(await ensureRecording('room'),true);             // media is flowing and nothing records it: start now
+  assert.deepEqual(started,[['room','khalil-obs',true]]);
+  jobs=[{status:1}];
+  assert.equal(await ensureRecording('room'),false);            // already recording: no second recording
+  assert.equal(started.length,1);
+ } finally {
+  [EgressClient.prototype.listEgress,EgressClient.prototype.startParticipantEgress,RoomServiceClient.prototype.listParticipants]=originals;
+  for(const key of Object.keys(env)){if(saved[key]===undefined)delete process.env[key];else process.env[key]=saved[key];}
+ }
+});

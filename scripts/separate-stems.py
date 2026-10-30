@@ -25,26 +25,69 @@ def main():
     report('Loading separation model')
     model = get_model('htdemucs').cpu().eval()
     report('Reading recording')
-    raw = subprocess.check_output(['ffmpeg', '-v', 'error', '-i', args.input,
-        '-t', '601', '-f', 'f32le', '-ac', str(model.audio_channels), '-ar', str(model.samplerate), '-'], timeout=120)
-    mix = torch.from_numpy(np.frombuffer(raw, dtype=np.float32).copy().reshape(-1, model.audio_channels).T)
-    if mix.shape[-1] > model.samplerate * 600:
-        raise ValueError('Choose a recording under 10 minutes.')
-    reference = mix.mean(0)
-    mean, std = reference.mean(), reference.std().clamp(min=1e-8)
-    report('Separating vocals, drums, bass and other music')
-    with torch.inference_mode():
-        stems = apply_model(model, ((mix-mean)/std)[None], device='cpu',
-            shifts=0, split=True, segment=3, overlap=.25, progress=True, num_workers=0)[0]
-    stems = stems * std + mean / len(model.sources)
-    # One common gain preserves the balance between stems and avoids clipping.
-    stems /= max(1., float(stems.abs().max()) / .98)
     directory = Path(args.output)
     directory.mkdir(parents=True, exist_ok=True)
-    report('Saving separated channels')
-    for name, samples in zip(model.sources, stems):
-        sf.write(directory / f'{name}.flac', samples.T.numpy(), model.samplerate, subtype='PCM_24')
-    print(json.dumps({'stage':'complete', 'duration':mix.shape[-1]/model.samplerate,
+    decoded = directory / 'decoded.wav'
+    temporary = [directory / f'{name}.working.wav' for name in model.sources]
+    try:
+        # Decode to disk, not a full-length subprocess byte buffer plus tensors.
+        subprocess.run(['ffmpeg', '-nostdin', '-y', '-v', 'error', '-i', args.input,
+            '-t', '601', '-acodec', 'pcm_f32le', '-ac', str(model.audio_channels),
+            '-ar', str(model.samplerate), str(decoded)], check=True, timeout=120)
+        with sf.SoundFile(decoded) as source:
+            frames, rate = len(source), source.samplerate
+            if frames == 0 or frames > rate * 600:
+                raise ValueError('Choose a non-empty recording under 10 minutes.')
+            # Keep one normalization for the whole recording without retaining it.
+            total = square = 0.0
+            for block in source.blocks(blocksize=rate, dtype='float32', always_2d=True):
+                mono = block.mean(axis=1, dtype=np.float64)
+                total += float(mono.sum())
+                square += float(np.square(mono).sum())
+            mean = total / frames
+            std = max(1e-8, (max(0.0, square / frames - mean * mean)) ** .5)
+            writers = []
+            peak = 0.0
+            try:
+                for target in temporary:
+                    writers.append(sf.SoundFile(target, mode='w', samplerate=rate,
+                        channels=model.audio_channels, subtype='FLOAT'))
+                chunk, context = rate * 12, rate * 2
+                for begin in range(0, frames, chunk):
+                    end = min(frames, begin + chunk)
+                    left, right = max(0, begin-context), min(frames, end+context)
+                    source.seek(left)
+                    samples = source.read(right-left, dtype='float32', always_2d=True)
+                    mix = torch.from_numpy(samples.T.copy())
+                    report(f'Separating channels ({int(begin / frames * 100)}%)')
+                    with torch.inference_mode():
+                        stems = apply_model(model, ((mix-mean)/std)[None], device='cpu',
+                            shifts=0, split=True, segment=3, overlap=.25,
+                            progress=False, num_workers=0)[0]
+                        stems.mul_(std).add_(mean / len(model.sources))
+                    # Context reduces block-edge artifacts; write only the central
+                    # samples, once, so every channel retains the original clock.
+                    central = stems[:, :, begin-left:end-left]
+                    peak = max(peak, float(central.abs().max()))
+                    for writer, channel in zip(writers, central):
+                        writer.write(channel.T.numpy())
+                    del central, stems, mix, samples
+            finally:
+                for writer in writers:
+                    writer.close()
+        report('Saving separated channels')
+        gain = max(1.0, peak / .98)
+        for name, target in zip(model.sources, temporary):
+            with sf.SoundFile(target) as source, sf.SoundFile(
+                    directory / f'{name}.flac', mode='w', samplerate=rate,
+                    channels=model.audio_channels, subtype='PCM_24') as output:
+                for block in source.blocks(blocksize=rate, dtype='float32', always_2d=True):
+                    output.write(block / gain)
+    finally:
+        decoded.unlink(missing_ok=True)
+        for target in temporary:
+            target.unlink(missing_ok=True)
+    print(json.dumps({'stage':'complete', 'duration':frames/rate,
         'sampleRate':model.samplerate, 'channels':list(model.sources)}), flush=True)
 
 

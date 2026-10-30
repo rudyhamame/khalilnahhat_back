@@ -69,7 +69,7 @@ function separate(input, directory, job) {
       if(progress) job.stage=`Separating channels (${progress[1]}%)`;
     });
     child.on('error', error => { clearTimeout(timer); reject(error); });
-    child.on('close', code => { clearTimeout(timer); code===0 ? resolve() : reject(new Error(errors || 'Separation failed.')); });
+    child.on('close', (code,signal) => { clearTimeout(timer); code===0 ? resolve() : reject(new Error(`Separator exited (${signal||code}): ${errors || 'No process diagnostics.'}`)); });
   });
 }
 async function readManifest(key) {

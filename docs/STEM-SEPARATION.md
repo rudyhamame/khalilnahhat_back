@@ -40,3 +40,9 @@ Render settings `STEM_WORKER_URL` / `STEM_WORKER_TOKEN` connect to the existing 
 
 
 The initial 1536 MiB limit caused pressure during fresh inference and stalled the worker. It was raised to 2048 MiB with no worker swap allowance; inference segment size was reduced to 3 seconds. Worker usage then measured ~1.42 GiB, while the host retained ~1.09 GiB available RAM. The original cache was reused only for the identical source URL. Render public status returned `ready` with all four channels, ranged vocals returned HTTP 206, and the real browser automatically enabled Vocals/Drums/Bass/Other music controls. Christmas is processing separately; no completion claim is made for that source yet. API commits `103f2b2` / `bb2e58c` were deployed; public worker rejects missing/incorrect credentials.
+
+### Bounded-memory processing correction (2026-10-30)
+
+The current Last Christmas source returned `status:error` and no channels. The OVH worker's memory controller recorded an OOM kill under its existing 2 GiB limit. The old script retained full-recording decoded bytes, normalized tensors and all separated output simultaneously.
+
+The separator now decodes to a temporary disk file and processes 12-second windows with two seconds of context on each side. Only central samples are written, preserving duration and a shared clock. Normalization and final peak attenuation remain common across all channels. Temporary float audio is converted to FLAC in bounded blocks and cleaned up. The worker script was replaced with a retained backup; existing caches and resource limits were preserved. Completion evidence for the current source must come from the public status and channel delivery, not from syntax checks.

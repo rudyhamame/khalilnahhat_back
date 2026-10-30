@@ -175,3 +175,25 @@ test('OpenRouter free chat preserves validated order patches and never calls pai
  const result=await request('chat',{consent:true,responseFormat:'patch',order:{'customer.email':'private@example.invalid'},messages:[{role:'user',content:'A wedding'}]},true,{Accept:'application/x-ndjson'});
  assert.equal(result.status,200);const events=(await result.text()).trim().split('\n').map(JSON.parse);assert.equal(events[0].type,'complete');assert.deepEqual(events[0].orderPatch,[{path:'event.type',value:'wedding'}]);assert.ok(sent.every(url=>!url.includes('openai.com')));
 });
+test('Alibaba voice issues a one-time socket ticket and bridges it to the provider',async t=>{
+ const {WebSocketServer,WebSocket}=require('ws');const {attachAlibabaVoiceSocket}=require('./ai-booking');const {defaults}=require('./ai-configuration');
+ const config=defaults({});config.voice.provider='alibaba';config.voice.model='qwen3.8-omni-flash-realtime';config.voice.providerRates={textInput:.23,textCached:.23,textOutput:.7,audioInput:.93,audioCached:.93,audioOutput:1.87};
+ const seen=[];const upstream=new WebSocketServer({port:0});t.after(()=>upstream.close());
+ upstream.on('connection',(socket,req)=>{seen.push(req.url);socket.on('message',raw=>{const event=JSON.parse(raw);seen.push(event.type);if(event.type==='response.create')socket.send(JSON.stringify({type:'response.done',response:{id:'r',status:'completed'}}));});});
+ const app=express();app.use(express.json());
+ const routes=registerAiBooking(app,{configService:{load:async()=>structuredClone(config),reserve:async()=>({id:'t'}),complete:async()=>{},fail:async()=>{},updateMetrics:async()=>{}},env:{DASHSCOPE_API_KEY:'k',DASHSCOPE_REALTIME_URL:`ws://127.0.0.1:${upstream.address().port}/api-ws/v1/realtime`},requireAuth:(req,res,next)=>{if(req.headers.authorization!=='Bearer unit-test')return res.status(401).end();req.authUser={_id:'u1'};next();},recordMetric(){}});
+ const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});t.after(()=>server.close());
+ attachAlibabaVoiceSocket(server,routes.voiceSocketHooks);
+ const base=`127.0.0.1:${server.address().port}`;
+ const post=await fetch(`http://${base}/api/ai-booking/voice`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer unit-test'},body:JSON.stringify({consent:true})});
+ assert.equal(post.status,200);const body=await post.json();assert.equal(body.provider,'alibaba');assert.equal(body.maxCallSeconds,300);assert.match(body.wsTicket,/^[0-9a-f]{48}$/);
+ const second=await fetch(`http://${base}/api/ai-booking/voice`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer unit-test'},body:JSON.stringify({consent:true})});assert.equal(second.status,409);
+ const bad=new WebSocket(`ws://${base}/api/ai-booking/voice-ws?ticket=nope`);await new Promise(resolve=>{bad.on('error',resolve);bad.on('close',resolve);});
+ const browser=new WebSocket(`ws://${base}/api/ai-booking/voice-ws?ticket=${body.wsTicket}`);
+ await new Promise(resolve=>{browser.on('open',()=>browser.send(JSON.stringify({type:'response.create'})));browser.on('message',raw=>{if(JSON.parse(raw).type==='response.done')resolve();});});
+ assert.match(seen[0],/model=qwen3\.8-omni-flash-realtime/);assert.ok(seen.includes('session.update'));
+ const reuse=new WebSocket(`ws://${base}/api/ai-booking/voice-ws?ticket=${body.wsTicket}`);await new Promise(resolve=>{reuse.on('error',resolve);reuse.on('close',resolve);});
+ await fetch(`http://${base}/api/ai-booking/voice/end`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer unit-test'},body:JSON.stringify({callId:body.callId})});
+ const again=await fetch(`http://${base}/api/ai-booking/voice`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer unit-test'},body:JSON.stringify({consent:true})});assert.equal(again.status,200);
+ await again.json();browser.close();
+});

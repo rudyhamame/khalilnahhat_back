@@ -11,12 +11,15 @@ const catalog=[
  {id:'gpt-realtime-2.1-mini',mode:'voice',label:'GPT-Realtime-2.1 Mini',rates:{textInput:0.6,textCached:0.06,textOutput:2.4,audioInput:10,audioCached:0.3,audioOutput:20}},
  {id:'gpt-realtime-2.1',mode:'voice',label:'GPT-Realtime-2.1',rates:{textInput:4,textCached:0.4,textOutput:24,audioInput:32,audioCached:0.4,audioOutput:64}},
 ].map(item=>({...item,provider:'openai',checkedOn:CHECKED,source:`https://developers.openai.com/api/docs/models/${item.id}`}));
+// Alibaba Cloud realtime voice. USD per 1M tokens, Singapore list price (Model Studio model pricing, checked on the date above); no cached-input discount is assumed.
+catalog.push({id:'qwen3.8-omni-flash-realtime',provider:'alibaba',mode:'voice',label:'Qwen3.8 Omni Flash Realtime',rates:{textInput:0.23,textCached:0.23,textOutput:0.7,audioInput:0.93,audioCached:0.93,audioOutput:1.87},checkedOn:CHECKED,source:'https://www.alibabacloud.com/help/en/model-studio/model-pricing'});
 const money=z.number().finite().min(0).max(100000);
 const rates=z.object({textInput:money,textCached:money,textOutput:money,audioInput:money.optional(),audioCached:money.optional(),audioOutput:money.optional()}).strict();
 const modeSchema=kind=>z.object({enabled:z.boolean(),model:z.string().trim().min(1).max(200).refine(id=>kind==='chat'||catalog.some(item=>item.mode===kind&&item.id===id),'Choose a supported model for this mode.'),providerRates:rates,maxOutputTokens:z.number().int().min(256).max(4096),requestsPer10Min:z.number().int().min(1).max(kind==='chat'?200:20)}).strict();
 const sttDefaults=()=>({enabled:true,model:'whisper-1',providerRates:{audioMinute:0.006},requestsPer10Min:6});
 const sttSchema=z.object({enabled:z.boolean(),model:z.literal('whisper-1'),providerRates:z.object({audioMinute:money}).strict(),requestsPer10Min:z.number().int().min(1).max(20)}).strict();
-const configSchema=z.object({stt:sttSchema.optional(),revision:z.number().int().min(0),chat:modeSchema('chat').extend({provider:z.enum(['openai','openrouter','alibaba']).default('openai'),freeOnly:z.boolean().default(true)}),voice:modeSchema('voice').extend({maxCallSeconds:z.number().int().min(30).max(900)}),customerPricing:z.object({policy:z.enum(['included','manual_invoice']),currency:z.enum(['CAD','USD']),chatReplyCents:z.number().int().min(0).max(100000),voiceSessionCents:z.number().int().min(0).max(100000)}).strict()}).strict().superRefine((config,ctx)=>{
+const configSchema=z.object({stt:sttSchema.optional(),revision:z.number().int().min(0),chat:modeSchema('chat').extend({provider:z.enum(['openai','openrouter','alibaba']).default('openai'),freeOnly:z.boolean().default(true)}),voice:modeSchema('voice').extend({provider:z.enum(['openai','alibaba']).default('openai'),maxCallSeconds:z.number().int().min(30).max(900)}),customerPricing:z.object({policy:z.enum(['included','manual_invoice']),currency:z.enum(['CAD','USD']),chatReplyCents:z.number().int().min(0).max(100000),voiceSessionCents:z.number().int().min(0).max(100000)}).strict()}).strict().superRefine((config,ctx)=>{
+ {const voiceModel=catalog.find(item=>item.mode==='voice'&&item.id===config.voice.model);if(voiceModel&&voiceModel.provider!==config.voice.provider)ctx.addIssue({code:'custom',path:['voice','model'],message:'This voice model belongs to a different provider.'});}
  for(const mode of ['chat','voice']){
   const r=config[mode].providerRates;
   if(r.textCached>r.textInput)ctx.addIssue({code:'custom',path:[mode,'providerRates','textCached'],message:'Cached input rate cannot exceed input rate.'});
@@ -28,7 +31,7 @@ function defaults(env=process.env){
  const chatProvider=env.OPENROUTER_API_KEY?'openrouter':'openai';
  const chatModel=chatProvider==='openrouter'?'openrouter/free':env.OPENAI_BOOKING_CHAT_MODEL||'gpt-4o-mini',voiceModel=env.OPENAI_BOOKING_VOICE_MODEL||'gpt-realtime-2.1-mini';
  const entry=(mode,id)=>catalog.find(item=>item.mode===mode&&item.id===id)||catalog.find(item=>item.mode===mode);
- return {revision:0,stt:sttDefaults(),chat:{provider:chatProvider,freeOnly:true,enabled:true,model:chatModel,providerRates:chatProvider==='openrouter'?{textInput:0,textCached:0,textOutput:0}:{...entry('chat',chatModel).rates},maxOutputTokens:chatProvider==='openrouter'?4096:2400,requestsPer10Min:20},voice:{enabled:true,model:voiceModel,providerRates:{...entry('voice',voiceModel).rates},maxOutputTokens:1200,requestsPer10Min:3,maxCallSeconds:300},customerPricing:{policy:'included',currency:'CAD',chatReplyCents:0,voiceSessionCents:0}};
+ return {revision:0,stt:sttDefaults(),chat:{provider:chatProvider,freeOnly:true,enabled:true,model:chatModel,providerRates:chatProvider==='openrouter'?{textInput:0,textCached:0,textOutput:0}:{...entry('chat',chatModel).rates},maxOutputTokens:chatProvider==='openrouter'?4096:2400,requestsPer10Min:20},voice:{provider:'openai',enabled:true,model:voiceModel,providerRates:{...entry('voice',voiceModel).rates},maxOutputTokens:1200,requestsPer10Min:3,maxCallSeconds:300},customerPricing:{policy:'included',currency:'CAD',chatReplyCents:0,voiceSessionCents:0}};
 }
 const configModel=mongoose.models.EchoAiConfiguration||mongoose.model('EchoAiConfiguration',new mongoose.Schema({_id:String,value:mongoose.Schema.Types.Mixed,updatedBy:String},{timestamps:true}));
 const usageModel=mongoose.models.EchoAiUsage||mongoose.model('EchoAiUsage',new mongoose.Schema({_id:String,owner:{type:String,index:true},mode:String,model:String,revision:Number,state:String,billingStatus:String,customerCents:Number,currency:String,providerUsdEstimate:{type:Number,default:null},metrics:mongoose.Schema.Types.Mixed,invoiceId:String,reference:String,paymentMethod:String,updatedBy:String},{timestamps:true}));
@@ -59,7 +62,7 @@ function providerEstimate(config,mode,metrics){
 function createAiConfiguration({store=mongoStore,env=process.env,fetchImpl=fetch}={}){
  const openrouter=createOpenRouter({env,fetchImpl});
  let cached=null,until=0,inflight=null;
- const load=async()=>{if(cached&&Date.now()<until)return structuredClone(cached);if(!inflight)inflight=store.getConfig().then(item=>{const value=item?.value||defaults(env);cached={...value,stt:{...sttDefaults(),...value.stt,model:'whisper-1',providerRates:{audioMinute:0.006}},chat:{provider:'openai',freeOnly:true,...value.chat}};until=Date.now()+5000;return cached;}).finally(()=>{inflight=null;});return structuredClone(await inflight);};
+ const load=async()=>{if(cached&&Date.now()<until)return structuredClone(cached);if(!inflight)inflight=store.getConfig().then(item=>{const value=item?.value||defaults(env);cached={...value,stt:{...sttDefaults(),...value.stt,model:'whisper-1',providerRates:{audioMinute:0.006}},chat:{provider:'openai',freeOnly:true,...value.chat},voice:{provider:'openai',...value.voice}};until=Date.now()+5000;return cached;}).finally(()=>{inflight=null;});return structuredClone(await inflight);};
  return {
   load,
   async describe(){let extra=[],catalogError='';try{extra=await openrouter.models();}catch{catalogError='OpenRouter catalog unavailable. Reload to retry.';}return {item:await load(),catalog:[...catalog,...extra,...openrouter.alibaba.models()],providers:{openai:{configured:Boolean(env.OPENAI_API_KEY)},openrouter:{configured:Boolean(env.OPENROUTER_API_KEY)},alibaba:{configured:openrouter.alibaba.configured()}},catalogError};},
@@ -82,7 +85,8 @@ function createAiConfiguration({store=mongoStore,env=process.env,fetchImpl=fetch
     const model=catalog.find(item=>item.mode===mode&&item.id===parsed.data[mode].model);
     parsed.data[mode].providerRates={...model.rates};
    }
-   for(const mode of ['chat','voice','stt'])if(!(mode==='chat'&&parsed.data.chat.provider!=='openai')&&parsed.data[mode].enabled&&(old[mode].model!==parsed.data[mode].model||(old[mode].provider||'openai')!==(parsed.data[mode].provider||'openai')||!old.revision)){
+   if(parsed.data.voice.provider==='alibaba'&&parsed.data.voice.enabled&&!env.DASHSCOPE_API_KEY)throw error(503,'Configure DASHSCOPE_API_KEY on the server before enabling Alibaba Cloud voice.');
+   for(const mode of ['chat','voice','stt'])if(!(mode==='chat'&&parsed.data.chat.provider!=='openai')&&!(mode==='voice'&&parsed.data.voice.provider==='alibaba')&&parsed.data[mode].enabled&&(old[mode].model!==parsed.data[mode].model||(old[mode].provider||'openai')!==(parsed.data[mode].provider||'openai')||!old.revision)){
     if(!env.OPENAI_API_KEY)throw error(503,'Configure the provider API key on the server before enabling a model.');
     const response=await fetchImpl(`https://api.openai.com/v1/models/${encodeURIComponent(parsed.data[mode].model)}`,{headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},signal:AbortSignal.timeout(10000)});
     if(!response.ok)throw error(400,`The configured OpenAI account cannot access ${parsed.data[mode].model}.`);
@@ -113,7 +117,7 @@ function createAiConfiguration({store=mongoStore,env=process.env,fetchImpl=fetch
   },
  };
 }
-function publicPolicy(config){return {revision:config.revision,chat:{enabled:config.chat.enabled,model:config.chat.model,provider:config.chat.provider||'openai'},voice:{enabled:config.voice.enabled,model:config.voice.model},customerPricing:config.customerPricing};}
+function publicPolicy(config){return {revision:config.revision,chat:{enabled:config.chat.enabled,model:config.chat.model,provider:config.chat.provider||'openai'},voice:{enabled:config.voice.enabled,model:config.voice.model,provider:config.voice.provider||'openai'},customerPricing:config.customerPricing};}
 function registerAiConfiguration(app,{requireAdmin,service}){
  const guarded=handler=>async(req,res)=>{res.set('Cache-Control','no-store');try{await handler(req,res);}catch(e){res.status([400,402,409,503].includes(e.status)?e.status:503).json({message:e.status?e.message:'AI configuration is temporarily unavailable.'});}};
  app.get('/api/ai-booking/admin/config',requireAdmin,guarded(async(_req,res)=>res.json(await service.describe())));

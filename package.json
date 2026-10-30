@@ -33,6 +33,7 @@
     "mongoose": "^9.8.1",
     "multer": "^2.2.0",
     "robots-parser": "^3.0.1",
+    "ws": "^8.22.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

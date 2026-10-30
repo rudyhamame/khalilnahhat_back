@@ -1897,7 +1897,7 @@ registerAiBilling(app, {
   requireAdmin: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, adminCheck: isAdminUser }),
   service: createAiBilling({store:mongoBillingStore(require('./ai-configuration').usageModel)}),
 });
-require('./ai-booking').registerAiBooking(app, {
+const aiBooking=require('./ai-booking'),aiBookingRoutes=aiBooking.registerAiBooking(app, {
   configService:aiConfiguration,
   requireAuth: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest }),
 });
@@ -1945,9 +1945,11 @@ async function startServer(port = PORT) {
   await connectToDatabase();
   if(process.env.ECHO_ADMIN_WORKER_MODE!=='external')await aiAdministrator.start();
 
-  return app.listen(port, '0.0.0.0', () => {
+  const server=app.listen(port, '0.0.0.0', () => {
     console.log(`Khalil app API listening on http://localhost:${port}`);
   });
+  aiBooking.attachAlibabaVoiceSocket(server,aiBookingRoutes.voiceSocketHooks);
+  return server;
 }
 
 if (require.main === module) {

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-30T05:10:15.059144+00:00",
+  "generatedAt": "2026-10-30T05:16:50.121642+00:00",
   "backendAdministrator": {
     "tests": 30,
     "pass": 30,
@@ -21,41 +21,49 @@
   "android": {
     "framework": "native Kotlin",
     "package": "ca.echo.dj",
-    "version": "0.3.0",
-    "versionCode": 10,
+    "version": "0.3.1",
+    "versionCode": 11,
     "assembleDebug": "pass",
     "assembleDebugAndroidTest": "pass",
     "lintDebug": "pass",
     "jvmTests": {
-      "tests": 4,
-      "pass": 4
+      "tests": 5,
+      "pass": 5
     },
     "physicalDevice": "Samsung SM_G781W",
     "installation": "updated existing app using install -r; no app data cleared",
     "instrumentation": {
-      "tests": 5,
+      "tests": 6,
       "pass": 5,
-      "skipped": 0,
+      "skipped": 1,
       "classes": [
         "AiAdministratorTest",
-        "AdministratorApiTest"
+        "AdministratorApiTest",
+        "AdminNavigationTest"
       ],
       "coverage": [
         "email/password form and email keyboard",
         "signed-out administrator guard",
         "encrypted draft roundtrip",
         "actual API client using injected HTTPS transport: admin sign-in, bearer command submission, email payload",
-        "normal customer rejection"
+        "normal customer rejection",
+        "13 existing manual native admin modules load through current Render API"
       ],
-      "livePasswordLoginTested": false,
+      "livePasswordLoginTested": true,
       "realMicrophoneTested": false,
       "physicalPushDeliveryTested": false,
-      "existingManualModulesLiveNavigationTested": false
+      "existingManualModulesLiveNavigationTested": true,
+      "livePasswordLoginEvidence": "User confirmed dashboard opens after signing in with email/password",
+      "manualModulesVerified": 13,
+      "signedOutGuard": "Passed on 0.3.0; skipped on signed-in 0.3.1 profile to preserve session"
     },
-    "apk": "/home/rudy/projects/echo-dj/dist/Echo-DJ-0.3.0-debug.apk",
-    "apkBytes": 62455062,
-    "sha256": "ee5c87fe78b9685329423b1170950735aecef2dc6743aa1fb69c5e93cde644ff",
-    "privateFirebaseKeyAbsentFromApk": true
+    "apk": "/home/rudy/projects/echo-dj/dist/Echo-DJ-0.3.1-debug.apk",
+    "apkBytes": 62319306,
+    "sha256": "2086f1721a0fe8387d67418041feb888f567671bab0e5def72f875b559b4b1fe",
+    "privateFirebaseKeyAbsentFromApk": true,
+    "apiBaseUrl": "https://echo-khalil-api.onrender.com/api",
+    "websiteBaseUrl": "https://echo-khalil.onrender.com",
+    "installedArtifactMatches": true
   },
   "firebase": {
     "projectId": "echo-dj",
@@ -78,12 +86,13 @@
     "sourceDeployed": false,
     "alwaysOnWorkerProvisioned": false,
     "paidResourcesPurchased": false,
-    "androidDefaultApiHostChanged": false
+    "androidDefaultApiHostChanged": true,
+    "hostCorrection": "Retired hostname now exposes only protected stem worker; app moved to existing canonical Render API."
   },
   "remaining": [
-    "Deploy matching backend to Android API host and privately configure its FCM credential",
-    "Provision or verify an existing always-on worker; sleeping free web service is insufficient",
-    "Physical authenticated login, task/approval, push/deep-link/locked-screen, microphone and manual-navigation QA",
+    "Deploy new administrator backend to current Render API and privately configure its FCM credential",
+    "Verify an always-on worker; sleeping free web service is insufficient",
+    "Physical real AI task/approval, push/deep-link/locked-screen and microphone QA",
     "Scheduled report scheduler unsupported"
   ]
 }

@@ -20,7 +20,7 @@ const input=z.object({id:slug,kind:z.enum(['event','service']),...fields}).stric
 async function list(admin=false){
  const rows=await Entry.find().lean(),merged=new Map(defaults.map(row=>[row.kind+':'+row.id,row]));
  for(const row of rows)merged.set(row.key,row.value);
- return [...merged.values()].filter(row=>admin||row.isActive).sort((a,b)=>a.sortOrder-b.sortOrder||a.name.localeCompare(b.name));
+ return [...merged.values()].filter(row=>!row.deleted&&(admin||row.isActive)).sort((a,b)=>a.sortOrder-b.sortOrder||a.name.localeCompare(b.name));
 }
 function registerSetupCatalog(app,{requireAdmin}){
  const wrap=fn=>async(req,res)=>{try{await fn(req,res);}catch(error){const status=error instanceof z.ZodError?400:error.code===11000?409:500;res.status(status).json({message:error instanceof z.ZodError?error.issues[0].message:status===409?'This item ID already exists.':'Could not save or load the setup catalog.'});if(status===500)console.error('Setup catalog failed',error.name,error.code||'');}};
@@ -35,10 +35,18 @@ function registerSetupCatalog(app,{requireAdmin}){
   if(value.equipmentIds.length&&await Equipment.countDocuments({slug:{$in:[...new Set(value.equipmentIds)]}})!==new Set(value.equipmentIds).size)return res.status(400).json({message:'Choose existing equipment items.'});
   const item={...value,equipmentIds:[...new Set(value.equipmentIds)],priceId:value.kind==='service'?'service-'+value.id:''};
   if(value.kind==='service')await ServicePrice.updateOne({serviceId:item.priceId},{$set:{name:item.name,category:'Service'},$setOnInsert:{amountCents:0,currency:'CAD',isActive:true}},{upsert:true});
-  if(creating)await Entry.create({key,value:item});else await Entry.updateOne({key},{$set:{value:item}},{upsert:true});
+  if(creating){const prior=await Entry.findOne({key}).lean();if(prior)await Entry.updateOne({key},{$set:{value:item}});else await Entry.create({key,value:item});}else await Entry.updateOne({key},{$set:{value:item}},{upsert:true});
   res.status(creating?201:200).json({item});
  };
  app.post('/api/admin/setup-catalog',requireAdmin,wrap((req,res)=>save(req,res,true)));
  app.put('/api/admin/setup-catalog/:kind/:id',requireAdmin,wrap((req,res)=>save(req,res,false)));
+ app.delete('/api/admin/setup-catalog/:kind/:id',requireAdmin,wrap(async(req,res)=>{
+  if(req.params.kind!=='service')return res.status(400).json({message:'Only services can be deleted from this action.'});
+  const id=slug.safeParse(req.params.id);if(!id.success)return res.status(400).json({message:'Invalid service ID.'});
+  const key=`service:${id.data}`,current=(await list(true)).find(row=>row.kind==='service'&&row.id===id.data);
+  if(!current)return res.status(404).json({message:'Service not found.'});
+  await Entry.updateOne({key},{$set:{value:{...current,deleted:true}}},{upsert:true});
+  res.json({removed:true,id:id.data});
+ }));
 }
 module.exports={registerSetupCatalog,list};

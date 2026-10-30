@@ -11,6 +11,9 @@ const equipmentSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     brandModel: { type: String, default: '', trim: true },
     description: { type: String, default: '', trim: true },
+    // Shown in the website's Selected experience: what the item does, and why it suits each kind of event (keys = event booking types).
+    functionSummary: { type: String, default: '', trim: true, maxlength: 600 },
+    eventFit: { type: mongoose.Schema.Types.Mixed, default: {} },
     imageUrl: { type: String, default: '' },
     modelUrl:{type:String,default:''},modelJobId:{type:String,default:''},
     priceCents: { type: Number, default: 0, min: 0 }, // internal only, never in public output
@@ -57,7 +60,7 @@ async function ensureSeed() {
 
 const publicView = (e) => ({
   id: e.slug, category: e.category, name: e.name, brandModel: e.brandModel,
-  description: e.description, imageUrl: e.imageUrl, modelUrl:e.modelUrl||'', minQuantity: e.minQuantity, ...stockView(e),
+  description: e.description, functionSummary: e.functionSummary || '', eventFit: e.eventFit && typeof e.eventFit === 'object' ? e.eventFit : {}, imageUrl: e.imageUrl, modelUrl:e.modelUrl||'', minQuantity: e.minQuantity, ...stockView(e),
 });
 const adminView = (e) => ({
   ...publicView(e),modelJobId:e.modelJobId||'', priceCents: e.priceCents, quantityOwned: e.quantityOwned, stockTracked: e.stockTracked, isActive: e.isActive, sortOrder: e.sortOrder,
@@ -67,6 +70,8 @@ const fields = {
   modelJobId:z.string().max(80).nullable(),
   category: z.string().trim().min(1), name: z.string().trim().min(1),
   brandModel: z.string().trim(), description: z.string().trim(), imageUrl: z.string().trim(),
+  functionSummary: z.string().trim().max(600),
+  eventFit: z.record(z.enum(['wedding', 'engagement', 'birthday', 'corporate', 'party', 'graduation', 'other']), z.string().trim().max(600)),
   priceCents: z.number().int().min(0), minQuantity: z.number().int().min(1),
   quantityOwned: z.number().int().min(0), stockTracked: z.boolean(), isActive: z.boolean(), sortOrder: z.number().int(),
 };

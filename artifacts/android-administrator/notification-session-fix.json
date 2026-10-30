@@ -1,0 +1,18 @@
+{
+  "checkedAt": "2026-10-30T05:25:36.997594+00:00",
+  "version": "0.3.2",
+  "versionCode": 12,
+  "rootCause": "Current persisted Android session rejected by /auth/me with 401",
+  "changes": [
+    "Notification enable explicitly revalidates administrator session",
+    "Expired-session recovery opens email/password form",
+    "Missing route/service/provider configuration distinct from expired session"
+  ],
+  "appBuild": "pass",
+  "instrumentationBuild": "pass",
+  "installed": true,
+  "dataCleared": false,
+  "livePushVerified": false,
+  "userReauthentication": "awaiting response",
+  "sha256": "3b3d24c25c65e25ff12fbea5c93515bc5a746c75752eb63bf5047d912f2265d5"
+}

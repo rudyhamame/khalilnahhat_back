@@ -1,8 +1,8 @@
 // Alibaba Cloud Model Studio (Qwen) through its OpenAI-compatible chat API. Needs DASHSCOPE_API_KEY on the server.
-// DASHSCOPE_BASE_URL overrides the endpoint (default: the international one).
+// Set DASHSCOPE_BASE_URL to the workspace API Host's compatible-mode/v1 endpoint.
 const failure=(status,message)=>Object.assign(new Error(message),{status});
 const DEFAULT_BASE='https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
-const MODELS=[['qwen-plus','Qwen Plus'],['qwen-max','Qwen Max'],['qwen-turbo','Qwen Turbo']];
+const MODELS=[['qwen3.7-plus','Qwen3.7 Plus'],['qwen-plus','Qwen Plus'],['qwen-max','Qwen Max'],['qwen-turbo','Qwen Turbo']];
 // Prices are not hard-coded: the admin enters them from the Model Studio price list, so cost estimates are never invented.
 const catalog=()=>MODELS.map(([id,label])=>({id,provider:'alibaba',mode:'chat',label,free:false,editableRates:true,rates:{textInput:0,textCached:0,textOutput:0},source:'https://www.alibabacloud.com/help/en/model-studio/models'}));
 function createAlibaba({env=process.env,fetchImpl=fetch}={}){
@@ -15,9 +15,10 @@ function createAlibaba({env=process.env,fetchImpl=fetch}={}){
   async request(body,{signal}={}){
    if(!env.DASHSCOPE_API_KEY)throw failure(503,'Configure DASHSCOPE_API_KEY on the server before using Alibaba Cloud.');
    const schema=body.text?.format?.schema;
-   // JSON mode needs the word JSON in the prompt; the schema goes in the prompt because it is not enforced by the API.
+   // Current Qwen models support schema enforcement; older aliases use JSON Object mode.
    const instructions=`${body.instructions||''}\nReturn ONLY one valid JSON object, no markdown.${schema?` It must match this JSON Schema: ${JSON.stringify(schema)}`:''}`;
-   const payload={model:body.config.model,messages:[{role:'system',content:instructions},...body.input],max_tokens:Math.min(body.max_output_tokens||2000,8192),response_format:{type:'json_object'},stream:false};
+   const format=schema&&body.config.model==='qwen3.7-plus'?{type:'json_schema',json_schema:{name:body.text.format.name||'echo_reply',strict:true,schema}}:{type:'json_object'};
+   const payload={model:body.config.model,messages:[{role:'system',content:instructions},...body.input],max_tokens:Math.min(body.max_output_tokens||2000,8192),response_format:format,stream:false};
    const response=await fetchImpl(`${base()}/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${env.DASHSCOPE_API_KEY}`,'Content-Type':'application/json'},signal,body:JSON.stringify(payload)});
    if(!response.ok)return response;
    const data=await response.json(),choice=data.choices?.[0];

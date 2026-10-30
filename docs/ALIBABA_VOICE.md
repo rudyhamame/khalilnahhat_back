@@ -21,3 +21,8 @@ Server VAD is used with threshold 0.3 and 900 ms silence; the original semantic 
 - Browser microphone capture, actual browser playback/avatar, end-to-end Render browser socket flow and human English/Arabic quality remain unverified. The successful live checks used the configured local server key and matching workspace, not browser microphone audio.
 
 Official protocol reference: https://www.alibabacloud.com/help/en/model-studio/client-events
+
+## Voice-guided homepage
+Voice sessions expose the presentation-only show_app_section tool on Alibaba and OpenAI. Allowed destinations are home, work, availability, music, setup, live and about. The browser maps these keys to the current real sections; model output cannot supply URLs/selectors. Navigation does not read calendar/catalog state, select fields, play media or submit a booking.
+
+The browser moves at completed navigation arguments when available, returns the tool result once, and resumes the spoken response through the existing channel. A Follow page toggle pauses voice-driven scrolling. The existing viewport controller owns alignment, header offsets, reduced-motion behavior and manual interruption. Date/music/setup field updates provide fallback focus only when the same response has no explicit chapter navigation.

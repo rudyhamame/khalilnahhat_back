@@ -1,6 +1,7 @@
 const {createOpenRouter,providerKey}=require('./openrouter');
 const {WebSocketServer}=require('ws');
 const {bridgeAlibabaVoice}=require('./ai-voice-alibaba');
+const {voiceNavigationTool,voiceNavigationInstructions}=require('./voice-navigation');
 const { z } = require('zod');
 const crypto = require('node:crypto');
 const {consumeResponseStream}=require('./ai-booking-stream');
@@ -195,7 +196,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
         return res.json({provider:'alibaba',callId,wsTicket,maxCallSeconds:config.voice.maxCallSeconds});
       }
       const form = new FormData(); form.set('sdp', req.body.sdp);
-      form.set('session', JSON.stringify({ type: 'realtime', model: config.voice.model, instructions: instructions()+'\n'+orderInstructions(), tools:[draftTool], tool_choice:'auto', max_output_tokens: config.voice.maxOutputTokens,
+      form.set('session', JSON.stringify({ type: 'realtime', model: config.voice.model, instructions: instructions()+'\n'+orderInstructions()+'\n'+voiceNavigationInstructions(), tools:[draftTool,voiceNavigationTool], tool_choice:'auto', max_output_tokens: config.voice.maxOutputTokens,
         audio: { input: { transcription: { model: 'gpt-4o-mini-transcribe' }, turn_detection: { type: 'server_vad' } }, output: { voice: 'marin' } },
       }));
       const upstream = await fetchImpl('https://api.openai.com/v1/realtime/calls', { method: 'POST', headers: headers(req), body: form, signal: AbortSignal.any([controller.signal,AbortSignal.timeout(45000)]) });
@@ -231,7 +232,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
       const call=calls.get(value.callId);
       if(!call){client.close();return;}
       call.attached=true;clearTimeout(call.attachTimer);
-      call.close=bridgeAlibabaVoice({client,env,model:value.config.voice.model,instructions:instructions()+'\n'+orderInstructions(),tools:[draftTool],maxOutputTokens:value.config.voice.maxOutputTokens,onClose:()=>hangup(value.callId)});
+      call.close=bridgeAlibabaVoice({client,env,model:value.config.voice.model,instructions:instructions()+'\n'+orderInstructions()+'\n'+voiceNavigationInstructions(),tools:[draftTool,voiceNavigationTool],maxOutputTokens:value.config.voice.maxOutputTokens,onClose:()=>hangup(value.callId)});
     },
   };
   return {voiceSocketHooks};

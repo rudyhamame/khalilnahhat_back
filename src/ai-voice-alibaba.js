@@ -61,7 +61,8 @@ function createTranslator({instructions,tools,voice,maxOutputTokens}){
     case 'input_audio_buffer.speech_stopped':return [{type:event.type}];
     case 'response.function_call_arguments.done':
      if(typeof event.call_id==='string'&&typeof event.name==='string')state.calls.push({type:'function_call',call_id:event.call_id,name:event.name,arguments:String(event.arguments||'')});
-     return [];
+     // Navigation can move the page as soon as its arguments are complete, before spoken audio.
+     return event.name==='show_app_section'?[{type:event.type,call_id:event.call_id,name:event.name,arguments:String(event.arguments||'')}]:[];
     case 'response.done':{
      const raw=event.response?.usage||{},input=count(raw.input_tokens??raw.prompt_tokens),output=count(raw.output_tokens??raw.completion_tokens),cached=count(raw.input_tokens_details?.cached_tokens);
      const done={type:'response.done',response:{id:event.response?.id,status:event.response?.status||'completed',output:state.calls.splice(0),

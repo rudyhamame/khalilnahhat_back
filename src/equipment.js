@@ -12,6 +12,7 @@ const equipmentSchema = new mongoose.Schema(
     brandModel: { type: String, default: '', trim: true },
     description: { type: String, default: '', trim: true },
     imageUrl: { type: String, default: '' },
+    modelUrl:{type:String,default:''},modelJobId:{type:String,default:''},
     priceCents: { type: Number, default: 0, min: 0 }, // internal only, never in public output
     minQuantity: { type: Number, default: 1, min: 1 },
     quantityOwned: { type: Number, default: 1, min: 0 },
@@ -56,13 +57,14 @@ async function ensureSeed() {
 
 const publicView = (e) => ({
   id: e.slug, category: e.category, name: e.name, brandModel: e.brandModel,
-  description: e.description, imageUrl: e.imageUrl, minQuantity: e.minQuantity, ...stockView(e),
+  description: e.description, imageUrl: e.imageUrl, modelUrl:e.modelUrl||'', minQuantity: e.minQuantity, ...stockView(e),
 });
 const adminView = (e) => ({
-  ...publicView(e), priceCents: e.priceCents, quantityOwned: e.quantityOwned, stockTracked: e.stockTracked, isActive: e.isActive, sortOrder: e.sortOrder,
+  ...publicView(e),modelJobId:e.modelJobId||'', priceCents: e.priceCents, quantityOwned: e.quantityOwned, stockTracked: e.stockTracked, isActive: e.isActive, sortOrder: e.sortOrder,
 });
 
 const fields = {
+  modelJobId:z.string().max(80).nullable(),
   category: z.string().trim().min(1), name: z.string().trim().min(1),
   brandModel: z.string().trim(), description: z.string().trim(), imageUrl: z.string().trim(),
   priceCents: z.number().int().min(0), minQuantity: z.number().int().min(1),
@@ -90,9 +92,11 @@ function registerEquipmentRoutes(app, requireAdmin) {
     const parsed = createSchema.safeParse(req.body);
     if (!parsed.success) return bad(res, parsed);
     try {
-      return res.status(201).json({ item: adminView(await Equipment.create(parsed.data)) });
+      const {modelJobId,...data}=parsed.data;const model=await require('./equipment-3d').equipmentModelFields(req,modelJobId);
+      return res.status(201).json({ item: adminView(await Equipment.create({...data,...model})) });
     } catch (e) {
       if (e.code === 11000) return res.status(409).json({ message: 'Equipment id already exists.' });
+      if(e.status)return res.status(e.status).json({message:e.message});
       throw e;
     }
   });
@@ -100,7 +104,8 @@ function registerEquipmentRoutes(app, requireAdmin) {
   app.patch('/api/equipment/:id', requireAdmin, async (req, res) => {
     const parsed = updateSchema.safeParse(req.body);
     if (!parsed.success) return bad(res, parsed);
-    const item = await Equipment.findOneAndUpdate({ slug: req.params.id }, parsed.data, { new: true });
+    const {modelJobId,...data}=parsed.data;let model;try{model=await require('./equipment-3d').equipmentModelFields(req,modelJobId);}catch(error){if(error.status)return res.status(error.status).json({message:error.message});throw error;}
+    const item = await Equipment.findOneAndUpdate({ slug: req.params.id }, {...data,...model}, { new: true });
     return item ? res.json({ item: adminView(item) }) : res.status(404).json({ message: 'Equipment not found.' });
   });
 

@@ -1,7 +1,9 @@
+const {createAlibaba}=require('./alibaba');
 const failure=(status,message)=>Object.assign(new Error(message),{status});
 const router={id:'openrouter/free',provider:'openrouter',mode:'chat',label:'Free models router',free:true,rates:{textInput:0,textCached:0,textOutput:0},source:'https://openrouter.ai/openrouter/free'};
 function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
  let cache=null,until=0,pending=null;
+ const alibaba=createAlibaba({env,fetchImpl});
  const models=async()=>{
   if(cache&&Date.now()<until)return structuredClone(cache);
   if(!pending)pending=(async()=>{
@@ -22,7 +24,8 @@ function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
   if(config.freeOnly!==false&&!model.free)throw failure(400,'Free-only mode blocks paid models.');
   return model;
  };
- return {models,validate,configured:()=>Boolean(env.OPENROUTER_API_KEY),async request(body,{signal}={}){
+ return {models,validate,alibaba,configured:()=>Boolean(env.OPENROUTER_API_KEY),async request(body,{signal}={}){
+  if(body.config?.provider==='alibaba')return alibaba.request(body,{signal});
   if(!env.OPENROUTER_API_KEY)throw failure(503,'Configure OPENROUTER_API_KEY in Render before using OpenRouter.');
   await validate(body.config);
   const request={model:body.config.model,messages:[{role:'system',content:body.instructions},...body.input],max_tokens:body.max_output_tokens,response_format:{type:'json_schema',json_schema:{name:body.text.format.name,strict:true,schema:body.text.format.schema}},stream:false,provider:{require_parameters:true,allow_fallbacks:false,...(body.config.freeOnly!==false?{max_price:{prompt:0,completion:0,request:0}}:{})}};
@@ -41,4 +44,6 @@ function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
   return new Response(JSON.stringify({status:'completed',output:[{content:[message.refusal?{type:'refusal',refusal:message.refusal}:{type:'output_text',text:message.content}]}],usage:{input_tokens:usageKnown?totals.prompt_tokens:undefined,output_tokens:usageKnown?totals.completion_tokens:undefined,input_tokens_details:{cached_tokens:usageKnown?totals.cached_tokens:undefined}}}),{headers:{'Content-Type':'application/json'}});
  }};
 }
-module.exports={createOpenRouter};
+// The API key a chat provider needs; every chat call site uses this so a new provider only has to be added here.
+const providerKey=(env,provider)=>provider==='openrouter'?env.OPENROUTER_API_KEY:provider==='alibaba'?env.DASHSCOPE_API_KEY:env.OPENAI_API_KEY;
+module.exports={createOpenRouter,providerKey};

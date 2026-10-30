@@ -16,7 +16,7 @@ const rates=z.object({textInput:money,textCached:money,textOutput:money,audioInp
 const modeSchema=kind=>z.object({enabled:z.boolean(),model:z.string().trim().min(1).max(200).refine(id=>kind==='chat'||catalog.some(item=>item.mode===kind&&item.id===id),'Choose a supported model for this mode.'),providerRates:rates,maxOutputTokens:z.number().int().min(256).max(4096),requestsPer10Min:z.number().int().min(1).max(kind==='chat'?200:20)}).strict();
 const sttDefaults=()=>({enabled:true,model:'whisper-1',providerRates:{audioMinute:0.006},requestsPer10Min:6});
 const sttSchema=z.object({enabled:z.boolean(),model:z.literal('whisper-1'),providerRates:z.object({audioMinute:money}).strict(),requestsPer10Min:z.number().int().min(1).max(20)}).strict();
-const configSchema=z.object({stt:sttSchema.optional(),revision:z.number().int().min(0),chat:modeSchema('chat').extend({provider:z.enum(['openai','openrouter']).default('openai'),freeOnly:z.boolean().default(true)}),voice:modeSchema('voice').extend({maxCallSeconds:z.number().int().min(30).max(900)}),customerPricing:z.object({policy:z.enum(['included','manual_invoice']),currency:z.enum(['CAD','USD']),chatReplyCents:z.number().int().min(0).max(100000),voiceSessionCents:z.number().int().min(0).max(100000)}).strict()}).strict().superRefine((config,ctx)=>{
+const configSchema=z.object({stt:sttSchema.optional(),revision:z.number().int().min(0),chat:modeSchema('chat').extend({provider:z.enum(['openai','openrouter','alibaba']).default('openai'),freeOnly:z.boolean().default(true)}),voice:modeSchema('voice').extend({maxCallSeconds:z.number().int().min(30).max(900)}),customerPricing:z.object({policy:z.enum(['included','manual_invoice']),currency:z.enum(['CAD','USD']),chatReplyCents:z.number().int().min(0).max(100000),voiceSessionCents:z.number().int().min(0).max(100000)}).strict()}).strict().superRefine((config,ctx)=>{
  for(const mode of ['chat','voice']){
   const r=config[mode].providerRates;
   if(r.textCached>r.textInput)ctx.addIssue({code:'custom',path:[mode,'providerRates','textCached'],message:'Cached input rate cannot exceed input rate.'});
@@ -62,7 +62,7 @@ function createAiConfiguration({store=mongoStore,env=process.env,fetchImpl=fetch
  const load=async()=>{if(cached&&Date.now()<until)return structuredClone(cached);if(!inflight)inflight=store.getConfig().then(item=>{const value=item?.value||defaults(env);cached={...value,stt:{...sttDefaults(),...value.stt,model:'whisper-1',providerRates:{audioMinute:0.006}},chat:{provider:'openai',freeOnly:true,...value.chat}};until=Date.now()+5000;return cached;}).finally(()=>{inflight=null;});return structuredClone(await inflight);};
  return {
   load,
-  async describe(){let extra=[],catalogError='';try{extra=await openrouter.models();}catch{catalogError='OpenRouter catalog unavailable. Reload to retry.';}return {item:await load(),catalog:[...catalog,...extra],providers:{openai:{configured:Boolean(env.OPENAI_API_KEY)},openrouter:{configured:Boolean(env.OPENROUTER_API_KEY)}},catalogError};},
+  async describe(){let extra=[],catalogError='';try{extra=await openrouter.models();}catch{catalogError='OpenRouter catalog unavailable. Reload to retry.';}return {item:await load(),catalog:[...catalog,...extra,...openrouter.alibaba.models()],providers:{openai:{configured:Boolean(env.OPENAI_API_KEY)},openrouter:{configured:Boolean(env.OPENROUTER_API_KEY)},alibaba:{configured:openrouter.alibaba.configured()}},catalogError};},
   async save(body,owner){
    const old=await load();
    const parsed=configSchema.safeParse({...body,stt:body.stt??old.stt});if(!parsed.success)throw error(400,parsed.error.issues[0]?.message||'Invalid AI configuration.');
@@ -72,13 +72,17 @@ function createAiConfiguration({store=mongoStore,env=process.env,fetchImpl=fetch
     const model=await openrouter.validate(parsed.data.chat);
     parsed.data.chat.providerRates={...model.rates};
     if(parsed.data.chat.enabled&&!openrouter.configured())throw error(503,'Configure OPENROUTER_API_KEY in Render before enabling OpenRouter.');
+   }else if(parsed.data.chat.provider==='alibaba'){
+    openrouter.alibaba.validate(parsed.data.chat);
+    // Prices come from the admin (the Model Studio price list), not from this code.
+    if(parsed.data.chat.enabled&&!openrouter.alibaba.configured())throw error(503,'Configure DASHSCOPE_API_KEY on the server before enabling Alibaba Cloud.');
    }else if(!catalog.some(item=>item.mode==='chat'&&item.id===parsed.data.chat.model))throw error(400,'Choose a supported OpenAI chat model.');
    for(const mode of ['chat','voice']){
-    if(mode==='chat'&&parsed.data.chat.provider==='openrouter')continue;
+    if(mode==='chat'&&parsed.data.chat.provider!=='openai')continue;
     const model=catalog.find(item=>item.mode===mode&&item.id===parsed.data[mode].model);
     parsed.data[mode].providerRates={...model.rates};
    }
-   for(const mode of ['chat','voice','stt'])if(!(mode==='chat'&&parsed.data.chat.provider==='openrouter')&&parsed.data[mode].enabled&&(old[mode].model!==parsed.data[mode].model||(old[mode].provider||'openai')!==(parsed.data[mode].provider||'openai')||!old.revision)){
+   for(const mode of ['chat','voice','stt'])if(!(mode==='chat'&&parsed.data.chat.provider!=='openai')&&parsed.data[mode].enabled&&(old[mode].model!==parsed.data[mode].model||(old[mode].provider||'openai')!==(parsed.data[mode].provider||'openai')||!old.revision)){
     if(!env.OPENAI_API_KEY)throw error(503,'Configure the provider API key on the server before enabling a model.');
     const response=await fetchImpl(`https://api.openai.com/v1/models/${encodeURIComponent(parsed.data[mode].model)}`,{headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},signal:AbortSignal.timeout(10000)});
     if(!response.ok)throw error(400,`The configured OpenAI account cannot access ${parsed.data[mode].model}.`);

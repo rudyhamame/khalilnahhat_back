@@ -1,4 +1,4 @@
-const {createOpenRouter}=require('./openrouter');
+const {createOpenRouter,providerKey}=require('./openrouter');
 const { z } = require('zod');
 const crypto = require('node:crypto');
 const {consumeResponseStream}=require('./ai-booking-stream');
@@ -69,7 +69,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
   };
   const identity = req => String(req.authUser?._id || req.authUser?.id || '');
   const safety = req => crypto.createHash('sha256').update(identity(req)).digest('hex');
-  const configured = (kind='chat',config=null) => kind==='chat'&&config?.chat?.provider==='openrouter'?Boolean(env.OPENROUTER_API_KEY):Boolean(env.OPENAI_API_KEY);
+  const configured = (kind='chat',config=null) => kind==='chat'?Boolean(providerKey(env,config?.chat?.provider)):Boolean(env.OPENAI_API_KEY);
   const admitted = (req, res, kind, limit,config) => {
     if (!configured(kind,config)) { res.status(503).json({ message: 'AI booking is not configured yet. Personal booking is available.' }); return false; }
     const now = Date.now(), key = `${identity(req)}:${kind}`;
@@ -119,7 +119,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
           } } } },
         }),
       };
-      const upstream=config.chat.provider==='openrouter'
+      const upstream=(config.chat.provider||'openai')!=='openai'
         ?await openrouter.request({...JSON.parse(requestOptions.body),config:config.chat},{signal:requestOptions.signal})
         :await fetchImpl('https://api.openai.com/v1/responses',requestOptions);
       if (!upstream.ok) console.warn('AI chat upstream failure', JSON.stringify({provider:config.chat.provider,model,status:upstream.status,body:(await upstream.clone().text().catch(()=>'')).slice(0,400)}));

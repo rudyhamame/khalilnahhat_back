@@ -1919,6 +1919,7 @@ require('./live-recordings').registerLiveRecordings(app, requireAdmin);
 require('./live-suggestions').registerLiveSuggestions(app, { getLiveStreamConfig });
 require('./live-comments').registerLiveComments(app, { getLiveStreamConfig });
 registerEquipmentRoutes(app, requireAdmin);
+require('./equipment-3d').registerEquipment3D(app,{requireAdmin});
 registerPlanning(app, { requireAuth, serialize: serializeServiceRequest });
 registerMeetings(app, { requireAuth, requireAdmin });
 registerAccount(app, { requireAuth, getFrontendUrl });

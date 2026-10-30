@@ -32,6 +32,7 @@ function createOllama({env=process.env,fetchImpl=fetch}={}){
   // each existing consumer still validates its JSON before applying changes.
   const instructions=`${body.instructions||''}\nReturn exactly one valid JSON object, without markdown or additional text.${schema?` Match this JSON Schema: ${JSON.stringify(schema)}`:''}`;
   const response=await fetchImpl(`${base()}/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${env.OLLAMA_API_KEY}`,'Content-Type':'application/json'},signal,redirect:'error',body:JSON.stringify({model:body.config.model,messages:[{role:'system',content:instructions},...body.input],max_tokens:Math.min(body.max_output_tokens||2400,4096),reasoning_effort:'none',stream:false})});
+  if(response.status===402)throw failure(503,'The Ollama Cloud account needs usage credits or an active subscription. Choose another configured provider or add credits in Ollama.');
   if(!response.ok)return response;
   const data=await response.json(),choice=data.choices?.[0];
   if(data.error||choice?.finish_reason!=='stop'||typeof choice.message?.content!=='string'||!choice.message.content.trim())throw failure(502,'Ollama Cloud did not complete the reply. Try a different model or retry.');

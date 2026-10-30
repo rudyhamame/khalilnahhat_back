@@ -16,3 +16,7 @@ References:
 - https://github.com/ollama/ollama/blob/main/docs/cloud.mdx
 - https://github.com/ollama/ollama/blob/main/docs/api/openai-compatibility.mdx
 - https://github.com/ollama/ollama/blob/main/docs/capabilities/structured-outputs.mdx
+
+## Account setup verification — 2026-10-30
+
+Created the approved Echo DJ API key in khalilnahhatdj’s Ollama account and saved it privately as OLLAMA_API_KEY in the local backend and Render API. The dashboard shows pay-as-you-go with $0 credits. A small real gpt-oss:20b request reached Ollama and returned HTTP 402 requiring usage credits or a subscription. No credits or plan were purchased, and the active Chat provider was not switched. Successful model output remains unverified until the account is funded. The adapter reports this account condition explicitly rather than an unexplained reply failure.

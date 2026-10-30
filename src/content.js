@@ -85,6 +85,20 @@ function registerContent(app, requireAdmin) {
       return res.status(500).json({ message: 'Upload failed.' });
     }
   });
+
+  // Gallery uploads: images and videos only, kept together in the Cloudinary "Gallery" folder (created on first upload).
+  app.post('/api/content/gallery/upload', requireAdmin, upload.single('file'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ message: 'File is required.' });
+    if (!/^(image|video)\//.test(req.file.mimetype || '')) return res.status(400).json({ message: 'Only images and videos can be added to the gallery.' });
+    try {
+      const r = await new Promise((resolve, reject) =>
+        cloudinary.uploader.upload_stream({ folder: 'Gallery', resource_type: 'auto' }, (e, out) => (e ? reject(e) : resolve(out))).end(req.file.buffer));
+      return res.status(201).json({ url: r.secure_url, durationSec: Math.round(r.duration || 0) });
+    } catch (e) {
+      console.error('Gallery upload failed:', e);
+      return res.status(500).json({ message: 'Upload failed.' });
+    }
+  });
 }
 
 module.exports = { MediaItem, Testimonial, registerContent };

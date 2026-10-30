@@ -5,6 +5,13 @@ const {redact}=require('./redact');
 const {conversationInput}=require('./conversation');
 const commandSchema=z.object({command:z.string().trim().min(1).max(8000),requestId:z.uuid(),sessionId:z.string().max(160).default('dashboard')}).strict();
 const audit=(task,type,detail={})=>task.audit.push({at:new Date().toISOString(),type,...redact(detail)});
+// The model's wording is not proof. This server-built section lists only writes that were verified against stored data.
+const esc=text=>String(text).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+function groundTruth(task,registry){
+ const changed=task.actions.filter(a=>a.state==='VERIFIED'&&registry.get(a.name)?.mutation);
+ const failed=task.actions.filter(a=>a.state==='FAILED'&&registry.get(a.name)?.mutation);
+ return `<h4>Verified by the system</h4>${changed.length?`<ul>${changed.map(a=>`<li>Changed and re-read from the database: <code>${esc(a.name)}</code></li>`).join('')}</ul>`:'<p><strong>No data was changed.</strong> If the text above says otherwise, it is wrong.</p>'}${failed.length?`<p>Failed, not applied: ${failed.map(a=>`<code>${esc(a.name)}</code>`).join(', ')}</p>`:''}`;
+}
 function createEngine({store,registry,agent,authorize}){
  let timer=null,running=false;const workerToken=randomUUID();
  const actorFor=async owner=>{const actor=await authorize(owner);if(!actor)throw failure(403,'The initiating account no longer has administrator authority or an active session.');return actor;};
@@ -24,7 +31,7 @@ function createEngine({store,registry,agent,authorize}){
     if(!action){
      if(task.actions.length>=24)throw failure(422,'Task reached its 24-action limit. Review completed actions before a new request.');
      const response=await agent.next(task);await checkpoint(task);
-     if(!response.calls.length){task.result={message:response.text||'No administrative action was requested.',verifiedActions:task.actions.filter(a=>a.state==='VERIFIED').length,model:response.model};task.state=task.actions.some(a=>a.state==='FAILED')?'FAILED':'COMPLETED';audit(task,task.state);await store.save(task);return;}
+     if(!response.calls.length){task.result={message:`${response.text||'No administrative action was requested.'}${groundTruth(task,registry)}`,verifiedActions:task.actions.filter(a=>a.state==='VERIFIED').length,model:response.model};task.state=task.actions.some(a=>a.state==='FAILED')?'FAILED':'COMPLETED';audit(task,task.state);await store.save(task);return;}
      task.input.push(...redact(response.output));
      const call=response.calls[0];if(!call.call_id||task.actions.some(item=>item.callId===call.call_id))throw failure(409,'The model repeated a tool-call identity. No duplicate operation was executed.');let args;
      try{const wrapped=JSON.parse(call.arguments);args=JSON.parse(wrapped.arguments_json);}catch{throw failure(400,'The model returned invalid tool arguments.');}

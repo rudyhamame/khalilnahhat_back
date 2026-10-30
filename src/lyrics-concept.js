@@ -18,7 +18,7 @@ function registerLyricsConcept(app,{requireAdmin,configService,fetchImpl=fetch,e
    const upstream=openrouterProvider?await openrouter.request({...body,config},{signal}):await fetchImpl('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify(body),signal});
    if(!upstream.ok){
     const failure=await upstream.json().catch(()=>({})),code=failure.error?.code;
-    const provider=config.provider==='alibaba'?'Alibaba Cloud':openrouterProvider?'OpenRouter':'OpenAI';
+    const provider=config.provider==='alibaba'?'Alibaba Cloud':config.provider==='ollama'?'Ollama Cloud':openrouterProvider?'OpenRouter':'OpenAI';
     console.warn('Lyrics concept provider rejected request',JSON.stringify({provider,model:config.model,status:upstream.status,code:typeof code==='string'||typeof code==='number'?code:null,requestId:upstream.headers.get('x-request-id')}));
     if(upstream.status===429){
      const retry=upstream.headers.get('retry-after');

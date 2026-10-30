@@ -28,8 +28,10 @@ function createOllama({env=process.env,fetchImpl=fetch}={}){
   if(!env.OLLAMA_API_KEY)throw failure(503,'Configure OLLAMA_API_KEY on the API server before using Ollama Cloud.');
   await validate(body.config);
   const schema=body.text?.format?.schema;
+  // Cloud does not enforce structured outputs. Keep the schema in the prompt;
+  // each existing consumer still validates its JSON before applying changes.
   const instructions=`${body.instructions||''}\nReturn exactly one valid JSON object, without markdown or additional text.${schema?` Match this JSON Schema: ${JSON.stringify(schema)}`:''}`;
-  const response=await fetchImpl(`${base()}/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${env.OLLAMA_API_KEY}`,'Content-Type':'application/json'},signal,redirect:'error',body:JSON.stringify({model:body.config.model,messages:[{role:'system',content:instructions},...body.input],max_tokens:Math.min(body.max_output_tokens||2400,4096),response_format:{type:'json_object'},reasoning_effort:'none',stream:false})});
+  const response=await fetchImpl(`${base()}/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${env.OLLAMA_API_KEY}`,'Content-Type':'application/json'},signal,redirect:'error',body:JSON.stringify({model:body.config.model,messages:[{role:'system',content:instructions},...body.input],max_tokens:Math.min(body.max_output_tokens||2400,4096),reasoning_effort:'none',stream:false})});
   if(!response.ok)return response;
   const data=await response.json(),choice=data.choices?.[0];
   if(data.error||choice?.finish_reason!=='stop'||typeof choice.message?.content!=='string'||!choice.message.content.trim())throw failure(502,'Ollama Cloud did not complete the reply. Try a different model or retry.');

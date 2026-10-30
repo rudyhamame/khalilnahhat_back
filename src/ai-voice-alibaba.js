@@ -18,7 +18,7 @@ function sessionUpdate({instructions,tools,voice,maxOutputTokens}){
  return {type:'session.update',session:{
   modalities:['text','audio'],voice,instructions,input_audio_format:'pcm',output_audio_format:'pcm',
   input_audio_transcription:{model:'qwen3-asr-flash-realtime'},
-  turn_detection:{type:'semantic_vad',threshold:0.1,prefix_padding_ms:500,silence_duration_ms:900},
+  turn_detection:{type:'server_vad',threshold:0.3,prefix_padding_ms:500,silence_duration_ms:900},
   tools:(tools||[]).map(tool=>({type:'function',function:{name:tool.name,description:tool.description,parameters:tool.parameters}})),
   ...(maxOutputTokens?{max_tokens:maxOutputTokens}:{}),
  }};
@@ -26,7 +26,7 @@ function sessionUpdate({instructions,tools,voice,maxOutputTokens}){
 
 // Pure translation, kept separate from the sockets so it can be tested without a network.
 function createTranslator({instructions,tools,voice,maxOutputTokens}){
- const state={context:'',calls:[]};
+ const state={context:'',calls:[],hasConversation:false};
  return {
   open:()=>sessionUpdate({instructions,tools,voice,maxOutputTokens}),
   // Browser event -> events for Alibaba.
@@ -36,25 +36,27 @@ function createTranslator({instructions,tools,voice,maxOutputTokens}){
    if(event.type==='conversation.item.create'){
     const item=event.item||{};
     if(item.type==='message'){state.context=`${state.context}\n${text(item.content)}`.trim().slice(0,6000);return [];}
-    if(item.type==='function_call_output'&&typeof item.call_id==='string')return [{type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:String(item.output??'')}}];
+    if(item.type==='function_call_output'&&typeof item.call_id==='string'){state.hasConversation=true;return [{type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:String(item.output??'')}}];}
     return [];
    }
    if(event.type==='response.create'){
-    // Alibaba has no standalone context message, so earlier chat context and the opening instruction go into the session instructions.
+    // Alibaba accepts text context through session instructions. A first response needs a committed audio turn; defer the proactive greeting until then.
     const extra=[state.context,typeof event.response?.instructions==='string'?event.response.instructions:''].filter(Boolean).join('\n');
     state.context='';
-    return [...(extra?[sessionUpdate({instructions:`${instructions}\n${extra}`.slice(0,30000),tools,voice,maxOutputTokens})]:[]),{type:'response.create'}];
+    return [...(extra?[sessionUpdate({instructions:`${instructions}\n${extra}`.slice(0,30000),tools,voice,maxOutputTokens})]:[]),...(state.hasConversation?[{type:'response.create'}]:[])];
    }
    return [];
   },
   // Alibaba event -> events for the browser, in the shapes the page already understands.
   toClient(event){
+   if(!event?.type&&typeof event?.code==='string'&&typeof event?.message==='string')return [{type:'error',error:{message:event.code==='AccessDenied'?'The Alibaba API key does not allow this voice model. Check its Model Studio permissions.':event.message}}];
    switch(event?.type){
-    case 'response.created':return [{type:'response.created',response:{id:event.response?.id}}];
+    case 'input_audio_buffer.committed':state.hasConversation=true;return [];
+    case 'response.created':state.hasConversation=true;return [{type:'response.created',response:{id:event.response?.id}}];
     case 'response.audio.delta':return typeof event.delta==='string'?[{type:'response.output_audio.delta',delta:event.delta}]:[];
     case 'response.audio_transcript.delta':return [{type:'response.output_audio_transcript.delta',delta:String(event.delta||'')}];
     case 'response.audio_transcript.done':return [{type:'response.output_audio_transcript.done',transcript:String(event.transcript||''),item_id:event.item_id||crypto.randomUUID()}];
-    case 'conversation.item.input_audio_transcription.completed':return [{type:event.type,transcript:String(event.transcript||''),item_id:event.item_id||crypto.randomUUID()}];
+    case 'conversation.item.input_audio_transcription.completed':state.hasConversation=true;return [{type:event.type,transcript:String(event.transcript||''),item_id:event.item_id||crypto.randomUUID()}];
     case 'input_audio_buffer.speech_started':
     case 'input_audio_buffer.speech_stopped':return [{type:event.type}];
     case 'response.function_call_arguments.done':
@@ -80,8 +82,8 @@ function bridgeAlibabaVoice({client,env=process.env,model,voice=env.DASHSCOPE_VO
  const queued=[];let ready=false,closed=false;
  const send=(socket,event)=>{if(socket.readyState===1)socket.send(JSON.stringify(event));};
  const close=()=>{if(closed)return;closed=true;try{upstream.close();}catch{/* Already closed. */}try{client.close();}catch{/* Already closed. */}onClose();};
- upstream.on('open',()=>{ready=true;send(upstream,translator.open());for(const event of queued.splice(0))send(upstream,event);send(client,{type:'bridge.ready'});});
- upstream.on('message',raw=>{let event;try{event=JSON.parse(raw.toString());}catch{return;}for(const out of translator.toClient(event))send(client,out);});
+ upstream.on('open',()=>send(upstream,translator.open()));
+ upstream.on('message',raw=>{let event;try{event=JSON.parse(raw.toString());}catch{return;}if(event.type==='session.updated'&&!ready){ready=true;for(const pending of queued.splice(0))send(upstream,pending);send(client,{type:'bridge.ready'});}for(const out of translator.toClient(event))send(client,out);});
  upstream.on('error',()=>{send(client,{type:'error',error:{message:'The AI voice service could not connect.'}});close();});
  upstream.on('close',close);
  client.on('message',raw=>{

@@ -1927,6 +1927,7 @@ require('./event-drafts').registerEventDrafts(app, {
 require('./archive-player').registerArchivePlayer(app, { requireAdmin });
 require('./stem-separation').registerStemSeparation(app, { requireAdmin });
 require('./music-archive').registerMusicArchive(app, { requireAdmin });
+require('./dj-service-builder').registerDjServiceBuilder(app, { requireAdmin });
 require('./setup-catalog').registerSetupCatalog(app, { requireAdmin });
 require('./availability').registerAvailability(app, { requireAdmin });
 vouchers.registerVouchers(app, { requireAdmin, requireAuth });

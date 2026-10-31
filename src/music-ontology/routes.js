@@ -16,10 +16,14 @@ function registerMusicOntology(app,{requireAdmin,service=createService()}={}){
   app.get(`${prefix}/works`,...guards,wrap(async(_req,res)=>{const ids=isAdmin?(await service.models.Work.find().lean()).map(w=>w.externalId):[...new Set((await service.list(false)).flatMap(r=>r.componentWorkIds||[r.workId]).filter(Boolean))];res.set('Cache-Control','no-store').json({items:[...(await service.workMap(ids)).works.values()]});}));
   app.get(`${prefix}/works/:id`,...guards,wrap(async(req,res)=>{if(!isAdmin&&!(await service.list(false)).some(r=>r.workId===req.params.id||r.componentWorkIds?.includes(req.params.id)))return res.status(404).json({message:'Work not found.'});const item=(await service.workMap([req.params.id])).works.get(req.params.id);if(!item)return res.status(404).json({message:'Work not found.'});res.json({item});}));
   app.get(`${prefix}/vocabulary`,...guards,wrap(async(req,res)=>{const query={};if(req.query.kind){query.kind=z.enum(contract.vocabularyKinds).parse(req.query.kind);}let rows=await service.models.Vocabulary.find(query).sort({name:1}).lean();if(req.query.q){const q=String(req.query.q).toLowerCase().slice(0,240);rows=rows.filter(r=>r.name.toLowerCase().includes(q));}res.set('Cache-Control','no-store').json({items:rows.map(entity)});}));
+  app.get(`${prefix}/work-types`,...guards,wrap(async(_req,res)=>res.set('Cache-Control','no-store').json({items:await service.listWorkTypes()})));
   app.get(`${prefix}/vocabulary/:id`,...guards,wrap(async(req,res)=>{const item=await service.models.Vocabulary.findOne({externalId:req.params.id}).lean();if(!item)return res.status(404).json({message:'Metadata entity not found.'});res.json({item:entity(item)});}));
  }
  app.post(`${admin}/vocabulary`,requireAdmin,wrap(async(req,res)=>res.status(201).json({item:entity(await service.saveVocabulary(req.body,null,actor(req)))})));
  app.put(`${admin}/vocabulary/:id`,requireAdmin,wrap(async(req,res)=>res.json({item:entity(await service.saveVocabulary(req.body,req.params.id,actor(req)))})));
+ app.post(`${admin}/work-types`,requireAdmin,wrap(async(req,res)=>res.status(201).json({item:await service.saveWorkType(req.body)})));
+ app.put(`${admin}/work-types/:id`,requireAdmin,wrap(async(req,res)=>res.json({item:await service.saveWorkType(req.body,req.params.id)})));
+ app.delete(`${admin}/work-types/:id`,requireAdmin,wrap(async(req,res)=>{await service.deleteWorkType(req.params.id);res.json({ok:true,deleted:true,id:req.params.id});}));
  for(const [name,save] of [['works',service.saveWork],['recordings',service.saveRecording]]){
   for(const [method,suffix] of [['post',''],['put','/:id']])app[method](`${admin}/${name}${suffix}`,requireAdmin,wrap(async(req,res)=>{
    const id=await save(req.body,req.params.id||null,actor(req));

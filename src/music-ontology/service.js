@@ -1,4 +1,5 @@
 const mongoose=require('mongoose');
+const {z}=require('zod');
 const {randomUUID,createHash}=require('crypto');
 const M=require('./models');
 const V=require('./validation');
@@ -46,7 +47,7 @@ function matches(r,f={}){
  return components.some(work=>matchesWork({...r,work},f));
 }
 function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>value,previewUrl=value=>value,ownedAsset=()=>false}={}){
- const {Work,Lyrics,Melody,Vocabulary,AudioAsset,Version}=models;
+ const {Work,Lyrics,Melody,Vocabulary,DjWorkType,DjWorkTypeSeed,AudioAsset,Version}=models;
  async function transaction(fn){
   const session=await mongoose.startSession();
   try{return await session.withTransaction(()=>fn(session));}catch(e){if(/Transaction numbers are only allowed|replica set/.test(e.message))fail('Music ontology writes require MongoDB configured as a replica set (transactions).',503);throw e;}finally{await session.endSession();}
@@ -58,6 +59,46 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
  }
  async function creditsCheck(credits,session){await references(credits.map(c=>c.artistId),'artist',session);}
  const provenance=(p,actor)=>({...p,recordedBy:actor||'admin'});
+ const defaultWorkTypes=[
+  {id:'MIX',name:'Mix',nameArabic:'ميكس',amount:'MULTIPLE',details:'A curated sequence of tracks blended into one continuous listening experience.',detailsArabic:'مجموعة مقطوعات مختارة ومنسّقة في تجربة استماع متصلة.'},
+  {id:'REMIX',name:'Remix',nameArabic:'ريميكس',amount:'INDIVIDUAL',details:'An existing recording reshaped with a new beat, arrangement or sound textures.',detailsArabic:'إعادة تشكيل تسجيل موجود بإيقاع أو توزيع أو ملامح صوتية جديدة.'},
+  {id:'MASHUP',name:'Mashup',nameArabic:'ماش أب',amount:'INDIVIDUAL',details:'Parts from separate recordings combined into one new musical arrangement.',detailsArabic:'جمع مقاطع من تسجيلات مختلفة في توزيع موسيقي جديد.'},
+  {id:'MEDLEY',name:'Medley',nameArabic:'ميدلي',amount:'MULTIPLE',details:'Selected passages from several works arranged into one connected performance.',detailsArabic:'مقاطع مختارة من عدة أعمال مرتّبة في أداء واحد متصل.'},
+  {id:'COVER',name:'Cover',nameArabic:'إعادة أداء',amount:'INDIVIDUAL',details:'A fresh interpretation of an existing work, with a different arrangement, sound or performance.',detailsArabic:'قراءة جديدة لعمل موجود، بتوزيع أو صوت أو إحساس أدائي مختلف.'},
+  {id:'LIVE',name:'Live',nameArabic:'أداء مباشر',amount:'MULTIPLE',details:'A real-time performance shaped by the room, the audience and the moment.',detailsArabic:'أداء في الوقت الفعلي يتفاعل مع المكان والجمهور واللحظة.'},
+ ];
+ async function ensureWorkTypes(){
+  const seed=await DjWorkTypeSeed.findOneAndUpdate({externalId:'defaults-v1'},{$setOnInsert:{externalId:'defaults-v1'}},{upsert:true,new:false}).lean();
+  if(seed)return;
+  await DjWorkType.bulkWrite(defaultWorkTypes.map(({id,...row},sortOrder)=>({updateOne:{filter:{externalId:id},update:{$setOnInsert:{...row,sortOrder,externalId:id,normalizedName:norm(row.name),revision:1}},upsert:true}})),{ordered:false});
+ }
+ async function listWorkTypes(){
+  await ensureWorkTypes();
+  return (await DjWorkType.find().sort({sortOrder:1,name:1}).lean()).map(row=>({id:row.externalId,name:row.name,nameArabic:row.nameArabic||'',amount:row.amount,details:row.details||'',detailsArabic:row.detailsArabic||'',revision:row.revision||1}));
+ }
+ async function saveWorkType(input,id=null){
+  const schema=z.object({name:z.string().trim().min(1).max(120),nameArabic:z.string().trim().max(120).default(''),amount:z.enum(contract.recordingAmounts),details:z.string().trim().max(2000).default(''),detailsArabic:z.string().trim().max(2000).default(''),revision:z.number().int().positive().optional()}).strict();
+  const value=schema.parse(input), code=(id||value.name).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,120);
+  if(!code)fail('Enter a work type name.');
+  if(code==='ORIGINAL')fail('Original is reserved for work without a DJ treatment.');
+  const old=id?await DjWorkType.findOne({externalId:id}):null;
+  if(id&&!old)fail('DJ work type not found.',404);
+  if(old&&value.revision!==old.revision)fail('This DJ work type changed. Reload before editing.',409);
+  if(old&&old.amount!==value.amount&&(await Work.exists({workKind:id})||await ArchiveItem.exists({recordingType:id})))fail('Move this work type to another recording content group only after it is unused.');
+  const conflict=await DjWorkType.findOne({normalizedName:norm(value.name),externalId:{$ne:code}}).lean();
+  if(conflict)fail('A DJ work type with this name already exists.',409);
+  const sortOrder=old?.sortOrder??((await DjWorkType.findOne().sort({sortOrder:-1}).select('sortOrder').lean())?.sortOrder??-1)+1;
+  const data={name:value.name,nameArabic:value.nameArabic,normalizedName:norm(value.name),amount:value.amount,details:value.details,detailsArabic:value.detailsArabic,sortOrder,revision:(old?.revision||0)+1};
+  if(old){old.set(data);await old.save();return {id:old.externalId,...data};}
+  try{const row=await DjWorkType.create({externalId:code,...data});return {id:row.externalId,name:row.name,nameArabic:row.nameArabic,amount:row.amount,details:row.details,detailsArabic:row.detailsArabic,revision:row.revision};}
+  catch(error){if(error.code===11000)fail('A DJ work type with this name already exists.',409);throw error;}
+ }
+ async function deleteWorkType(id){
+  const type=await DjWorkType.findOne({externalId:id});if(!type)fail('DJ work type not found.',404);
+  if(await Work.exists({workKind:id})||await ArchiveItem.exists({recordingType:id}))fail('This DJ work type is assigned to catalog content and cannot be deleted yet.',409);
+  const deleted=await DjWorkType.deleteOne({_id:type._id,revision:type.revision});if(deleted.deletedCount!==1)fail('This DJ work type changed. Reload before deleting.',409);
+  return true;
+ }
  async function saveVocabulary(input,id,actor){
   const value=V.vocabulary.parse(input);
   return transaction(async session=>{
@@ -76,6 +117,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
  async function saveWork(input,id,actor){
   const value=V.work.parse(input);
   return transaction(async session=>{
+   if(value.workKind!=='ORIGINAL'&&!await DjWorkType.exists({externalId:value.workKind}).session(session))fail('Choose an existing DJ work type.');
    const old=id?await Work.findOne({externalId:id}).session(session):null;
    if(id&&!old)fail('Musical work not found.',404);
    if(old&&value.revision!==old.revision)fail('This work changed. Reload before editing.',409);
@@ -100,6 +142,9 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
  async function saveRecording(input,id,actor,migration=null){
   const v=V.recording.parse(input);
   return transaction(async session=>{
+   const type=await DjWorkType.findOne({externalId:v.recordingType}).session(session);
+   if(!type)fail('Choose an existing DJ work type.');
+   if(v.recordingAmount&&v.recordingAmount!==type.amount)fail('Recording type does not belong to the selected recording content group.');
    const old=id?await ArchiveModel.findOne({externalId:id}).session(session):null;
    if(id&&!old)fail('Recording not found.',404);
    if(old&&v.revision!==(old.ontologyRevision||0))fail('This recording changed. Reload before editing.',409);
@@ -124,7 +169,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    if(timing&&(timing.audioUrl!==v.audioUrl||!componentWorkIds.includes(timing.workId)))fail('Timed lyrics must match the recording audio and one of its content entries.');
    if(timing&&!await Work.exists({externalId:timing.workId,type:'SONG'}).session(session))fail('Timed lyrics require a lyrical content entry.');
    const duration=v.durationSeconds==null?'':`${Math.floor(v.durationSeconds/60)}:${String(Math.floor(v.durationSeconds%60)).padStart(2,'0')}`;
-   const data={lyricsTiming:timing||null,title:v.title,recordingType:v.recordingType,recordingAmount:amountFor(v.recordingType),componentWorkIds,workId:v.workId,audioAssetId,sourceRecordingIds:v.sourceRecordingIds,sourceWorkIds:v.sourceWorkIds,publicationStatus:v.publicationStatus,archivalStatus:v.archivalStatus,versionLabel:v.versionLabel,productionNotes:v.productionNotes,provenance:provenance(v.provenance,actor),ontologyRevision:(old?.ontologyRevision||0)+1,description:v.description,date:v.releaseDate,audioUrl:v.audioUrl,coverImage:v.coverImage,duration,published:v.publicationStatus==='PUBLISHED'&&v.archivalStatus==='ACTIVE',mediaType:'audio'};
+   const data={lyricsTiming:timing||null,title:v.title,recordingType:v.recordingType,recordingAmount:type.amount,componentWorkIds,workId:v.workId,audioAssetId,sourceRecordingIds:v.sourceRecordingIds,sourceWorkIds:v.sourceWorkIds,publicationStatus:v.publicationStatus,archivalStatus:v.archivalStatus,versionLabel:v.versionLabel,productionNotes:v.productionNotes,provenance:provenance(v.provenance,actor),ontologyRevision:(old?.ontologyRevision||0)+1,description:v.description,date:v.releaseDate,audioUrl:v.audioUrl,coverImage:v.coverImage,duration,published:v.publicationStatus==='PUBLISHED'&&v.archivalStatus==='ACTIVE',mediaType:'audio'};
    if(migration){for(const key of ['title','description','date','audioUrl','coverImage','duration','mediaType'])delete data[key];data.ontologyMigrationId=migration.runId;await mongoose.connection.collection('musicontologymigrationbackups').insertOne({_id:`${migration.runId}:${recordId}`,runId:migration.runId,recordingId:recordId,before:plain(old),afterRevision:data.ontologyRevision,createdAt:new Date()},{session});}
    let row;
    if(old){old.set(data);row=await old.save({session});}else row=(await ArchiveModel.create([{...data,externalId:recordId,category:'Music Archive',artist:''}],{session}))[0];
@@ -134,24 +179,26 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
  }
  async function workMap(ids){
   const works=await Work.find({externalId:{$in:ids}}).lean();
-  const [melodies,lyrics,vocabulary]=await Promise.all([Melody.find({externalId:{$in:works.map(w=>w.melodyId)}}).lean(),Lyrics.find({externalId:{$in:works.map(w=>w.lyricsId).filter(Boolean)}}).lean(),Vocabulary.find({}).lean()]);
+  const [melodies,lyrics,vocabulary,workTypes]=await Promise.all([Melody.find({externalId:{$in:works.map(w=>w.melodyId)}}).lean(),Lyrics.find({externalId:{$in:works.map(w=>w.lyricsId).filter(Boolean)}}).lean(),Vocabulary.find({}).lean(),listWorkTypes()]);
+  const workTypeMap=new Map(workTypes.map(type=>[type.id,type]));
   const vs=new Map(vocabulary.map(v=>[v.externalId,{...v,id:v.externalId,_id:undefined}]));
   const entity=(kind,id)=>vs.get(id)?.kind===kind?vs.get(id):null;
   const mm=new Map(melodies.map(m=>[m.externalId,m])),lm=new Map(lyrics.map(l=>[l.externalId,l]));
   const mapped=works.map(w=>{
    const m=mm.get(w.melodyId),l=lm.get(w.lyricsId);
-   return [w.externalId,{...w,id:w.externalId,_id:undefined,credits:creditNames(w.credits||[],vs),melody:m?{...m,id:m.externalId,_id:undefined,rhythm:entity('rhythm',m.rhythmId),genres:(m.genreIds||[]).map(id=>entity('genre',id)).filter(Boolean),instruments:(m.instrumentIds||[]).map(id=>entity('instrument',id)).filter(Boolean),musicianCredits:creditNames(m.musicianCredits||[],vs)}:null,lyrics:w.type==='SONG'&&l?{...l,id:l.externalId,_id:undefined,language:entity('language',l.languageId),dialect:entity('dialect',l.dialectId),regions:(l.regionIds||[]).map(id=>entity('region',id)).filter(Boolean),primaryConcept:entity('concept',l.primaryConceptId),concepts:(l.conceptIds||[]).map(id=>entity('concept',id)).filter(Boolean),artistCredits:creditNames(l.artistCredits||[],vs)}:null}];
-  });return {works:new Map(mapped),vocabulary:vs};
+   return [w.externalId,{...w,id:w.externalId,_id:undefined,workKindDefinition:workTypeMap.get(w.workKind)||null,credits:creditNames(w.credits||[],vs),melody:m?{...m,id:m.externalId,_id:undefined,rhythm:entity('rhythm',m.rhythmId),genres:(m.genreIds||[]).map(id=>entity('genre',id)).filter(Boolean),instruments:(m.instrumentIds||[]).map(id=>entity('instrument',id)).filter(Boolean),musicianCredits:creditNames(m.musicianCredits||[],vs)}:null,lyrics:w.type==='SONG'&&l?{...l,id:l.externalId,_id:undefined,language:entity('language',l.languageId),dialect:entity('dialect',l.dialectId),regions:(l.regionIds||[]).map(id=>entity('region',id)).filter(Boolean),primaryConcept:entity('concept',l.primaryConceptId),concepts:(l.conceptIds||[]).map(id=>entity('concept',id)).filter(Boolean),artistCredits:creditNames(l.artistCredits||[],vs)}:null}];
+  });return {works:new Map(mapped),vocabulary:vs,workTypes:workTypeMap};
  }
  async function hydrate(rows,{admin=false}={}){
-  rows=rows.map(plain);const {works,vocabulary}=await workMap([...new Set(rows.flatMap(r=>[r.workId,...(r.componentWorkIds||[])]).filter(Boolean))]);
+  rows=rows.map(plain);const {works,vocabulary,workTypes}=await workMap([...new Set(rows.flatMap(r=>[r.workId,...(r.componentWorkIds||[])]).filter(Boolean))]);
   const assets=await AudioAsset.find({externalId:{$in:rows.map(r=>r.audioAssetId).filter(Boolean)}}).lean();const am=new Map(assets.map(a=>[a.externalId,a]));
   return rows.map(r=>{
    const w=works.get(r.workId)||null,a=am.get(r.audioAssetId),deliver=url=>admin?previewUrl(deliveryUrl(url)):deliveryUrl(url);
    const componentWorkIds=[...new Set([r.workId,...(r.componentWorkIds||[])].filter(Boolean))],componentWorks=componentWorkIds.map(id=>works.get(id)).filter(Boolean);
    const artist=[...new Set([...inferredRecordingCredits(componentWorks),...componentWorks.flatMap(c=>[...(c.credits||[]),...(c.melody?.musicianCredits||[]),...(c.lyrics?.artistCredits||[])])].map(c=>vocabulary.get(c.artistId)?.name).filter(Boolean))].join(', ')||(!r.workId?r.artist||'':'');
    const timing=r.lyricsTiming?.audioUrl===r.audioUrl&&componentWorks.some(work=>work.id===r.lyricsTiming?.workId&&work.type==='SONG')&&r.lyricsTiming?.lines?.length?r.lyricsTiming:null;
-   return {lyricsTiming:timing?{workId:timing.workId,model:timing.model,lines:timing.lines,...(admin?{audioUrl:timing.audioUrl}:{})}:null,id:r.externalId,title:r.title,description:r.description||'',recordingType:contract.recordingTypes.includes(r.recordingType)?r.recordingType:null,recordingAmount:r.recordingAmount||amountFor(r.recordingType),componentWorkIds,componentWorks,workId:r.workId||null,work:w,ontologyStatus:r.workId?'MAPPED':'UNMAPPED',recordingMetadata:inferredRecordingMetadata(componentWorks),credits:inferredRecordingCredits(componentWorks),sourceRecordingIds:r.sourceRecordingIds||[],sourceWorkIds:r.sourceWorkIds||[],publicationStatus:r.publicationStatus||(r.published!==false?'PUBLISHED':'DRAFT'),archivalStatus:r.archivalStatus||'ACTIVE',revision:r.ontologyRevision||0,versionLabel:r.versionLabel||'',productionNotes:r.productionNotes||'',provenance:r.provenance||null,audio:{assetId:r.audioAssetId||null,url:deliver(r.audioUrl||a?.url||''),durationSeconds:r.duration?String(r.duration).split(':').reduce((t,n)=>t*60+Number(n),0):(a?.durationSeconds??null)},audioUrl:deliver(r.audioUrl||''),coverImage:deliver(r.coverImage||r.image||''),artist,duration:r.duration||'',date:r.date||'',releaseDate:r.date||'',createdAt:r.createdAt,updatedAt:r.updatedAt,sortOrder:r.sortOrder||0,published:r.published!==false,...(admin?{storedAudioUrl:r.audioUrl||'',storedCoverImage:r.coverImage||r.image||''}:{})};
+   const type=workTypes.get(r.recordingType)||null;
+   return {lyricsTiming:timing?{workId:timing.workId,model:timing.model,lines:timing.lines,...(admin?{audioUrl:timing.audioUrl}:{})}:null,id:r.externalId,title:r.title,description:r.description||'',recordingType:type?r.recordingType:null,recordingTypeDefinition:type,recordingAmount:r.recordingAmount||type?.amount||amountFor(r.recordingType),componentWorkIds,componentWorks,workId:r.workId||null,work:w,ontologyStatus:r.workId?'MAPPED':'UNMAPPED',recordingMetadata:inferredRecordingMetadata(componentWorks),credits:inferredRecordingCredits(componentWorks),sourceRecordingIds:r.sourceRecordingIds||[],sourceWorkIds:r.sourceWorkIds||[],publicationStatus:r.publicationStatus||(r.published!==false?'PUBLISHED':'DRAFT'),archivalStatus:r.archivalStatus||'ACTIVE',revision:r.ontologyRevision||0,versionLabel:r.versionLabel||'',productionNotes:r.productionNotes||'',provenance:r.provenance||null,audio:{assetId:r.audioAssetId||null,url:deliver(r.audioUrl||a?.url||''),durationSeconds:r.duration?String(r.duration).split(':').reduce((t,n)=>t*60+Number(n),0):(a?.durationSeconds??null)},audioUrl:deliver(r.audioUrl||''),coverImage:deliver(r.coverImage||r.image||''),artist,duration:r.duration||'',date:r.date||'',releaseDate:r.date||'',createdAt:r.createdAt,updatedAt:r.updatedAt,sortOrder:r.sortOrder||0,published:r.published!==false,...(admin?{storedAudioUrl:r.audioUrl||'',storedCoverImage:r.coverImage||r.image||''}:{})};
   });
  }
  async function list(admin=false,filters={}){
@@ -160,6 +207,9 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
  }
  async function preflightRecording(input,id){
   const v=V.recording.parse(input);
+  await ensureWorkTypes();
+  const type=await DjWorkType.findOne({externalId:v.recordingType}).lean();if(!type)fail('Choose an existing DJ work type.');
+  if(v.recordingAmount&&v.recordingAmount!==type.amount)fail('Recording type does not belong to the selected recording content group.');
   if(!await Work.exists({externalId:v.workId}))fail('Choose an existing musical work.');
   const componentIds=[...new Set([v.workId,...(v.componentWorkIds||[])])];
   if(componentIds.length>100||await Work.countDocuments({externalId:{$in:componentIds}})!==componentIds.length)fail('Choose up to 100 existing recording component works.');
@@ -172,6 +222,6 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
   return v;
  }
  async function deleteLegacy(id){return transaction(async session=>{await mongoose.connection.collection('musicontologylocks').updateOne({_id:'source-graph'},{$inc:{revision:1}},{upsert:true,session});const row=await ArchiveModel.findOne({externalId:id}).session(session);if(!row)return null;if(row.workId)fail('Archive this recording through the ontology editor.',409);if(await ArchiveModel.exists({sourceRecordingIds:id}).session(session))fail('This recording is used as a source; retain its identity and media.',409);return ArchiveModel.findOneAndDelete({externalId:id}).session(session);});}
- return {transaction,saveVocabulary,saveWork,saveRecording,hydrate,list,workMap,models,contract,deleteLegacy,preflightRecording};
+ return {transaction,saveVocabulary,saveWork,saveWorkType,deleteWorkType,listWorkTypes,saveRecording,hydrate,list,workMap,models,contract,deleteLegacy,preflightRecording};
 }
 module.exports={createService,assertAcyclic,matches,norm,fail};

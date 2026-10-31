@@ -15,3 +15,26 @@ test('missing key and incomplete provider output fail closed',async()=>{
   await assert.rejects(client.request(body),e=>e.status===502&&!e.message.includes('private'));
  }
 });
+test('Poe exposes account models and sends Responses requests with the server key',async()=>{
+ const calls=[];
+ const client=createOpenRouter({env:{POE_API_KEY:'poe-secret'},fetchImpl:async(url,options={})=>{
+  calls.push({url,options});
+  if(url.endsWith('/models'))return Response.json({data:[{id:'Claude-Sonnet',name:'Claude Sonnet'},{id:'GPT-4o'}]});
+  return Response.json({status:'completed',output:[{content:[{type:'output_text',text:'ok'}]}]});
+ }});
+ const models=await client.poe.models();
+ assert.deepEqual(models.map(item=>item.id),['Claude-Sonnet','GPT-4o']);
+ assert.equal(models[0].provider,'poe');assert.equal(models[0].pricingUnknown,true);
+ const response=await client.request({config:{provider:'poe',model:'Claude-Sonnet'},instructions:'system',input:[],max_output_tokens:256});
+ assert.equal(response.status,200);
+ assert.equal(calls[2].url,'https://api.poe.com/v1/responses');
+ assert.equal(calls[2].options.headers.Authorization,'Bearer poe-secret');
+ assert.equal(JSON.parse(calls[2].options.body).model,'Claude-Sonnet');
+ assert.equal(JSON.parse(calls[2].options.body).config,undefined);
+});
+test('Poe fails closed without a key or for models outside the account catalog',async()=>{
+ const request={config:{provider:'poe',model:'unavailable'},input:[]};
+ await assert.rejects(createOpenRouter({env:{}}).request(request),{status:503});
+ const client=createOpenRouter({env:{POE_API_KEY:'secret'},fetchImpl:async()=>Response.json({data:[{id:'available'}]})});
+ await assert.rejects(client.request(request),{status:400});
+});

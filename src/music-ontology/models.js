@@ -13,13 +13,15 @@ const Melody=model('MusicMelody',{bpm:Number,key:String,rhythmId:String,genreIds
 const Lyrics=model('MusicLyrics',{languageId:String,dialectId:String,regionIds:[String],artistCredits:[credit],primaryConceptId:String,conceptIds:[String],releaseYear:Number,conceptLabel:String,conceptSummary:String,text:String,script:String,translationRefs:[String],notes:String,completeness:{type:String,enum:['INCOMPLETE','COMPLETE'],default:'INCOMPLETE'},states:{type:Map,of:state},provenance});
 const Work=model('MusicalWork',{title:{type:String,required:true},type:{type:String,enum:contract.workTypes,required:true},lyricsId:String,melodyId:{type:String,required:true},credits:[credit],description:String,workKind:{type:String,default:'ORIGINAL'},provenance},[[{type:1,title:1},{}]]);
 const Vocabulary=model('MusicVocabulary',{kind:{type:String,enum:contract.vocabularyKinds,required:true},name:{type:String,required:true},normalizedName:{type:String,required:true},parentId:{type:String,default:''},isoCode:String,description:String,provenance},[[{kind:1,normalizedName:1,parentId:1},{unique:true}],[{kind:1,isoCode:1},{unique:true,partialFilterExpression:{isoCode:{$gt:''}}}]]);
+const DjWorkType=model('DjWorkType',{name:{type:String,required:true},nameArabic:{type:String,default:''},normalizedName:{type:String,required:true},amount:{type:String,enum:contract.recordingAmounts,required:true},details:{type:String,default:''},detailsArabic:{type:String,default:''},sortOrder:{type:Number,default:0}},[[{normalizedName:1},{unique:true}]]);
+const DjWorkTypeSeed=model('DjWorkTypeSeed',{});
 const AudioAsset=model('MusicAudioAsset',{url:{type:String,required:true,unique:true},mime:String,durationSeconds:Number,originalName:String,provenance});
 const Version=model('MusicRecordingVersion',{recordingId:{type:String,index:true,required:true},number:Number,snapshot:Schema.Types.Mixed,changedBy:String},[[{recordingId:1,number:1},{unique:true}]]);
 const RecordingFields={
  lyricsTiming:{audioUrl:String,workId:String,model:String,lines:{type:[{_id:false,start:Number,end:Number,text:String}],default:undefined}},
- recordingType:{type:String,enum:contract.recordingTypes,index:true},workId:{type:String,index:true},recordingAmount:{type:String,enum:contract.recordingAmounts,index:true},componentWorkIds:{type:[String],index:true},audioAssetId:String,
+ recordingType:{type:String,index:true},workId:{type:String,index:true},recordingAmount:{type:String,enum:contract.recordingAmounts,index:true},componentWorkIds:{type:[String],index:true},audioAssetId:String,
  recordingMetadata:{bpm:Number,key:String,bpms:{type:[Number],default:undefined},keys:{type:[String],default:undefined},genreIds:{type:[String],default:undefined},states:{type:Map,of:state}},credits:[credit],sourceRecordingIds:{type:[String],index:true},sourceWorkIds:{type:[String],index:true},
  publicationStatus:{type:String,enum:contract.publicationStatuses,index:true},archivalStatus:{type:String,enum:contract.archivalStatuses,index:true},
  ontologyRevision:Number,versionLabel:String,productionNotes:String,provenance,ontologyMigrationId:String,
 };
-module.exports={Melody,Lyrics,Work,Vocabulary,AudioAsset,Version,RecordingFields};
+module.exports={Melody,Lyrics,Work,Vocabulary,DjWorkType,DjWorkTypeSeed,AudioAsset,Version,RecordingFields};

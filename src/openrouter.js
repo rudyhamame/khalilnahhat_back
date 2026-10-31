@@ -4,6 +4,41 @@ const failure=(status,message)=>Object.assign(new Error(message),{status});
 const router={id:'openrouter/free',provider:'openrouter',mode:'chat',label:'Free models router',free:true,rates:{textInput:0,textCached:0,textOutput:0},source:'https://openrouter.ai/openrouter/free'};
 function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
  let cache=null,until=0,pending=null;
+ const poe={
+  async models(){
+   if(!env.POE_API_KEY)return [];
+   const r=await fetchImpl('https://api.poe.com/v1/models',{headers:{Authorization:`Bearer ${env.POE_API_KEY}`},signal:AbortSignal.timeout(15000)});
+   if(!r.ok)throw failure(503,'Poe model catalog is unavailable. Check the Poe API key and retry.');
+   const body=await r.json();if(!Array.isArray(body.data))throw failure(503,'Invalid Poe model catalog.');
+   return body.data.filter(m=>typeof m.id==='string').map(m=>({id:m.id,provider:'poe',mode:'chat',label:m.name||m.id,pricingUnknown:true,rates:{textInput:0,textCached:0,textOutput:0},source:'https://poe.com/api/keys'}));
+  },
+  configured:()=>Boolean(env.POE_API_KEY),
+  async validate(config){const model=(await this.models()).find(m=>m.id===config.model);if(!model)throw failure(400,'Select a model available through the configured Poe account.');return model;},
+  async request(body,{signal}={}){
+   if(!env.POE_API_KEY)throw failure(503,'Configure POE_API_KEY in Render before using Poe.');
+   await this.validate(body.config);
+   const request={...body,model:body.config.model};delete request.config;
+   return fetchImpl('https://api.poe.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.POE_API_KEY}`,'Content-Type':'application/json'},signal,body:JSON.stringify(request)});
+  }
+ };
+ const omniRoute={
+  baseUrl(){return String(env.OMNIROUTE_BASE_URL||'').trim().replace(/\/+$/,'');},
+  configured(){return Boolean(env.OMNIROUTE_API_KEY&&this.baseUrl());},
+  async models(){
+   if(!this.configured())return [];
+   const r=await fetchImpl(`${this.baseUrl()}/models`,{headers:{Authorization:`Bearer ${env.OMNIROUTE_API_KEY}`},signal:AbortSignal.timeout(15000)});
+   if(!r.ok)throw failure(503,'OmniRoute model catalog is unavailable. Check its URL and API key, then retry.');
+   const body=await r.json();if(!Array.isArray(body.data))throw failure(503,'Invalid OmniRoute model catalog.');
+   return body.data.filter(m=>typeof m.id==='string'&&(m.type==='chat'||m.supportedEndpoints?.some?.(endpoint=>['/v1/responses','/v1/chat/completions','responses','chat/completions'].includes(endpoint)))).map(m=>({id:m.id,provider:'omniroute',mode:'chat',label:m.name||m.id,pricingUnknown:true,rates:{textInput:0,textCached:0,textOutput:0},source:this.baseUrl()}));
+  },
+  async validate(config){const model=(await this.models()).find(m=>m.id===config.model);if(!model)throw failure(400,'Select a chat model available through OmniRoute.');return model;},
+  async request(body,{signal}={}){
+   if(!this.configured())throw failure(503,'Configure OMNIROUTE_BASE_URL and OMNIROUTE_API_KEY on the API server before using OmniRoute.');
+   await this.validate(body.config);
+   const request={...body,model:body.config.model};delete request.config;
+   return fetchImpl(`${this.baseUrl()}/responses`,{method:'POST',headers:{Authorization:`Bearer ${env.OMNIROUTE_API_KEY}`,'Content-Type':'application/json'},signal,body:JSON.stringify(request)});
+  }
+ };
  const alibaba=createAlibaba({env,fetchImpl}),ollama=createOllama({env,fetchImpl});
  const models=async()=>{
   if(cache&&Date.now()<until)return structuredClone(cache);
@@ -25,7 +60,9 @@ function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
   if(config.freeOnly!==false&&!model.free)throw failure(400,'Free-only mode blocks paid models.');
   return model;
  };
- return {models,validate,alibaba,ollama,configured:()=>Boolean(env.OPENROUTER_API_KEY),async request(body,{signal}={}){
+ return {models,validate,alibaba,ollama,poe,omniRoute,configured:()=>Boolean(env.OPENROUTER_API_KEY),async request(body,{signal}={}){
+  if(body.config?.provider==='omniroute')return omniRoute.request(body,{signal});
+  if(body.config?.provider==='poe')return poe.request(body,{signal});
   if(body.config?.provider==='ollama')return ollama.request(body,{signal});
   if(body.config?.provider==='alibaba')return alibaba.request(body,{signal});
   if(!env.OPENROUTER_API_KEY)throw failure(503,'Configure OPENROUTER_API_KEY in Render before using OpenRouter.');
@@ -47,5 +84,5 @@ function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
  }};
 }
 // The API key a chat provider needs; every chat call site uses this so a new provider only has to be added here.
-const providerKey=(env,provider)=>provider==='openrouter'?env.OPENROUTER_API_KEY:provider==='alibaba'?env.DASHSCOPE_API_KEY:provider==='ollama'?env.OLLAMA_API_KEY:env.OPENAI_API_KEY;
+const providerKey=(env,provider)=>provider==='omniroute'?env.OMNIROUTE_API_KEY&&env.OMNIROUTE_BASE_URL?env.OMNIROUTE_API_KEY:null:provider==='poe'?env.POE_API_KEY:provider==='openrouter'?env.OPENROUTER_API_KEY:provider==='alibaba'?env.DASHSCOPE_API_KEY:provider==='ollama'?env.OLLAMA_API_KEY:env.OPENAI_API_KEY;
 module.exports={createOpenRouter,providerKey};

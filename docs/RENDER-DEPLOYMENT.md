@@ -43,6 +43,14 @@ OpenRouter replies are returned after the complete JSON reply has been validated
 
 On 2026-10-27, a dedicated Echo key was created in Khalil’s OpenRouter account and saved in Render. It expires April 25, 2027. No credits were purchased or top-ups enabled. The live unsaved default policy selects `openrouter/free`; voice retains its OpenAI configuration. Synthetic English booking through the free router and Arabic booking through `nvidia/nemotron-3.5-super-vl:free` produced validated order patches. NVIDIA reported $0 cost. Other free-model attempts returned rate-limit/incomplete responses; availability and quality are not guaranteed. Thirty-five focused backend checks and the frontend production build pass.
 
+## Poe text provider
+
+Create an API key at [poe.com/api/keys](https://poe.com/api/keys), then add it to the API service's Render environment as `POE_API_KEY`. Keep it server-side; never put it in the browser or Git. After deployment, Admin → ECHO AI Configuration lists models available to that Poe account. Select Poe and a model, then save. Poe supports the OpenAI-compatible Responses API at `https://api.poe.com/v1`; this integration uses it for chat. Poe usage consumes points from the Poe account. The model catalog does not publish comparable USD token rates, so the provider usage estimate is left blank. Voice and STT retain their separate provider settings. Poe API reference: [OpenAI-compatible API](https://creator.poe.com/docs/external-applications/openai-compatible-api).
+
+## OmniRoute text provider
+
+Configure `OMNIROUTE_BASE_URL` to the reachable API root ending in `/v1` and `OMNIROUTE_API_KEY` to an API key created by your OmniRoute instance. Keep both on the API service in Render. The app reads the OpenAI-compatible `GET /models` catalog and sends chat requests to `POST /responses`. OmniRoute can be self-hosted or hosted; the configured URL must be reachable from the API service. After deployment, select OmniRoute and a chat model in Admin → ECHO AI Configuration. Usage estimates are left blank because OmniRoute can route each request to different providers and pricing; actual usage is visible in OmniRoute. Voice and STT remain separate. OmniRoute docs: [API surface](https://omniroute.cheaperinference.com/api/), [API reference](https://omniroute.hagicode.com/en-US/reference/api-reference/).
+
 ## Ontology API image packaging — 2026-10-28
 
 The first ontology deployment (`9b2d885`) failed at startup because the Docker image copied `src` but omitted `contracts/music-ontology.json`. Render retained the preceding API, which returned 404 for the new editor. The Dockerfile now includes the canonical contracts and migration CLI and loads the ontology models/validation during the image build to catch a missing dependency before deployment. This code deployment does not apply a legacy-data migration.

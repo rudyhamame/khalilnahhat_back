@@ -30,6 +30,18 @@ const draftSchema = z.object({
 const replySchema = z.string().trim().min(1).max(4000);
 // The conversation must survive an uncertain optional form value. Never guess
 // a concrete guest count from a range or accept malformed dates/times.
+// Weaker models often wrap the JSON in markdown fences or add a sentence around it. Accept those; anything that is not a JSON object still fails closed.
+function parseModelReply(text) {
+  const raw = String(text || '').trim();
+  const attempts = [raw, raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')];
+  const start = raw.indexOf('{'), end = raw.lastIndexOf('}');
+  if (start >= 0 && end > start) attempts.push(raw.slice(start, end + 1));
+  for (const candidate of attempts) {
+    try { const value = JSON.parse(candidate); if (value && typeof value === 'object' && !Array.isArray(value)) return value; } catch { /* Try the next form. */ }
+  }
+  return null;
+}
+
 function normalizeDraft(value) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const draft = {};
@@ -143,7 +155,8 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
       }
       const text = content.filter(item => item.type === 'output_text').map(item => item.text).join('');
       stage = 'reply_json';
-      const parsed = JSON.parse(text);
+      const parsed = parseModelReply(text);
+      if (!parsed) throw new Error('Unreadable AI reply');
       stage = 'draft_validation';
       // A summary may contain a useful draft but no conversational text.
       // Preserve the review-only draft; the fallback makes no booking claims.
@@ -249,4 +262,4 @@ function attachAlibabaVoiceSocket(server,hooks){
     wss.handleUpgrade(req,socket,head,client=>hooks.connect(accepted,client));
   });
 }
-module.exports = { attachAlibabaVoiceSocket, registerAiBooking, instructions, draftSchema, normalizeDraft };
+module.exports = { attachAlibabaVoiceSocket, registerAiBooking, instructions, draftSchema, normalizeDraft, parseModelReply };

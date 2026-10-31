@@ -96,10 +96,5 @@
     "id": "influences",
     "label": "Musical influences",
     "source": "preset"
-  },
-  {
-    "id": "script",
-    "label": "Lyrics script",
-    "source": "preset"
   }
 ]

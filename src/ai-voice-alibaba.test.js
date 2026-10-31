@@ -10,12 +10,19 @@ test('session.update uses nested tool format, PCM and server VAD',()=>{
  assert.equal(session.input_audio_format,'pcm');assert.equal(session.turn_detection.type,'server_vad');
  assert.deepEqual(session.tools[0],{type:'function',function:{name:'update_event_draft',description:'d',parameters:{type:'object'}}});
 });
-test('browser opening instruction speaks first; later replies wait for committed audio',()=>{
+test('the model speaks the opening greeting on a silent turn, then server VAD returns; later replies wait for committed audio',()=>{
  const t=make();
- assert.deepEqual(t.toUpstream({type:'conversation.item.create',item:{type:'message',role:'user',content:[{type:'input_text',text:'CTX'}]}}),[]);
+ const context=t.toUpstream({type:'conversation.item.create',item:{type:'message',role:'user',content:[{type:'input_text',text:'CTX'}]}});
+ assert.equal(context[0].type,'session.update');assert.match(context[0].session.instructions,/BASE\nCTX/);
  const out=t.toUpstream({type:'response.create',response:{instructions:'GREET'}});
- assert.equal(out[0].type,'session.update');assert.match(out[0].session.instructions,/BASE\nCTX\nGREET/);
- assert.deepEqual(out[1],{type:'response.create'});assert.equal(out.length,2);
+ assert.deepEqual(out.map(event=>event.type),['session.update','input_audio_buffer.append','input_audio_buffer.commit','response.create']);
+ assert.equal(out[0].session.turn_detection,null);assert.match(out[0].session.instructions,/GREET/);
+ assert.ok(out[1].audio.length>1000);
+ assert.deepEqual(t.drain(),[]);
+ t.toClient({type:'response.created',response:{id:'r1'}});
+ t.toClient({type:'response.done',response:{id:'r1'}});
+ const back=t.drain();assert.equal(back.length,1);assert.equal(back[0].session.turn_detection.type,'server_vad');
+ assert.deepEqual(t.drain(),[]);
  const later=make();
  assert.deepEqual(later.toUpstream({type:'response.create'}),[]);
  later.toClient({type:'input_audio_buffer.committed'});

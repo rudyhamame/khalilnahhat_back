@@ -14,11 +14,13 @@ function realtimeUrl(env,model){
 const text=content=>(Array.isArray(content)?content:[]).map(part=>typeof part?.text==='string'?part.text:'').join('\n').trim();
 const count=value=>Number.isInteger(value)&&value>=0?value:undefined;
 
-function sessionUpdate({instructions,tools,voice,maxOutputTokens}){
+// Half a second of 16 kHz mono PCM16 silence: lets the model take the first turn without the caller saying anything.
+const SILENCE=Buffer.alloc(16000).toString('base64');
+function sessionUpdate({instructions,tools,voice,maxOutputTokens,manual=false}){
  return {type:'session.update',session:{
   modalities:['text','audio'],voice,instructions,input_audio_format:'pcm',output_audio_format:'pcm',
   input_audio_transcription:{model:'qwen3-asr-flash-realtime'},
-  turn_detection:{type:'server_vad',threshold:0.3,prefix_padding_ms:500,silence_duration_ms:900},
+  turn_detection:manual?null:{type:'server_vad',threshold:0.3,prefix_padding_ms:500,silence_duration_ms:900},
   tools:(tools||[]).map(tool=>({type:'function',function:{name:tool.name,description:tool.description,parameters:tool.parameters}})),
   ...(maxOutputTokens?{max_tokens:maxOutputTokens}:{}),
  }};
@@ -26,9 +28,11 @@ function sessionUpdate({instructions,tools,voice,maxOutputTokens}){
 
 // Pure translation, kept separate from the sockets so it can be tested without a network.
 function createTranslator({instructions,tools,voice,maxOutputTokens}){
- const state={context:'',calls:[],hasConversation:false};
+ const state={context:'',calls:[],hasConversation:false,opening:false,afterOpening:null,restore:[]};
  return {
   open:()=>sessionUpdate({instructions,tools,voice,maxOutputTokens}),
+  // Events the bridge must send upstream after what it just received (e.g. back to server VAD once the opening greeting is done).
+  drain:()=>state.restore.splice(0),
   // Browser event -> events for Alibaba.
   toUpstream(event){
    if(!event||typeof event.type!=='string')return [];
@@ -46,10 +50,14 @@ function createTranslator({instructions,tools,voice,maxOutputTokens}){
     return [];
    }
    if(event.type==='response.create'){
-    // Qwen needs an actual conversation/audio input before response.create.
-    // The browser's initial response.create only requests a spoken greeting;
-    // there is no user turn yet, so wait for server VAD to hear the user.
-    if(typeof event.response?.instructions==='string'&&event.response.instructions.trim()!==''&&!state.hasConversation)return [];
+    // Qwen only answers a committed audio turn. For the opening greeting the model takes a first turn on a moment of silence, in manual
+    // turn mode so nothing needs to be heard; server VAD comes back as soon as that greeting is done. The greeting is spoken by the model.
+    if(typeof event.response?.instructions==='string'&&event.response.instructions.trim()!==''&&!state.hasConversation){
+     const extra=[state.context,event.response.instructions].filter(Boolean).join('\n');
+     state.context='';state.opening=true;
+     state.afterOpening=sessionUpdate({instructions:`${instructions}\n${extra}`.slice(0,30000),tools,voice,maxOutputTokens});
+     return [sessionUpdate({instructions:`${instructions}\n${extra}`.slice(0,30000),tools,voice,maxOutputTokens,manual:true}),{type:'input_audio_buffer.append',audio:SILENCE},{type:'input_audio_buffer.commit'},{type:'response.create'}];
+    }
     state.context='';
     return state.hasConversation?[{type:'response.create'}]:[];
    }
@@ -72,6 +80,7 @@ function createTranslator({instructions,tools,voice,maxOutputTokens}){
      // Navigation can move the page as soon as its arguments are complete, before spoken audio.
      return event.name==='show_app_section'?[{type:event.type,call_id:event.call_id,name:event.name,arguments:String(event.arguments||'')}]:[];
     case 'response.done':{
+     if(state.opening){state.opening=false;state.restore.push(state.afterOpening);}
      const raw=event.response?.usage||{},input=count(raw.input_tokens??raw.prompt_tokens),output=count(raw.output_tokens??raw.completion_tokens),cached=count(raw.input_tokens_details?.cached_tokens);
      const done={type:'response.done',response:{id:event.response?.id,status:event.response?.status||'completed',output:state.calls.splice(0),
       ...(input!==undefined||output!==undefined?{usage:{...(input!==undefined?{input_tokens:input}:{}),...(output!==undefined?{output_tokens:output}:{}),...(cached!==undefined?{input_token_details:{cached_tokens:cached}}:{})}}:{})}};
@@ -94,7 +103,7 @@ function bridgeAlibabaVoice({client,env=process.env,model,voice=env.DASHSCOPE_VO
  const send=(socket,event)=>{if(socket.readyState===1)socket.send(JSON.stringify(event));};
  const close=()=>{if(closed)return;closed=true;try{upstream.close();}catch{/* Already closed. */}try{client.close();}catch{/* Already closed. */}onClose();};
  upstream.on('open',()=>send(upstream,translator.open()));
- upstream.on('message',raw=>{let event;try{event=JSON.parse(raw.toString());}catch{return;}if(event.type==='error'||(!event.type&&event.code))console.error('[alibaba-voice]',JSON.stringify({event:'provider_error',code:event.error?.code||event.code||'unknown'}));if(event.type==='session.updated'&&!ready){ready=true;for(const pending of queued.splice(0))send(upstream,pending);send(client,{type:'bridge.ready'});}for(const out of translator.toClient(event))send(client,out);});
+ upstream.on('message',raw=>{let event;try{event=JSON.parse(raw.toString());}catch{return;}if(event.type==='error'||(!event.type&&event.code))console.error('[alibaba-voice]',JSON.stringify({event:'provider_error',code:event.error?.code||event.code||'unknown'}));if(event.type==='session.updated'&&!ready){ready=true;for(const pending of queued.splice(0))send(upstream,pending);send(client,{type:'bridge.ready'});}for(const out of translator.toClient(event))send(client,out);for(const out of translator.drain())send(upstream,out);});
  // Log why Alibaba ended the call (never the key) and tell the browser, so a drop is diagnosable.
  const fail=(reason,message)=>{console.error('[alibaba-voice]',reason);send(client,{type:'error',error:{message}});close();};
  upstream.on('unexpected-response',(request,response)=>fail(`handshake HTTP ${response.statusCode}`,`Alibaba rejected the voice connection (HTTP ${response.statusCode}). Check the API key, region and model access.`));

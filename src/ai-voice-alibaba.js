@@ -35,17 +35,23 @@ function createTranslator({instructions,tools,voice,maxOutputTokens}){
    if(event.type==='input_audio_buffer.append')return typeof event.audio==='string'?[{type:'input_audio_buffer.append',audio:event.audio}]:[];
    if(event.type==='conversation.item.create'){
     const item=event.item||{};
-    if(item.type==='message'){state.context=`${state.context}\n${text(item.content)}`.trim().slice(0,6000);return [];}
+    if(item.type==='message'){
+     // The browser seeds the booking context as a user text item before voice
+     // input. Qwen Omni Realtime does not accept message items from
+     // conversation.item.create; keep the text in session instructions instead.
+     state.context=`${state.context}\n${text(item.content)}`.trim().slice(0,6000);
+     return [sessionUpdate({instructions:`${instructions}\n${state.context}`.slice(0,30000),tools,voice,maxOutputTokens})];
+    }
     if(item.type==='function_call_output'&&typeof item.call_id==='string'){state.hasConversation=true;return [{type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:String(item.output??'')}}];}
     return [];
    }
    if(event.type==='response.create'){
-    // Alibaba accepts text context through session instructions. An opening response (the browser sends its greeting as instructions) speaks first on its own; later replies wait for a committed audio turn.
-    const opening=typeof event.response?.instructions==='string'&&event.response.instructions.trim()!=='';
-    const extra=[state.context,opening?event.response.instructions:''].filter(Boolean).join('\n');
+    // Qwen needs an actual conversation/audio input before response.create.
+    // The browser's initial response.create only requests a spoken greeting;
+    // there is no user turn yet, so wait for server VAD to hear the user.
+    if(typeof event.response?.instructions==='string'&&event.response.instructions.trim()!==''&&!state.hasConversation)return [];
     state.context='';
-    if(opening)state.hasConversation=true;
-    return [...(extra?[sessionUpdate({instructions:`${instructions}\n${extra}`.slice(0,30000),tools,voice,maxOutputTokens})]:[]),...(state.hasConversation?[{type:'response.create'}]:[])];
+    return state.hasConversation?[{type:'response.create'}]:[];
    }
    return [];
   },

@@ -86,6 +86,7 @@ function registerObsBroadcastRoutes(app, deps) {
         }
         try { await stop(await getLiveStreamConfig().then(row => row.obsRoomName === claimed.obsRoomName ? row : { obsRoomName: '' })); } catch { /* retry by worker */ }
       }
+      console.error('OBS prepare failed:', error?.code || error?.status || '', error?.message || error);
       return res.status(503).json({ message: error.status === 503 ? error.message : 'OBS setup did not finish. Retry shortly.' });
     }
   });

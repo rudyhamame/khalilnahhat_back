@@ -3,12 +3,8 @@ const {createOllama}=require('./ollama');
 const failure=(status,message)=>Object.assign(new Error(message),{status});
 const router={id:'openrouter/free',provider:'openrouter',mode:'chat',label:'Free models router',free:true,rates:{textInput:0,textCached:0,textOutput:0},source:'https://openrouter.ai/openrouter/free'};
 function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
- async function chatCompletion(body,{signal,url,key,label,explicitSchema=false}){
+ async function chatCompletion(body,{signal,url,key,label}){
   const request={model:body.config.model,messages:[{role:'system',content:body.instructions},...body.input],max_tokens:body.max_output_tokens,response_format:{type:'json_schema',json_schema:{name:body.text.format.name,strict:true,schema:body.text.format.schema}},stream:false,provider:{require_parameters:true,allow_fallbacks:false,...(body.config.freeOnly!==false?{max_price:{prompt:0,completion:0,request:0}}:{})}};
-  if(explicitSchema){
-   request.messages[0].content+='\nReturn only a JSON object, without markdown or commentary, matching this schema: '+JSON.stringify(body.text.format.schema)+'\nPut the conversational answer in reply and only explicitly supplied draft changes in orderPatch. When nothing changes, use orderPatch: [].';
-   request.reasoning={effort:'none'};
-  }
   let data;let usageKnown=true;const totals={prompt_tokens:0,completion_tokens:0,cached_tokens:0};
   for(let attempt=0;attempt<2;attempt++){
    const response=await fetchImpl(url,{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json','X-Title':'Echo Event Entertainment'},signal,body:JSON.stringify(request)});
@@ -46,33 +42,6 @@ function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
    return fetchImpl('https://api.poe.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.POE_API_KEY}`,'Content-Type':'application/json'},signal,body:JSON.stringify(request)});
   }
  };
- const omniRoute={
-  baseUrl(){return String(env.OMNIROUTE_BASE_URL||'').trim().replace(/\/+$/,'');},
-  configured(){return Boolean(env.OMNIROUTE_API_KEY&&this.baseUrl());},
-  async models(){
-   if(!this.configured())return [];
-   const url=`${this.baseUrl()}/models`;
-   let r;
-   try{r=await fetchImpl(url,{headers:{Authorization:`Bearer ${env.OMNIROUTE_API_KEY}`},signal:AbortSignal.timeout(15000)});}
-   catch(error){console.error('OmniRoute catalog connection failed:',error.name||'Error',error.cause?.code||'',error.message||'');throw failure(503,'OmniRoute model catalog is unavailable. Check its URL and API key, then retry.');}
-   if(!r.ok){console.error('OmniRoute catalog returned HTTP',r.status,'for',new URL(url).host+new URL(url).pathname);throw failure(503,'OmniRoute model catalog is unavailable. Check its URL and API key, then retry.');}
-   let body;
-   try{body=await r.json();}catch(error){console.error('OmniRoute catalog returned invalid JSON:',error.message||'');throw failure(503,'Invalid OmniRoute model catalog.');}
-   if(!Array.isArray(body.data)){console.error('OmniRoute catalog JSON shape is invalid:',Object.keys(body||{}).slice(0,12).join(','));throw failure(503,'Invalid OmniRoute model catalog.');}
-   // OmniRoute may expose both free and paid routes. Only allow OpenRouter's
-   // explicit free router and provider-pinned :free models; labels/pricing
-   // metadata alone are not a cost control.
-   return body.data.filter(m=>typeof m.id==='string'&&(m.type==='chat'||m.supportedEndpoints?.some?.(endpoint=>['/v1/responses','/v1/chat/completions','responses','chat/completions'].includes(endpoint)))&&(m.id==='openrouter/free'||(m.id.startsWith('openrouter/')&&m.id.endsWith(':free')))).map(m=>({id:m.id,provider:'omniroute',mode:'chat',label:`${m.name||m.id} · free`,free:true,rates:{textInput:0,textCached:0,textOutput:0},source:this.baseUrl()}));
-  },
-  async validate(config){const model=(await this.models()).find(m=>m.id===config.model);if(!model)throw failure(400,'OmniRoute is restricted to explicit free OpenRouter models. Select a listed free model.');return model;},
-  async request(body,{signal}={}){
-   if(!this.configured())throw failure(503,'Configure OMNIROUTE_BASE_URL and OMNIROUTE_API_KEY on the API server before using OmniRoute.');
-   await this.validate(body.config);
-   // OmniRoute's Responses translation drops text.format; send the schema
-   // through Chat Completions and normalize its validated completion instead.
-   return chatCompletion(body,{signal,url:`${this.baseUrl()}/chat/completions`,key:env.OMNIROUTE_API_KEY,label:'OmniRoute',explicitSchema:true});
-  }
- };
  const alibaba=createAlibaba({env,fetchImpl}),ollama=createOllama({env,fetchImpl});
  const models=async()=>{
   if(cache&&Date.now()<until)return structuredClone(cache);
@@ -94,8 +63,7 @@ function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
   if(config.freeOnly!==false&&!model.free)throw failure(400,'Free-only mode blocks paid models.');
   return model;
  };
- return {models,validate,alibaba,ollama,poe,omniRoute,configured:()=>Boolean(env.OPENROUTER_API_KEY),async request(body,{signal}={}){
-  if(body.config?.provider==='omniroute')return omniRoute.request(body,{signal});
+ return {models,validate,alibaba,ollama,poe,configured:()=>Boolean(env.OPENROUTER_API_KEY),async request(body,{signal}={}){
   if(body.config?.provider==='poe')return poe.request(body,{signal});
   if(body.config?.provider==='ollama')return ollama.request(body,{signal});
   if(body.config?.provider==='alibaba')return alibaba.request(body,{signal});
@@ -105,5 +73,5 @@ function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
  }};
 }
 // The API key a chat provider needs; every chat call site uses this so a new provider only has to be added here.
-const providerKey=(env,provider)=>provider==='omniroute'?env.OMNIROUTE_API_KEY&&env.OMNIROUTE_BASE_URL?env.OMNIROUTE_API_KEY:null:provider==='poe'?env.POE_API_KEY:provider==='openrouter'?env.OPENROUTER_API_KEY:provider==='alibaba'?env.DASHSCOPE_API_KEY:provider==='ollama'?env.OLLAMA_API_KEY:env.OPENAI_API_KEY;
+const providerKey=(env,provider='openai')=>({openai:env.OPENAI_API_KEY,openrouter:env.OPENROUTER_API_KEY,poe:env.POE_API_KEY,alibaba:env.DASHSCOPE_API_KEY,ollama:env.OLLAMA_API_KEY})[provider];
 module.exports={createOpenRouter,providerKey};

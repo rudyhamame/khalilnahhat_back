@@ -31,9 +31,14 @@ function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
   configured(){return Boolean(env.OMNIROUTE_API_KEY&&this.baseUrl());},
   async models(){
    if(!this.configured())return [];
-   const r=await fetchImpl(`${this.baseUrl()}/models`,{headers:{Authorization:`Bearer ${env.OMNIROUTE_API_KEY}`},signal:AbortSignal.timeout(15000)});
-   if(!r.ok)throw failure(503,'OmniRoute model catalog is unavailable. Check its URL and API key, then retry.');
-   const body=await r.json();if(!Array.isArray(body.data))throw failure(503,'Invalid OmniRoute model catalog.');
+   const url=`${this.baseUrl()}/models`;
+   let r;
+   try{r=await fetchImpl(url,{headers:{Authorization:`Bearer ${env.OMNIROUTE_API_KEY}`},signal:AbortSignal.timeout(15000)});}
+   catch(error){console.error('OmniRoute catalog connection failed:',error.name||'Error',error.cause?.code||'',error.message||'');throw failure(503,'OmniRoute model catalog is unavailable. Check its URL and API key, then retry.');}
+   if(!r.ok){console.error('OmniRoute catalog returned HTTP',r.status,'for',new URL(url).host+new URL(url).pathname);throw failure(503,'OmniRoute model catalog is unavailable. Check its URL and API key, then retry.');}
+   let body;
+   try{body=await r.json();}catch(error){console.error('OmniRoute catalog returned invalid JSON:',error.message||'');throw failure(503,'Invalid OmniRoute model catalog.');}
+   if(!Array.isArray(body.data)){console.error('OmniRoute catalog JSON shape is invalid:',Object.keys(body||{}).slice(0,12).join(','));throw failure(503,'Invalid OmniRoute model catalog.');}
    // OmniRoute may expose both free and paid routes. Only allow OpenRouter's
    // explicit free router and provider-pinned :free models; labels/pricing
    // metadata alone are not a cost control.

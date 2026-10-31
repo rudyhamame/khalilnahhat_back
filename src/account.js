@@ -14,6 +14,7 @@ async function sendVerification(user, baseUrl) {
   await User.updateOne({ _id: user._id }, { verifyTokenHash: sha(token) });
   const link = `${baseUrl}/verify-email?token=${token}`;
   return sendSimpleEmail({ to: user.email, name: user.firstName, subject: 'Verify your email — Echo Event Entertainment', tags: ['verify-email'],
+    notificationContext:{actionUrl:link},
     html: `<p>Welcome to Echo Event Entertainment.</p><p><a href="${link}">Verify your email address</a></p>` });
 }
 
@@ -40,6 +41,7 @@ function registerAccount(app, { requireAuth, getFrontendUrl }) {
         const token = newToken();
         await User.updateOne({ _id: user._id }, { resetTokenHash: sha(token), resetExpires: new Date(Date.now() + RESET_MS) });
         sendSimpleEmail({ to: user.email, name: user.firstName, subject: 'Reset your password — Echo Event Entertainment', tags: ['password-reset'],
+          notificationContext:{actionUrl:`${getFrontendUrl()}/reset-password?token=${token}`},
           html: `<p>Use this link within one hour to choose a new password:</p><p><a href="${getFrontendUrl()}/reset-password?token=${token}">Reset password</a></p><p>If you did not ask for this, ignore this email.</p>` })
           .catch((e) => console.error('Reset email failed:', e));
       }

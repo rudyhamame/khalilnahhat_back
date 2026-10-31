@@ -1,9 +1,9 @@
 const { z } = require('zod');
 const { ServiceRequest } = require('./models');
 const { sendQuoteExpiryReminder } = require('./brevo');
+const { notificationEmails } = require('./notification-emails');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const REMINDER_MS = 48 * 60 * 60 * 1000;
 const SWEEP_MS = 10 * 60 * 1000;
 const round2 = (n) => Math.round(n * 100) / 100;
 
@@ -17,17 +17,19 @@ function quoteTotals(sr) {
 
 const isExpired = (sr) => ['quoted', 'accepted'].includes(sr.status) && sr.expiresAt && sr.expiresAt <= new Date();
 
-// Marks overdue quotes Expired and sends the one-time 48h reminder. Safe to run repeatedly.
-async function sweepQuotes() {
-  const now = new Date();
-  await ServiceRequest.updateMany({ status: { $in: ['quoted', 'accepted'] }, expiresAt: { $lte: now } }, { status: 'expired' });
-  const due = await ServiceRequest.find({
-    status: 'quoted', reminderSentAt: null, expiresAt: { $gt: now, $lte: new Date(now.getTime() + REMINDER_MS) },
+// Expire overdue quotes and send each enabled reminder within its configured window.
+async function sweepQuotes({notifications=notificationEmails,Model=ServiceRequest,send=sendQuoteExpiryReminder,clock=Date.now} = {}) {
+  const now = new Date(clock());
+  await Model.updateMany({ status: { $in: ['quoted', 'accepted'] }, expiresAt: { $lte: now } }, { status: 'expired' });
+  const rule = await notifications.get('quote-expiry-reminder');
+  if (!rule.enabled) return;
+  const due = await Model.find({
+    status: 'quoted', reminderSentAt: null, expiresAt: { $gt: now, $lte: new Date(now.getTime() + rule.leadHours * 60 * 60 * 1000) },
   });
   for (const sr of due) {
     try {
-      const r = await sendQuoteExpiryReminder(sr, sr.expiresAt);
-      if (r.sent) await ServiceRequest.updateOne({ _id: sr._id }, { reminderSentAt: new Date() });
+      const r = await send(sr, sr.expiresAt);
+      if (r.sent) await Model.updateOne({ _id: sr._id }, { reminderSentAt: new Date(clock()) });
     } catch (e) {
       console.error('Quote reminder failed:', e);
     }

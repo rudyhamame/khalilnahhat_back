@@ -1,5 +1,6 @@
 const BREVO_TRANSACTIONAL_EMAIL_URL = 'https://api.brevo.com/v3/smtp/email';
 const DEFAULT_NOTIFICATION_EMAIL = 'khalilnahhatdj@gmail.com';
+const { notificationEmails } = require('./notification-emails');
 
 function escapeHtml(value) {
   return String(value || '')
@@ -17,20 +18,23 @@ function formatCad(value) {
   }).format(Number(value || 0));
 }
 
-async function sendBrevoEmail(payload) {
-  const apiKey = process.env.BREVO_API_KEY?.trim();
-  const senderEmail = process.env.EMAIL_FROM_ADDRESS?.trim();
+async function sendBrevoEmail(payload, {notifications=notificationEmails,fetchImpl=fetch,env=process.env} = {}) {
+  const apiKey = env.BREVO_API_KEY?.trim();
+  const senderEmail = env.EMAIL_FROM_ADDRESS?.trim();
 
   if (!apiKey || !senderEmail) {
     console.warn('Brevo notification skipped: BREVO_API_KEY or EMAIL_FROM_ADDRESS is missing.');
     return { sent: false, skipped: true };
   }
 
+  payload = await notifications.apply(payload);
+  if (!payload) return { sent: false, skipped: true, disabled: true };
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
 
   try {
-    const response = await fetch(BREVO_TRANSACTIONAL_EMAIL_URL, {
+    const response = await fetchImpl(BREVO_TRANSACTIONAL_EMAIL_URL, {
       method: 'POST',
       headers: {
         accept: 'application/json',
@@ -39,7 +43,7 @@ async function sendBrevoEmail(payload) {
       },
       body: JSON.stringify({
         sender: {
-          name: process.env.EMAIL_FROM_NAME?.trim() || 'Khalil Nahhat Website',
+          name: env.EMAIL_FROM_NAME?.trim() || 'Khalil Nahhat Website',
           email: senderEmail,
         },
         ...payload,
@@ -78,6 +82,7 @@ async function sendServiceRequestNotification(serviceRequest) {
     },
     subject: `New service request from ${serviceRequest.customerName}`,
     tags: ['service-request'],
+    notificationContext: {customerName:serviceRequest.customerName,customerEmail:serviceRequest.customerEmail,requestId:serviceRequest.requestNumber||serviceRequest.externalId,details:serviceRequest.items.map(item=>`${item.name} (${item.category}) × ${item.quantity}`).join('\n'),actionUrl:adminServicesUrl||''},
     htmlContent: `<!doctype html>
       <html>
         <body style="margin:0;background:#080808;color:#f4f1ed;font-family:Arial,sans-serif;">
@@ -142,6 +147,7 @@ async function sendServiceQuoteNotification(serviceRequest) {
     },
     subject: 'Your DJ Khalil Nahhat service quote is ready',
     tags: ['service-quote'],
+    notificationContext: {customerName:serviceRequest.customerName,requestId:serviceRequest.requestNumber||serviceRequest.externalId,details:serviceRequest.items.map(item=>`${item.name} × ${item.quantity} — ${formatCad(Number(item.unitPrice||0)*item.quantity)}`).join('\n'),total:formatCad(total),adminNote:serviceRequest.adminNote||'',actionUrl:customerServicesUrl||''},
     htmlContent: `<!doctype html>
       <html>
         <body style="margin:0;background:#080808;color:#f4f1ed;font-family:Arial,sans-serif;">
@@ -183,6 +189,7 @@ async function sendQuoteExpiryReminder(serviceRequest, expiresAt) {
     to: [{ email: serviceRequest.customerEmail, name: serviceRequest.customerName }],
     subject: `Your Echo Event Entertainment quote expires soon (${serviceRequest.requestNumber || serviceRequest.externalId})`,
     tags: ['quote-expiry-reminder'],
+    notificationContext: {customerName:serviceRequest.customerName,requestId:serviceRequest.requestNumber||serviceRequest.externalId,expiresAt:`${when} (Toronto time)`,actionUrl:process.env.CUSTOMER_SERVICES_URL||''},
     htmlContent: `<p>Hello ${escapeHtml(serviceRequest.customerName)},</p>
       <p>Your quotation <strong>${escapeHtml(serviceRequest.requestNumber || serviceRequest.externalId)}</strong> expires on <strong>${escapeHtml(when)}</strong> (Toronto time). Log in to review and accept it before then.</p>
       <p>A quotation does not guarantee a booking. Your date is confirmed only after you accept the quote and pay the deposit.</p>
@@ -197,16 +204,18 @@ async function sendBookingConfirmation(sr, paidCents) {
     <p>Booking <strong>${ref}</strong> is <strong>confirmed</strong> for <strong>${escapeHtml(sr.event.eventDate)}</strong> at ${escapeHtml(sr.event.venueName || sr.event.city || 'your venue')}.</p>
     <p>Deposit received: ${formatCad(paidCents / 100)}. Remaining balance is shown in your dashboard.</p>
     <p>Echo Event Entertainment</p>`;
-  await sendBrevoEmail({ to: [{ email: sr.customerEmail, name: sr.customerName }], subject: `Booking confirmed ${ref}`, tags: ['booking-confirmation'], htmlContent: body(`Hello ${escapeHtml(sr.customerName)},`) });
-  await sendBrevoEmail({ to: [{ email: khalilEmail }], subject: `New confirmed booking ${ref}`, tags: ['booking-admin'], htmlContent: body(`${escapeHtml(sr.customerName)} paid the deposit.`) });
+  const notificationContext={customerName:sr.customerName,requestId:sr.requestNumber||sr.externalId,eventDate:sr.event.eventDate,venue:sr.event.venueName||sr.event.city||'your venue',depositAmount:formatCad(paidCents/100)};
+  await sendBrevoEmail({ to: [{ email: sr.customerEmail, name: sr.customerName }], notificationContext, subject: `Booking confirmed ${ref}`, tags: ['booking-confirmation'], htmlContent: body(`Hello ${escapeHtml(sr.customerName)},`) });
+  await sendBrevoEmail({ to: [{ email: khalilEmail }], notificationContext, subject: `New confirmed booking ${ref}`, tags: ['booking-admin'], htmlContent: body(`${escapeHtml(sr.customerName)} paid the deposit.`) });
 }
 
 // Generic transactional email: html must already be escaped by the caller.
-function sendSimpleEmail({ to, name = '', subject, html, tags = [] }) {
-  return sendBrevoEmail({ to: [{ email: to, name }], subject, tags, htmlContent: html });
+function sendSimpleEmail({ to, name = '', subject, html, tags = [], notificationContext }) {
+  return sendBrevoEmail({ to: [{ email: to, name }], subject, tags, htmlContent: html, notificationContext });
 }
 
 module.exports = {
+  sendBrevoEmail,
   sendSimpleEmail,
   sendBookingConfirmation,
   sendQuoteExpiryReminder,

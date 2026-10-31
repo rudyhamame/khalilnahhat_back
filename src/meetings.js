@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const { z } = require('zod');
 const { sendSimpleEmail } = require('./brevo');
+const { notificationEmails } = require('./notification-emails');
 
 const DEFAULT_ADMIN_EMAIL = 'khalilnahhatdj@gmail.com';
 const HOUR_MS = 60 * 60 * 1000;
@@ -31,12 +32,18 @@ const publicSlot = (m) => ({ id: m.id, start: m.start, durationMin: m.durationMi
 const bookedView = (m) => ({ ...publicSlot(m), link: m.link, location: m.location, topic: m.topic, bookedByName: m.bookedByName, bookedByEmail: m.bookedByEmail });
 
 function mail(m, subject, intro) {
+  const event = subject.toLowerCase().replaceAll(' ', '-');
+  const notificationContext = meetingEmailContext(m);
   const body = `<p>${esc(intro)}</p><p><strong>${esc(when(m.start))}</strong> (Toronto time, ${m.durationMin} min)<br>
     ${m.mode === 'online' ? `Online${m.link ? `: <a href="${esc(m.link)}">${esc(m.link)}</a>` : ''}` : `In person${m.location ? `: ${esc(m.location)}` : ''}`}</p><p>Echo Event Entertainment</p>`;
   return Promise.allSettled([
-    sendSimpleEmail({ to: m.bookedByEmail, name: m.bookedByName, subject, html: body, tags: ['meeting'] }),
-    sendSimpleEmail({ to: adminEmail(), subject: `${subject} — ${m.bookedByName}`, html: body, tags: ['meeting-admin'] }),
+    sendSimpleEmail({ to: m.bookedByEmail, name: m.bookedByName, subject, html: body, tags: [event,'meeting'], notificationContext }),
+    sendSimpleEmail({ to: adminEmail(), subject: `${subject} — ${m.bookedByName}`, html: body, tags: [`${event}-admin`,'meeting-admin'], notificationContext }),
   ]);
+}
+
+function meetingEmailContext(m) {
+  return {customerName:m.bookedByName,meetingTime:`${when(m.start)} (Toronto time)`,duration:`${m.durationMin} minutes`,meetingLocation:m.mode==='online'?`Online${m.link?`: ${m.link}`:''}`:`In person${m.location?`: ${m.location}`:''}`,topic:m.topic||''};
 }
 
 async function bookSlot(id, user, topic) {
@@ -48,13 +55,16 @@ async function bookSlot(id, user, topic) {
 }
 const freeSlot = (m) => Meeting.updateOne({ _id: m._id }, { status: 'open', bookedBy: null, bookedByName: '', bookedByEmail: '', topic: '', reminderSentAt: null });
 
-async function sweepMeetings() {
-  const now = new Date();
-  const due = await Meeting.find({ status: 'booked', reminderSentAt: null, start: { $gt: now, $lte: new Date(now.getTime() + 24 * HOUR_MS) } });
+async function sweepMeetings({notifications=notificationEmails,Model=Meeting,send=sendSimpleEmail,clock=Date.now} = {}) {
+  const rule = await notifications.get('meeting-reminder');
+  if (!rule.enabled) return;
+  const now = new Date(clock());
+  const due = await Model.find({ status: 'booked', reminderSentAt: null, start: { $gt: now, $lte: new Date(now.getTime() + rule.leadHours * HOUR_MS) } });
   for (const m of due) {
-    const r = await sendSimpleEmail({ to: m.bookedByEmail, name: m.bookedByName, subject: 'Meeting reminder', tags: ['meeting-reminder'],
+    const r = await send({ to: m.bookedByEmail, name: m.bookedByName, subject: 'Meeting reminder', tags: ['meeting-reminder'],
+      notificationContext:meetingEmailContext(m),
       html: `<p>Reminder: your meeting is <strong>${esc(when(m.start))}</strong> (Toronto time).</p><p>Echo Event Entertainment</p>` }).catch(() => ({}));
-    if (r.sent) await Meeting.updateOne({ _id: m._id }, { reminderSentAt: new Date() });
+    if (r.sent) await Model.updateOne({ _id: m._id }, { reminderSentAt: new Date(clock()) });
   }
 }
 

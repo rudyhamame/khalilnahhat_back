@@ -1983,6 +1983,7 @@ async function startServer(port = PORT) {
     console.log(`Khalil app API listening on http://localhost:${port}`);
   });
   aiBooking.attachAlibabaVoiceSocket(server,aiBookingRoutes.voiceSocketHooks);
+  aiAdministrator.attachVoice(server);
   return server;
 }
 

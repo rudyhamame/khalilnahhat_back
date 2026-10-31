@@ -8,6 +8,7 @@ const {createPush}=require('./push');
 const {redact}=require('./redact');
 const {tokenPolicy}=require('./token-policy');
 const {createAdminServices}=require('./services');
+const {createAdminRealtime}=require('./realtime');
 const publicTask=task=>{const {input,leaseToken,leaseUntil,...value}=task;return redact(value);};
 function registerAiAdministrator(app,{requireAdmin,authorize,configService,env=process.env}){
  const store=createStore(),registry=createRegistry({invoke:createRouteAdapter(app),app});
@@ -21,6 +22,7 @@ function registerAiAdministrator(app,{requireAdmin,authorize,configService,env=p
  const owned=async(req)=>{const task=await store.get(req.params.id);if(!task||task.owner!==owner(req))throw failure(404,'Task not found.');return task;};
  const admitted=async who=>{if(await store.Task.countDocuments({owner:who,createdAt:{$gte:new Date(Date.now()-600000)}})>=30)throw failure(429,'Administrator task limit reached. Wait ten minutes.');};
  adminServices.register(app,requireAdmin,guard);
+ const realtime=createAdminRealtime({adminServices,engine,store,authorize,admitted,env});realtime.register(app,requireAdmin,guard);
  app.get(base,requireAdmin,guard(async(req,res)=>{const settings=await adminServices.load();return res.json({tasks:(await store.list(owner(req))).map(publicTask),control:await store.control(),capabilities:registry.list(),inventory:registry.inventory(),model:{...settings.text,configured:adminServices.configured(settings.text.provider)},services:settings,worker:{mode:env.ECHO_ADMIN_WORKER_MODE==='external'?'external':'api-process',sleepWarning:env.RENDER==='true',androidPush:push.configured()},context:{scope:'conversation',...tokenPolicy(env)},permissions:{identity:owner(req),role:'administrator',permanentDeletion:false,privilegeChanges:false,customerMessages:false}});}));
  app.get(`${base}/conversations`,requireAdmin,guard(async(req,res)=>res.json({items:redact(await store.conversations(owner(req)))})));
  app.get(`${base}/conversations/:sessionId/messages`,requireAdmin,guard(async(req,res)=>{
@@ -35,7 +37,7 @@ function registerAiAdministrator(app,{requireAdmin,authorize,configService,env=p
  app.put(`${base}/control`,requireAdmin,guard(async(req,res)=>{const {paused}=z.object({paused:z.boolean()}).strict().parse(req.body);res.json({item:await engine.pause(paused,owner(req))});}));
  app.put(`${base}/devices`,requireAdmin,guard(async(req,res)=>res.json({item:await push.register(owner(req),req.user,req.body)})));
  app.delete(`${base}/devices/:id`,requireAdmin,guard(async(req,res)=>res.json({item:await push.revoke(owner(req),req.params.id)})));
- const service={engine,registry,store,push,start,stop(){engine.stop();clearInterval(pushTimer);pushTimer=null;}};
+ const service={engine,registry,store,push,start,attachVoice:realtime.attach,stop(){realtime.stop();engine.stop();clearInterval(pushTimer);pushTimer=null;}};
  app.locals.aiAdministrator=service;return service;
 }
 module.exports={registerAiAdministrator,publicTask};

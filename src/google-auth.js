@@ -44,8 +44,8 @@ function registerGoogleAuth(app, { User, serializeUser, isAdminUser, clientId = 
         const matches = await User.find({ email }).limit(2);
         if (matches.length) {
           user = matches[0];
-          if (matches.length !== 1 || user.googleSubject || ((user.isAdmin || isAdminUser(user)) && !canUseAdminGoogle(user, email)) || !(email.endsWith('@gmail.com') || profile.hd)) return res.status(409).json({ message: 'Please sign in to your existing account with your email address and password.' });
-          user = await User.findOneAndUpdate({ _id: user._id, username: user.username, email: user.email, isAdmin: canUseAdminGoogle(user, email) && user.isAdmin ? true : { $ne: true }, googleSubject: { $exists: false } }, { $set: { googleSubject: profile.sub, emailVerified: true } }, { new: true });
+          if (matches.length !== 1 || user.googleSubject || user.isBlocked || ((user.isAdmin || isAdminUser(user)) && !canUseAdminGoogle(user, email)) || !(email.endsWith('@gmail.com') || profile.hd)) return res.status(409).json({ message: 'Please sign in to your existing account with your email address and password.' });
+          user = await User.findOneAndUpdate({ _id: user._id, username: user.username, email: user.email, isAdmin: canUseAdminGoogle(user, email) && user.isAdmin ? true : { $ne: true }, isBlocked: { $ne: true }, googleSubject: { $exists: false } }, { $set: { googleSubject: profile.sub, emailVerified: true } }, { new: true });
           if (!user) return res.status(409).json({ message: 'Your account changed. Please try signing in again.' });
         } else {
           user = await User.create({
@@ -59,6 +59,7 @@ function registerGoogleAuth(app, { User, serializeUser, isAdminUser, clientId = 
           });
         }
       }
+      if (user.isBlocked) return res.status(403).json({ message: 'This account is blocked. Contact support.' });
       if ((user.isAdmin || isAdminUser(user)) && !canUseAdminGoogle(user, email)) return res.status(403).json({ message: 'Administrator accounts must sign in with their email address and password.' });
       user.sessionToken = createSessionToken();
       await user.save();

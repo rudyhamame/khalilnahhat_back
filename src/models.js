@@ -9,6 +9,7 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, trim: true, lowercase: true },
     phoneNumber: { type: String, required() { return !this.googleSubject; }, trim: true },
     isAdmin: { type: Boolean, default: false },
+    isBlocked: { type: Boolean, default: false, index: true },
     sessionToken: { type: String, default: '' },
     googleSubject: { type: String, unique: true, sparse: true },
     emailVerified: { type: Boolean, default: false },

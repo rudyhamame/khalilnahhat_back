@@ -9,8 +9,12 @@ const { User, ServiceRequest, Booking, ArchiveItem, LiveSession, LiveRequest } =
 const { EventBooking } = require('./payments');
 const { Meeting } = require('./meetings');
 const { MediaItem, Testimonial } = require('./content');
+const { Redemption } = require('./vouchers');
+const { EventDraft } = require('./event-drafts');
+const { Model: SimulationDraft } = require('./simulation-drafts');
 const { Equipment } = require('./equipment');
 const { hashPassword } = require('./security');
+const { ADMIN_USERNAMES } = require('./default-data');
 
 User.schema.add({ adminNotes: { type: String, default: '', maxlength: 6000 } });
 const fileSchema = new mongoose.Schema({
@@ -26,11 +30,11 @@ const clientFields = {
 };
 const clientUpdate = z.object(clientFields).partial().strict();
 const clientCreate = z.object({ ...clientFields, username: z.string().trim().toLowerCase().regex(/^[a-z0-9_.-]{3,60}$/) }).partial({ phoneNumber: true, adminNotes: true }).strict();
-const CLIENT_FIELDS = '_id username firstName lastName email phoneNumber emailVerified isAdmin createdAt adminNotes';
+const CLIENT_FIELDS = '_id username firstName lastName email phoneNumber emailVerified isAdmin isBlocked createdAt adminNotes';
 function clientView(u) {
   return { id: String(u._id), username: u.username, firstName: u.firstName, lastName: u.lastName,
     name: `${u.firstName} ${u.lastName}`.trim(), email: u.email, phoneNumber: u.phoneNumber || '',
-    isAdmin: Boolean(u.isAdmin || u.username === 'khalilnahhat'), emailVerified: Boolean(u.emailVerified), createdAt: u.createdAt, adminNotes: u.get?.('adminNotes') || u.adminNotes || '' };
+    isAdmin: Boolean(u.isAdmin || ADMIN_USERNAMES.has(String(u.username||'').toLowerCase())), isBlocked: Boolean(u.isBlocked), emailVerified: Boolean(u.emailVerified), createdAt: u.createdAt, adminNotes: u.get?.('adminNotes') || u.adminNotes || '' };
 }
 const fileView = d => ({ id: String(d._id), name: d.name, bytes: d.bytes, mime: d.mime, clientId: d.clientId ? String(d.clientId) : '', requestId: d.requestId, note: d.note, archived: d.archived, createdAt: d.createdAt });
 const validId = value => mongoose.isValidObjectId(value);
@@ -43,7 +47,7 @@ function signedFileUrl(file) {
 function registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest }) {
   app.get('/api/admin/overview', requireAdmin, async (_req,res) => {
     const [clients,requests,pending,confirmed,media,archive,vault,queue,meetings,equipment] = await Promise.all([
-      User.countDocuments({isAdmin:{$ne:true},username:{$ne:'khalilnahhat'}}),ServiceRequest.countDocuments(),
+      User.countDocuments({isAdmin:{$ne:true},username:{$nin:[...ADMIN_USERNAMES]}}),ServiceRequest.countDocuments(),
       ServiceRequest.countDocuments({status:{$in:['pending','changes_requested']}}),EventBooking.countDocuments(),MediaItem.countDocuments(),
       ArchiveItem.countDocuments(),StoredFile.countDocuments({archived:false}),LiveRequest.countDocuments({requestStatus:'pending'}),
       Meeting.countDocuments({status:'booked',start:{$gte:new Date()}}),Equipment.countDocuments(),
@@ -53,14 +57,68 @@ function registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest 
   });
   app.get('/api/admin/clients', requireAdmin, async (req,res) => {
     const q=String(req.query.q || '').trim().slice(0,100);
-    const filter={$and:[{isAdmin:{$ne:true}},{username:{$ne:'khalilnahhat'}},...(q ? [{$or:['firstName','lastName','email','username'].map(key=>({[key]:{$regex:q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),$options:'i'}}))}] : [])]};
+    const filter={$and:[{isAdmin:{$ne:true}},{username:{$nin:[...ADMIN_USERNAMES]}},...(q ? [{$or:['firstName','lastName','email','username'].map(key=>({[key]:{$regex:q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),$options:'i'}}))}] : [])]};
     const items=await User.find(filter).select(CLIENT_FIELDS).sort({createdAt:-1}).limit(500);
     res.json({items:items.map(clientView)});
+  });
+  app.patch('/api/admin/clients/:id/block', requireAdmin, async (req,res) => {
+    const parsed=z.object({blocked:z.boolean()}).strict().safeParse(req.body);
+    if(!validId(req.params.id)||!parsed.success) return fail(res,400,'Invalid client block request.');
+    const client=await User.findOne({_id:req.params.id,isAdmin:{$ne:true},username:{$nin:[...ADMIN_USERNAMES]}});
+    if(!client) return fail(res,404,'Client not found.');
+    client.isBlocked=parsed.data.blocked;
+    if(client.isBlocked) client.sessionToken='';
+    await client.save();
+    res.json({item:clientView(client)});
+  });
+  app.delete('/api/admin/clients/:id', requireAdmin, async (req,res) => {
+    if(!validId(req.params.id)) return fail(res,400,'Invalid client.');
+    try {
+      const removed=await mongoose.connection.transaction(async session=>{
+        const client=await User.findOne({_id:req.params.id,isAdmin:{$ne:true},username:{$nin:[...ADMIN_USERNAMES]}}).session(session).lean();
+        if(!client) throw Object.assign(new Error('Client not found.'),{status:404});
+        const objectId=client._id, owner=String(client._id), email=String(client.email||'').toLowerCase();
+        const serviceRequestFilter={$or:[{userId:objectId},...(email?[{customerEmail:email}]:[])]};
+        const requests=await ServiceRequest.find(serviceRequestFilter).select('externalId').session(session).lean();
+        const requestIds=requests.map(row=>row.externalId);
+        const counts={};
+        const remove=async(name,query)=>{const result=await mongoose.connection.collection(name).deleteMany(query,{session});counts[name]=(counts[name]||0)+result.deletedCount;};
+        await remove(ServiceRequest.collection.collectionName,serviceRequestFilter);
+        await remove(EventBooking.collection.collectionName,{$or:[{userId:objectId},...(requestIds.length?[{requestId:{$in:requestIds}}]:[])]});
+        await remove(StoredFile.collection.collectionName,{$or:[{clientId:objectId},...(requestIds.length?[{requestId:{$in:requestIds}}]:[])]});
+        await remove(Redemption.collection.collectionName,{userId:objectId});
+        await remove(EventDraft.collection.collectionName,{_id:owner});
+        await remove(SimulationDraft.collection.collectionName,{_id:owner});
+        const now=new Date();
+        const meetingOwner={$or:[{bookedBy:objectId},...(email?[{bookedByEmail:email}]:[])]};
+        const meetings=await Meeting.collection.updateMany({...meetingOwner,start:{$gt:now}},{$set:{status:'open',bookedBy:null,bookedByName:'',bookedByEmail:'',topic:'',reminderSentAt:null}},{session});
+        const pastMeetings=await Meeting.collection.updateMany({...meetingOwner,start:{$lte:now}},{$set:{bookedBy:null,bookedByName:'',bookedByEmail:'',topic:'',reminderSentAt:null}},{session});
+        counts[Meeting.collection.collectionName]=(counts[Meeting.collection.collectionName]||0)+meetings.modifiedCount+pastMeetings.modifiedCount;
+        if(email){
+          await remove(Booking.collection.collectionName,{email});
+          await remove(LiveRequest.collection.collectionName,{requesterEmail:email});
+        }
+        const skip=new Set([User.collection.collectionName,ServiceRequest.collection.collectionName,EventBooking.collection.collectionName,StoredFile.collection.collectionName,Redemption.collection.collectionName,EventDraft.collection.collectionName,SimulationDraft.collection.collectionName,Meeting.collection.collectionName,Booking.collection.collectionName,LiveRequest.collection.collectionName]);
+        const ownerFilter={$or:[{owner},{owner:objectId},{userId:objectId},{clientId:objectId}]};
+        for(const [name,collection] of Object.entries(mongoose.connection.collections)){
+          if(skip.has(collection.collectionName)) continue;
+          const result=await collection.deleteMany(ownerFilter,{session});
+          if(result.deletedCount) counts[collection.collectionName]=(counts[collection.collectionName]||0)+result.deletedCount;
+        }
+        await User.collection.deleteOne({_id:objectId},{session});
+        return {counts};
+      });
+      res.json({deleted:true,removed:removed.counts});
+    } catch(error) {
+      if(error.status) return fail(res,error.status,error.message);
+      console.error('Client deletion failed:',error.name);
+      return fail(res,503,'Could not fully delete the client and their database records. No changes were committed.');
+    }
   });
   app.post('/api/admin/clients', requireAdmin, async (req,res) => {
     const parsed=clientCreate.safeParse(req.body);
     if(!parsed.success) return fail(res,400,'Enter a name, valid email and a username with at least three characters.');
-    if(parsed.data.username==='khalilnahhat') return fail(res,409,'That administrator username is reserved.');
+    if(ADMIN_USERNAMES.has(parsed.data.username)) return fail(res,409,'That administrator username is reserved.');
     try {
       const u=await User.create({...parsed.data,phoneNumber:parsed.data.phoneNumber || 'Not provided',passwordHash:hashPassword(crypto.randomBytes(40).toString('hex')),isAdmin:false,emailVerified:false});
       res.status(201).json({item:clientView(u),message:'Client created. They can set their own password through Forgot password.'});

@@ -849,6 +849,8 @@ async function requireAuth(request, response, next) {
     });
   }
 
+  if (user.isBlocked) return response.status(403).json({ message: 'This account is blocked. Contact support.' });
+
   request.authUser = user;
   return next();
 }
@@ -976,6 +978,8 @@ app.post('/api/auth/login', async (request, response) => {
       message: 'Incorrect email address or password.',
     });
   }
+
+  if (user.isBlocked) return response.status(403).json({ message: 'This account is blocked. Contact support.' });
 
   if (isAdminUser(user) && !user.isAdmin) {
     user.isAdmin = true;

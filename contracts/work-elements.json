@@ -52,15 +52,6 @@
     "source": "workType"
   },
   {
-    "id": "recordingAmount",
-    "label": "Recording content",
-    "source": "fixed",
-    "values": [
-      "Individual",
-      "Multiple"
-    ]
-  },
-  {
     "id": "artist",
     "label": "Vocalist",
     "source": "vocabulary",

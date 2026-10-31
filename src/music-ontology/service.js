@@ -111,7 +111,8 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    if(id&&!old)fail('Metadata entity not found.',404);
    if(old&&(value.kind!==old.kind||value.parentId!==old.parentId))fail('Entity kind and parent identity cannot be changed; create a separate entity.');
    if(old&&value.revision!==old.revision)fail('This entity changed. Reload before editing.',409);
-   const data={...value,externalId:id||makeId(value.kind),normalizedName:norm(value.name),provenance:provenance(value.provenance,actor),revision:(old?.revision||0)+1};
+   if(value.languageIds?.length)await references(value.languageIds,'language',session);
+   const data={...value,languageIds:value.languageIds??old?.languageIds??[],externalId:id||makeId(value.kind),normalizedName:norm(value.name),provenance:provenance(value.provenance,actor),revision:(old?.revision||0)+1};
    if(old){old.set(data);await old.save({session});return plain(old);}
    return plain((await Vocabulary.create([data],{session}))[0]);
   });

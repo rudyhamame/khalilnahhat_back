@@ -151,7 +151,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
      }
      delete l.audioLanguageCodes;
      l.languageIds=[...new Set([l.languageId,...(l.languageIds||[])].filter(Boolean))];
-     if(l.languageIds.length)await references(l.languageIds,'language',session);if(l.dialectId){await references([l.dialectId],'dialect',session);const d=await Vocabulary.findOne({externalId:l.dialectId}).session(session);if(!l.languageIds.includes(d.parentId))fail('Dialect must belong to the selected lyrics language.');}
+     if(l.languageIds.length)await references(l.languageIds,'language',session);if(l.dialectId){await references([l.dialectId],'dialect',session);const d=await Vocabulary.findOne({externalId:l.dialectId}).session(session);if(d.parentId&&!l.languageIds.includes(d.parentId))fail('Dialect must belong to the selected lyrics language.');}
      await references(l.regionIds,'region',session);await references(l.conceptIds,'concept',session);if(l.primaryConceptId)await references([l.primaryConceptId],'concept',session);await creditsCheck(l.artistCredits,session);if(l.completeness==='COMPLETE'&&(!l.text||!l.languageId))fail('Complete lyrics require text and a language.');l.states=V.metadataStates(l,l.states);lyricsId=makeId('lyrics');await Lyrics.create([{...l,externalId:lyricsId,provenance:provenance(l.provenance,actor)}],{session});}
    }
    // Work revisions use new component identities, preserving reused components and provenance.

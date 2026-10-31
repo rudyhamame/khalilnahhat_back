@@ -31,7 +31,7 @@ async function mtx(route, method='GET', data) {
  return response.status === 200 ? response.json() : {};
 }
 function view(row) {
- return {id:row.id, state:row.state, error:row.error || '', expiresAt:row.expiresAt, endedAt:row.endedAt,
+ return {id:row.id, state:row.state, saveRecording:row.saveRecording!==false, error:row.error || '', expiresAt:row.expiresAt, endedAt:row.endedAt,
   playbackUrl:`${ORIGIN}/live/${row.id}/whep`,
   segments:Object.values(row.segments).filter(segment=>!segment.acknowledged).map(({id,duration,bytes})=>({id,duration,bytes}))};
 }
@@ -78,7 +78,7 @@ async function sweep() {
   const full = await storageBytes() > 2*1024*1024*1024;
   for(const row of sessions.values()) {
    try {
-    if(full && !['ended','ending'].includes(row.state))await stop(row,'Recording storage is full. Save or clear recordings before another broadcast.');
+    if(full && row.saveRecording!==false && !['ended','ending'].includes(row.state))await stop(row,'Recording storage is full. Save or clear recordings before another broadcast.');
     else await status(row);
    }catch { console.error('Relay status retry pending'); }
   }
@@ -126,12 +126,14 @@ async function start() {
    }
    if(url.pathname==='/control/sessions' && req.method==='POST') {
     const data=await body(req); if(!idPattern.test(data.id) || !/^[a-f0-9]{64}$/.test(data.publishToken || ''))return json(res,400,{});
+    if(data.saveRecording!==undefined && typeof data.saveRecording!=='boolean')return json(res,400,{});
+    const saveRecording=data.saveRecording!==false;
     if([...sessions.values()].some(row=>row.state!=='ended'))return json(res,409,{message:'Another OBS connection is active.'});
     if(sessions.has(data.id))return json(res,409,{message:'This OBS connection already exists.'});
-    if(await storageBytes() > 1024*1024*1024)return json(res,507,{message:'Save pending recordings before preparing another OBS connection.'});
-    const row={id:data.id,publishToken:data.publishToken,state:'waiting',expiresAt:Date.now()+120000,segments:{}};
+    if(saveRecording && await storageBytes() > 1024*1024*1024)return json(res,507,{message:'Save pending recordings before preparing another OBS connection.'});
+    const row={id:data.id,publishToken:data.publishToken,saveRecording,state:'waiting',expiresAt:Date.now()+120000,segments:{}};
     sessions.set(row.id,row); await persist(row);
-    try {await mtx(`config/paths/add/live/${row.id}`,'POST',{source:'publisher',overridePublisher:false,record:true,recordPath:'/recordings/%path/%Y-%m-%d_%H-%M-%S-%f'});}
+    try {await mtx(`config/paths/add/live/${row.id}`,'POST',{source:'publisher',overridePublisher:false,record:saveRecording,recordPath:'/recordings/%path/%Y-%m-%d_%H-%M-%S-%f'});}
     catch(error){await stop(row).catch(()=>{});throw error;}
     return json(res,201,{...view(row),server:`${ORIGIN}/live/${row.id}/whip`,streamKey:`echo:${row.publishToken}`});
    }

@@ -10,6 +10,8 @@ RTMP, HLS, RTSP, SRT, MoQ, and playback/download servers are disabled.
 The live path forwards H.264 and Opus; it does not remux into HLS or run an encoder.
 Use H.264 Baseline, no B-frames, Opus, 720p30, keyframes every 2 seconds, and a sensible bitrate (2.5–4 Mbps initially).
 Browser support and network connectivity still require physical-device QA; no universal old-browser guarantee.
+The admin **Save recording** switch is persisted and selected before Prepare OBS. Its value is fixed for that connection. Off sets MediaMTX `record: false` and creates no Live Recordings entry. Existing recordings are preserved.
+
 Recording writes the original encoded tracks into private MP4 files; this file packaging is separate from live forwarding. Render splits oversized archive files using `-c copy`, then uploads them to the existing Cloudinary archive. That service's existing quotas still apply.
 
 ## Access

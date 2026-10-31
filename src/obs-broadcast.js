@@ -43,7 +43,7 @@ function registerObsBroadcastRoutes(app, deps) {
       const publishing = participants.some(p => p.identity === IDENTITY && p.tracks?.length);
       if (!publishing && (row.obsState === 'live' || new Date(row.obsExpiresAt).getTime() <= Date.now())) return stop(row);
       // Media is flowing: make sure it is being recorded even if LiveKit recreated the room after it timed out empty.
-      if (publishing) Promise.resolve(ensureRecording?.(row.obsRoomName)).catch(() => {});
+      if (publishing && row.obsSaveRecording !== false) Promise.resolve(ensureRecording?.(row.obsRoomName)).catch(() => {});
       if (publishing && row.obsState !== 'live') {
         row = await change(row, { isLive: true, obsState: 'live', statusLabel: 'Live now — DJ Khalil is on air.' },
           { obsState: { $in: ['waiting', 'live'] } }) || await getLiveStreamConfig();
@@ -57,6 +57,17 @@ function registerObsBroadcastRoutes(app, deps) {
     res.set?.('Cache-Control', 'no-store');
     try { return res.json({ item: serialize(await synchronize()) }); }
     catch { return res.status(503).json({ message: 'Could not check OBS. Try again shortly.' }); }
+  });
+  app.patch('/api/live-stream/obs/recording', requireAdmin, async (req, res) => {
+    res.set?.('Cache-Control', 'no-store');
+    if (typeof req.body?.saveRecording !== 'boolean') return res.status(400).json({ message: 'Choose whether to save the recording.' });
+    try {
+      await getLiveStreamConfig();
+      const updated = await LiveStreamConfig.findOneAndUpdate({ key: defaults.key, isLive: { $ne: true }, obsRoomName: { $in: ['', null] } },
+        { $set: { obsSaveRecording: req.body.saveRecording } }, { new: true });
+      if (!updated) return res.status(409).json({ message: 'Choose recording before preparing the OBS connection. End the current connection to change it.' });
+      return res.json({ item: serialize(updated) });
+    } catch { return res.status(503).json({ message: 'Could not save the recording preference. Try again.' }); }
   });
   app.post('/api/live-stream/obs/prepare', requireAdmin, async (req, res) => {
     res.set?.('Cache-Control', 'no-store');
@@ -72,7 +83,7 @@ function registerObsBroadcastRoutes(app, deps) {
         { isLive: false, title, streamUrl: '', broadcastMode: 'webrtc', broadcastSource: 'obs',
           webrtcRoomName: roomName, obsRoomName: roomName, obsState: 'preparing', obsExpiresAt: new Date(Date.now() + 120000) }, { new: true });
       if (!claimed) return res.status(409).json({ message: 'Another broadcaster started first.' });
-      await prepareRecording(roomName, title);
+      if (claimed.obsSaveRecording !== false) await prepareRecording(roomName, title);
       // RTMP_INPUT = 0. LiveKit Cloud supplies the actual RTMP endpoint and secret.
       ingress = await client(IngressClient).createIngress(0, { name: roomName, roomName, participantIdentity: IDENTITY,
         participantName: 'DJ Khalil · OBS', enableTranscoding: true });

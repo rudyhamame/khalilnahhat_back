@@ -33,8 +33,9 @@ function createRelayBroadcast(deps) {
    claimed=await LiveStreamConfig.findOneAndUpdate({key:defaults.key,isLive:{$ne:true},obsRoomName:{$in:['',null]}},
     {isLive:false,title,streamUrl:'',broadcastMode:'whep',broadcastSource:'obs',webrtcRoomName:'',obsRoomName:roomName,obsState:'preparing',obsExpiresAt:new Date(Date.now()+120000)},{new:true});
    if(!claimed)return res.status(409).json({message:'Another broadcaster started first.'});
-   await LiveRecording.create({roomName,title,provider:'ovh',status:'waiting'});
-   const connection=await relay.request('sessions',{method:'POST',body:{id:roomName,publishToken:randomBytes(32).toString('hex')}});
+   const saveRecording=claimed.obsSaveRecording!==false;
+   if(saveRecording)await LiveRecording.create({roomName,title,provider:'ovh',status:'waiting'});
+   const connection=await relay.request('sessions',{method:'POST',body:{id:roomName,publishToken:randomBytes(32).toString('hex'),saveRecording}});
    const updated=await LiveStreamConfig.findOneAndUpdate({...owned(claimed),obsState:'preparing'},
     {obsUrl:connection.server,obsStreamKey:connection.streamKey,obsState:'waiting',obsExpiresAt:new Date(connection.expiresAt)},{new:true});
    if(!updated)throw new Error('OBS setup was cancelled');

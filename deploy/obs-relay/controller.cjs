@@ -1,4 +1,4 @@
-// Media relay control plane. MediaMTX only remuxes; no encoder or FFmpeg runs here.
+// Media relay control plane. Live media is forwarded over WebRTC; no encoder runs here.
 const http = require('node:http');
 const fs = require('node:fs/promises');
 const path = require('node:path');
@@ -10,6 +10,7 @@ if (!TOKEN || TOKEN.length < 40 || !/^https:\/\/[^/]+$/.test(ORIGIN || '')) thro
 const sessions = new Map();
 const idPattern = /^khalil-obs-[a-f0-9-]{36}$/;
 const segmentPattern = /^[0-9_-]+\.mp4$/;
+const recordingDirectory = row => path.join(RECORDINGS, 'live', row.id);
 const equal = (a, b) => typeof a === 'string' && typeof b === 'string' && Buffer.byteLength(a) === Buffer.byteLength(b) && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
 const json = (res, status, data) => { res.writeHead(status, {'Content-Type':'application/json','Cache-Control':'no-store'}); res.end(JSON.stringify(data)); };
 async function body(req) {
@@ -44,8 +45,8 @@ async function status(row) {
  if(row.state === 'ended') {
   if(Date.now()-row.endedAt>5000) {
    let recovered=false;
-   for(const name of await fs.readdir(path.join(RECORDINGS,row.id)).catch(()=>[])) {
-    if(segmentPattern.test(name) && !row.segments[name]) { row.segments[name]={id:name,bytes:(await fs.stat(path.join(RECORDINGS,row.id,name))).size,duration:0};recovered=true; }
+   for(const name of await fs.readdir(recordingDirectory(row)).catch(()=>[])) {
+    if(segmentPattern.test(name) && !row.segments[name]) { row.segments[name]={id:name,bytes:(await fs.stat(path.join(recordingDirectory(row),name))).size,duration:0};recovered=true; }
    }
    if(recovered)await persist(row);
   }
@@ -65,8 +66,8 @@ async function status(row) {
 }
 async function storageBytes() {
  let bytes=0;
- for(const row of sessions.values()) for(const entry of await fs.readdir(path.join(RECORDINGS,row.id),{withFileTypes:true}).catch(()=>[])) {
-  if(entry.isFile())bytes+=(await fs.stat(path.join(RECORDINGS,row.id,entry.name))).size;
+ for(const row of sessions.values()) for(const entry of await fs.readdir(recordingDirectory(row),{withFileTypes:true}).catch(()=>[])) {
+  if(entry.isFile())bytes+=(await fs.stat(path.join(recordingDirectory(row),entry.name))).size;
  }
  return bytes;
 }
@@ -92,9 +93,9 @@ async function start() {
  // A restart revokes active keys. Closed files retained on disk are recovered below.
  for(const row of sessions.values()) {
   if(row.state !== 'ended')await stop(row).catch(()=>{row.state='ending';});
-  const files=await fs.readdir(path.join(RECORDINGS,row.id)).catch(()=>[]);
+  const files=await fs.readdir(recordingDirectory(row)).catch(()=>[]);
   for(const name of files.filter(name=>segmentPattern.test(name))) {
-   if(!row.segments[name])row.segments[name]={id:name,bytes:(await fs.stat(path.join(RECORDINGS,row.id,name))).size,duration:0};
+   if(!row.segments[name])row.segments[name]={id:name,bytes:(await fs.stat(path.join(recordingDirectory(row),name))).size,duration:0};
   }
   await persist(row);
  }
@@ -112,7 +113,7 @@ async function start() {
    const hook=url.pathname.match(/^\/internal\/segments\/live\/(khalil-obs-[a-f0-9-]{36})\/([0-9_-]+\.mp4)$/);
    if(hook && req.method==='POST') {
     const row=sessions.get(hook[1]); if(!row)return json(res,404,{});
-    const data=await body(req); const filename=path.join(RECORDINGS,row.id,hook[2]);
+    const data=await body(req); const filename=path.join(recordingDirectory(row),hook[2]);
     const bytes=(await fs.stat(filename)).size;
     if(!row.segments[hook[2]])row.segments[hook[2]]={id:hook[2],duration:Number(data.duration)||0,bytes};
     await persist(row); return json(res,200,{});
@@ -130,7 +131,7 @@ async function start() {
     if(await storageBytes() > 1024*1024*1024)return json(res,507,{message:'Save pending recordings before preparing another OBS connection.'});
     const row={id:data.id,publishToken:data.publishToken,state:'waiting',expiresAt:Date.now()+120000,segments:{}};
     sessions.set(row.id,row); await persist(row);
-    try {await mtx(`config/paths/add/live/${row.id}`,'POST',{source:'publisher',overridePublisher:false,record:true,recordPath:`/recordings/${row.id}/%Y-%m-%d_%H-%M-%S-%f`});}
+    try {await mtx(`config/paths/add/live/${row.id}`,'POST',{source:'publisher',overridePublisher:false,record:true,recordPath:'/recordings/%path/%Y-%m-%d_%H-%M-%S-%f'});}
     catch(error){await stop(row).catch(()=>{});throw error;}
     return json(res,201,{...view(row),server:`${ORIGIN}/live/${row.id}/whip`,streamKey:`echo:${row.publishToken}`});
    }
@@ -138,7 +139,7 @@ async function start() {
    const row=match && sessions.get(match[1]); if(!row)return json(res,404,{});
    if(match[2]) {
     const segment=row.segments[match[2]]; if(!segment || segment.acknowledged)return json(res,404,{});
-    const filename=path.join(RECORDINGS,row.id,segment.id);
+    const filename=path.join(recordingDirectory(row),segment.id);
     if(req.method==='GET') {
      const handle=await fs.open(filename,'r');res.writeHead(200,{'Content-Type':'video/mp4','Content-Length':(await handle.stat()).size,'Cache-Control':'no-store'});
      const stream=handle.createReadStream();stream.on('error',()=>res.destroy());res.on('close',()=>stream.destroy());stream.pipe(res);return;

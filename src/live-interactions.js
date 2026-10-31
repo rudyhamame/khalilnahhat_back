@@ -8,7 +8,7 @@ function sessionKey(stream) {
 
 function externalBroadcastId(current, next) {
   if (!next.isLive) return '';
-  return current?.isLive && current.broadcastMode === 'youtube' && current.broadcastSessionId
+  return current?.isLive && current.broadcastMode === 'youtube' && current.streamUrl === next.streamUrl && current.broadcastSessionId
     ? current.broadcastSessionId : randomUUID();
 }
 
@@ -20,7 +20,7 @@ function requestScope(session) {
 }
 
 function memberName(user) {
-  return [user.firstName, user.lastName].filter(Boolean).join(' ').slice(0, 60) || user.username || 'Member';
+  return ([user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || 'Member').slice(0, 60);
 }
 
 module.exports = { sessionKey, externalBroadcastId, requestScope, memberName };

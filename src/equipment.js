@@ -71,7 +71,7 @@ const fields = {
   category: z.string().trim().min(1), name: z.string().trim().min(1),
   brandModel: z.string().trim(), description: z.string().trim(), imageUrl: z.string().trim(),
   functionSummary: z.string().trim().max(600),
-  eventFit: z.record(z.enum(['wedding', 'engagement', 'birthday', 'corporate', 'party', 'graduation', 'other']), z.string().trim().max(600)),
+  eventFit: z.object(Object.fromEntries(['wedding', 'engagement', 'birthday', 'corporate', 'party', 'graduation', 'other'].map((type) => [type, z.string().trim().max(600).optional()]))).strict(),
   priceCents: z.number().int().min(0), minQuantity: z.number().int().min(1),
   quantityOwned: z.number().int().min(0), stockTracked: z.boolean(), isActive: z.boolean(), sortOrder: z.number().int(),
 };

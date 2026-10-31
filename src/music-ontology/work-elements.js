@@ -6,7 +6,7 @@ const audioLanguages=require('../../contracts/audio-languages.json');
 const {ArchiveItem}=require('../models');
 const norm=value=>value.normalize('NFKC').trim().toLocaleLowerCase().replace(/\s+/g,' ');
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
-const schema=new mongoose.Schema({key:{type:String,required:true},value:{type:String,required:true},normalizedValue:{type:String,required:true},revision:{type:Number,default:1},archived:{type:Boolean,default:false}},{timestamps:true});
+const schema=new mongoose.Schema({key:{type:String,required:true},value:{type:String,required:true},normalizedValue:{type:String,required:true},revision:{type:Number,default:1},languageIds:{type:[String],default:[]},archived:{type:Boolean,default:false}},{timestamps:true});
 schema.index({key:1,normalizedValue:1},{unique:true});
 const Option=mongoose.models.WorkElementOption||mongoose.model('WorkElementOption',schema);
 const State=mongoose.models.WorkElementCatalogState||mongoose.model('WorkElementCatalogState',new mongoose.Schema({_id:String,version:Number}));
@@ -29,7 +29,7 @@ function createWorkElements(service){
  }
  async function list(){
   const [vocabulary,options,types,recordings,works]=await Promise.all([Vocabulary.find({}).sort({name:1}).lean(),Option.find({archived:{$ne:true}}).sort({value:1}).lean(),service.listWorkTypes(),ArchiveItem.find().select('externalId title ontologyRevision').lean(),service.models.Work.find().select('externalId title revision').lean()]);
-  return definitions.map(def=>({...def,editable:!['fixed','recording','work'].includes(def.source),options:def.source==='vocabulary'?vocabulary.filter(row=>!row.archived&&row.kind===def.kind).map(row=>({id:row.externalId,value:row.name,revision:row.revision,parentId:row.parentId||'',isoCode:row.isoCode||'',languageIds:row.languageIds||[],languages:(row.languageIds||[]).map(id=>vocabulary.find(language=>language.externalId===id&&language.kind==='language')).filter(Boolean).map(language=>({id:language.externalId,name:language.name})),description:row.description||'',provenance:row.provenance||{source:'',note:''}})):def.source==='workType'?[...(def.id==='workKind'?[{id:'ORIGINAL',value:'Original',locked:true}]:[]),...types.map(row=>({...row,value:row.name}))]:def.source==='fixed'?def.values.map(value=>({id:value,value,locked:true})):def.source==='recording'||def.source==='work'?(def.source==='recording'?recordings:works).map(row=>({id:row.externalId,value:row.externalId,label:row.title,locked:true})):options.filter(row=>row.key===def.id).map(row=>({id:String(row._id),value:row.value,revision:row.revision}))}));
+  return definitions.map(def=>({...def,editable:!['fixed','recording','work'].includes(def.source),options:def.source==='vocabulary'?vocabulary.filter(row=>!row.archived&&row.kind===def.kind).map(row=>({id:row.externalId,value:row.name,revision:row.revision,parentId:row.parentId||'',isoCode:row.isoCode||'',languageIds:row.languageIds||[],languages:(row.languageIds||[]).map(id=>vocabulary.find(language=>language.externalId===id&&language.kind==='language')).filter(Boolean).map(language=>({id:language.externalId,name:language.name})),description:row.description||'',provenance:row.provenance||{source:'',note:''}})):def.source==='workType'?[...(def.id==='workKind'?[{id:'ORIGINAL',value:'Original',locked:true}]:[]),...types.map(row=>({...row,value:row.name}))]:def.source==='fixed'?def.values.map(value=>({id:value,value,locked:true})):def.source==='recording'||def.source==='work'?(def.source==='recording'?recordings:works).map(row=>({id:row.externalId,value:row.externalId,label:row.title,locked:true})):options.filter(row=>row.key===def.id).map(row=>({id:String(row._id),value:row.value,revision:row.revision,...(def.id==='influences'?{languageIds:row.languageIds||[],languages:(row.languageIds||[]).map(id=>vocabulary.find(language=>language.externalId===id&&language.kind==='language')).filter(Boolean).map(language=>({id:language.externalId,name:language.name}))}:{})}))}));
  }
  function validateValue(key,value){
   if(key==='bpm'&&(!Number.isFinite(Number(value))||Number(value)<=0||Number(value)>1000))fail('Enter BPM between 0 and 1000.');
@@ -56,9 +56,11 @@ function createWorkElements(service){
    return service.saveWorkType({name:data.value,nameArabic:old?.nameArabic||'',amount:old?.amount||data.amount||'INDIVIDUAL',details:old?.details||'',detailsArabic:old?.detailsArabic||'',artworkUrl:old?.artworkUrl||'',...(old?{revision:data.revision}:{})},id);
   }
   validateValue(key,data.value);
-  if(id){if(!mongoose.isValidObjectId(id))fail('Option not found.',404);const result=await Option.findOneAndUpdate({_id:id,key,revision:data.revision,archived:{$ne:true}},{$set:{value:data.value,normalizedValue:norm(data.value)},$inc:{revision:1}},{new:true,runValidators:true});if(!result)fail('This option changed. Reload before editing.',409);return result;}
+  const languageSet=def.id==='influences'&&data.languageIds!==undefined?{languageIds:data.languageIds}:{};
+  if(languageSet.languageIds?.length&&await Vocabulary.countDocuments({externalId:{$in:languageSet.languageIds},kind:'language'})!==languageSet.languageIds.length)fail('Choose existing language terms.');
+  if(id){if(!mongoose.isValidObjectId(id))fail('Option not found.',404);const result=await Option.findOneAndUpdate({_id:id,key,revision:data.revision,archived:{$ne:true}},{$set:{value:data.value,normalizedValue:norm(data.value),...languageSet},$inc:{revision:1}},{new:true,runValidators:true});if(!result)fail('This option changed. Reload before editing.',409);return result;}
   const old=await Option.findOne({key,normalizedValue:norm(data.value)});if(old&&!old.archived)fail('This option already exists.',409);
-  return Option.findOneAndUpdate({key,normalizedValue:norm(data.value)},{$set:{value:data.value,archived:false},$inc:{revision:1}},{upsert:true,new:true,runValidators:true});
+  return Option.findOneAndUpdate({key,normalizedValue:norm(data.value)},{$set:{value:data.value,archived:false,...languageSet},$inc:{revision:1}},{upsert:true,new:true,runValidators:true});
  }
  async function remove(key,id,revision){
   const def=definition(key);if(['fixed','recording','work'].includes(def.source))fail('Manage these identities in their recording or content editor.');

@@ -55,10 +55,10 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
  }
  async function references(ids,kind,session){
   if(!ids.length)return;
-  const rows=await Vocabulary.find({externalId:{$in:ids},kind}).session(session).lean();
+  const rows=await Vocabulary.find({externalId:{$in:ids},kind:{$in:[].concat(kind)}}).session(session).lean();
   if(new Set(rows.map(r=>r.externalId)).size!==new Set(ids).size)fail(`Choose existing ${kind} references.`);
  }
- async function creditsCheck(credits,session){await references(credits.map(c=>c.artistId),'artist',session);}
+ async function creditsCheck(credits,session,kind='artist'){await references(credits.map(c=>c.artistId),kind,session);}
  const provenance=(p,actor)=>({...p,recordedBy:actor||'admin'});
  const defaultWorkTypes=[
   {id:'MIX',name:'Mix',nameArabic:'ميكس',amount:'MULTIPLE',details:'A curated sequence of tracks blended into one continuous listening experience.',detailsArabic:'مجموعة مقطوعات مختارة ومنسّقة في تجربة استماع متصلة.'},
@@ -129,7 +129,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    let melodyId=value.melodyId,lyricsId=value.type==='SONG'?value.lyricsId:null;
    if(melodyId&&value.melody)fail('Choose either an existing melody or new melody metadata.');
    if(melodyId&&!await Melody.exists({externalId:melodyId}).session(session))fail('Melody not found.');
-   if(!melodyId){const m=V.melody.parse(value.melody||{});if(old){const previous=await Melody.findOne({externalId:old.melodyId}).session(session).lean();for(const field of ['instrumentIds','musicianCredits'])if(!Object.hasOwn(input.melody||{},field)){m[field]=previous?.[field]||[];if(previous?.states?.[field])m.states[field]=previous.states[field];}}await references(m.genreIds,'genre',session);await references(m.instrumentIds,'instrument',session);await creditsCheck(m.musicianCredits,session);if(m.rhythmId)await references([m.rhythmId],'rhythm',session);m.states=V.metadataStates(m,m.states);melodyId=makeId('melody');await Melody.create([{...m,externalId:melodyId,provenance:provenance(m.provenance,actor)}],{session});}
+   if(!melodyId){const m=V.melody.parse(value.melody||{});if(old){const previous=await Melody.findOne({externalId:old.melodyId}).session(session).lean();for(const field of ['instrumentIds','musicianCredits'])if(!Object.hasOwn(input.melody||{},field)){m[field]=previous?.[field]||[];if(previous?.states?.[field])m.states[field]=previous.states[field];}}await references(m.genreIds,'genre',session);await references(m.instrumentIds,'instrument',session);await creditsCheck(m.musicianCredits,session,['musician','artist']);if(m.rhythmId)await references([m.rhythmId],'rhythm',session);m.states=V.metadataStates(m,m.states);melodyId=makeId('melody');await Melody.create([{...m,externalId:melodyId,provenance:provenance(m.provenance,actor)}],{session});}
    if(value.type==='SONG'){
     if(lyricsId&&value.lyrics)fail('Choose either existing lyrics or new lyrics metadata.');
     if(lyricsId&&!await Lyrics.exists({externalId:lyricsId}).session(session))fail('Lyrics not found.');

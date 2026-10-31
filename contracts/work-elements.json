@@ -72,7 +72,7 @@
   },
   {
     "id": "artist",
-    "label": "Artist",
+    "label": "Vocalist",
     "source": "vocabulary",
     "kind": "artist"
   },
@@ -80,16 +80,7 @@
     "id": "musician",
     "label": "Musician",
     "source": "vocabulary",
-    "kind": "artist"
-  },
-  {
-    "id": "workType",
-    "label": "Music type",
-    "source": "fixed",
-    "values": [
-      "Lyrical Music",
-      "Instrumental Music"
-    ]
+    "kind": "musician"
   },
   {
     "id": "workKind",
@@ -97,23 +88,8 @@
     "source": "workType"
   },
   {
-    "id": "releaseDate",
-    "label": "Recording release date",
-    "source": "preset"
-  },
-  {
-    "id": "releaseYear",
-    "label": "Lyrics release year",
-    "source": "preset"
-  },
-  {
     "id": "timeSignature",
     "label": "Time signature",
-    "source": "preset"
-  },
-  {
-    "id": "mode",
-    "label": "Musical mode",
     "source": "preset"
   },
   {
@@ -122,57 +98,8 @@
     "source": "preset"
   },
   {
-    "id": "lyricsText",
-    "label": "Lyrics text",
-    "source": "preset"
-  },
-  {
-    "id": "conceptSummary",
-    "label": "Concept summary",
-    "source": "preset"
-  },
-  {
     "id": "script",
     "label": "Lyrics script",
     "source": "preset"
-  },
-  {
-    "id": "lyricsCompleteness",
-    "label": "Lyrics completeness",
-    "source": "fixed",
-    "values": [
-      "Incomplete",
-      "Complete"
-    ]
-  },
-  {
-    "id": "lyricsNotes",
-    "label": "Lyrics notes",
-    "source": "preset"
-  },
-  {
-    "id": "translationRefs",
-    "label": "Translation references",
-    "source": "preset"
-  },
-  {
-    "id": "publicationStatus",
-    "label": "Publication status",
-    "source": "fixed",
-    "values": [
-      "Draft",
-      "Published",
-      "Withdrawn"
-    ]
-  },
-  {
-    "id": "sourceRecordings",
-    "label": "Source recording",
-    "source": "recording"
-  },
-  {
-    "id": "sourceWorks",
-    "label": "Source content",
-    "source": "work"
   }
 ]

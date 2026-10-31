@@ -28,7 +28,10 @@ function sessionUpdate({instructions,tools,voice,maxOutputTokens,manual=false}){
 
 // Pure translation, kept separate from the sockets so it can be tested without a network.
 function createTranslator({instructions,tools,voice,maxOutputTokens}){
- const state={context:'',calls:[],hasConversation:false,opening:false,awaitingOpeningConfig:false,restoring:false,afterOpening:null,restore:[],speech:false,turnPending:false,responseActive:false,pendingOutputs:[],outputAcks:new Set(),continuationRequested:false};
+ const state={context:'',calls:[],hasConversation:false,opening:false,awaitingOpeningConfig:false,restoring:false,afterOpening:null,restore:[],speech:false,turnPending:false,responseActive:false,pendingOutputs:[],outputAcks:new Set(),continuationRequested:false,configurationAcks:[]};
+ // Match successful session.updated events to our ordered outbound updates.
+ // Optional configuration fields are not reliable acknowledgement identifiers.
+ const configure=(event,purpose)=>{state.configurationAcks.push(purpose);return event;};
  const idle=()=>!state.opening&&!state.restoring&&!state.speech&&!state.turnPending&&!state.responseActive;
  const outputEvent=item=>{state.outputAcks.add(item.call_id);return {type:'conversation.item.create',item};};
  const flush=()=>{
@@ -39,7 +42,7 @@ function createTranslator({instructions,tools,voice,maxOutputTokens}){
   return events;
  };
  return {
-  open:()=>sessionUpdate({instructions,tools,voice,maxOutputTokens}),
+  open:()=>configure(sessionUpdate({instructions,tools,voice,maxOutputTokens}),'initial'),
   // Events the bridge must send upstream after what it just received (e.g. back to server VAD once the opening greeting is done).
   drain:flush,
   // Browser event -> events for Alibaba.
@@ -53,7 +56,7 @@ function createTranslator({instructions,tools,voice,maxOutputTokens}){
      // input. Qwen Omni Realtime does not accept message items from
      // conversation.item.create; keep the text in session instructions instead.
      state.context=`${state.context}\n${text(item.content)}`.trim().slice(0,6000);
-     return [{type:'session.update',session:{instructions:`${instructions}\n${state.context}`.slice(0,30000)}}];
+     return [configure({type:'session.update',session:{instructions:`${instructions}\n${state.context}`.slice(0,30000)}},'context')];
     }
     if(item.type==='function_call_output'&&typeof item.call_id==='string'){
      state.hasConversation=true;const result={type:'function_call_output',call_id:item.call_id,output:String(item.output??'')};
@@ -71,7 +74,7 @@ function createTranslator({instructions,tools,voice,maxOutputTokens}){
      const context=state.context,extra=[context,event.response.instructions].filter(Boolean).join('\n');
      state.context='';state.opening=true;state.awaitingOpeningConfig=true;
      state.afterOpening={type:'session.update',session:{instructions:`${instructions}\n${context}`.trim().slice(0,30000),turn_detection:sessionUpdate({instructions,tools,voice,maxOutputTokens}).session.turn_detection}};
-     return [sessionUpdate({instructions:`${instructions}\n${extra}`.slice(0,30000),tools,voice,maxOutputTokens,manual:true})];
+     return [configure(sessionUpdate({instructions:`${instructions}\n${extra}`.slice(0,30000),tools,voice,maxOutputTokens,manual:true}),'opening')];
     }
     state.context='';
     if(!state.hasConversation)return [];
@@ -84,12 +87,14 @@ function createTranslator({instructions,tools,voice,maxOutputTokens}){
   toClient(event){
    if(!event?.type&&typeof event?.code==='string'&&typeof event?.message==='string')return [{type:'error',error:{message:event.code==='AccessDenied'?'The Alibaba API key does not allow this voice model. Check its Model Studio permissions.':event.message}}];
    switch(event?.type){
-    case 'session.updated':
-     if(state.awaitingOpeningConfig&&event.session?.turn_detection===null){
+    case 'session.updated':{
+     const purpose=state.configurationAcks.shift();
+     if(purpose==='opening'&&state.awaitingOpeningConfig){
       state.awaitingOpeningConfig=false;
       state.restore.push({type:'input_audio_buffer.append',audio:SILENCE},{type:'input_audio_buffer.commit'},{type:'response.create'});
-     }else if(state.restoring&&event.session?.turn_detection?.type==='server_vad'){state.restoring=false;return [{type:'bridge.listening'}];}
+     }else if(purpose==='listening'&&state.restoring){state.restoring=false;return [{type:'bridge.listening'}];}
      return [];
+    }
     case 'conversation.item.created':
      if(event.item?.type==='function_call_output')state.outputAcks.delete(event.item.call_id);
      return [];
@@ -107,7 +112,7 @@ function createTranslator({instructions,tools,voice,maxOutputTokens}){
      return event.name==='show_app_section'?[{type:event.type,call_id:event.call_id,name:event.name,arguments:String(event.arguments||'')}]:[];
     case 'response.done':{
      state.responseActive=false;
-     if(state.opening){state.opening=false;state.restoring=true;state.restore.push({type:'input_audio_buffer.clear'},state.afterOpening);}
+     if(state.opening){state.opening=false;state.restoring=true;state.restore.push({type:'input_audio_buffer.clear'},configure(state.afterOpening,'listening'));}
      const raw=event.response?.usage||{},input=count(raw.input_tokens??raw.prompt_tokens),output=count(raw.output_tokens??raw.completion_tokens),cached=count(raw.input_tokens_details?.cached_tokens);
      const done={type:'response.done',response:{id:event.response?.id,status:event.response?.status||'completed',output:state.calls.splice(0),
       ...(input!==undefined||output!==undefined?{usage:{...(input!==undefined?{input_tokens:input}:{}),...(output!==undefined?{output_tokens:output}:{}),...(cached!==undefined?{input_token_details:{cached_tokens:cached}}:{})}}:{})}};

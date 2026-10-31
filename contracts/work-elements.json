@@ -29,11 +29,6 @@
     "kind": "rhythm"
   },
   {
-    "id": "duration",
-    "label": "Duration",
-    "source": "preset"
-  },
-  {
     "id": "region",
     "label": "Region",
     "source": "vocabulary",

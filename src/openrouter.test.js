@@ -38,3 +38,25 @@ test('Poe fails closed without a key or for models outside the account catalog',
  const client=createOpenRouter({env:{POE_API_KEY:'secret'},fetchImpl:async()=>Response.json({data:[{id:'available'}]})});
  await assert.rejects(client.request(request),{status:400});
 });
+test('OmniRoute preserves booking JSON schema and normalizes completion and usage',async()=>{
+ const schema={type:'object',additionalProperties:false,required:['reply','orderPatch'],properties:{reply:{type:'string'},orderPatch:{type:'array',items:{type:'object'}}}};
+ const reply={reply:'Hello, I can help plan your event.',orderPatch:[]};
+ const client=createOpenRouter({env:{OMNIROUTE_BASE_URL:'https://omni.example/v1',OMNIROUTE_API_KEY:'test-secret'},fetchImpl:async(url,options={})=>{
+  assert.equal(options.headers.Authorization,'Bearer test-secret');
+  if(url.endsWith('/models'))return Response.json({data:[{id:'openrouter/free',type:'chat'}]});
+  assert.equal(url,'https://omni.example/v1/chat/completions');
+  const sent=JSON.parse(options.body);
+  assert.deepEqual(sent.response_format,{type:'json_schema',json_schema:{name:'booking',strict:true,schema}});
+  assert.deepEqual(sent.messages,[{role:'system',content:'Plan events safely.'},{role:'user',content:'Hello'}]);
+  assert.deepEqual(sent.provider.max_price,{prompt:0,completion:0,request:0});
+  assert.equal(sent.stream,false);
+  return Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify(reply)}}],usage:{prompt_tokens:10,completion_tokens:20,prompt_tokens_details:{cached_tokens:2}}});
+ }});
+ const result=await (await client.request({config:{provider:'omniroute',model:'openrouter/free',freeOnly:true},stream:true,instructions:'Plan events safely.',input:[{role:'user',content:'Hello'}],max_output_tokens:600,text:{format:{name:'booking',schema}}})).json();
+ assert.equal(result.status,'completed');assert.deepEqual(JSON.parse(result.output[0].content[0].text),reply);
+ assert.deepEqual(result.usage,{input_tokens:10,output_tokens:20,input_tokens_details:{cached_tokens:2}});
+});
+test('OmniRoute catalog authentication failures cannot fabricate an available model',async()=>{
+ const client=createOpenRouter({env:{OMNIROUTE_BASE_URL:'https://omni.example/v1',OMNIROUTE_API_KEY:'invalid'},fetchImpl:async()=>new Response('Unauthorized',{status:401})});
+ await assert.rejects(client.omniRoute.models(),{status:503});
+});

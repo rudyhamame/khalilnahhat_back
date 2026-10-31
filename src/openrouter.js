@@ -3,6 +3,22 @@ const {createOllama}=require('./ollama');
 const failure=(status,message)=>Object.assign(new Error(message),{status});
 const router={id:'openrouter/free',provider:'openrouter',mode:'chat',label:'Free models router',free:true,rates:{textInput:0,textCached:0,textOutput:0},source:'https://openrouter.ai/openrouter/free'};
 function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
+ async function chatCompletion(body,{signal,url,key,label}){
+  const request={model:body.config.model,messages:[{role:'system',content:body.instructions},...body.input],max_tokens:body.max_output_tokens,response_format:{type:'json_schema',json_schema:{name:body.text.format.name,strict:true,schema:body.text.format.schema}},stream:false,provider:{require_parameters:true,allow_fallbacks:false,...(body.config.freeOnly!==false?{max_price:{prompt:0,completion:0,request:0}}:{})}};
+  let data;let usageKnown=true;const totals={prompt_tokens:0,completion_tokens:0,cached_tokens:0};
+  for(let attempt=0;attempt<2;attempt++){
+   const response=await fetchImpl(url,{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json','X-Title':'Echo Event Entertainment'},signal,body:JSON.stringify(request)});
+   if(!response.ok)return response;
+   data=await response.json();if(!Number.isInteger(data.usage?.prompt_tokens)||!Number.isInteger(data.usage?.completion_tokens))usageKnown=false;for(const field of ['prompt_tokens','completion_tokens'])totals[field]+=data.usage?.[field]||0;totals.cached_tokens+=data.usage?.prompt_tokens_details?.cached_tokens||0;
+   if(data.choices?.[0]?.finish_reason!=='length'||attempt||body.config.freeOnly===false)break;
+   const nextTokens=Math.min(Math.max((request.max_tokens||600)*2,1600),body.config.maxOutputTokens||4096);if(nextTokens<=request.max_tokens)break;request.max_tokens=nextTokens;
+  }
+  const choice=data.choices?.[0];
+  if(data.error||!choice||!['stop','tool_calls'].includes(choice.finish_reason))throw failure(502,`${label} did not complete the booking reply.`);
+  const message=choice.message;
+  if(!message?.refusal&&typeof message?.content!=='string')throw failure(502,`${label} returned an invalid booking reply.`);
+  return new Response(JSON.stringify({status:'completed',output:[{content:[message.refusal?{type:'refusal',refusal:message.refusal}:{type:'output_text',text:message.content}]}],usage:{input_tokens:usageKnown?totals.prompt_tokens:undefined,output_tokens:usageKnown?totals.completion_tokens:undefined,input_tokens_details:{cached_tokens:usageKnown?totals.cached_tokens:undefined}}}),{headers:{'Content-Type':'application/json'}});
+ }
  let cache=null,until=0,pending=null;
  const poe={
   async models(){
@@ -35,11 +51,6 @@ function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
    let r;
    try{r=await fetchImpl(url,{headers:{Authorization:`Bearer ${env.OMNIROUTE_API_KEY}`},signal:AbortSignal.timeout(15000)});}
    catch(error){console.error('OmniRoute catalog connection failed:',error.name||'Error',error.cause?.code||'',error.message||'');throw failure(503,'OmniRoute model catalog is unavailable. Check its URL and API key, then retry.');}
-   // OmniRoute can require a dashboard session for GET /v1/models even when
-   // API-key-authenticated inference is enabled. Echo's OmniRoute key is
-   // restricted to this exact free route, so keep that single safe option
-   // available when the catalog endpoint is dashboard-only.
-   if(r.status===401||r.status===403)return [{id:'openrouter/free',provider:'omniroute',mode:'chat',label:'OpenRouter Free · free',free:true,rates:{textInput:0,textCached:0,textOutput:0},source:this.baseUrl()}];
    if(!r.ok){console.error('OmniRoute catalog returned HTTP',r.status,'for',new URL(url).host+new URL(url).pathname);throw failure(503,'OmniRoute model catalog is unavailable. Check its URL and API key, then retry.');}
    let body;
    try{body=await r.json();}catch(error){console.error('OmniRoute catalog returned invalid JSON:',error.message||'');throw failure(503,'Invalid OmniRoute model catalog.');}
@@ -53,8 +64,9 @@ function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
   async request(body,{signal}={}){
    if(!this.configured())throw failure(503,'Configure OMNIROUTE_BASE_URL and OMNIROUTE_API_KEY on the API server before using OmniRoute.');
    await this.validate(body.config);
-   const request={...body,model:body.config.model};delete request.config;
-   return fetchImpl(`${this.baseUrl()}/responses`,{method:'POST',headers:{Authorization:`Bearer ${env.OMNIROUTE_API_KEY}`,'Content-Type':'application/json'},signal,body:JSON.stringify(request)});
+   // OmniRoute's Responses translation drops text.format; send the schema
+   // through Chat Completions and normalize its validated completion instead.
+   return chatCompletion(body,{signal,url:`${this.baseUrl()}/chat/completions`,key:env.OMNIROUTE_API_KEY,label:'OmniRoute'});
   }
  };
  const alibaba=createAlibaba({env,fetchImpl}),ollama=createOllama({env,fetchImpl});
@@ -85,20 +97,7 @@ function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
   if(body.config?.provider==='alibaba')return alibaba.request(body,{signal});
   if(!env.OPENROUTER_API_KEY)throw failure(503,'Configure OPENROUTER_API_KEY in Render before using OpenRouter.');
   await validate(body.config);
-  const request={model:body.config.model,messages:[{role:'system',content:body.instructions},...body.input],max_tokens:body.max_output_tokens,response_format:{type:'json_schema',json_schema:{name:body.text.format.name,strict:true,schema:body.text.format.schema}},stream:false,provider:{require_parameters:true,allow_fallbacks:false,...(body.config.freeOnly!==false?{max_price:{prompt:0,completion:0,request:0}}:{})}};
-  let data;let usageKnown=true;const totals={prompt_tokens:0,completion_tokens:0,cached_tokens:0};
-  for(let attempt=0;attempt<2;attempt++){
-   const response=await fetchImpl('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENROUTER_API_KEY}`,'Content-Type':'application/json','X-Title':'Echo Event Entertainment'},signal,body:JSON.stringify(request)});
-   if(!response.ok)return response;
-   data=await response.json();if(!Number.isInteger(data.usage?.prompt_tokens)||!Number.isInteger(data.usage?.completion_tokens))usageKnown=false;for(const field of ['prompt_tokens','completion_tokens'])totals[field]+=data.usage?.[field]||0;totals.cached_tokens+=data.usage?.prompt_tokens_details?.cached_tokens||0;
-   if(data.choices?.[0]?.finish_reason!=='length'||attempt||body.config.freeOnly===false)break;
-   const nextTokens=Math.min(Math.max((request.max_tokens||600)*2,1600),body.config.maxOutputTokens||4096);if(nextTokens<=request.max_tokens)break;request.max_tokens=nextTokens;
-  }
-  const choice=data.choices?.[0];
-  if(data.error||!choice||!['stop','tool_calls'].includes(choice.finish_reason))throw failure(502,'OpenRouter did not complete the booking reply.');
-  const message=choice.message;
-  if(!message?.refusal&&typeof message?.content!=='string')throw failure(502,'OpenRouter returned an invalid booking reply.');
-  return new Response(JSON.stringify({status:'completed',output:[{content:[message.refusal?{type:'refusal',refusal:message.refusal}:{type:'output_text',text:message.content}]}],usage:{input_tokens:usageKnown?totals.prompt_tokens:undefined,output_tokens:usageKnown?totals.completion_tokens:undefined,input_tokens_details:{cached_tokens:usageKnown?totals.cached_tokens:undefined}}}),{headers:{'Content-Type':'application/json'}});
+  return chatCompletion(body,{signal,url:'https://openrouter.ai/api/v1/chat/completions',key:env.OPENROUTER_API_KEY,label:'OpenRouter'});
  }};
 }
 // The API key a chat provider needs; every chat call site uses this so a new provider only has to be added here.

@@ -35,6 +35,11 @@ function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
    let r;
    try{r=await fetchImpl(url,{headers:{Authorization:`Bearer ${env.OMNIROUTE_API_KEY}`},signal:AbortSignal.timeout(15000)});}
    catch(error){console.error('OmniRoute catalog connection failed:',error.name||'Error',error.cause?.code||'',error.message||'');throw failure(503,'OmniRoute model catalog is unavailable. Check its URL and API key, then retry.');}
+   // OmniRoute can require a dashboard session for GET /v1/models even when
+   // API-key-authenticated inference is enabled. Echo's OmniRoute key is
+   // restricted to this exact free route, so keep that single safe option
+   // available when the catalog endpoint is dashboard-only.
+   if(r.status===401||r.status===403)return [{id:'openrouter/free',provider:'omniroute',mode:'chat',label:'OpenRouter Free · free',free:true,rates:{textInput:0,textCached:0,textOutput:0},source:this.baseUrl()}];
    if(!r.ok){console.error('OmniRoute catalog returned HTTP',r.status,'for',new URL(url).host+new URL(url).pathname);throw failure(503,'OmniRoute model catalog is unavailable. Check its URL and API key, then retry.');}
    let body;
    try{body=await r.json();}catch(error){console.error('OmniRoute catalog returned invalid JSON:',error.message||'');throw failure(503,'Invalid OmniRoute model catalog.');}

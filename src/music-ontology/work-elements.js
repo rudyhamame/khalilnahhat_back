@@ -45,7 +45,7 @@ function createWorkElements(service){
   if(def.source==='vocabulary'){
    const old=id?await Vocabulary.findOne({externalId:id}).lean():await Vocabulary.findOne({kind:def.kind,normalizedName:norm(data.value),parentId:data.parentId||'',archived:true}).lean();
    if(id&&(!old||old.kind!==def.kind))fail('Option not found.',404);
-   const value={...(data.languageIds!==undefined?{languageIds:data.languageIds}:{}),kind:def.kind,name:data.value,parentId:old?.parentId??data.parentId??'',isoCode:data.isoCode??old?.isoCode??'',description:old?.description||'',provenance:{source:old?.provenance?.source||'',note:old?.provenance?.note||''},...(old?{revision:id?data.revision:old.revision}:{})};
+   const value={...(data.languageIds!==undefined?{languageIds:data.languageIds}:{}),kind:def.kind,name:data.value,parentId:def.kind==='genre'?(data.parentId??old?.parentId??''):(old?.parentId??data.parentId??''),isoCode:data.isoCode??old?.isoCode??'',description:old?.description||'',provenance:{source:old?.provenance?.source||'',note:old?.provenance?.note||''},...(old?{revision:id?data.revision:old.revision}:{})};
    const row=await service.saveVocabulary(value,old?.externalId||null,actor);
    if(old?.archived)await Vocabulary.updateOne({externalId:old.externalId},{$set:{archived:false}});
    return row;

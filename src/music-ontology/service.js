@@ -110,7 +110,8 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
     let next=value.parentId;const seen=new Set([id]);while(next){if(seen.has(next))fail('Vocabulary hierarchy cannot contain cycles.');seen.add(next);next=(await Vocabulary.findOne({externalId:next}).session(session).lean())?.parentId;}}
    const old=id?await Vocabulary.findOne({externalId:id}).session(session):null;
    if(id&&!old)fail('Metadata entity not found.',404);
-   if(old&&(value.kind!==old.kind||value.parentId!==old.parentId))fail('Entity kind and parent identity cannot be changed; create a separate entity.');
+   if(old&&value.kind!==old.kind)fail('Entity kind cannot be changed; create a separate entity.');
+   if(old&&value.kind!=='genre'&&value.parentId!==old.parentId)fail('Parent identity cannot be changed for this entity; create a separate entity.');
    if(old&&value.revision!==old.revision)fail('This entity changed. Reload before editing.',409);
    if(value.languageIds?.length)await references(value.languageIds,'language',session);
    const data={...value,languageIds:value.languageIds??old?.languageIds??[],externalId:id||makeId(value.kind),normalizedName:norm(value.name),provenance:provenance(value.provenance,actor),revision:(old?.revision||0)+1};

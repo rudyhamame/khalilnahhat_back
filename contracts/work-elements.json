@@ -83,16 +83,6 @@
     "kind": "artist"
   },
   {
-    "id": "creditDetail",
-    "label": "Credit details",
-    "source": "preset"
-  },
-  {
-    "id": "description",
-    "label": "Recording description",
-    "source": "preset"
-  },
-  {
     "id": "workType",
     "label": "Music type",
     "source": "fixed",

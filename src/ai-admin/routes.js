@@ -7,10 +7,12 @@ const {createEngine}=require('./engine');
 const {createPush}=require('./push');
 const {redact}=require('./redact');
 const {tokenPolicy}=require('./token-policy');
+const {createAdminServices}=require('./services');
 const publicTask=task=>{const {input,leaseToken,leaseUntil,...value}=task;return redact(value);};
 function registerAiAdministrator(app,{requireAdmin,authorize,configService,env=process.env}){
  const store=createStore(),registry=createRegistry({invoke:createRouteAdapter(app),app});
- const agent=createEchoAdminAgent({registry,configService,env});const engine=createEngine({store,registry,agent,authorize});
+ const adminServices=createAdminServices({configService,env});
+ const agent=createEchoAdminAgent({registry,configService,adminServices,env});const engine=createEngine({store,registry,agent,authorize});
  const push=createPush({store,env,authorize});let pushTimer=null,notifying=false;
  const start=async()=>{await push.init();await engine.start();if(!pushTimer){pushTimer=setInterval(async()=>{if(notifying)return;notifying=true;try{await push.tick();}catch(error){console.error('Administrator notification:',error.name);}finally{notifying=false;}},5000);pushTimer.unref?.();}};
  const base='/api/admin/ai-administrator';
@@ -18,14 +20,15 @@ function registerAiAdministrator(app,{requireAdmin,authorize,configService,env=p
  const owner=req=>String(req.user._id||req.user.id);
  const owned=async(req)=>{const task=await store.get(req.params.id);if(!task||task.owner!==owner(req))throw failure(404,'Task not found.');return task;};
  const admitted=async who=>{if(await store.Task.countDocuments({owner:who,createdAt:{$gte:new Date(Date.now()-600000)}})>=30)throw failure(429,'Administrator task limit reached. Wait ten minutes.');};
- app.get(base,requireAdmin,guard(async(req,res)=>{const config=await configService.load();return res.json({tasks:(await store.list(owner(req))).map(publicTask),control:await store.control(),capabilities:registry.list(),inventory:registry.inventory(),model:{provider:'openai',model:env.OPENAI_ADMIN_MODEL||(config.chat.provider==='openai'?config.chat.model:env.OPENAI_BOOKING_CHAT_MODEL||'gpt-4o-mini'),configured:!!env.OPENAI_API_KEY},worker:{mode:env.ECHO_ADMIN_WORKER_MODE==='external'?'external':'api-process',sleepWarning:env.RENDER==='true',androidPush:push.configured()},context:{scope:'conversation',...tokenPolicy(env)},permissions:{identity:owner(req),role:'administrator',permanentDeletion:false,privilegeChanges:false,customerMessages:false}});}));
+ adminServices.register(app,requireAdmin,guard);
+ app.get(base,requireAdmin,guard(async(req,res)=>{const settings=await adminServices.load();return res.json({tasks:(await store.list(owner(req))).map(publicTask),control:await store.control(),capabilities:registry.list(),inventory:registry.inventory(),model:{...settings.text,configured:adminServices.configured(settings.text.provider)},services:settings,worker:{mode:env.ECHO_ADMIN_WORKER_MODE==='external'?'external':'api-process',sleepWarning:env.RENDER==='true',androidPush:push.configured()},context:{scope:'conversation',...tokenPolicy(env)},permissions:{identity:owner(req),role:'administrator',permanentDeletion:false,privilegeChanges:false,customerMessages:false}});}));
  app.get(`${base}/conversations`,requireAdmin,guard(async(req,res)=>res.json({items:redact(await store.conversations(owner(req)))})));
  app.get(`${base}/conversations/:sessionId/messages`,requireAdmin,guard(async(req,res)=>{
   const sessionId=z.string().min(1).max(160).parse(req.params.sessionId);const before=z.uuid().optional().parse(req.query.before);
   const result=await store.messages(owner(req),sessionId,before);if(!result)throw failure(404,'Conversation page not found.');
   res.json({...result,items:result.items.map(publicTask),nextBefore:result.hasMore?result.items[0]?._id:null});
  }));
- app.post(`${base}/tasks`,requireAdmin,guard(async(req,res)=>{await admitted(owner(req));res.status(202).json({item:publicTask(await engine.submit(owner(req),req.body,req.get('x-echo-client')==='android'?'android':'dashboard'))});}));
+ app.post(`${base}/tasks`,requireAdmin,guard(async(req,res)=>{if(!(await adminServices.load()).text.enabled)throw failure(503,'Administrator Text is disabled in ECHO AI Configuration.');await admitted(owner(req));res.status(202).json({item:publicTask(await engine.submit(owner(req),req.body,req.get('x-echo-client')==='android'?'android':'dashboard'))});}));
  app.get(`${base}/tasks/:id`,requireAdmin,guard(async(req,res)=>res.json({item:publicTask(await owned(req))})));
  app.post(`${base}/tasks/:id/approve`,requireAdmin,guard(async(req,res)=>{await owned(req);const {digest}=z.object({digest:z.string().regex(/^[a-f0-9]{64}$/)}).strict().parse(req.body);res.json({item:publicTask(await engine.approve(req.params.id,owner(req),digest))});}));
  for(const action of ['cancel','retry'])app.post(`${base}/tasks/:id/${action}`,requireAdmin,guard(async(req,res)=>{await owned(req);res.json({item:publicTask(await engine[action](req.params.id,owner(req)))});}));

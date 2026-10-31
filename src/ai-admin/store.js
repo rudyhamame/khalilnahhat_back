@@ -20,7 +20,7 @@ function createStore(){const auditCounts=new WeakMap();return {
  async messages(owner,sessionId,before){
   const query={owner,hidden:{$ne:true},sessionId:sessionId==='dashboard'?{$in:[sessionId,null,'']}:sessionId};
   if(before){const anchor=await Task.findOne({...query,_id:before}).select('createdAt').lean();if(!anchor)return null;query.$or=[{createdAt:{$lt:anchor.createdAt}},{createdAt:anchor.createdAt,_id:{$lt:anchor._id}}];}
-  const rows=await Task.find(query).sort({createdAt:-1,_id:-1}).limit(31).select('sessionId requestId command state result error pending actions.id actions.name actions.state actions.error cancelRequested createdAt updatedAt').lean();
+  const rows=await Task.find(query).sort({createdAt:-1,_id:-1}).limit(31).select('sessionId requestId command state result error pending actions.id actions.name actions.state actions.error actions.result.data.navigation cancelRequested createdAt updatedAt').lean();
   const hasMore=rows.length>30;return {items:rows.slice(0,30).reverse(),hasMore};
  },
  list:owner=>Task.find({owner}).sort({createdAt:-1}).limit(100).select('owner sessionId requestId command source state error createdAt updatedAt cancelRequested').lean(),

@@ -4,6 +4,7 @@ const {failure}=require('./route-adapter');
 const {redact}=require('./redact');
 const {conversationInput}=require('./conversation');
 const {parseToolArguments}=require('./tool-arguments');
+const {navigationIntent}=require('./navigation');
 const commandSchema=z.object({command:z.string().trim().min(1).max(8000),requestId:z.uuid(),sessionId:z.string().max(160).default('dashboard')}).strict();
 const audit=(task,type,detail={})=>task.audit.push({at:new Date().toISOString(),type,...redact(detail)});
 // The model's wording is not proof. This server-built section lists only writes that were verified against stored data.
@@ -25,6 +26,19 @@ function createEngine({store,registry,agent,authorize}){
     const rows=store.conversation?await store.conversation(task.owner,task.sessionId,task):[];
     task.input=conversationInput(rows,task.command);task.contextInitialized=true;
     audit(task,'CONVERSATION_CONTEXT',{previousTasks:task.input.length-1});await store.save(task);
+   }
+   // A plain request to open a known tab is deterministic and needs no model
+   // tokens, entity IDs, or data access. Retain the normal authorization/audit path.
+   const section=navigationIntent(task.command);
+   if(section&&task.actions.every(action=>action.name==='administrator_open_section')){
+    let action=task.actions[0];
+    if(!action){action={id:randomUUID(),callId:randomUUID(),name:'administrator_open_section',args:{section},state:'PLANNED',createdAt:new Date().toISOString()};task.actions.push(action);audit(task,'TOOL_PLANNED',{name:action.name,actionId:action.id});await store.save(task);}
+    const actor=await checkpoint(task);
+    const data=await registry.executeRead(action.name,action.args,actor);
+    action.result={ok:true,data};action.state='VERIFIED';action.delivered=true;
+    audit(task,'TOOL_VERIFIED',{actionId:action.id,name:action.name,mutation:false});
+    task.result={message:`<h4>Navigation</h4><p>Opening ${esc(data.label)}.</p>`,verifiedActions:1,model:'dashboard-navigation',provider:'application',usage:{calls:0,inputTokens:0,cachedInputTokens:0,outputTokens:0}};
+    task.state='COMPLETED';audit(task,task.state);await store.save(task);return;
    }
    // Older tasks could fail while parsing a call, leaving no action and no
    // receipt. A safe user retry must close that rejected call, never execute it.

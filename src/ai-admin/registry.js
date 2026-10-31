@@ -3,6 +3,7 @@ const {createHash}=require('node:crypto');
 const {failure}=require('./route-adapter');
 const V=require('../music-ontology/validation');
 const {redact}=require('./redact');
+const {sections:navigationSections}=require('./navigation');
 const id=z.string().min(1).max(160),query=z.string().max(240).default('');
 const canonical=value=>typeof value==='string'&&/^\/api\/music-archive\/media\/[a-f0-9-]{36}\?/.test(value)?value.split('?')[0]:Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
 const hash=value=>createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
@@ -16,6 +17,7 @@ function merge(base,patch){const value={...base};for(const [key,item] of Object.
 function createRegistry({invoke,app}){
  const entries=new Map();
  const add=entry=>entries.set(entry.name,entry);
+ add({name:'administrator_open_section',domain:'Dashboard Navigation',description:'Open a dashboard tab/section by its section name. Work Elements is the shared metadata options tab, not an individual music work. No work ID or recording ID is needed for any tab. Use this whenever the administrator asks to open/show/switch tabs. This requests navigation in the connected app; it does not read or change records.',policy:'AUTO',mutation:false,schema:z.object({section:z.enum(Object.keys(navigationSections))}).strict(),async read(args){return {navigation:{section:args.section},label:navigationSections[args.section],requested:true};}});
  const routeRead=(name,domain,path,description)=>add({name,domain,description,policy:'AUTO',mutation:false,schema:z.object({q:query}).strict(),route:{method:'GET',path},async read(args,actor){const result=await invoke('GET',path,{actor});const rows=result.items||result.recordings||result.songs;return args.q&&Array.isArray(rows)?{items:rows.filter(item=>JSON.stringify(item).toLowerCase().includes(args.q.toLowerCase()))}:result;}});
  const ontology='/api/admin/music-ontology',archive='/api/admin/music-archive';
  for(const [kind,schema,input] of [['recordings',V.recording,recordingInput],['works',V.work,workInput],['vocabulary',V.vocabulary,item=>project(jsonSchema(V.vocabulary),item)]]){

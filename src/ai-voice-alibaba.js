@@ -28,15 +28,24 @@ function sessionUpdate({instructions,tools,voice,maxOutputTokens,manual=false}){
 
 // Pure translation, kept separate from the sockets so it can be tested without a network.
 function createTranslator({instructions,tools,voice,maxOutputTokens}){
- const state={context:'',calls:[],hasConversation:false,opening:false,afterOpening:null,restore:[]};
+ const state={context:'',calls:[],hasConversation:false,opening:false,awaitingOpeningConfig:false,restoring:false,afterOpening:null,restore:[],speech:false,turnPending:false,responseActive:false,pendingOutputs:[],outputAcks:new Set(),continuationRequested:false};
+ const idle=()=>!state.opening&&!state.restoring&&!state.speech&&!state.turnPending&&!state.responseActive;
+ const outputEvent=item=>{state.outputAcks.add(item.call_id);return {type:'conversation.item.create',item};};
+ const flush=()=>{
+  const events=state.restore.splice(0);
+  if(!idle())return events;
+  if(state.pendingOutputs.length)events.push(...state.pendingOutputs.splice(0).map(outputEvent));
+  if(state.continuationRequested&&!state.outputAcks.size){state.continuationRequested=false;state.responseActive=true;events.push({type:'response.create'});}
+  return events;
+ };
  return {
   open:()=>sessionUpdate({instructions,tools,voice,maxOutputTokens}),
   // Events the bridge must send upstream after what it just received (e.g. back to server VAD once the opening greeting is done).
-  drain:()=>state.restore.splice(0),
+  drain:flush,
   // Browser event -> events for Alibaba.
   toUpstream(event){
    if(!event||typeof event.type!=='string')return [];
-   if(event.type==='input_audio_buffer.append')return typeof event.audio==='string'?[{type:'input_audio_buffer.append',audio:event.audio}]:[];
+   if(event.type==='input_audio_buffer.append')return !state.opening&&!state.restoring&&typeof event.audio==='string'?[{type:'input_audio_buffer.append',audio:event.audio}]:[];
    if(event.type==='conversation.item.create'){
     const item=event.item||{};
     if(item.type==='message'){
@@ -44,22 +53,30 @@ function createTranslator({instructions,tools,voice,maxOutputTokens}){
      // input. Qwen Omni Realtime does not accept message items from
      // conversation.item.create; keep the text in session instructions instead.
      state.context=`${state.context}\n${text(item.content)}`.trim().slice(0,6000);
-     return [sessionUpdate({instructions:`${instructions}\n${state.context}`.slice(0,30000),tools,voice,maxOutputTokens})];
+     return [{type:'session.update',session:{instructions:`${instructions}\n${state.context}`.slice(0,30000)}}];
     }
-    if(item.type==='function_call_output'&&typeof item.call_id==='string'){state.hasConversation=true;return [{type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:String(item.output??'')}}];}
+    if(item.type==='function_call_output'&&typeof item.call_id==='string'){
+     state.hasConversation=true;const result={type:'function_call_output',call_id:item.call_id,output:String(item.output??'')};
+     // A tool receipt is a different input origin. Let a newer microphone turn
+     // finish before returning it, then wait for the provider's item acknowledgement.
+     if(!idle()){if(state.pendingOutputs.length<MAX_QUEUED)state.pendingOutputs.push(result);return [];}
+     return [outputEvent(result)];
+    }
     return [];
    }
    if(event.type==='response.create'){
     // Qwen only answers a committed audio turn. For the opening greeting the model takes a first turn on a moment of silence, in manual
     // turn mode so nothing needs to be heard; server VAD comes back as soon as that greeting is done. The greeting is spoken by the model.
     if(typeof event.response?.instructions==='string'&&event.response.instructions.trim()!==''&&!state.hasConversation){
-     const extra=[state.context,event.response.instructions].filter(Boolean).join('\n');
-     state.context='';state.opening=true;
-     state.afterOpening=sessionUpdate({instructions:`${instructions}\n${extra}`.slice(0,30000),tools,voice,maxOutputTokens});
-     return [sessionUpdate({instructions:`${instructions}\n${extra}`.slice(0,30000),tools,voice,maxOutputTokens,manual:true}),{type:'input_audio_buffer.append',audio:SILENCE},{type:'input_audio_buffer.commit'},{type:'response.create'}];
+     const context=state.context,extra=[context,event.response.instructions].filter(Boolean).join('\n');
+     state.context='';state.opening=true;state.awaitingOpeningConfig=true;
+     state.afterOpening={type:'session.update',session:{instructions:`${instructions}\n${context}`.trim().slice(0,30000),turn_detection:sessionUpdate({instructions,tools,voice,maxOutputTokens}).session.turn_detection}};
+     return [sessionUpdate({instructions:`${instructions}\n${extra}`.slice(0,30000),tools,voice,maxOutputTokens,manual:true})];
     }
     state.context='';
-    return state.hasConversation?[{type:'response.create'}]:[];
+    if(!state.hasConversation)return [];
+    if(!idle()||state.outputAcks.size||state.pendingOutputs.length){state.continuationRequested=true;return [];}
+    state.responseActive=true;return [{type:'response.create'}];
    }
    return [];
   },
@@ -67,20 +84,30 @@ function createTranslator({instructions,tools,voice,maxOutputTokens}){
   toClient(event){
    if(!event?.type&&typeof event?.code==='string'&&typeof event?.message==='string')return [{type:'error',error:{message:event.code==='AccessDenied'?'The Alibaba API key does not allow this voice model. Check its Model Studio permissions.':event.message}}];
    switch(event?.type){
-    case 'input_audio_buffer.committed':state.hasConversation=true;return [];
-    case 'response.created':state.hasConversation=true;return [{type:'response.created',response:{id:event.response?.id}}];
+    case 'session.updated':
+     if(state.awaitingOpeningConfig&&event.session?.turn_detection===null){
+      state.awaitingOpeningConfig=false;
+      state.restore.push({type:'input_audio_buffer.append',audio:SILENCE},{type:'input_audio_buffer.commit'},{type:'response.create'});
+     }else if(state.restoring&&event.session?.turn_detection?.type==='server_vad'){state.restoring=false;return [{type:'bridge.listening'}];}
+     return [];
+    case 'conversation.item.created':
+     if(event.item?.type==='function_call_output')state.outputAcks.delete(event.item.call_id);
+     return [];
+    case 'input_audio_buffer.committed':state.hasConversation=true;state.turnPending=true;return [];
+    case 'response.created':state.hasConversation=true;state.turnPending=false;state.responseActive=true;return [{type:'response.created',response:{id:event.response?.id}}];
     case 'response.audio.delta':return typeof event.delta==='string'?[{type:'response.output_audio.delta',delta:event.delta}]:[];
     case 'response.audio_transcript.delta':return [{type:'response.output_audio_transcript.delta',delta:String(event.delta||'')}];
     case 'response.audio_transcript.done':return [{type:'response.output_audio_transcript.done',transcript:String(event.transcript||''),item_id:event.item_id||crypto.randomUUID()}];
     case 'conversation.item.input_audio_transcription.completed':state.hasConversation=true;return [{type:event.type,transcript:String(event.transcript||''),item_id:event.item_id||crypto.randomUUID()}];
-    case 'input_audio_buffer.speech_started':
-    case 'input_audio_buffer.speech_stopped':return [{type:event.type}];
+    case 'input_audio_buffer.speech_started':state.speech=true;state.turnPending=true;return [{type:event.type}];
+    case 'input_audio_buffer.speech_stopped':state.speech=false;return [{type:event.type}];
     case 'response.function_call_arguments.done':
      if(typeof event.call_id==='string'&&typeof event.name==='string')state.calls.push({type:'function_call',call_id:event.call_id,name:event.name,arguments:String(event.arguments||'')});
      // Navigation can move the page as soon as its arguments are complete, before spoken audio.
      return event.name==='show_app_section'?[{type:event.type,call_id:event.call_id,name:event.name,arguments:String(event.arguments||'')}]:[];
     case 'response.done':{
-     if(state.opening){state.opening=false;state.restore.push(state.afterOpening);}
+     state.responseActive=false;
+     if(state.opening){state.opening=false;state.restoring=true;state.restore.push({type:'input_audio_buffer.clear'},state.afterOpening);}
      const raw=event.response?.usage||{},input=count(raw.input_tokens??raw.prompt_tokens),output=count(raw.output_tokens??raw.completion_tokens),cached=count(raw.input_tokens_details?.cached_tokens);
      const done={type:'response.done',response:{id:event.response?.id,status:event.response?.status||'completed',output:state.calls.splice(0),
       ...(input!==undefined||output!==undefined?{usage:{...(input!==undefined?{input_tokens:input}:{}),...(output!==undefined?{output_tokens:output}:{}),...(cached!==undefined?{input_token_details:{cached_tokens:cached}}:{})}}:{})}};

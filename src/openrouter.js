@@ -10,7 +10,12 @@ function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
    const r=await fetchImpl('https://api.poe.com/v1/models',{headers:{Authorization:`Bearer ${env.POE_API_KEY}`},signal:AbortSignal.timeout(15000)});
    if(!r.ok)throw failure(503,'Poe model catalog is unavailable. Check the Poe API key and retry.');
    const body=await r.json();if(!Array.isArray(body.data))throw failure(503,'Invalid Poe model catalog.');
-   return body.data.filter(m=>typeof m.id==='string').map(m=>({id:m.id,provider:'poe',mode:'chat',label:m.name||m.id,pricingUnknown:true,rates:{textInput:0,textCached:0,textOutput:0},source:'https://poe.com/api/keys'}));
+   return body.data.filter(m=>typeof m.id==='string').map(m=>{
+    const prices=Object.values(m.pricing||{}).filter(value=>value!==null&&value!==undefined&&value!==''&&Number.isFinite(Number(value))).map(Number);
+    const pricingUnknown=prices.length===0;
+    const free=!pricingUnknown&&prices.every(value=>value===0);
+    return {id:m.id,provider:'poe',mode:'chat',label:m.metadata?.display_name||m.name||m.id,free,pricingUnknown,rates:{textInput:0,textCached:0,textOutput:0},source:m.metadata?.url||`https://poe.com/${encodeURIComponent(m.id)}`};
+   });
   },
   configured:()=>Boolean(env.POE_API_KEY),
   async validate(config){const model=(await this.models()).find(m=>m.id===config.model);if(!model)throw failure(400,'Select a model available through the configured Poe account.');return model;},

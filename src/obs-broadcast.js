@@ -87,6 +87,10 @@ function registerObsBroadcastRoutes(app, deps) {
         try { await stop(await getLiveStreamConfig().then(row => row.obsRoomName === claimed.obsRoomName ? row : { obsRoomName: '' })); } catch { /* retry by worker */ }
       }
       console.error('OBS prepare failed:', error?.code || error?.status || '', error?.message || error);
+      if (error?.code === 'resource_exhausted' && /ingress minutes exceeded/i.test(error?.message || '')) {
+        return res.status(503).json({ code: 'OBS_INGRESS_QUOTA_EXCEEDED',
+          message: 'OBS is unavailable because this LiveKit project has reached its streaming ingress allowance. Check LiveKit usage and billing, or wait for the allowance to reset.' });
+      }
       return res.status(503).json({ message: error.status === 503 ? error.message : 'OBS setup did not finish. Retry shortly.' });
     }
   });

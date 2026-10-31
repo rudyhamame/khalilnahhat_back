@@ -1,0 +1,6 @@
+[Unit]
+Description=Reload Echo TURN certificate after renewal
+After=docker.service
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /srv/rh/echo-obs-relay/reload-turn-certificate.py

@@ -228,7 +228,7 @@ const liveStreamConfigSchema = new mongoose.Schema(
     muxRtmpUrl: { type: String, default: '', trim: true },
     // What ECHO is on air for: broadcast | event | home-studio | chill-mix | radio
     goal: { type: String, enum: ['broadcast', 'event', 'home-studio', 'chill-mix', 'radio'], default: 'broadcast', trim: true },
-    broadcastMode: { type: String, enum: ['youtube', 'mux', 'webrtc'], default: 'youtube', trim: true },
+    broadcastMode: { type: String, enum: ['youtube', 'mux', 'webrtc', 'whep'], default: 'youtube', trim: true },
     webrtcRoomName: { type: String, default: '', trim: true },
     broadcastSource: { type: String, enum: ['', 'browser', 'obs'], default: '' },
     obsRoomName: { type: String, default: '' },

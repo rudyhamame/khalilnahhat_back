@@ -695,7 +695,8 @@ function serializeAdminLiveStreamConfig(config) {
   return {
     ...serializeLiveStreamConfig(config),
     obs: { roomName: config?.obsRoomName || '', state: config?.obsState || '',
-      url: config?.obsUrl || '', streamKey: config?.obsStreamKey || '', expiresAt: config?.obsExpiresAt || null },
+      url: config?.obsUrl || '', streamKey: config?.obsStreamKey || '', expiresAt: config?.obsExpiresAt || null,
+      transport: config?.broadcastMode === 'whep' || (!config?.obsRoomName && require('./obs-relay-client').configured()) ? 'ovh' : 'livekit', error: config?._obsRelayError || '' },
     muxLiveStreamId: config?.muxLiveStreamId || '',
     muxPlaybackId: config?.muxPlaybackId || '',
     muxStreamKey: config?.muxStreamKey || '',

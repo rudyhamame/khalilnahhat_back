@@ -1,0 +1,36 @@
+logLevel: warn
+logDestinations: [stdout]
+authMethod: http
+authHTTPAddress: http://127.0.0.1:18991/internal/auth
+authHTTPExclude:
+  - action: api
+api: true
+apiAddress: 127.0.0.1:19997
+metrics: false
+pprof: false
+playback: false
+rtsp: false
+rtmp: false
+hls: false
+moq: false
+webrtc: true
+webrtcAddress: 127.0.0.1:18889
+webrtcAllowOrigins: ['https://echo-khalil.onrender.com', 'http://localhost:5176']
+webrtcTrustedProxies: ['127.0.0.1']
+webrtcLocalUDPAddress: :8189
+webrtcLocalTCPAddress: :8190
+webrtcIPsFromInterfaces: false
+webrtcAdditionalHosts: ['148.113.249.11']
+srt: false
+pathDefaults:
+  source: publisher
+  overridePublisher: false
+  record: true
+  recordFormat: fmp4
+  recordPartDuration: 1s
+  recordMaxPartSize: 8M
+  recordSegmentDuration: 2m
+  recordDeleteAfter: 0s
+  runOnRecordSegmentComplete: >-
+    wget -q -O /dev/null --post-data "{\"duration\":$MTX_SEGMENT_DURATION}" "http://127.0.0.1:18991/internal/segments/$MTX_PATH/$(basename "$MTX_SEGMENT_PATH")"
+paths: {}

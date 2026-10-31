@@ -4,12 +4,14 @@ const IDENTITY = 'khalil-obs';
 function registerObsBroadcastRoutes(app, deps) {
   const { requireAdmin, getLiveStreamConfig, LiveStreamConfig, defaults, getConfig,
     serialize, IngressClient, RoomServiceClient, randomUUID, prepareRecording, ensureRecording } = deps;
+  const relay = require('./obs-relay-broadcast').createRelayBroadcast(deps);
   const client = Class => { const c = getConfig(); return new Class(c.wsUrl, c.apiKey, c.apiSecret); };
   const filter = row => ({ key: defaults.key, obsRoomName: row.obsRoomName });
   const change = (row, values, extra = {}) => LiveStreamConfig.findOneAndUpdate({ ...filter(row), ...extra }, values, { new: true });
   const missing = error => error?.status === 404 || error?.code === 'not_found' || error?.code === 5;
   async function stop(row) {
     if (!row.obsRoomName) return row;
+    if (row.broadcastMode === 'whep') return relay.stop(row);
     const ending = await change(row, { isLive: false, obsState: 'ending', statusLabel: defaults.statusLabel });
     if (!ending) return getLiveStreamConfig();
     // Keep the reservation if revocation fails. The worker retries; no second broadcaster can steal it.
@@ -23,6 +25,7 @@ function registerObsBroadcastRoutes(app, deps) {
   async function synchronize() {
     let row = await getLiveStreamConfig();
     if (!row.obsRoomName) return row;
+    if (row.broadcastMode === 'whep') return relay.synchronize(row);
     if (row.obsState === 'ending') return stop(row);
     if (!row.obsIngressId) {
       if (new Date(row.obsExpiresAt).getTime() <= Date.now()) return stop(row);
@@ -57,6 +60,7 @@ function registerObsBroadcastRoutes(app, deps) {
   });
   app.post('/api/live-stream/obs/prepare', requireAdmin, async (req, res) => {
     res.set?.('Cache-Control', 'no-store');
+    if (require('./obs-relay-client').configured()) return relay.prepare(req, res);
     let claimed, ingress;
     try {
       getConfig();

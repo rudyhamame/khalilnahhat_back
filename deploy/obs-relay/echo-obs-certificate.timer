@@ -1,0 +1,8 @@
+[Unit]
+Description=Watch Echo TURN TLS certificate renewal
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=6h
+Persistent=true
+[Install]
+WantedBy=timers.target

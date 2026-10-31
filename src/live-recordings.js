@@ -18,6 +18,7 @@ const schema=new mongoose.Schema({
  publicId:String,delivery:{type:String,default:'authenticated'},bytes:{type:Number,default:0},duration:{type:Number,default:0},
  attempts:{type:Number,default:0},nextRetryAt:{type:Date,default:()=>new Date()},leaseUntil:{type:Date,default:()=>new Date(0)},
  deletedAt:{type:Date,default:null},
+ provider:{type:String,default:'livekit'},relaySegments:[String],
  error:{type:String,default:''},published:{type:Boolean,default:false},test:{type:Boolean,default:false},
 },{timestamps:true});
 const LiveRecording=mongoose.models.LiveRecording||mongoose.model('LiveRecording',schema);
@@ -107,11 +108,14 @@ async function ensureRecording(roomName){
 }
 let sweeping=false;
 async function sweepRecordings(){
- if(sweeping||!configured())return;sweeping=true;
+ if(sweeping)return;sweeping=true;
  try {
-  const rows=await LiveRecording.find({deletedAt:null,$or:[{status:{$in:['waiting','recording']}},{status:'upload_failed',attempts:{$lt:3},nextRetryAt:{$lte:new Date()}},{status:'processing',leaseUntil:{$lt:new Date()}}]}).sort({createdAt:1}).limit(10);
+  const pending={deletedAt:null,$or:[{status:{$in:['waiting','recording']}},{status:'upload_failed',attempts:{$lt:3},nextRetryAt:{$lte:new Date()}},{status:'processing',leaseUntil:{$lt:new Date()}}]};
+  const rows=await LiveRecording.find({...pending,provider:'ovh'}).sort({createdAt:1}).limit(10);
+  if(configured())rows.push(...await LiveRecording.find({...pending,provider:{$ne:'ovh'}}).sort({createdAt:1}).limit(10));
   for(const row of rows){
    try {
+    if(row.provider==='ovh'){await require('./obs-relay-recordings').transfer(row,{LiveRecording,uploadRecordingPart,prepareRecordingFiles,DEFAULT_LIMIT});continue;}
     if(row.objectKey){await transferRecording(row);continue;}
     const jobs=await sdk(EgressClient).listEgress({roomName:row.roomName});
     const completedFile=job=>job.fileResults?.[0] || (job.result?.case==='file'?job.result.value:null);

@@ -29,9 +29,12 @@ function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
    const r=await fetchImpl(`${this.baseUrl()}/models`,{headers:{Authorization:`Bearer ${env.OMNIROUTE_API_KEY}`},signal:AbortSignal.timeout(15000)});
    if(!r.ok)throw failure(503,'OmniRoute model catalog is unavailable. Check its URL and API key, then retry.');
    const body=await r.json();if(!Array.isArray(body.data))throw failure(503,'Invalid OmniRoute model catalog.');
-   return body.data.filter(m=>typeof m.id==='string'&&(m.type==='chat'||m.supportedEndpoints?.some?.(endpoint=>['/v1/responses','/v1/chat/completions','responses','chat/completions'].includes(endpoint)))).map(m=>({id:m.id,provider:'omniroute',mode:'chat',label:m.name||m.id,pricingUnknown:true,rates:{textInput:0,textCached:0,textOutput:0},source:this.baseUrl()}));
+   // OmniRoute may expose both free and paid routes. Only allow OpenRouter's
+   // explicit free router and provider-pinned :free models; labels/pricing
+   // metadata alone are not a cost control.
+   return body.data.filter(m=>typeof m.id==='string'&&(m.type==='chat'||m.supportedEndpoints?.some?.(endpoint=>['/v1/responses','/v1/chat/completions','responses','chat/completions'].includes(endpoint)))&&(m.id==='openrouter/free'||(m.id.startsWith('openrouter/')&&m.id.endsWith(':free')))).map(m=>({id:m.id,provider:'omniroute',mode:'chat',label:`${m.name||m.id} · free`,free:true,rates:{textInput:0,textCached:0,textOutput:0},source:this.baseUrl()}));
   },
-  async validate(config){const model=(await this.models()).find(m=>m.id===config.model);if(!model)throw failure(400,'Select a chat model available through OmniRoute.');return model;},
+  async validate(config){const model=(await this.models()).find(m=>m.id===config.model);if(!model)throw failure(400,'OmniRoute is restricted to explicit free OpenRouter models. Select a listed free model.');return model;},
   async request(body,{signal}={}){
    if(!this.configured())throw failure(503,'Configure OMNIROUTE_BASE_URL and OMNIROUTE_API_KEY on the API server before using OmniRoute.');
    await this.validate(body.config);

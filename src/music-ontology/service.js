@@ -28,7 +28,7 @@ function matchesWork(r,f={}){
  const has=(items,id)=>!id||items?.some(v=>(typeof v==='string'?v:v.id||v.artistId)===id);
  if(f.recordingType&&r.recordingType!==f.recordingType||f.workType&&w?.type!==f.workType)return false;
  if(f.publicationStatus&&r.publicationStatus!==f.publicationStatus||f.archivalStatus&&r.archivalStatus!==f.archivalStatus)return false;
- if(f.language&&l?.language?.id!==f.language||f.dialect&&l?.dialect?.id!==f.dialect)return false;
+ if(f.language&&l?.language?.id!==f.language&&!l?.languages?.some(item=>item.id===f.language)||f.dialect&&l?.dialect?.id!==f.dialect)return false;
  if(!has(l?.regions,f.region)||(!has(l?.concepts,f.concept)&&l?.primaryConcept?.id!==f.concept)||(!has(m?.genres,f.genre)&&!has(r.recordingMetadata?.genreIds,f.genre)))return false;
  if(f.lyricArtist&&!has(l?.artistCredits,f.lyricArtist))return false;
  if(!has(m?.instruments,f.instrument)||!has(m?.musicianCredits,f.musician))return false;
@@ -132,7 +132,23 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    if(value.type==='SONG'){
     if(lyricsId&&value.lyrics)fail('Choose either existing lyrics or new lyrics metadata.');
     if(lyricsId&&!await Lyrics.exists({externalId:lyricsId}).session(session))fail('Lyrics not found.');
-    if(!lyricsId){const l=V.lyrics.parse(value.lyrics||{});if(l.languageId)await references([l.languageId],'language',session);if(l.dialectId){await references([l.dialectId],'dialect',session);const d=await Vocabulary.findOne({externalId:l.dialectId}).session(session);if(!l.languageId||d.parentId!==l.languageId)fail('Dialect must belong to the selected lyrics language.');}
+    if(!lyricsId){const l=V.lyrics.parse(value.lyrics||{});
+     if(l.audioLanguageCodes!==undefined){
+      const definitions=new Map(require('../../contracts/audio-languages.json'));
+      l.languageIds=[];
+      for(const code of [...new Set(l.audioLanguageCodes)]){
+       const name=definitions.get(code).split(' · ')[0];
+       let ref=await Vocabulary.findOne({kind:'language',$or:[{isoCode:code},{normalizedName:norm(name)}]}).session(session);
+       if(!ref)ref=(await Vocabulary.create([{externalId:makeId('language'),kind:'language',name,normalizedName:norm(name),isoCode:code,parentId:'',revision:1}],{session}))[0];
+       else if(!ref.isoCode){ref.isoCode=code;await ref.save({session});}
+       l.languageIds.push(ref.externalId);
+      }
+      l.languageId=l.languageIds[0]||null;
+      l.states={...l.states,languageId:l.languageId?'SPECIFIED':'MISSING',languageIds:l.languageIds.length?'SPECIFIED':'MISSING'};
+     }
+     delete l.audioLanguageCodes;
+     l.languageIds=[...new Set([l.languageId,...(l.languageIds||[])].filter(Boolean))];
+     if(l.languageIds.length)await references(l.languageIds,'language',session);if(l.dialectId){await references([l.dialectId],'dialect',session);const d=await Vocabulary.findOne({externalId:l.dialectId}).session(session);if(!l.languageIds.includes(d.parentId))fail('Dialect must belong to the selected lyrics language.');}
      await references(l.regionIds,'region',session);await references(l.conceptIds,'concept',session);if(l.primaryConceptId)await references([l.primaryConceptId],'concept',session);await creditsCheck(l.artistCredits,session);if(l.completeness==='COMPLETE'&&(!l.text||!l.languageId))fail('Complete lyrics require text and a language.');l.states=V.metadataStates(l,l.states);lyricsId=makeId('lyrics');await Lyrics.create([{...l,externalId:lyricsId,provenance:provenance(l.provenance,actor)}],{session});}
    }
    // Work revisions use new component identities, preserving reused components and provenance.
@@ -188,7 +204,9 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
   const mm=new Map(melodies.map(m=>[m.externalId,m])),lm=new Map(lyrics.map(l=>[l.externalId,l]));
   const mapped=works.map(w=>{
    const m=mm.get(w.melodyId),l=lm.get(w.lyricsId);
-   return [w.externalId,{...w,id:w.externalId,_id:undefined,workKindDefinition:workTypeMap.get(w.workKind)||null,credits:creditNames(w.credits||[],vs),melody:m?{...m,id:m.externalId,_id:undefined,rhythm:entity('rhythm',m.rhythmId),genres:(m.genreIds||[]).map(id=>entity('genre',id)).filter(Boolean),instruments:(m.instrumentIds||[]).map(id=>entity('instrument',id)).filter(Boolean),musicianCredits:creditNames(m.musicianCredits||[],vs)}:null,lyrics:w.type==='SONG'&&l?{...l,id:l.externalId,_id:undefined,language:entity('language',l.languageId),dialect:entity('dialect',l.dialectId),regions:(l.regionIds||[]).map(id=>entity('region',id)).filter(Boolean),primaryConcept:entity('concept',l.primaryConceptId),concepts:(l.conceptIds||[]).map(id=>entity('concept',id)).filter(Boolean),artistCredits:creditNames(l.artistCredits||[],vs)}:null}];
+   const languageRows=[...new Set([l?.languageId,...(l?.languageIds||[])].filter(Boolean))].map(id=>entity('language',id)).filter(Boolean);
+   const audioCodes=languageRows.map(row=>require('../../contracts/audio-languages.json').find(([code,name])=>code===row.isoCode||norm(name.split(' · ')[0])===norm(row.name))?.[0]);
+   return [w.externalId,{...w,id:w.externalId,_id:undefined,workKindDefinition:workTypeMap.get(w.workKind)||null,credits:creditNames(w.credits||[],vs),melody:m?{...m,id:m.externalId,_id:undefined,rhythm:entity('rhythm',m.rhythmId),genres:(m.genreIds||[]).map(id=>entity('genre',id)).filter(Boolean),instruments:(m.instrumentIds||[]).map(id=>entity('instrument',id)).filter(Boolean),musicianCredits:creditNames(m.musicianCredits||[],vs)}:null,lyrics:w.type==='SONG'&&l?{...l,id:l.externalId,_id:undefined,language:entity('language',l.languageId),languages:languageRows,audioLanguageCodes:audioCodes.every(Boolean)?audioCodes:undefined,dialect:entity('dialect',l.dialectId),regions:(l.regionIds||[]).map(id=>entity('region',id)).filter(Boolean),primaryConcept:entity('concept',l.primaryConceptId),concepts:(l.conceptIds||[]).map(id=>entity('concept',id)).filter(Boolean),artistCredits:creditNames(l.artistCredits||[],vs)}:null}];
   });return {works:new Map(mapped),vocabulary:vs,workTypes:workTypeMap};
  }
  async function hydrate(rows,{admin=false}={}){

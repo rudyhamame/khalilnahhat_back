@@ -4,6 +4,8 @@ const archiveFiles=require('./music-archive-files');
 const {ownedAsset,deliveryUrl}=require('./music-archive');
 
 const MAX_BYTES=25*1024*1024;
+const audioLanguageDefinitions=require('../contracts/audio-languages.json');
+const languageCode=value=>{const text=String(value||'').toLowerCase();return audioLanguageDefinitions.find(([code,name])=>code===text||name.split(' · ')[0].toLowerCase()===text)?.[0];};
 const languages=new Set(['ar','en','fr','es','de','it','pt','tr','fa','ur','hi','ru','uk','el','he','nl','pl','zh','ja','ko']);
 const ALIBABA_BASE='https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
 // Qwen-ASR takes one base64 data URL (10 MB limit incl. encoding, about 5 minutes of audio) and returns plain text without timestamps.
@@ -106,7 +108,7 @@ function registerLyricsTranscription(app,{requireAdmin,configService,fetchImpl=f
    await configService.complete(ticket,{...(Number.isFinite(duration)?{durationSeconds:duration}:{}),fileBytes:file.size},false);ticket=null;
    const segments=timed&&Array.isArray(result.segments)?result.segments.map(row=>({start:row.start,end:row.end,text:typeof row.text==='string'?row.text.trim():''})).filter(row=>Number.isFinite(row.start)&&Number.isFinite(row.end)&&row.start>=0&&row.end>row.start&&row.text).sort((a,b)=>a.start-b.start):[];
    if(timed&&!segments.length)return res.status(422).json({message:'No timed lyric lines were detected. Try a clearer recording.'});
-   res.json({text:timed?segments.map(row=>row.text).join('\n'):result.text,model,segments,sourceAudioUrl:timed?sourceAudioUrl:'',languages:Array.isArray(result.languages)?result.languages:[]});
+   res.json({text:timed?segments.map(row=>row.text).join('\n'):result.text,model,segments,sourceAudioUrl:timed?sourceAudioUrl:'',languages:[...new Set([result.language,...(Array.isArray(result.languages)?result.languages:[])].map(languageCode).filter(Boolean))]});
   }catch(error){
    if(ticket)await configService.fail(ticket).catch(()=>{});
    res.status(error.status||502).json({message:error.status===400?error.message:error.name==='TimeoutError'?'Transcription timed out. Try a shorter audio file.':'Could not transcribe this audio. Your existing lyrics are unchanged.'});

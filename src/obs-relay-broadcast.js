@@ -19,8 +19,10 @@ function createRelayBroadcast(deps) {
    return status?.error?Object.assign(cleared,{_obsRelayError:status.error}):cleared;
   }
   const live=status.state==='live';
-  return await LiveStreamConfig.findOneAndUpdate({...owned(row),obsState:{$in:['preparing','waiting','live']}},
-   {isLive:live,obsState:live?'live':'waiting',streamUrl:live?status.playbackUrl:'',statusLabel:live?'Live now — DJ Khalil is on air.':defaults.statusLabel},{new:true}) || getLiveStreamConfig();
+  const updated=await LiveStreamConfig.findOneAndUpdate({...owned(row),obsState:{$in:['preparing','waiting','live']}},
+   {isLive:live,obsState:live?'live':'waiting',streamUrl:live?status.playbackUrl:'',statusLabel:live?'Live now — DJ Khalil is on air.':defaults.statusLabel},{new:true});
+  if(updated)await deps.notifyLiveTransition?.(row,updated);
+  return updated || getLiveStreamConfig();
  }
  async function prepare(req,res) {
   let claimed;

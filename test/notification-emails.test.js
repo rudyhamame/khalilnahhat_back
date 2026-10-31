@@ -17,7 +17,7 @@ const draft=item=>({revision:item.revision,enabled:item.enabled,subject:item.sub
 const payload={to:[{email:'recipient@example.test',name:'Alex'}],subject:'Original subject',htmlContent:'<p>Original rich email</p>',tags:['password-reset'],notificationContext:{actionUrl:'https://example.test/reset?token=private-token'}};
 
 test('all current events have valid defaults and existing rich emails are preserved until saved',async()=>{
- const {service,rows}=fixture();const events=await service.list();assert.equal(events.length,14);
+ const {service,rows}=fixture();const events=await service.list();assert.equal(events.length,15);
  for(const event of events){assert.equal(event.enabled,true);validate(event.id,draft(event));}
  const actual=await service.apply(payload);assert.equal(actual.htmlContent,payload.htmlContent);assert.equal(actual.subject,payload.subject);assert.equal(actual.notificationContext,undefined);assert.equal(rows.size,0);
 });

@@ -3,7 +3,7 @@ const { randomUUID } = require('crypto');
 // A song, title, goal, or status edit must not change the audience's room.
 function sessionKey(stream) {
   if (!stream?.isLive) return null;
-  return String(stream.webrtcRoomName || stream.broadcastSessionId || '') || null;
+  return String(stream.webrtcRoomName || stream.obsRoomName || stream.broadcastSessionId || '') || null;
 }
 
 function externalBroadcastId(current, next) {

@@ -2,8 +2,9 @@ const mongoose = require('mongoose');
 const { z } = require('zod');
 
 const BRAND = 'Echo Event Entertainment';
-const sample = { recipientName:'Alex', customerName:'Alex Morgan', customerEmail:'alex@example.com', requestId:'ECHO-1042', eventDate:'November 21, 2026', venue:'Toronto', depositAmount:'$250.00', total:'$1,000.00', details:'DJ performance × 1 — $1,000.00', adminNote:'We look forward to your event.', expiresAt:'November 14, 2026 at 5:00 p.m. Eastern', meetingTime:'November 7, 2026 at 2:00 p.m. Eastern', duration:'30 minutes', meetingLocation:'Online meeting', topic:'Event planning', actionUrl:'https://example.com/your-link', brand:BRAND };
+const sample = { recipientName:'Alex', customerName:'Alex Morgan', customerEmail:'alex@example.com', requestId:'ECHO-1042', eventDate:'November 21, 2026', venue:'Toronto', depositAmount:'$250.00', total:'$1,000.00', details:'DJ performance × 1 — $1,000.00', adminNote:'We look forward to your event.', expiresAt:'November 14, 2026 at 5:00 p.m. Eastern', meetingTime:'November 7, 2026 at 2:00 p.m. Eastern', duration:'30 minutes', meetingLocation:'Online meeting', topic:'Event planning', actionUrl:'https://example.com/your-link', brand:BRAND, liveTitle:'Live with DJ Khalil', liveGoal:'DJing in Home Studio' };
 const catalog = [
+  {id:'live-started',label:'Live started',group:'Live streams',when:'When a new live stream starts; once per broadcast',recipient:'All verified members',subject:'We are live: {{liveTitle}}',body:'Hello {{recipientName}},\n\nDJ Khalil is live!\n\n{{liveTitle}}\nLive goal: {{liveGoal}}\n\nWatch now:\n{{actionUrl}}\n\n{{brand}}',variables:['recipientName','liveTitle','liveGoal','actionUrl','brand'],required:['liveTitle','liveGoal','actionUrl']},
   { id:'verify-email',label:'Email verification',group:'Account',when:'When an account is created or verification is requested',recipient:'Account holder',subject:'Verify your email — {{brand}}',body:'Hello {{recipientName}},\n\nWelcome to {{brand}}. Verify your email address using this link:\n{{actionUrl}}',variables:['recipientName','actionUrl','brand'],required:['actionUrl'] },
   { id:'password-reset',label:'Password reset',group:'Account',when:'When the account holder requests a password reset',recipient:'Account holder',subject:'Reset your password — {{brand}}',body:'Hello {{recipientName}},\n\nUse this link within one hour to choose a new password:\n{{actionUrl}}\n\nIf you did not request this, ignore this email.',variables:['recipientName','actionUrl','brand'],required:['actionUrl'] },
   { id:'service-request',label:'New service request',group:'Bookings',when:'When a customer submits a service request',recipient:'Existing admin notification address',subject:'New service request from {{customerName}}',body:'New service request {{requestId}}\n\nCustomer: {{customerName}}\nEmail: {{customerEmail}}\n\n{{details}}\n\nReview the request:\n{{actionUrl}}',variables:['customerName','customerEmail','requestId','details','actionUrl','brand'],required:['requestId','details'] },
@@ -57,7 +58,7 @@ function createNotificationEmails({store=mongoStore}={}){
   async apply(payload){
    const {notificationContext,...email}=payload;
    const event=catalog.find(event=>email.tags?.includes(event.id));if(!event)return email;
-   const saved=await store.get(event.id);if(!saved)return email;
+   const saved=await store.get(event.id) || (event.id==='live-started'?{...event,enabled:true}:null);if(!saved)return email;
    if(!saved.enabled)return null;
    const message=render(saved,{recipientName:email.to?.[0]?.name||'there',...notificationContext});
    return {...email,subject:message.subject,htmlContent:message.html,textContent:message.text};

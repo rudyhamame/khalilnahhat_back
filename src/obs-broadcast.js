@@ -7,7 +7,11 @@ function registerObsBroadcastRoutes(app, deps) {
   const relay = require('./obs-relay-broadcast').createRelayBroadcast(deps);
   const client = Class => { const c = getConfig(); return new Class(c.wsUrl, c.apiKey, c.apiSecret); };
   const filter = row => ({ key: defaults.key, obsRoomName: row.obsRoomName });
-  const change = (row, values, extra = {}) => LiveStreamConfig.findOneAndUpdate({ ...filter(row), ...extra }, values, { new: true });
+  const change = async (row, values, extra = {}) => {
+    const updated=await LiveStreamConfig.findOneAndUpdate({ ...filter(row), ...extra }, values, { new: true });
+    if(updated)await deps.notifyLiveTransition?.(row,updated);
+    return updated;
+  };
   const missing = error => error?.status === 404 || error?.code === 'not_found' || error?.code === 5;
   async function stop(row) {
     if (!row.obsRoomName) return row;

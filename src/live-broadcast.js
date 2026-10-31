@@ -46,6 +46,7 @@ function registerLiveBroadcastRoutes(app, deps) {
           throw error;
         }
       }
+      await deps.notifyLiveTransition?.(current,updated);
       return response.status(201).json({ item: serialize(updated), token, url: config.wsUrl, roomName });
     } catch (error) {
       console.error('WebRTC go-live failed:', error.message);

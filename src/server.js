@@ -3,6 +3,7 @@ require('dotenv').config();
 
 const express = require('express');
 const crypto = require('crypto');
+const { notifyLiveTransition } = require('./live-start-emails');
 const { sessionKey: liveBroadcastSession, externalBroadcastId, requestScope, memberName } = require('./live-interactions');
 const cors = require('cors');
 const multer = require('multer');
@@ -1398,6 +1399,7 @@ app.patch('/api/live-stream', requireAdmin, async (request, response) => {
     { new: true },
   );
   if (!config) return response.status(409).json({ message: 'End the OBS session before changing its source.' });
+  await notifyLiveTransition(previous,config);
 
   return response.json({
     item: serializeLiveStreamConfig(config),
@@ -1779,7 +1781,7 @@ app.post('/api/live-stream/mux', requireAdmin, async (request, response) => {
 });
 
 require('./live-broadcast').registerLiveBroadcastRoutes(app, {
-  requireAdmin, getLiveStreamConfig, LiveStreamConfig, defaults: defaultLiveStreamConfig,
+  requireAdmin, getLiveStreamConfig, LiveStreamConfig, defaults: defaultLiveStreamConfig, notifyLiveTransition,
   createToken: createLiveKitToken, getConfig: getLiveKitConfig,
   serialize: serializeAdminLiveStreamConfig, serializePublic: serializeLiveStreamConfig,
   RoomServiceClient, IngressClient, randomUUID: crypto.randomUUID, prepareRecording: require('./live-recordings').prepareRecordingRoom, ensureRecording: require('./live-recordings').ensureRecording,

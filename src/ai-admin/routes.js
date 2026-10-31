@@ -6,6 +6,7 @@ const {createEchoAdminAgent}=require('./agent');
 const {createEngine}=require('./engine');
 const {createPush}=require('./push');
 const {redact}=require('./redact');
+const {tokenPolicy}=require('./token-policy');
 const publicTask=task=>{const {input,leaseToken,leaseUntil,...value}=task;return redact(value);};
 function registerAiAdministrator(app,{requireAdmin,authorize,configService,env=process.env}){
  const store=createStore(),registry=createRegistry({invoke:createRouteAdapter(app),app});
@@ -17,7 +18,7 @@ function registerAiAdministrator(app,{requireAdmin,authorize,configService,env=p
  const owner=req=>String(req.user._id||req.user.id);
  const owned=async(req)=>{const task=await store.get(req.params.id);if(!task||task.owner!==owner(req))throw failure(404,'Task not found.');return task;};
  const admitted=async who=>{if(await store.Task.countDocuments({owner:who,createdAt:{$gte:new Date(Date.now()-600000)}})>=30)throw failure(429,'Administrator task limit reached. Wait ten minutes.');};
- app.get(base,requireAdmin,guard(async(req,res)=>{const config=await configService.load();return res.json({tasks:(await store.list(owner(req))).map(publicTask),control:await store.control(),capabilities:registry.list(),inventory:registry.inventory(),model:{provider:'openai',model:env.OPENAI_ADMIN_MODEL||(config.chat.provider==='openai'?config.chat.model:env.OPENAI_BOOKING_CHAT_MODEL||'gpt-4o-mini'),configured:!!env.OPENAI_API_KEY},worker:{mode:env.ECHO_ADMIN_WORKER_MODE==='external'?'external':'api-process',sleepWarning:env.RENDER==='true',androidPush:push.configured()},permissions:{identity:owner(req),role:'administrator',permanentDeletion:false,privilegeChanges:false,customerMessages:false}});}));
+ app.get(base,requireAdmin,guard(async(req,res)=>{const config=await configService.load();return res.json({tasks:(await store.list(owner(req))).map(publicTask),control:await store.control(),capabilities:registry.list(),inventory:registry.inventory(),model:{provider:'openai',model:env.OPENAI_ADMIN_MODEL||(config.chat.provider==='openai'?config.chat.model:env.OPENAI_BOOKING_CHAT_MODEL||'gpt-4o-mini'),configured:!!env.OPENAI_API_KEY},worker:{mode:env.ECHO_ADMIN_WORKER_MODE==='external'?'external':'api-process',sleepWarning:env.RENDER==='true',androidPush:push.configured()},context:{scope:'conversation',...tokenPolicy(env)},permissions:{identity:owner(req),role:'administrator',permanentDeletion:false,privilegeChanges:false,customerMessages:false}});}));
  app.get(`${base}/conversations`,requireAdmin,guard(async(req,res)=>res.json({items:redact(await store.conversations(owner(req)))})));
  app.get(`${base}/conversations/:sessionId/messages`,requireAdmin,guard(async(req,res)=>{
   const sessionId=z.string().min(1).max(160).parse(req.params.sessionId);const before=z.uuid().optional().parse(req.query.before);

@@ -1,5 +1,6 @@
 const mongoose=require('mongoose');
 const {randomUUID}=require('node:crypto');
+const {tokenPolicy}=require('./token-policy');
 const taskSchema=new mongoose.Schema({_id:String,owner:{type:String,required:true,index:true},sessionId:String,requestId:String,command:String,source:String,contextInitialized:Boolean,state:{type:String,index:true},input:[mongoose.Schema.Types.Mixed],actions:[mongoose.Schema.Types.Mixed],audit:[mongoose.Schema.Types.Mixed],result:mongoose.Schema.Types.Mixed,error:String,pending:mongoose.Schema.Types.Mixed,cancelRequested:{type:Boolean,default:false},leaseToken:String,leaseUntil:Date,notification:mongoose.Schema.Types.Mixed,pushPublishedVersion:String},{timestamps:true,versionKey:false});
  taskSchema.index({owner:1,sessionId:1,createdAt:-1});taskSchema.index({owner:1,requestId:1},{unique:true});taskSchema.index({state:1,leaseUntil:1,createdAt:1});
 const Task=mongoose.models.EchoAdminTask||mongoose.model('EchoAdminTask',taskSchema);
@@ -8,7 +9,7 @@ function createStore(){const auditCounts=new WeakMap();return {
  async init(){await Promise.all([Task.init(),Control.init()]);},
  async create(value){try{return (await Task.create(value)).toObject();}catch(e){if(e.code!==11000)throw e;return Task.findOne({owner:value.owner,requestId:value.requestId}).lean();}},
  get:id=>Task.findById(id).lean(),
- conversation:(owner,sessionId,task)=>Task.find({owner,sessionId,_id:{$ne:task._id},createdAt:{$lte:task.createdAt}}).sort({createdAt:-1,_id:-1}).limit(12).select('_id command state result error actions').lean(),
+ conversation:(owner,sessionId,task)=>Task.find({owner,sessionId,_id:{$ne:task._id},createdAt:{$lte:task.createdAt}}).sort({createdAt:-1,_id:-1}).limit(tokenPolicy().historyRequests).select('_id command state result error actions').lean(),
  async conversations(owner){return Task.aggregate([{$match:{owner}},{$sort:{createdAt:1,_id:1}},{$group:{_id:{$cond:[{$in:['$sessionId',[null,'']]},'dashboard',{$ifNull:['$sessionId','dashboard']}]},title:{$first:'$command'},createdAt:{$first:'$createdAt'},updatedAt:{$max:'$updatedAt'},lastCommand:{$last:'$command'},state:{$last:'$state'},messageCount:{$sum:1}}},{$sort:{updatedAt:-1}},{$limit:100},{$project:{title:{$substrCP:[{$ifNull:['$title','Untitled chat']},0,100]},createdAt:1,updatedAt:1,state:1,messageCount:1}}]);},
  async messages(owner,sessionId,before){
   const query={owner,sessionId:sessionId==='dashboard'?{$in:[sessionId,null,'']}:sessionId};

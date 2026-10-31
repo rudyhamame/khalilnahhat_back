@@ -3,6 +3,7 @@ require('dotenv').config();
 
 const express = require('express');
 const crypto = require('crypto');
+const { sessionKey: liveBroadcastSession, externalBroadcastId, requestScope, memberName } = require('./live-interactions');
 const cors = require('cors');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
@@ -581,6 +582,7 @@ async function deleteCloudinaryAudio(publicId) {
 
 function serializeLiveRequest(request) {
   return {
+    broadcastSessionId: request.broadcastSessionId || request.broadcastRoomName || '',
     id: request.externalId || request.id,
     requesterName: request.requesterName || 'Audience',
     requesterEmail: request.requesterEmail || '',
@@ -674,6 +676,7 @@ function serializeArchiveItem(item) {
 
 function serializeLiveStreamConfig(config) {
   return {
+    broadcastSessionId: liveBroadcastSession(config),
     isLive: Boolean(config?.isLive),
     title: config?.title || '',
     streamUrl: config?.streamUrl || '',
@@ -766,6 +769,12 @@ async function getLiveStreamConfig() {
     config = await LiveStreamConfig.create(defaultLiveStreamConfig);
   }
 
+  if (config.isLive && !config.webrtcRoomName && !config.broadcastSessionId) {
+    config = await LiveStreamConfig.findOneAndUpdate(
+      { _id: config._id, isLive: true, updatedAt: config.updatedAt, broadcastSessionId: { $in: ['', null] } },
+      { $set: { broadcastSessionId: crypto.randomUUID() } }, { new: true },
+    ) || await LiveStreamConfig.findOne({ key: defaultLiveStreamConfig.key });
+  }
   return config;
 }
 
@@ -1382,9 +1391,10 @@ app.patch('/api/live-stream', requireAdmin, async (request, response) => {
     });
   }
 
+  const previous = await getLiveStreamConfig();
   const config = await LiveStreamConfig.findOneAndUpdate(
     { key: defaultLiveStreamConfig.key, obsRoomName: { $in: ['', null] } },
-    { ...parsed.data, broadcastMode: 'youtube', webrtcRoomName: '' },
+    { ...parsed.data, broadcastMode: 'youtube', webrtcRoomName: '', broadcastSessionId: externalBroadcastId(previous, parsed.data) },
     { new: true },
   );
   if (!config) return response.status(409).json({ message: 'End the OBS session before changing its source.' });
@@ -1547,6 +1557,8 @@ app.post('/api/live-requests/analyze', async (request, response) => {
 
 // Song requests are free; every request waits for Khalil's review before it is used.
 async function createLiveRequest(request, response) {
+  const session = liveBroadcastSession(await getLiveStreamConfig());
+  if (!session || request.body?.session !== session) return response.status(409).json({ message: 'Refresh to request a song for the current live broadcast.' });
   const parsed = liveRequestCheckoutSchema.safeParse(request.body);
 
   if (!parsed.success) {
@@ -1559,8 +1571,10 @@ async function createLiveRequest(request, response) {
   const requestGroupId = createCode('GROUP');
   await LiveRequest.insertMany(parsed.data.requests.map((item) => ({
     externalId: `live-request-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    requesterName: parsed.data.requesterName,
-    requesterEmail: parsed.data.requesterEmail,
+    requesterName: memberName(request.authUser),
+    requesterEmail: request.authUser.email,
+    requesterUserId: String(request.authUser._id),
+    broadcastSessionId: session,
     requestGroupId,
     confirmationCode: createCode('REQ'),
     message: item.message,
@@ -1573,14 +1587,16 @@ async function createLiveRequest(request, response) {
   return response.status(201).json({ message: 'Request sent. Khalil will review it.' });
 }
 
-app.post('/api/live-requests/checkout', createLiveRequest);
-app.post('/api/live-requests', createLiveRequest);
+app.post('/api/live-requests/checkout', requireAuth, createLiveRequest);
+app.post('/api/live-requests', requireAuth, createLiveRequest);
 
-app.get('/api/live-requests/admin', requireAdmin, async (_request, response) => {
-  const requests = await LiveRequest.find({ paymentStatus: { $in: ['paid', 'none'] } }).sort({ createdAt: -1 });
+app.get('/api/live-requests/admin', requireAdmin, async (request, response) => {
+  const session = request.query.broadcast === 'current' ? liveBroadcastSession(await getLiveStreamConfig()) : undefined;
+  if (session === null) return response.json({ session: null, items: [] });
+  const requests = await LiveRequest.find({ paymentStatus: { $in: ['paid', 'none'] }, ...(session ? requestScope(session) : {}) }).sort({ createdAt: -1 });
 
   return response.json({
-    items: requests.map(serializeLiveRequest),
+    session, items: requests.map(serializeLiveRequest),
   });
 });
 
@@ -1952,8 +1968,8 @@ require('./setup-catalog').registerSetupCatalog(app, { requireAdmin });
 require('./availability').registerAvailability(app, { requireAdmin });
 vouchers.registerVouchers(app, { requireAdmin, requireAuth });
 require('./live-recordings').registerLiveRecordings(app, requireAdmin);
-require('./live-suggestions').registerLiveSuggestions(app, { getLiveStreamConfig });
-require('./live-comments').registerLiveComments(app, { getLiveStreamConfig });
+require('./live-suggestions').registerLiveSuggestions(app, { getLiveStreamConfig, requireAuth });
+require('./live-comments').registerLiveComments(app, { getLiveStreamConfig, requireAuth });
 registerEquipmentRoutes(app, requireAdmin);
 require('./equipment-3d').registerEquipment3D(app,{requireAdmin});
 registerPlanning(app, { requireAuth, serialize: serializeServiceRequest });

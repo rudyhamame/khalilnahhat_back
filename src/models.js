@@ -69,6 +69,9 @@ const liveSessionSchema = new mongoose.Schema(
 
 const liveRequestSchema = new mongoose.Schema(
   {
+    broadcastRoomName: { type: String, default: '', index: true },
+    broadcastSessionId: { type: String, default: '', index: true },
+    requesterUserId: { type: String, default: '' },
     externalId: { type: String, required: true, unique: true, trim: true },
     requesterName: { type: String, default: 'Audience', trim: true },
     requesterEmail: { type: String, default: '', trim: true, lowercase: true },
@@ -215,6 +218,7 @@ const bookingSchema = new mongoose.Schema(
 
 const liveStreamConfigSchema = new mongoose.Schema(
   {
+    broadcastSessionId: { type: String, default: '' },
     key: { type: String, required: true, unique: true, trim: true },
     isLive: { type: Boolean, default: false },
     title: { type: String, default: '', trim: true },

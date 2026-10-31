@@ -105,7 +105,6 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
  async function saveVocabulary(input,id,actor){
   const value=V.vocabulary.parse(input);
   return transaction(async session=>{
-   if(value.kind==='dialect'&&!value.parentId)fail('A dialect must reference its parent language.');
    if(value.parentId){if(!['dialect','genre'].includes(value.kind))fail('Only dialects and genres have parents.');await references([value.parentId],value.kind==='dialect'?'language':'genre',session);if(value.parentId===id)fail('An entity cannot be its own parent.');
     let next=value.parentId;const seen=new Set([id]);while(next){if(seen.has(next))fail('Vocabulary hierarchy cannot contain cycles.');seen.add(next);next=(await Vocabulary.findOne({externalId:next}).session(session).lean())?.parentId;}}
    const old=id?await Vocabulary.findOne({externalId:id}).session(session):null;

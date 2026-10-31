@@ -3,6 +3,7 @@ const {z}=require('zod');
 const {failure}=require('./route-adapter');
 const {redact}=require('./redact');
 const {conversationInput}=require('./conversation');
+const {parseToolArguments}=require('./tool-arguments');
 const commandSchema=z.object({command:z.string().trim().min(1).max(8000),requestId:z.uuid(),sessionId:z.string().max(160).default('dashboard')}).strict();
 const audit=(task,type,detail={})=>task.audit.push({at:new Date().toISOString(),type,...redact(detail)});
 // The model's wording is not proof. This server-built section lists only writes that were verified against stored data.
@@ -25,6 +26,14 @@ function createEngine({store,registry,agent,authorize}){
     task.input=conversationInput(rows,task.command);task.contextInitialized=true;
     audit(task,'CONVERSATION_CONTEXT',{previousTasks:task.input.length-1});await store.save(task);
    }
+   // Older tasks could fail while parsing a call, leaving no action and no
+   // receipt. A safe user retry must close that rejected call, never execute it.
+   for(const call of task.input.filter(item=>item.type==='function_call')){
+    if(!task.actions.some(action=>action.callId===call.call_id)&&!task.input.some(item=>item.type==='function_call_output'&&item.call_id===call.call_id)){
+     task.input.push({type:'function_call_output',call_id:call.call_id,output:JSON.stringify({ok:false,code:'INVALID_TOOL_ARGUMENTS',executed:false,error:'This earlier call was rejected before execution. Generate a new call with schema-valid JSON arguments.'})});
+     audit(task,'REJECTED_TOOL_CALL_RECONCILED',{name:call.name,callId:call.call_id});await store.save(task);
+    }
+   }
    // Model outputs and every tool receipt are persisted BEFORE moving to the next step.
    for(let count=0;count<24;count++){
     let action=task.actions.find(item=>!item.delivered);
@@ -33,9 +42,17 @@ function createEngine({store,registry,agent,authorize}){
      const response=await agent.next(task);await checkpoint(task);
      if(response.usage){const usage=response.usage;const count=value=>Number.isSafeInteger(value)&&value>=0?value:0;audit(task,'MODEL_USAGE',{inputTokens:count(usage.input_tokens),cachedInputTokens:count(usage.input_tokens_details?.cached_tokens),outputTokens:count(usage.output_tokens)});}
      if(!response.calls.length){task.result={message:`${response.text||'No administrative action was requested.'}${groundTruth(task,registry)}`,verifiedActions:task.actions.filter(a=>a.state==='VERIFIED').length,model:response.model,provider:response.provider||'openai',usage:task.audit.filter(event=>event.type==='MODEL_USAGE').reduce((total,event)=>({calls:total.calls+1,inputTokens:total.inputTokens+event.inputTokens,cachedInputTokens:total.cachedInputTokens+event.cachedInputTokens,outputTokens:total.outputTokens+event.outputTokens}),{calls:0,inputTokens:0,cachedInputTokens:0,outputTokens:0})};task.state=task.actions.some(a=>a.state==='FAILED')?'FAILED':'COMPLETED';audit(task,task.state);await store.save(task);return;}
-     task.input.push(...redact(response.output));
-     const call=response.calls[0];if(!call.call_id||task.actions.some(item=>item.callId===call.call_id))throw failure(409,'The model repeated a tool-call identity. No duplicate operation was executed.');let args;
-     try{const wrapped=JSON.parse(call.arguments);args=JSON.parse(wrapped.arguments_json);}catch{throw failure(400,'The model returned invalid tool arguments.');}
+     const call=response.calls[0];if(!call.call_id||task.input.some(item=>item.type==='function_call'&&item.call_id===call.call_id))throw failure(409,'The model repeated a tool-call identity. No duplicate operation was executed.');
+     task.input.push(...redact(response.output));let args;
+     try{args=parseToolArguments(call.arguments,registry.get(call.name));}catch(error){
+      // Validation happens before planning or writing. Feed back a bounded,
+      // structured error; only the model can submit a corrected new call.
+      const message=String(error.message||'Invalid tool input.').slice(0,1200);
+      task.input.push({type:'function_call_output',call_id:call.call_id,output:JSON.stringify({ok:false,code:'INVALID_TOOL_ARGUMENTS',executed:false,error:message,instruction:'Return a NEW tool call. Use exactly {"arguments_json":"..."}, where the string contains a valid JSON OBJECT matching the tool input schema. No Markdown, missing required fields, or invented identities. No operation from this rejected call was executed.'})});
+      audit(task,'TOOL_ARGUMENTS_REJECTED',{name:call.name,callId:call.call_id,error:message});await store.save(task);
+      if(task.audit.filter(event=>event.type==='TOOL_ARGUMENTS_REJECTED').length>=3)throw failure(422,'The model could not produce valid tool arguments after two correction attempts. The rejected calls did not execute. Review the request and action timeline before retrying.');
+      continue;
+     }
      action={id:randomUUID(),callId:call.call_id,name:call.name,args:redact(args),state:'PLANNED',createdAt:new Date().toISOString()};task.actions.push(action);audit(task,'TOOL_PLANNED',{name:action.name,actionId:action.id});await store.save(task);
     }
     const entry=registry.get(action.name);let actor=await checkpoint(task);

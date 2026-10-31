@@ -6,7 +6,6 @@ const {ownedAsset,deliveryUrl}=require('./music-archive');
 const MAX_BYTES=25*1024*1024;
 const audioLanguageDefinitions=require('../contracts/audio-languages.json');
 const languageCode=value=>{const text=String(value||'').toLowerCase();return audioLanguageDefinitions.find(([code,name])=>code===text||name.split(' · ')[0].toLowerCase()===text)?.[0];};
-const languages=new Set(['ar','en','fr','es','de','it','pt','tr','fa','ur','hi','ru','uk','el','he','nl','pl','zh','ja','ko']);
 const ALIBABA_BASE='https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
 // Qwen-ASR takes one base64 data URL (10 MB limit incl. encoding, about 5 minutes of audio) and returns plain text without timestamps.
 const ALIBABA_MAX_BYTES=7*1024*1024;
@@ -45,7 +44,7 @@ function registerLyricsTranscription(app,{requireAdmin,configService,fetchImpl=f
    if(!req.file&&!sourceAudioUrl)return res.status(400).json({message:'Choose an audio file or upload the recording audio first.'});
    if(timed&&!sourceAudioUrl)return res.status(400).json({message:'Timed lyrics must use the recording’s uploaded audio so they match playback.'});
    const language=req.body?.language||'';
-   if(typeof language!=='string'||language&&!languages.has(language))return res.status(400).json({message:'Choose a supported language or automatic detection.'});
+   if(typeof language!=='string'||language&&!/^[a-z]{2,3}$/.test(language))return res.status(400).json({message:'Choose a supported language or automatic detection.'});
    if(active.has(owner))return res.status(409).json({message:'A transcription is already running. Wait for it to finish.'});
    const now=Date.now(),windowMs=10*60*1000;
    for(const [id,times] of requests)if(!times.some(time=>now-time<windowMs))requests.delete(id);

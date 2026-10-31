@@ -4,6 +4,7 @@ const {ArchiveItem}=require('../models');
 const contract=require('../../contracts/music-ontology.json');
 function registerMusicOntology(app,{requireAdmin,service=createService()}={}){
  const admin='/api/admin/music-ontology',pub='/api/music-ontology';
+ const elements=require('./work-elements').createWorkElements(service);
  const wrap=fn=>async(req,res)=>{try{await fn(req,res);}catch(e){const status=e instanceof z.ZodError?400:e.code===11000?409:e.status||500;res.status(status).json({message:e instanceof z.ZodError?e.issues[0].message:e.code===11000?'This metadata identity already exists. Select the existing entity.':status<500?e.message:'The music archive could not complete this request.',...(e.status===503?{message:e.message}:{})});if(status>=500)console.error('Music ontology:',e.name,e.code||'');}};
  const entity=r=>({...r,id:r.externalId,_id:undefined});
  const actor=req=>String(req.user?.externalId||req.user?._id||req.user?.id||'admin');
@@ -15,10 +16,15 @@ function registerMusicOntology(app,{requireAdmin,service=createService()}={}){
   app.get(`${prefix}/recordings/:id`,...guards,wrap(async(req,res)=>{const item=(await service.list(isAdmin)).find(r=>r.id===req.params.id);if(!item)return res.status(404).json({message:'Recording not found.'});res.set('Cache-Control','no-store').json({item});}));
   app.get(`${prefix}/works`,...guards,wrap(async(_req,res)=>{const ids=isAdmin?(await service.models.Work.find().lean()).map(w=>w.externalId):[...new Set((await service.list(false)).flatMap(r=>r.componentWorkIds||[r.workId]).filter(Boolean))];res.set('Cache-Control','no-store').json({items:[...(await service.workMap(ids)).works.values()]});}));
   app.get(`${prefix}/works/:id`,...guards,wrap(async(req,res)=>{if(!isAdmin&&!(await service.list(false)).some(r=>r.workId===req.params.id||r.componentWorkIds?.includes(req.params.id)))return res.status(404).json({message:'Work not found.'});const item=(await service.workMap([req.params.id])).works.get(req.params.id);if(!item)return res.status(404).json({message:'Work not found.'});res.json({item});}));
-  app.get(`${prefix}/vocabulary`,...guards,wrap(async(req,res)=>{const query={};if(req.query.kind){query.kind=z.enum(contract.vocabularyKinds).parse(req.query.kind);}let rows=await service.models.Vocabulary.find(query).sort({name:1}).lean();if(req.query.q){const q=String(req.query.q).toLowerCase().slice(0,240);rows=rows.filter(r=>r.name.toLowerCase().includes(q));}res.set('Cache-Control','no-store').json({items:rows.map(entity)});}));
+  app.get(`${prefix}/vocabulary`,...guards,wrap(async(req,res)=>{const query={archived:{$ne:true}};if(req.query.kind){query.kind=z.enum(contract.vocabularyKinds).parse(req.query.kind);}let rows=await service.models.Vocabulary.find(query).sort({name:1}).lean();if(req.query.q){const q=String(req.query.q).toLowerCase().slice(0,240);rows=rows.filter(r=>r.name.toLowerCase().includes(q));}res.set('Cache-Control','no-store').json({items:rows.map(entity)});}));
   app.get(`${prefix}/work-types`,...guards,wrap(async(_req,res)=>res.set('Cache-Control','no-store').json({items:await service.listWorkTypes()})));
   app.get(`${prefix}/vocabulary/:id`,...guards,wrap(async(req,res)=>{const item=await service.models.Vocabulary.findOne({externalId:req.params.id}).lean();if(!item)return res.status(404).json({message:'Metadata entity not found.'});res.json({item:entity(item)});}));
  }
+ app.get(`${admin}/work-elements`,requireAdmin,wrap(async(_req,res)=>res.set('Cache-Control','no-store').json({items:await elements.list()})));
+ app.post(`${admin}/work-elements/initialize`,requireAdmin,wrap(async(_req,res)=>{await elements.initialize();res.json({items:await elements.list()});}));
+ app.post(`${admin}/work-elements/:key/options`,requireAdmin,wrap(async(req,res)=>{await elements.save(req.params.key,req.body,null,actor(req));res.status(201).json({items:await elements.list()});}));
+ app.put(`${admin}/work-elements/:key/options/:id`,requireAdmin,wrap(async(req,res)=>{await elements.save(req.params.key,req.body,req.params.id,actor(req));res.json({items:await elements.list()});}));
+ app.delete(`${admin}/work-elements/:key/options/:id`,requireAdmin,wrap(async(req,res)=>{const {revision}=z.object({revision:z.number().int().positive()}).strict().parse(req.body);await elements.remove(req.params.key,req.params.id,revision);res.json({items:await elements.list()});}));
  app.post(`${admin}/vocabulary`,requireAdmin,wrap(async(req,res)=>res.status(201).json({item:entity(await service.saveVocabulary(req.body,null,actor(req)))})));
  app.put(`${admin}/vocabulary/:id`,requireAdmin,wrap(async(req,res)=>res.json({item:entity(await service.saveVocabulary(req.body,req.params.id,actor(req)))})));
  app.post(`${admin}/work-types`,requireAdmin,wrap(async(req,res)=>res.status(201).json({item:await service.saveWorkType(req.body)})));

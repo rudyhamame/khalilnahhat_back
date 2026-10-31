@@ -137,8 +137,9 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
       const definitions=new Map(require('../../contracts/audio-languages.json'));
       l.languageIds=[];
       for(const code of [...new Set(l.audioLanguageCodes)]){
-       const name=definitions.get(code).split(' · ')[0];
-       let ref=await Vocabulary.findOne({kind:'language',$or:[{isoCode:code},{normalizedName:norm(name)}]}).session(session);
+       const name=definitions.get(code)?.split(' · ')[0];
+       let ref=await Vocabulary.findOne({kind:'language',$or:[{isoCode:code},...(name?[{normalizedName:norm(name)}]:[])]}).session(session);
+       if(!ref&&!name)fail('Add this language and its ISO code in Work Elements first.');
        if(!ref)ref=(await Vocabulary.create([{externalId:makeId('language'),kind:'language',name,normalizedName:norm(name),isoCode:code,parentId:'',revision:1}],{session}))[0];
        else if(!ref.isoCode){ref.isoCode=code;await ref.save({session});}
        l.languageIds.push(ref.externalId);
@@ -205,7 +206,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
   const mapped=works.map(w=>{
    const m=mm.get(w.melodyId),l=lm.get(w.lyricsId);
    const languageRows=[...new Set([l?.languageId,...(l?.languageIds||[])].filter(Boolean))].map(id=>entity('language',id)).filter(Boolean);
-   const audioCodes=languageRows.map(row=>require('../../contracts/audio-languages.json').find(([code,name])=>code===row.isoCode||norm(name.split(' · ')[0])===norm(row.name))?.[0]);
+   const audioCodes=languageRows.map(row=>row.isoCode||require('../../contracts/audio-languages.json').find(([,name])=>norm(name.split(' · ')[0])===norm(row.name))?.[0]);
    return [w.externalId,{...w,id:w.externalId,_id:undefined,workKindDefinition:workTypeMap.get(w.workKind)||null,credits:creditNames(w.credits||[],vs),melody:m?{...m,id:m.externalId,_id:undefined,rhythm:entity('rhythm',m.rhythmId),genres:(m.genreIds||[]).map(id=>entity('genre',id)).filter(Boolean),instruments:(m.instrumentIds||[]).map(id=>entity('instrument',id)).filter(Boolean),musicianCredits:creditNames(m.musicianCredits||[],vs)}:null,lyrics:w.type==='SONG'&&l?{...l,id:l.externalId,_id:undefined,language:entity('language',l.languageId),languages:languageRows,audioLanguageCodes:audioCodes.every(Boolean)?audioCodes:undefined,dialect:entity('dialect',l.dialectId),regions:(l.regionIds||[]).map(id=>entity('region',id)).filter(Boolean),primaryConcept:entity('concept',l.primaryConceptId),concepts:(l.conceptIds||[]).map(id=>entity('concept',id)).filter(Boolean),artistCredits:creditNames(l.artistCredits||[],vs)}:null}];
   });return {works:new Map(mapped),vocabulary:vs,workTypes:workTypeMap};
  }

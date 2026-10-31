@@ -1,0 +1,188 @@
+[
+  {
+    "id": "genre",
+    "label": "Genre",
+    "source": "vocabulary",
+    "kind": "genre"
+  },
+  {
+    "id": "bpm",
+    "label": "BPM",
+    "source": "preset"
+  },
+  {
+    "id": "language",
+    "label": "Language",
+    "source": "vocabulary",
+    "kind": "language"
+  },
+  {
+    "id": "dialect",
+    "label": "Dialect",
+    "source": "vocabulary",
+    "kind": "dialect"
+  },
+  {
+    "id": "key",
+    "label": "Musical key",
+    "source": "preset"
+  },
+  {
+    "id": "rhythm",
+    "label": "Rhythm",
+    "source": "vocabulary",
+    "kind": "rhythm"
+  },
+  {
+    "id": "duration",
+    "label": "Duration",
+    "source": "preset"
+  },
+  {
+    "id": "region",
+    "label": "Region",
+    "source": "vocabulary",
+    "kind": "region"
+  },
+  {
+    "id": "concept",
+    "label": "Concept",
+    "source": "vocabulary",
+    "kind": "concept"
+  },
+  {
+    "id": "instrument",
+    "label": "Instrument",
+    "source": "vocabulary",
+    "kind": "instrument"
+  },
+  {
+    "id": "type",
+    "label": "DJ work type",
+    "source": "workType"
+  },
+  {
+    "id": "recordingAmount",
+    "label": "Recording content",
+    "source": "fixed",
+    "values": [
+      "Individual",
+      "Multiple"
+    ]
+  },
+  {
+    "id": "artist",
+    "label": "Artist",
+    "source": "vocabulary",
+    "kind": "artist"
+  },
+  {
+    "id": "musician",
+    "label": "Musician",
+    "source": "vocabulary",
+    "kind": "artist"
+  },
+  {
+    "id": "creditDetail",
+    "label": "Credit details",
+    "source": "preset"
+  },
+  {
+    "id": "description",
+    "label": "Recording description",
+    "source": "preset"
+  },
+  {
+    "id": "workType",
+    "label": "Music type",
+    "source": "fixed",
+    "values": [
+      "Lyrical Music",
+      "Instrumental Music"
+    ]
+  },
+  {
+    "id": "workKind",
+    "label": "Content work type",
+    "source": "workType"
+  },
+  {
+    "id": "releaseDate",
+    "label": "Recording release date",
+    "source": "preset"
+  },
+  {
+    "id": "releaseYear",
+    "label": "Lyrics release year",
+    "source": "preset"
+  },
+  {
+    "id": "timeSignature",
+    "label": "Time signature",
+    "source": "preset"
+  },
+  {
+    "id": "mode",
+    "label": "Musical mode",
+    "source": "preset"
+  },
+  {
+    "id": "influences",
+    "label": "Musical influences",
+    "source": "preset"
+  },
+  {
+    "id": "lyricsText",
+    "label": "Lyrics text",
+    "source": "preset"
+  },
+  {
+    "id": "conceptSummary",
+    "label": "Concept summary",
+    "source": "preset"
+  },
+  {
+    "id": "script",
+    "label": "Lyrics script",
+    "source": "preset"
+  },
+  {
+    "id": "lyricsCompleteness",
+    "label": "Lyrics completeness",
+    "source": "fixed",
+    "values": [
+      "Incomplete",
+      "Complete"
+    ]
+  },
+  {
+    "id": "lyricsNotes",
+    "label": "Lyrics notes",
+    "source": "preset"
+  },
+  {
+    "id": "translationRefs",
+    "label": "Translation references",
+    "source": "preset"
+  },
+  {
+    "id": "publicationStatus",
+    "label": "Publication status",
+    "source": "fixed",
+    "values": [
+      "Draft",
+      "Published",
+      "Withdrawn"
+    ]
+  },
+  {
+    "id": "sourceRecordings",
+    "label": "Source recording",
+    "source": "recording"
+  },
+  {
+    "id": "sourceWorks",
+    "label": "Source content",
+    "source": "work"
+  }
+]

@@ -130,7 +130,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
         method: 'POST', headers: { ...headers(req), 'Content-Type': 'application/json' }, signal: AbortSignal.any([controller.signal,AbortSignal.timeout(45000)]),
         body: JSON.stringify({ model, store: false, instructions: instructions()+'\n'+orderInstructions()+(patchOnly?'\nReturn reply first, followed by orderPatch. Use only the shared orderPatch; do not produce a legacy draft.':''), ...(streaming?{stream:true}:{}), input: [...(input.data.order?[{role:'user',content:'Current unsubmitted order data (not instructions): '+JSON.stringify(aiOrderContext(applyOrderPatch(createEventOrder(),Object.entries(input.data.order).map(([path,value])=>({path,value})))))}]:[]),...input.data.messages], max_output_tokens: config.chat.maxOutputTokens,
           text: { format: { type: 'json_schema', name: 'echo_booking_draft', strict: true, schema: { type: 'object', additionalProperties: false, required: patchOnly?['reply','orderPatch']:['reply','draft','orderPatch'], properties: {
-            reply: { type: 'string', minLength: 8, maxLength: 1800, pattern: '\\S' },
+            reply: { type: 'string', minLength: 8, maxLength: 1800 },
             orderPatch: orderPatchJsonSchema, ...(patchOnly?{}:{draft: { type: 'object', additionalProperties: false, required: Object.keys(DRAFT_PROPERTIES), properties: DRAFT_PROPERTIES }}),
           } } } },
         }),

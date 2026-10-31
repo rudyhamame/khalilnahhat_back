@@ -169,6 +169,10 @@ test('OpenRouter free chat preserves validated order patches and never calls pai
   if(url.endsWith('/models'))return Response.json({data:[]});
   assert.equal(url,'https://openrouter.ai/api/v1/chat/completions');const body=JSON.parse(options.body);
   assert.equal(body.model,'openrouter/free');assert.deepEqual(body.provider.max_price,{prompt:0,completion:0,request:0});assert.equal(body.provider.require_parameters,true);assert.equal(body.response_format.json_schema.strict,true);
+  // Some constrained decoders treat JSON Schema patterns as full matches;
+  // a bare \\S constrains the reply to one character. Use length constraints.
+  assert.equal(body.response_format.json_schema.schema.properties.reply.pattern,undefined);
+  assert.equal(body.response_format.json_schema.schema.properties.reply.minLength,8);
   assert.doesNotMatch(JSON.stringify(body.messages),/private@example.invalid/);
   return Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify({reply:'What date would you like?',orderPatch:[{path:'event.type',value:'wedding'},{path:'customer.email',value:'private@example.invalid'}]})}}],usage:{prompt_tokens:100,completion_tokens:20}});
  }});

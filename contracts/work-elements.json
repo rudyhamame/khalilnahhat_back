@@ -29,12 +29,6 @@
     "kind": "rhythm"
   },
   {
-    "id": "region",
-    "label": "Region",
-    "source": "vocabulary",
-    "kind": "region"
-  },
-  {
     "id": "concept",
     "label": "Concept",
     "source": "vocabulary",
@@ -47,11 +41,6 @@
     "kind": "instrument"
   },
   {
-    "id": "type",
-    "label": "DJ work type",
-    "source": "workType"
-  },
-  {
     "id": "artist",
     "label": "Vocalist",
     "source": "vocabulary",
@@ -62,16 +51,6 @@
     "label": "Musician",
     "source": "vocabulary",
     "kind": "musician"
-  },
-  {
-    "id": "workKind",
-    "label": "Content work type",
-    "source": "workType"
-  },
-  {
-    "id": "timeSignature",
-    "label": "Time signature",
-    "source": "preset"
   },
   {
     "id": "influences",

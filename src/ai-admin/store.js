@@ -1,7 +1,7 @@
 const mongoose=require('mongoose');
 const {randomUUID}=require('node:crypto');
 const {tokenPolicy}=require('./token-policy');
-const taskSchema=new mongoose.Schema({_id:String,owner:{type:String,required:true,index:true},sessionId:String,requestId:String,command:String,source:String,contextInitialized:Boolean,state:{type:String,index:true},input:[mongoose.Schema.Types.Mixed],actions:[mongoose.Schema.Types.Mixed],audit:[mongoose.Schema.Types.Mixed],result:mongoose.Schema.Types.Mixed,error:String,pending:mongoose.Schema.Types.Mixed,cancelRequested:{type:Boolean,default:false},leaseToken:String,leaseUntil:Date,notification:mongoose.Schema.Types.Mixed,pushPublishedVersion:String},{timestamps:true,versionKey:false});
+const taskSchema=new mongoose.Schema({_id:String,owner:{type:String,required:true,index:true},sessionId:String,requestId:String,command:String,source:String,contextInitialized:Boolean,state:{type:String,index:true},input:[mongoose.Schema.Types.Mixed],actions:[mongoose.Schema.Types.Mixed],audit:[mongoose.Schema.Types.Mixed],result:mongoose.Schema.Types.Mixed,error:String,pending:mongoose.Schema.Types.Mixed,cancelRequested:{type:Boolean,default:false},leaseToken:String,leaseUntil:Date,notification:mongoose.Schema.Types.Mixed,pushPublishedVersion:String,hidden:{type:Boolean,default:false}},{timestamps:true,versionKey:false});
  taskSchema.index({owner:1,sessionId:1,createdAt:-1});taskSchema.index({owner:1,requestId:1},{unique:true});taskSchema.index({state:1,leaseUntil:1,createdAt:1});
 const Task=mongoose.models.EchoAdminTask||mongoose.model('EchoAdminTask',taskSchema);
 const Control=mongoose.models.EchoAdminControl||mongoose.model('EchoAdminControl',new mongoose.Schema({_id:String,paused:{type:Boolean,default:false},updatedBy:String,leaseToken:String,leaseUntil:Date},{timestamps:true}));
@@ -9,10 +9,16 @@ function createStore(){const auditCounts=new WeakMap();return {
  async init(){await Promise.all([Task.init(),Control.init()]);},
  async create(value){try{return (await Task.create(value)).toObject();}catch(e){if(e.code!==11000)throw e;return Task.findOne({owner:value.owner,requestId:value.requestId}).lean();}},
  get:id=>Task.findById(id).lean(),
- conversation:(owner,sessionId,task)=>Task.find({owner,sessionId,_id:{$ne:task._id},createdAt:{$lte:task.createdAt}}).sort({createdAt:-1,_id:-1}).limit(tokenPolicy().historyRequests).select('_id command state result error actions').lean(),
- async conversations(owner){return Task.aggregate([{$match:{owner}},{$sort:{createdAt:1,_id:1}},{$group:{_id:{$cond:[{$in:['$sessionId',[null,'']]},'dashboard',{$ifNull:['$sessionId','dashboard']}]},title:{$first:'$command'},createdAt:{$first:'$createdAt'},updatedAt:{$max:'$updatedAt'},lastCommand:{$last:'$command'},state:{$last:'$state'},messageCount:{$sum:1}}},{$sort:{updatedAt:-1}},{$limit:100},{$project:{title:{$substrCP:[{$ifNull:['$title','Untitled chat']},0,100]},createdAt:1,updatedAt:1,state:1,messageCount:1}}]);},
+ conversation:(owner,sessionId,task)=>Task.find({owner,sessionId,hidden:{$ne:true},_id:{$ne:task._id},createdAt:{$lte:task.createdAt}}).sort({createdAt:-1,_id:-1}).limit(tokenPolicy().historyRequests).select('_id command state result error actions').lean(),
+ async conversations(owner){return Task.aggregate([{$match:{owner,hidden:{$ne:true}}},{$sort:{createdAt:1,_id:1}},{$group:{_id:{$cond:[{$in:['$sessionId',[null,'']]},'dashboard',{$ifNull:['$sessionId','dashboard']}]},title:{$first:'$command'},createdAt:{$first:'$createdAt'},updatedAt:{$max:'$updatedAt'},lastCommand:{$last:'$command'},state:{$last:'$state'},messageCount:{$sum:1}}},{$sort:{updatedAt:-1}},{$limit:100},{$project:{title:{$substrCP:[{$ifNull:['$title','Untitled chat']},0,100]},createdAt:1,updatedAt:1,state:1,messageCount:1}}]);},
+ // A deleted chat is hidden, not erased: its tasks keep their audit trail. Refused while the chat still has work in flight.
+ async hideConversation(owner,sessionId){
+  const match={owner,hidden:{$ne:true},sessionId:sessionId==='dashboard'?{$in:[sessionId,null,'']}:sessionId};
+  if(await Task.exists({...match,state:{$in:['QUEUED','RUNNING','AWAITING_APPROVAL']}}))return {busy:true};
+  return {hidden:(await Task.updateMany(match,{$set:{hidden:true}})).modifiedCount};
+ },
  async messages(owner,sessionId,before){
-  const query={owner,sessionId:sessionId==='dashboard'?{$in:[sessionId,null,'']}:sessionId};
+  const query={owner,hidden:{$ne:true},sessionId:sessionId==='dashboard'?{$in:[sessionId,null,'']}:sessionId};
   if(before){const anchor=await Task.findOne({...query,_id:before}).select('createdAt').lean();if(!anchor)return null;query.$or=[{createdAt:{$lt:anchor.createdAt}},{createdAt:anchor.createdAt,_id:{$lt:anchor._id}}];}
   const rows=await Task.find(query).sort({createdAt:-1,_id:-1}).limit(31).select('sessionId requestId command state result error pending actions.id actions.name actions.state actions.error cancelRequested createdAt updatedAt').lean();
   const hasMore=rows.length>30;return {items:rows.slice(0,30).reverse(),hasMore};

@@ -30,6 +30,11 @@ function registerAiAdministrator(app,{requireAdmin,authorize,configService,env=p
   const result=await store.messages(owner(req),sessionId,before);if(!result)throw failure(404,'Conversation page not found.');
   res.json({...result,items:result.items.map(publicTask),nextBefore:result.hasMore?result.items[0]?._id:null});
  }));
+ app.delete(`${base}/conversations/:sessionId`,requireAdmin,guard(async(req,res)=>{
+  const sessionId=z.string().min(1).max(160).parse(req.params.sessionId);
+  const result=await store.hideConversation(owner(req),sessionId);if(result.busy)throw failure(409,'This chat still has a running or waiting request. Cancel it first.');
+  res.json({deleted:true,count:result.hidden});
+ }));
  app.post(`${base}/tasks`,requireAdmin,guard(async(req,res)=>{if(!(await adminServices.load()).text.enabled)throw failure(503,'Administrator Text is disabled in ECHO AI Configuration.');await admitted(owner(req));res.status(202).json({item:publicTask(await engine.submit(owner(req),req.body,req.get('x-echo-client')==='android'?'android':'dashboard'))});}));
  app.get(`${base}/tasks/:id`,requireAdmin,guard(async(req,res)=>res.json({item:publicTask(await owned(req))})));
  app.post(`${base}/tasks/:id/approve`,requireAdmin,guard(async(req,res)=>{await owned(req);const {digest}=z.object({digest:z.string().regex(/^[a-f0-9]{64}$/)}).strict().parse(req.body);res.json({item:publicTask(await engine.approve(req.params.id,owner(req),digest))});}));

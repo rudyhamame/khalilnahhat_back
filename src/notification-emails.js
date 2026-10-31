@@ -13,7 +13,7 @@ const catalog = [
   ...['confirmed','cancelled','rescheduled'].flatMap(state=>['customer','admin'].map(audience=>({id:`meeting-${state}${audience==='admin'?'-admin':''}`,label:`Meeting ${state} · ${audience}`,group:'Meetings',when:`When a meeting is ${state}`,recipient:audience==='admin'?'Existing admin notification address':'Meeting attendee',subject:`Meeting ${state} — {{meetingTime}}`,body:`Hello {{recipientName}},\n\nThe meeting for {{customerName}} has been ${state}.\n\n{{meetingTime}}\nDuration: {{duration}}\n{{meetingLocation}}\nTopic: {{topic}}\n\n{{brand}}`,variables:['recipientName','customerName','meetingTime','duration','meetingLocation','topic','brand'],required:['meetingTime']}))),
   {id:'meeting-reminder',label:'Meeting reminder',group:'Meetings',when:'Before a booked meeting starts',recipient:'Meeting attendee',leadHours:24,subject:'Meeting reminder — {{meetingTime}}',body:'Hello {{recipientName}},\n\nYour meeting is {{meetingTime}}.\nDuration: {{duration}}\n{{meetingLocation}}\n\n{{brand}}',variables:['recipientName','meetingTime','duration','meetingLocation','brand'],required:['meetingTime']},
 ];
-const EmailRule = mongoose.models.NotificationEmailRule || mongoose.model('NotificationEmailRule',new mongoose.Schema({ _id:String,revision:{type:Number,default:1},enabled:Boolean,subject:String,body:String,leadHours:{type:Number,default:null},updatedBy:String },{timestamps:true}));
+const EmailRule = mongoose.models.NotificationEmailRule || mongoose.model('NotificationEmailRule',new mongoose.Schema({ _id:String,revision:{type:Number,default:1},enabled:Boolean,subject:String,body:String,imageUrl:{type:String,default:''},leadHours:{type:Number,default:null},updatedBy:String },{timestamps:true}));
 const mongoStore = {
   list:()=>EmailRule.find().lean(),
   get:id=>EmailRule.findById(id).lean(),
@@ -28,7 +28,7 @@ const fail=(status,message)=>Object.assign(new Error(message),{status});
 function definition(id){const item=catalog.find(item=>item.id===id);if(!item)throw fail(404,'Email notification not found.');return item;}
 function validate(id,value){
  const event=definition(id);
- const parsed=z.object({revision:z.number().int().min(0),enabled:z.boolean(),subject:z.string().trim().min(1).max(200).refine(v=>!/[\r\n]/.test(v),'Use a single-line subject.'),body:z.string().trim().min(1).max(12000),leadHours:z.number().finite().min(.25).max(720).nullable()}).strict().safeParse(value);
+ const parsed=z.object({revision:z.number().int().min(0),enabled:z.boolean(),subject:z.string().trim().min(1).max(200).refine(v=>!/[\r\n]/.test(v),'Use a single-line subject.'),body:z.string().trim().min(1).max(12000),imageUrl:z.string().max(2048).refine(value=>{if(!value)return true;try{const url=new URL(value);return url.protocol==='https:'&&!url.username&&!url.password;}catch{return false;}},'Choose a valid HTTPS gallery photo.').optional().default(''),leadHours:z.number().finite().min(.25).max(720).nullable()}).strict().safeParse(value);
  if(!parsed.success)throw fail(400,parsed.error.issues[0]?.message||'Check the email settings.');
  const rule=parsed.data;
  if((event.leadHours==null)!==(rule.leadHours==null))throw fail(400,'Only reminder emails have a lead time.');
@@ -42,10 +42,13 @@ function render(rule,context={}){
  const values={brand:BRAND,...context};
  const subject=interpolate(rule.subject,values).replace(/[\r\n]+/g,' ').slice(0,300);
  const text=interpolate(rule.body,values);
- return {subject,text,html:`<!doctype html><html><body style="margin:0;background:#f5f5f4;font-family:Arial,sans-serif;color:#202124"><div style="max-width:640px;margin:auto;padding:32px 24px"><p style="font-size:12px;color:#68716e">${BRAND}</p><div style="white-space:pre-wrap;line-height:1.7">${escapeHtml(text).replace(/https?:\/\/[^\s<>]+/g,url=>`<a href="${url}">${url}</a>`)}</div></div></body></html>`};
+ const imageUrl=rule.imageUrl||'';
+ const content=escapeHtml(text).replace(/https?:\/\/[^\s<>]+/g,url=>`<a href="${url}">${url}</a>`);
+ const layout=imageUrl?`<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td valign="top" style="white-space:pre-wrap;line-height:1.7;overflow-wrap:anywhere">${content}</td><td width="200" valign="top" style="padding-left:24px"><img src="${escapeHtml(imageUrl)}" alt="" width="200" style="display:block;width:200px;max-width:100%;height:auto;border-radius:8px"></td></tr></table>`:`<div style="white-space:pre-wrap;line-height:1.7">${content}</div>`;
+ return {subject,text,imageUrl,html:`<!doctype html><html><body style="margin:0;background:#f5f5f4;font-family:Arial,sans-serif;color:#202124"><div style="max-width:640px;margin:auto;padding:32px 24px"><p style="font-size:12px;color:#68716e">${BRAND}</p>${layout}</div></body></html>`};
 }
 function createNotificationEmails({store=mongoStore}={}){
- const merged=(event,saved)=>({...event,enabled:true,revision:0,leadHours:event.leadHours??null,...(saved?{enabled:saved.enabled,revision:saved.revision,subject:saved.subject,body:saved.body,leadHours:saved.leadHours??null}:{}),customized:Boolean(saved),sample});
+ const merged=(event,saved)=>({...event,enabled:true,revision:0,imageUrl:'',leadHours:event.leadHours??null,...(saved?{enabled:saved.enabled,revision:saved.revision,subject:saved.subject,body:saved.body,imageUrl:saved.imageUrl||'',leadHours:saved.leadHours??null}:{}),customized:Boolean(saved),sample});
  return {
   async list(){const rows=await store.list();return catalog.map(event=>merged(event,rows.find(row=>String(row._id)===event.id)));},
   async get(id){return merged(definition(id),await store.get(id));},

@@ -6,11 +6,6 @@
     "kind": "genre"
   },
   {
-    "id": "bpm",
-    "label": "BPM",
-    "source": "preset"
-  },
-  {
     "id": "language",
     "label": "Language",
     "source": "vocabulary",

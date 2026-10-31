@@ -159,7 +159,8 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
       if(streaming){emit({type:'complete',...result});return res.end();}return res.json(result);
     } catch (error) {
       console.warn('AI booking reply failed', JSON.stringify({ stage, error: error.name, fields: error.issues?.map(issue => ({ path: issue.path.join('.'), code: issue.code })) }));
-      const failure={code:'ai_reply_incomplete',message:'Could not complete the AI reply. Your request has not been submitted.'};
+      const poeFormatFailure=config.chat.provider==='poe'&&['provider_json','reply_json','draft_validation'].includes(stage);
+      const failure={code:'ai_reply_incomplete',message:poeFormatFailure?`Poe model ${model} could not return a usable booking reply. Your request has not been submitted. Choose another Poe model and try again.`:'Could not complete the AI reply. Your request has not been submitted.'};
       if(res.headersSent){emit({type:'error',...failure});return res.end();}
       if(!res.destroyed)return res.status([400,402,409,503].includes(error.status)?error.status:502).json({...failure,...(error.status?{message:error.message}:{})});
     }

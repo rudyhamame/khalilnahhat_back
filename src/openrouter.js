@@ -3,8 +3,12 @@ const {createOllama}=require('./ollama');
 const failure=(status,message)=>Object.assign(new Error(message),{status});
 const router={id:'openrouter/free',provider:'openrouter',mode:'chat',label:'Free models router',free:true,rates:{textInput:0,textCached:0,textOutput:0},source:'https://openrouter.ai/openrouter/free'};
 function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
- async function chatCompletion(body,{signal,url,key,label}){
+ async function chatCompletion(body,{signal,url,key,label,explicitSchema=false}){
   const request={model:body.config.model,messages:[{role:'system',content:body.instructions},...body.input],max_tokens:body.max_output_tokens,response_format:{type:'json_schema',json_schema:{name:body.text.format.name,strict:true,schema:body.text.format.schema}},stream:false,provider:{require_parameters:true,allow_fallbacks:false,...(body.config.freeOnly!==false?{max_price:{prompt:0,completion:0,request:0}}:{})}};
+  if(explicitSchema){
+   request.messages[0].content+='\nReturn only a JSON object, without markdown or commentary, matching this schema: '+JSON.stringify(body.text.format.schema)+'\nPut the conversational answer in reply and only explicitly supplied draft changes in orderPatch. When nothing changes, use orderPatch: [].';
+   request.reasoning={effort:'none'};
+  }
   let data;let usageKnown=true;const totals={prompt_tokens:0,completion_tokens:0,cached_tokens:0};
   for(let attempt=0;attempt<2;attempt++){
    const response=await fetchImpl(url,{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json','X-Title':'Echo Event Entertainment'},signal,body:JSON.stringify(request)});
@@ -66,7 +70,7 @@ function createOpenRouter({env=process.env,fetchImpl=fetch}={}){
    await this.validate(body.config);
    // OmniRoute's Responses translation drops text.format; send the schema
    // through Chat Completions and normalize its validated completion instead.
-   return chatCompletion(body,{signal,url:`${this.baseUrl()}/chat/completions`,key:env.OMNIROUTE_API_KEY,label:'OmniRoute'});
+   return chatCompletion(body,{signal,url:`${this.baseUrl()}/chat/completions`,key:env.OMNIROUTE_API_KEY,label:'OmniRoute',explicitSchema:true});
   }
  };
  const alibaba=createAlibaba({env,fetchImpl}),ollama=createOllama({env,fetchImpl});

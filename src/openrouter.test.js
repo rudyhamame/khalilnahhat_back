@@ -47,7 +47,10 @@ test('OmniRoute preserves booking JSON schema and normalizes completion and usag
   assert.equal(url,'https://omni.example/v1/chat/completions');
   const sent=JSON.parse(options.body);
   assert.deepEqual(sent.response_format,{type:'json_schema',json_schema:{name:'booking',strict:true,schema}});
-  assert.deepEqual(sent.messages,[{role:'system',content:'Plan events safely.'},{role:'user',content:'Hello'}]);
+  assert.ok(sent.messages[0].content.startsWith('Plan events safely.'));
+  assert.ok(sent.messages[0].content.includes(JSON.stringify(schema)));
+  assert.deepEqual(sent.messages[1],{role:'user',content:'Hello'});
+  assert.deepEqual(sent.reasoning,{effort:'none'});
   assert.deepEqual(sent.provider.max_price,{prompt:0,completion:0,request:0});
   assert.equal(sent.stream,false);
   return Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify(reply)}}],usage:{prompt_tokens:10,completion_tokens:20,prompt_tokens_details:{cached_tokens:2}}});

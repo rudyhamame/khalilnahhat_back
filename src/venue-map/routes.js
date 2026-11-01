@@ -10,6 +10,7 @@ const room=z.object({name:z.string().trim().min(1).max(160),seatedCapacity:nulla
  .refine(r=>r.areaSqM===null||!(/footprint|capacity|guest/i.test(r.areaMethod)),'Interior area cannot be inferred from a footprint or capacity.');
 const link=z.object({kind:z.enum(['booking','service_request']),id:z.string().regex(/^[a-f\d]{24}$/i)}).strict();
 const venueInput=z.object({name:z.string().trim().min(1).max(240),address:z.string().trim().min(1).max(500),city:text(160),postalCode:text(12),country:text(80),latitude:z.number().min(-85).max(85),longitude:z.number().min(-180).max(180),venueType:z.enum(['restaurant','banquet_hall','outdoor','other']),source:z.enum(['manual','geoapify']),sourceId:text(500),sourceAttribution:text(2000),verificationStatus:z.enum(['verified','unverified']),lastVerifiedAt:z.iso.datetime().nullable().default(null),rooms:z.array(room).max(100).default([]),eventLinks:z.array(link).max(100).default([]),version:z.number().int().positive().optional()}).strict().refine(r=>(r.verificationStatus==='verified')===!!r.lastVerifiedAt,'Verification requires a date; unverified venues must have no verification date.').refine(r=>r.source==='manual'||!!(r.sourceId&&r.sourceAttribution),'External records require source ID and attribution.');
+function searchWords(value){return String(value).normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[’‘']/g,"'").replace(/'s\b/g,'').replace(/[^\p{L}\p{N}]+/gu,' ').trim().split(/\s+/).filter(w=>w&&w!=='the');}
 function parseBounds(value){const a=String(value||'').split(',').map(Number);if(a.length!==4||!a.every(Number.isFinite)||a[0]<-180||a[2]>180||a[1]<-85||a[3]>85||a[0]>=a[2]||a[1]>=a[3])throw Object.assign(new Error('Use valid west,south,east,north bounds.'),{status:400});return a;}
 function listQuery(query){const [w,s,e,n]=parseBounds(query.bounds);
  const region=(west,east)=>({location:{$geoWithin:{$geometry:{type:'Polygon',coordinates:[[[west,s],[east,s],[east,n],[west,n],[west,s]]]}}}});
@@ -17,7 +18,8 @@ function listQuery(query){const [w,s,e,n]=parseBounds(query.bounds);
  // and a >hemisphere ring can select the opposite side of the earth.
  const filter=e-w<179?region(w,e):{$and:[{$or:Array.from({length:Math.ceil((e-w)/90)},(_,i)=>region(w+i*90,Math.min(e,w+(i+1)*90)))}]};
  if(query.type){if(!['restaurant','banquet_hall','outdoor','other'].includes(query.type))throw Object.assign(new Error('Invalid venue type.'),{status:400});filter.venueType=query.type;}
- if(query.q){const q=String(query.q).trim().slice(0,160).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');filter.$or=['name','address','city'].map(k=>({[k]:{$regex:q,$options:'i'}}));}
+ if(query.q){const terms=searchWords(String(query.q).slice(0,160));if(terms.length)filter.$and=[...(filter.$and||[]),...terms.map(term=>({$or:['name','address','city'].map(k=>({[k]:{$regex:term,$options:'i'}}))}))];}
+
  if(query.capacity==='known')filter.rooms={$elemMatch:{$or:[{seatedCapacity:{$gt:0}},{standingCapacity:{$gt:0}}]}};
  else if(query.capacity==='unknown')filter.rooms={$not:{$elemMatch:{$or:[{seatedCapacity:{$gt:0}},{standingCapacity:{$gt:0}}]}}};
  else if(query.capacity)throw Object.assign(new Error('Invalid capacity filter.'),{status:400});return filter;}
@@ -48,11 +50,22 @@ function registerVenueMap(app,{requireAdmin,requireAuth,env=process.env,fetchImp
   const q=z.string().trim().min(3).max(160).safeParse(req.query.q);if(!q.success)return res.status(400).json({message:'Enter 3–160 characters.'});const bounds=parseBounds(req.query.bounds);
   const now=Date.now();for(const [k,b]of buckets)if(b.until<now)buckets.delete(k);const owner=String(req.authUser?._id||req.user?._id||req.ip),b=buckets.get(owner)||{count:0,until:now+60000};if(b.count>=10||active>=2||buckets.size>1000)return res.status(429).json({message:'Search limit reached. Please wait a minute.'});b.count++;buckets.set(owner,b);
   active++;const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);const closed=()=>controller.abort();res.on('close',closed);
-  try{const url=new URL('https://api.geoapify.com/v1/geocode/search');url.search=new URLSearchParams({text:q.data,filter:'rect:'+bounds.join(','),limit:'10',format:'json',apiKey:env.VENUE_SEARCH_API_KEY}).toString();const upstream=await fetchImpl(url,{signal:controller.signal,redirect:'error'});if(!upstream.ok)throw new Error('Provider failure');const raw=await upstream.text();if(raw.length>500000)throw new Error('Oversized response');const data=JSON.parse(raw);if(!Array.isArray(data.results))throw new Error('Invalid response');
-   const items=data.results.filter(p=>typeof p.place_id==='string'&&p.place_id.length>0&&Number.isFinite(p.lat)&&Number.isFinite(p.lon)&&p.lat>=-85&&p.lat<=85&&p.lon>=-180&&p.lon<=180).slice(0,10).map(p=>({name:String(p.name||p.address_line1||p.formatted).slice(0,240),address:String(p.formatted||'').slice(0,500),city:String(p.city||'').slice(0,160),postalCode:String(p.postcode||'').slice(0,12),country:String(p.country||'').slice(0,80),latitude:p.lat,longitude:p.lon,venueType:p.category==='catering.restaurant'?'restaurant':'other',source:'geoapify',sourceId:String(p.place_id||'').slice(0,500),sourceAttribution:'Powered by Geoapify · '+String(p.datasource?.attribution||'© OpenStreetMap contributors').slice(0,1000),verificationStatus:'unverified',lastVerifiedAt:null,rooms:[],eventLinks:[],saved:false}));res.json({items,attribution:'Powered by Geoapify · © OpenStreetMap contributors'});
+  try{
+   const request=async(path,params)=>{const url=new URL(path,'https://api.geoapify.com');url.search=new URLSearchParams({...params,filter:'rect:'+bounds.join(','),apiKey:env.VENUE_SEARCH_API_KEY}).toString();const upstream=await fetchImpl(url,{signal:controller.signal,redirect:'error'});if(!upstream.ok)throw new Error('Provider failure');const raw=await upstream.text();if(raw.length>500000)throw new Error('Oversized response');return JSON.parse(raw);};
+   // Geocoding alone misses many businesses. Search named POIs first, with a
+   // bounded partial-name retry, then retain address/city lookup as a fallback.
+   const words=searchWords(q.data),name=words.join(' '),categories='catering,accommodation,activity,entertainment,leisure,tourism';
+   let rows=[];
+   const places=async(term)=>{const data=await request('/v2/places',{name:term,categories,limit:'30'});if(!Array.isArray(data.features))throw new Error('Invalid response');return data.features.map(f=>f.properties).filter(Boolean);};
+   const addressQuery=/^\d+\s/.test(q.data);
+   if(!addressQuery&&name){rows=await places(name);if(!rows.length&&words.length>1)rows=await places(words[0]);}
+   if(!rows.length){const data=await request('/v1/geocode/search',{text:q.data,limit:'10',format:'json'});if(!Array.isArray(data.results))throw new Error('Invalid response');rows=data.results;}
+   const score=p=>{const title=searchWords(p.name||p.address_line1||'').join(' ');return words.reduce((n,w)=>n+(title.includes(w)?10:0),0)+(title===name?20:0);};
+   const items=rows.filter(p=>typeof p.place_id==='string'&&p.place_id.length>0&&Number.isFinite(p.lat)&&Number.isFinite(p.lon)&&p.lat>=bounds[1]&&p.lat<=bounds[3]&&p.lon>=bounds[0]&&p.lon<=bounds[2]).sort((a,b)=>score(b)-score(a)).slice(0,10).map(p=>({name:String(p.name||p.address_line1||p.formatted||'Venue').slice(0,240),address:String(p.formatted||'').slice(0,500),city:String(p.city||'').slice(0,160),postalCode:String(p.postcode||'').slice(0,12),country:String(p.country||'').slice(0,80),latitude:p.lat,longitude:p.lon,venueType:(p.categories||[p.category]).some(c=>c?.startsWith('catering.restaurant'))?'restaurant':'other',source:'geoapify',sourceId:String(p.place_id).slice(0,500),sourceAttribution:'Powered by Geoapify · '+String(p.datasource?.attribution||'© OpenStreetMap contributors').slice(0,1000),verificationStatus:'unverified',lastVerifiedAt:null,rooms:[],eventLinks:[],saved:false}));res.json({items,attribution:'Powered by Geoapify · © OpenStreetMap contributors'});
+
   }finally{active--;clearTimeout(timer);res.off('close',closed);}
  };
  app.get(base+'/search',...guard(search));
  app.get('/api/venue-map/search',...guard(search,requireAuth));
 }
-module.exports={registerVenueMap,venueInput,listQuery,parseBounds};
+module.exports={registerVenueMap,venueInput,listQuery,parseBounds,searchWords};

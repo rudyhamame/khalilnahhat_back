@@ -1,0 +1,26 @@
+✔ incomplete drafts are private, persist and resume without submitting (951.722583ms)
+✔ stale saves and deletes cannot overwrite another device (290.552964ms)
+✔ invalid values and supplied account identifiers are rejected (53.645414ms)
+✔ venue validation rejects invalid coordinates, guessed measurements and absent provenance (106.148246ms)
+◇ injected env (7) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+▶ real Mongo venue CRUD, spatial discovery, owner privacy, event links and provider boundaries
+  ✔ anonymous denied and customer cannot create or edit directory (269.364904ms)
+  ✔ admin creates real venue; null room dimensions survive storage (109.636086ms)
+  ✔ bounds, literal name/city search and capacity filters (207.364999ms)
+  ✔ saved search accepts apostrophes, articles, partial names and reordered words (124.920451ms)
+  ✔ admin edit links an existing event and enforces optimistic version (132.040948ms)
+  ✔ customers see only their own events, never directory event IDs (86.92906ms)
+  ✔ forged saved-venue coordinates are rejected before booking or notification writes (148.698312ms)
+  ✔ missing external credentials produce setup error (17.603444ms)
+  ✔ hosted search: real route with fixture upstream, bounded results and quota (101.009008ms)
+✔ real Mongo venue CRUD, spatial discovery, owner privacy, event links and provider boundaries (15021.475549ms)
+✔ business-name search supports articles, apostrophes, partial names and address fallback (59.962711ms)
+✔ worldwide venue search avoids a world POI rectangle and handles provider failures (63.799769ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 17731.329405

@@ -1,0 +1,29 @@
+✖ worldwide venue search avoids a world POI rectangle and handles provider failures (583.864315ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2352.539752
+
+✖ failing tests:
+
+test at test/venue-map.integration.test.js:68:1
+✖ worldwide venue search avoids a world POI rectangle and handles provider failures (583.864315ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  503 !== 200
+  
+      at TestContext.<anonymous> (/home/rudy/projects/khalil-back/test/venue-map.integration.test.js:81:45)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 503,
+    expected: 200,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

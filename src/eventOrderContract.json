@@ -187,6 +187,65 @@
       "corporate"
      ],
      "required": true
+    },
+    {
+     "key": "event.venue.recordId",
+     "label": "Saved venue ID",
+     "ar": "معرّف المكان",
+     "type": "text",
+     "maxLength": 24,
+     "private": true,
+     "manualOnly": true,
+     "hidden": true
+    },
+    {
+     "key": "event.venue.latitude",
+     "label": "Venue latitude",
+     "ar": "خط العرض",
+     "type": "coordinate",
+     "max": 85,
+     "private": true,
+     "manualOnly": true,
+     "hidden": true
+    },
+    {
+     "key": "event.venue.longitude",
+     "label": "Venue longitude",
+     "ar": "خط الطول",
+     "type": "coordinate",
+     "max": 180,
+     "private": true,
+     "manualOnly": true,
+     "hidden": true
+    },
+    {
+     "key": "event.venue.source",
+     "label": "Venue source",
+     "ar": "مصدر المكان",
+     "type": "text",
+     "maxLength": 40,
+     "private": true,
+     "manualOnly": true,
+     "hidden": true
+    },
+    {
+     "key": "event.venue.sourceId",
+     "label": "Venue source identifier",
+     "ar": "معرّف المصدر",
+     "type": "text",
+     "maxLength": 500,
+     "private": true,
+     "manualOnly": true,
+     "hidden": true
+    },
+    {
+     "key": "event.venue.sourceAttribution",
+     "label": "Venue source attribution",
+     "ar": "مصدر بيانات المكان",
+     "maxLength": 2000,
+     "private": true,
+     "manualOnly": true,
+     "hidden": true
     }
    ]
   },

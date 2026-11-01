@@ -1079,6 +1079,15 @@ app.post('/api/service-requests', requireAuth, async (request, response) => {
     catch(error){return response.status(400).json({message:error.message});}
   }
 
+  const selectedVenueId = parsed.data.order?.event?.venue?.recordId;
+  if (selectedVenueId) {
+    const selectedVenue = /^[a-f\d]{24}$/i.test(selectedVenueId) ? await require('./venue-map/models').Venue.findById(selectedVenueId).lean() : null;
+    const point = parsed.data.order.event.venue;
+    if (!selectedVenue || point.longitude !== selectedVenue.location.coordinates[0] || point.latitude !== selectedVenue.location.coordinates[1]) {
+      return response.status(400).json({ message: 'The selected venue changed. Select it again on the map or enter the address manually.' });
+    }
+  }
+
   const user = request.authUser;
   // A voucher is claimed before the booking is saved and released again if saving fails.
   let voucher = null;
@@ -1952,6 +1961,8 @@ const aiBooking=require('./ai-booking'),aiBookingRoutes=aiBooking.registerAiBook
   configService:aiConfiguration,
   requireAuth: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest }),
 });
+require('./venue-map/routes').registerVenueMap(app, { requireAdmin, requireAuth });
+
 require('./venue-intelligence/routes').registerVenueIntelligence(app, {
   requireAuth: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest }),
   service: require('./venue-intelligence/service').createVenueIntelligence({configService:aiConfiguration}),

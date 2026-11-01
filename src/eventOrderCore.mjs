@@ -20,6 +20,7 @@ export function createEventOrder() {
 }
 export function validValue(field, value) {
   if(value===null)return !['multi','links'].includes(field.type);
+  if(field.type==='coordinate')return typeof value==='number'&&Number.isFinite(value)&&Math.abs(value)<=field.max;
   if(field.type==='number')return typeof value==='number'&&Number.isInteger(value)&&value>=0&&value<=(field.max||100000);
   if(field.type==='boolean')return typeof value==='boolean';
   if(['multi','links'].includes(field.type))return Array.isArray(value)&&value.length<=30&&value.every(item=>typeof item==='string'&&item.length<=2048&&(field.options?field.options.includes(item):/^https:\/\//i.test(item)&&safeLink(item)));

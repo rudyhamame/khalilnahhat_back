@@ -64,3 +64,23 @@ test('business-name search supports articles, apostrophes, partial names and add
   assert.equal((await run('unknown'))[0].name,'Address result');assert.equal(calls.at(-1).path,'/v1/geocode/search');
  }finally{await new Promise(r=>server.close(r));}
 });
+
+test('worldwide venue search avoids a world POI rectangle and handles provider failures',async()=>{
+ const express=require('express'),local=express();let mode='world',calls=[];
+ const guard=(req,res,next)=>{req.authUser={_id:'qa-global'};next();};
+ const result={name:'Rawabi Cafe',formatted:'Hamilton, Ontario, Canada',place_id:'qa-rawabi',lat:43.25,lon:-79.87};
+ require('../src/venue-map/routes').registerVenueMap(local,{requireAdmin:guard,requireAuth:guard,env:{VENUE_SEARCH_API_KEY:'fixture-private'},fetchImpl:async url=>{
+  calls.push(url.pathname);
+  if(mode==='world'){assert.equal(url.pathname,'/v1/geocode/search');assert.equal(url.searchParams.has('filter'),false);return new Response(JSON.stringify({results:[result]}));}
+  if(mode==='area'){assert.equal(url.searchParams.get('filter'),'rect:-80,43,-79,44');return url.pathname==='/v2/places'?new Response('{}',{status:400}):new Response(JSON.stringify({results:[result]}));}
+  if(mode==='quota')return new Response('{}',{status:429});
+  throw Object.assign(new Error('provider deadline'),{name:'TimeoutError'});
+ }});
+ const server=local.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
+ try{const run=async bounds=>{const response=await fetch(`http://127.0.0.1:${server.address().port}/api/venue-map/search?`+new URLSearchParams({q:'Rawabi cafe Hamilton',bounds}));return {status:response.status,body:await response.json()};};
+  let r=await run('-180,-85,180,85');assert.equal(r.status,200);assert.equal(r.body.items[0].name,'Rawabi Cafe');assert.deepEqual(calls,['/v1/geocode/search']);
+  mode='area';calls=[];r=await run('-80,43,-79,44');assert.equal(r.status,200);assert.equal(r.body.items[0].name,'Rawabi Cafe');assert.deepEqual(calls,['/v2/places','/v1/geocode/search']);
+  mode='quota';r=await run('-180,-85,180,85');assert.equal(r.status,429);assert.match(r.body.message,/busy|limit/i);
+  mode='timeout';r=await run('-180,-85,180,85');assert.equal(r.status,504);assert.match(r.body.message,/timed out/i);assert.ok(!JSON.stringify(r).includes('fixture-private'));
+ }finally{await new Promise(r=>server.close(r));}
+});

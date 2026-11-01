@@ -19,3 +19,7 @@ node --test test/venue-map.integration.test.js src/event-drafts.test.js
 The tests spawn an isolated temporary MongoDB and never migrate or write the production database.
 
 The API also runs this same idempotent index migration after connecting at startup, so deployment on Render Free does not require a paid shell. A migration error prevents startup rather than serving a partially configured venue directory.
+
+Worldwide search fix: All sends full-world bounds. The API omits that redundant rectangle for global geocoding and skips spatial POI enumeration for areas wider/taller than 10 degrees. Local POI requests rejected as unsupported (400/404/422) fall back to text geocoding. Provider quota and timeout failures return actionable messages without exposing credentials. The total 8-second deadline, authenticated per-user quota, bounded results and provenance remain.
+
+Regression verification: the worldwide-search case returned 503 before the fix and 200 afterward; all 16 focused venue/draft tests pass, including unsupported-area fallback, provider throttling and timeout handling. No production booking or directory mutation is part of this fix.

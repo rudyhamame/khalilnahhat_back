@@ -25,7 +25,6 @@ COPY scripts/stem-worker.js ./scripts/stem-worker.js
 COPY scripts/ai-administrator-worker.js ./scripts/ai-administrator-worker.js
 RUN mkdir -p /app/.runtime/stems && chown -R node:node /app/.runtime
 COPY scripts/music-ontology-migrate.js ./scripts/music-ontology-migrate.js
-COPY scripts/venue-map-migrate.js ./scripts/venue-map-migrate.js
 RUN node -e "require('./src/music-ontology/models'); require('./src/music-ontology/validation')"
 ENV NODE_ENV=production YT_DLP_PATH=/opt/yt-dlp/bin/yt-dlp FFMPEG_PATH=/usr/bin/ffmpeg YOUTUBE_PROCESSING_MODE=server MUSIC_ARCHIVE_STORAGE_PROVIDER=cloudinary
 USER node

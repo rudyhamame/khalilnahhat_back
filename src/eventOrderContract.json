@@ -189,16 +189,6 @@
      "required": true
     },
     {
-     "key": "event.venue.recordId",
-     "label": "Saved venue ID",
-     "ar": "معرّف المكان",
-     "type": "text",
-     "maxLength": 24,
-     "private": true,
-     "manualOnly": true,
-     "hidden": true
-    },
-    {
      "key": "event.venue.latitude",
      "label": "Venue latitude",
      "ar": "خط العرض",

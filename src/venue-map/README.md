@@ -1,27 +1,11 @@
-# Shared venue directory
+# Venue search for booking locations
 
-Browser integration: **Complete your booking** in the sibling `khalil-front` project. Operational setup, provider variables/licensing, source-file inventory and verification are documented in `khalil-front/docs/VENUE-MAP.md`.
+The browser map in Complete your booking uses live Geoapify results. A customer can accept a result or manually enter a location for their own booking. There is no shared saved-venue directory, venue CRUD, event linking, venue model, directory index migration, or selected-record lookup.
 
-Run the additive migration with the existing deployment database environment:
+`GET /api/venue-map/search` and `/api/venue-map/configuration` require the existing authentication guard. Search keeps its server-side `VENUE_SEARCH_API_KEY`, optional `VENUE_SEARCH_PROVIDER=geoapify`, 8-second total deadline, 10 searches/minute/user, two concurrent searches per API process, bounded results and source attribution. No provider search results are persisted by these endpoints.
 
-```sh
-node scripts/venue-map-migrate.js
-```
+Local searches try named POIs, bounded partial-name retries, then geocoding and amenity autocomplete. Worldwide/large-area searches use text geocoding; a full-world rectangle is omitted. Unsupported local POI areas fall back to text search. Provider quota/timeouts produce actionable errors. Coverage is not exhaustive.
 
-New server environment: `VENUE_SEARCH_PROVIDER=geoapify`, `VENUE_SEARCH_API_KEY` (server-side secret). No key or hosted data subscription is bundled. All read endpoints use `requireAuth`; all directory mutations and cross-client event lookups use `requireAdmin`. The standard existing account/user IDs own booking data; the directory itself contains shared venue facts, with no client content copied into it.
+Saved-directory implementation removed at the user's request. Existing database collections/indexes and historical booking records were not deleted or rewritten. New normalized bookings use address, coordinates and provider provenance without a directory record ID.
 
-Focused verification:
-
-```sh
-node --test test/venue-map.integration.test.js src/event-drafts.test.js
-```
-
-The tests spawn an isolated temporary MongoDB and never migrate or write the production database.
-
-The API also runs this same idempotent index migration after connecting at startup, so deployment on Render Free does not require a paid shell. A migration error prevents startup rather than serving a partially configured venue directory.
-
-Worldwide search fix: All sends full-world bounds. The API omits that redundant rectangle for global geocoding and skips spatial POI enumeration for areas wider/taller than 10 degrees. Local POI requests rejected as unsupported (400/404/422) fall back to text geocoding. Provider quota and timeout failures return actionable messages without exposing credentials. The total 8-second deadline, authenticated per-user quota, bounded results and provenance remain.
-
-Regression verification: the worldwide-search case returned 503 before the fix and 200 afterward; all 16 focused venue/draft tests pass, including unsupported-area fallback, provider throttling and timeout handling. No production booking or directory mutation is part of this fix.
-
-Live verification: Render confirmed `c049600` as successfully deployed. Retried the original `Rawabi cafe hamilton` query with All in the authenticated browser: it completed with 10 real external results and no service error or console warnings/errors. The provider did **not** return the exact intended Hamilton café; error recovery does not imply complete venue coverage. Public API health is OK. Screenshot: `docs/venue-map/worldwide-search-fixed.jpg`. Frontend work in progress was left unchanged.
+Verification: `node --test test/venue-map.integration.test.js src/event-drafts.test.js` passes six tests covering search behavior, global/provider recovery, authentication/quota, absent directory routes and account-private booking drafts. Tests do not write production data.

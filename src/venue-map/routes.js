@@ -11,7 +11,11 @@ const room=z.object({name:z.string().trim().min(1).max(160),seatedCapacity:nulla
 const link=z.object({kind:z.enum(['booking','service_request']),id:z.string().regex(/^[a-f\d]{24}$/i)}).strict();
 const venueInput=z.object({name:z.string().trim().min(1).max(240),address:z.string().trim().min(1).max(500),city:text(160),postalCode:text(12),country:text(80),latitude:z.number().min(-85).max(85),longitude:z.number().min(-180).max(180),venueType:z.enum(['restaurant','banquet_hall','outdoor','other']),source:z.enum(['manual','geoapify']),sourceId:text(500),sourceAttribution:text(2000),verificationStatus:z.enum(['verified','unverified']),lastVerifiedAt:z.iso.datetime().nullable().default(null),rooms:z.array(room).max(100).default([]),eventLinks:z.array(link).max(100).default([]),version:z.number().int().positive().optional()}).strict().refine(r=>(r.verificationStatus==='verified')===!!r.lastVerifiedAt,'Verification requires a date; unverified venues must have no verification date.').refine(r=>r.source==='manual'||!!(r.sourceId&&r.sourceAttribution),'External records require source ID and attribution.');
 function parseBounds(value){const a=String(value||'').split(',').map(Number);if(a.length!==4||!a.every(Number.isFinite)||a[0]<-180||a[2]>180||a[1]<-85||a[3]>85||a[0]>=a[2]||a[1]>=a[3])throw Object.assign(new Error('Use valid west,south,east,north bounds.'),{status:400});return a;}
-function listQuery(query){const [w,s,e,n]=parseBounds(query.bounds),filter={location:{$geoWithin:{$geometry:{type:'Polygon',coordinates:[[[w,s],[e,s],[e,n],[w,n],[w,s]]]}}}};
+function listQuery(query){const [w,s,e,n]=parseBounds(query.bounds);
+ const region=(west,east)=>({location:{$geoWithin:{$geometry:{type:'Polygon',coordinates:[[[west,s],[east,s],[east,n],[west,n],[west,s]]]}}}});
+ // Wide views must be split: a full-world spherical polygon degenerates at ±180,
+ // and a >hemisphere ring can select the opposite side of the earth.
+ const filter=e-w<179?region(w,e):{$and:[{$or:Array.from({length:Math.ceil((e-w)/90)},(_,i)=>region(w+i*90,Math.min(e,w+(i+1)*90)))}]};
  if(query.type){if(!['restaurant','banquet_hall','outdoor','other'].includes(query.type))throw Object.assign(new Error('Invalid venue type.'),{status:400});filter.venueType=query.type;}
  if(query.q){const q=String(query.q).trim().slice(0,160).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');filter.$or=['name','address','city'].map(k=>({[k]:{$regex:q,$options:'i'}}));}
  if(query.capacity==='known')filter.rooms={$elemMatch:{$or:[{seatedCapacity:{$gt:0}},{standingCapacity:{$gt:0}}]}};

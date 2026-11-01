@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const room = new mongoose.Schema({
-  name: {type:String, required:true}, seatedCapacity:{type:Number,default:null}, standingCapacity:{type:Number,default:null},
-  layoutNotes:{type:String,default:''}, capacitySource:{type:String,default:''}, areaSqM:{type:Number,default:null},
+  name: {type:String, required:true}, seatedCapacity:{type:Number,min:1,default:null,validate:v=>v===null||Number.isInteger(v)}, standingCapacity:{type:Number,min:1,default:null,validate:v=>v===null||Number.isInteger(v)},
+  layoutNotes:{type:String,default:''}, capacitySource:{type:String,default:''}, areaSqM:{type:Number,min:Number.MIN_VALUE,default:null},
   areaMethod:{type:String,default:''}, areaSource:{type:String,default:''},
 }, {_id:false});
 const schema = new mongoose.Schema({

@@ -2009,6 +2009,8 @@ app.use((_request, response) => {
 
 async function startServer(port = PORT) {
   await connectToDatabase();
+  await require('./venue-map/migrate').ensureVenueMapIndexes();
+  console.log('Venue map indexes ready.');
   if(process.env.ECHO_ADMIN_WORKER_MODE!=='external')await aiAdministrator.start();
 
   const server=app.listen(port, '0.0.0.0', () => {

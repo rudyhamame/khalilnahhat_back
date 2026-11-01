@@ -49,8 +49,9 @@ test('business-name search supports articles, apostrophes, partial names and add
   calls.push({path:url.pathname,name:url.searchParams.get('name'),text:url.searchParams.get('text')});
   assert.equal(url.searchParams.get('filter'),'rect:-80,43,-79,44');
   if(url.pathname==='/v2/places')return new Response(JSON.stringify({features: url.searchParams.get('name')==='lara'?[{properties:poi},{properties:{...poi,place_id:'outside',lon:-85}}]:url.searchParams.get('name')==='keg'?[{properties:{...poi,name:'The Keg Steakhouse',place_id:'keg'}}]:[]}));
-  if(url.pathname==='/v1/geocode/autocomplete')return new Response(JSON.stringify({results:[{...poi,name:'Remo Restaurant',place_id:'remo'}]}));
-  return new Response(JSON.stringify({results:url.searchParams.get('text')==='Remos'?[]:[{...poi,name:'Address result',place_id:'address'}]}));
+  if(url.pathname==='/v1/geocode/autocomplete'){assert.equal(url.searchParams.get('type'),'amenity');return new Response(JSON.stringify({results:[{...poi,name:'Remo Restaurant',place_id:'remo'}]}));}
+  if(url.searchParams.get('text')==="Dino's")return new Response(JSON.stringify({results:[{...poi,name:"Dino's Restaurant",place_id:'dino'}]}));
+  return new Response(JSON.stringify({results:['Remos',"Remo's",'Dinos'].includes(url.searchParams.get('text'))?[]:[{...poi,name:'Address result',place_id:'address'}]}));
  }});
  const server=local.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
  try{const run=async q=>{const res=await fetch(`http://127.0.0.1:${server.address().port}/api/venue-map/search?`+new URLSearchParams({q,bounds:'-80,43,-79,44'}));assert.equal(res.status,200);return (await res.json()).items;};
@@ -58,6 +59,7 @@ test('business-name search supports articles, apostrophes, partial names and add
   const lara=await run('Lara’s');assert.equal(lara.length,1);assert.equal(lara[0].venueType,'restaurant');assert.equal(lara[0].rooms.length,0);assert.equal((await run('Laras'))[0].name,poi.name);
   assert.equal((await run('Lara private banquet'))[0].name,poi.name);assert.equal(calls.at(-1).name,'lara');
   const before=calls.length;assert.equal((await run('155 Consumers Road'))[0].name,'Address result');assert.equal(calls.length,before+1);assert.equal(calls.at(-1).path,'/v1/geocode/search');
+  assert.equal((await run('Dinos'))[0].name,"Dino's Restaurant");assert.equal(calls.at(-1).text,"Dino's");
   assert.equal((await run('Remos'))[0].name,'Remo Restaurant');assert.equal(calls.at(-1).path,'/v1/geocode/autocomplete');assert.equal(calls.at(-1).text,'remo');
   assert.equal((await run('unknown'))[0].name,'Address result');assert.equal(calls.at(-1).path,'/v1/geocode/search');
  }finally{await new Promise(r=>server.close(r));}

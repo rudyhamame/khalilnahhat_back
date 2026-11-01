@@ -18,7 +18,7 @@ function listQuery(query){const [w,s,e,n]=parseBounds(query.bounds);
  // and a >hemisphere ring can select the opposite side of the earth.
  const filter=e-w<179?region(w,e):{$and:[{$or:Array.from({length:Math.ceil((e-w)/90)},(_,i)=>region(w+i*90,Math.min(e,w+(i+1)*90)))}]};
  if(query.type){if(!['restaurant','banquet_hall','outdoor','other'].includes(query.type))throw Object.assign(new Error('Invalid venue type.'),{status:400});filter.venueType=query.type;}
- if(query.q){const terms=searchWords(String(query.q).slice(0,160));if(terms.length)filter.$and=[...(filter.$and||[]),...terms.map(term=>({$or:['name','address','city'].map(k=>({[k]:{$regex:term,$options:'i'}}))}))];}
+ if(query.q){const terms=searchWords(String(query.q).slice(0,160));if(terms.length)filter.$and=[...(filter.$and||[]),...terms.map(term=>({$or:['name','address','city'].map(k=>({[k]:{$regex:[...term].join("[’‘']?"),$options:'i'}}))}))];}
 
  if(query.capacity==='known')filter.rooms={$elemMatch:{$or:[{seatedCapacity:{$gt:0}},{standingCapacity:{$gt:0}}]}};
  else if(query.capacity==='unknown')filter.rooms={$not:{$elemMatch:{$or:[{seatedCapacity:{$gt:0}},{standingCapacity:{$gt:0}}]}}};
@@ -58,7 +58,7 @@ function registerVenueMap(app,{requireAdmin,requireAuth,env=process.env,fetchImp
    let rows=[];
    const places=async(term)=>{const data=await request('/v2/places',{name:term,categories,limit:'30'});if(!Array.isArray(data.features))throw new Error('Invalid response');return data.features.map(f=>f.properties).filter(Boolean);};
    const addressQuery=/^\d+\s/.test(q.data);
-   if(!addressQuery&&name){rows=await places(name);if(!rows.length&&words.length>1)rows=await places(words[0]);}
+   if(!addressQuery&&name){rows=await places(name);const partial=words[0].length>4?words[0].replace(/s$/,''):words[0];if(!rows.length&&partial!==name)rows=await places(partial);}
    if(!rows.length){const data=await request('/v1/geocode/search',{text:q.data,limit:'10',format:'json'});if(!Array.isArray(data.results))throw new Error('Invalid response');rows=data.results;}
    const score=p=>{const title=searchWords(p.name||p.address_line1||'').join(' ');return words.reduce((n,w)=>n+(title.includes(w)?10:0),0)+(title===name?20:0);};
    const items=rows.filter(p=>typeof p.place_id==='string'&&p.place_id.length>0&&Number.isFinite(p.lat)&&Number.isFinite(p.lon)&&p.lat>=bounds[1]&&p.lat<=bounds[3]&&p.lon>=bounds[0]&&p.lon<=bounds[2]).sort((a,b)=>score(b)-score(a)).slice(0,10).map(p=>({name:String(p.name||p.address_line1||p.formatted||'Venue').slice(0,240),address:String(p.formatted||'').slice(0,500),city:String(p.city||'').slice(0,160),postalCode:String(p.postcode||'').slice(0,12),country:String(p.country||'').slice(0,80),latitude:p.lat,longitude:p.lon,venueType:(p.categories||[p.category]).some(c=>c?.startsWith('catering.restaurant'))?'restaurant':'other',source:'geoapify',sourceId:String(p.place_id).slice(0,500),sourceAttribution:'Powered by Geoapify · '+String(p.datasource?.attribution||'© OpenStreetMap contributors').slice(0,1000),verificationStatus:'unverified',lastVerifiedAt:null,rooms:[],eventLinks:[],saved:false}));res.json({items,attribution:'Powered by Geoapify · © OpenStreetMap contributors'});

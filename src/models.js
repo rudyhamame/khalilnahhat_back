@@ -132,7 +132,7 @@ const liveRequestSchema = new mongoose.Schema(
     analysisSources: [{ type: String, trim: true }],
     requestStatus: {
       type: String,
-      enum: ['pending_admin', 'approved', 'rejected', 'duplicate'],
+      enum: ['pending_admin', 'reviewing', 'approved', 'rejected', 'duplicate'],
       default: 'pending_admin',
       trim: true,
     },
@@ -234,7 +234,7 @@ const liveStreamConfigSchema = new mongoose.Schema(
     goal: { type: String, enum: ['broadcast', 'event', 'home-studio', 'chill-mix', 'radio'], default: 'broadcast', trim: true },
     broadcastMode: { type: String, enum: ['youtube', 'mux', 'webrtc', 'whep'], default: 'youtube', trim: true },
     webrtcRoomName: { type: String, default: '', trim: true },
-    broadcastSource: { type: String, enum: ['', 'browser', 'obs'], default: '' },
+    broadcastSource: { type: String, enum: ['', 'browser', 'android', 'obs'], default: '' },
     obsRoomName: { type: String, default: '' },
     obsIngressId: { type: String, default: '' },
     obsUrl: { type: String, default: '' },

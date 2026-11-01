@@ -1,20 +1,32 @@
 const mongoose=require('mongoose');
 const {z}=require('zod');
 const {sessionKey,memberName}=require('./live-interactions');
-const schema=new mongoose.Schema({session:{type:String,required:true},authorId:{type:String,required:true},name:{type:String,required:true,maxlength:60},text:{type:String,required:true,maxlength:280}},{timestamps:true});
+const schema=new mongoose.Schema({session:{type:String,required:true},authorId:{type:String,required:true},name:{type:String,required:true,maxlength:60},text:{type:String,required:true,maxlength:280},hidden:{type:Boolean,default:false}},{timestamps:true});
 schema.index({session:1,createdAt:-1});
 const LiveComment=mongoose.models.LiveComment||mongoose.model('LiveComment',schema);
 const input=z.object({name:z.string().trim().max(60).optional().default(''),text:z.string().trim().min(1).max(280),session:z.string().min(1).max(300)}).strict();
-function serialize(comment){return {id:String(comment._id),name:comment.name,text:comment.text,createdAt:comment.createdAt};}
-function registerLiveComments(app,{getLiveStreamConfig,requireAuth,CommentModel=LiveComment,clock=Date.now}){
+function serialize(comment){return {id:String(comment._id),name:comment.name,text:comment.text,createdAt:comment.createdAt,hidden:Boolean(comment.hidden)};}
+function registerLiveComments(app,{getLiveStreamConfig,requireAuth,requireAdmin,CommentModel=LiveComment,clock=Date.now}){
  const limits=new Map();
- app.get('/api/live-comments',requireAuth,async(req,res)=>{
+ const read=async(req,res)=>{
   const session=sessionKey(await getLiveStreamConfig());
   if(req.query?.session && req.query.session!==session)return res.status(409).json({message:'This live session has ended. Refresh to join the current broadcast.'});
   if(!session)return res.json({session:null,items:[]});
-  const comments=await CommentModel.find({session}).sort({createdAt:-1,_id:-1}).limit(20).lean();
+  const comments=await CommentModel.find({session,...(req.liveCommentsAdmin ? {} : {hidden:{$ne:true}})}).sort({createdAt:-1,_id:-1}).limit(req.liveCommentsAdmin?100:20).lean();
   res.set('Cache-Control','no-store').json({session,items:comments.reverse().map(serialize)});
+ };
+ app.get('/api/live-comments',requireAuth,read);
+ if(requireAdmin) app.get('/api/live-comments/admin',requireAdmin,(req,res)=>{req.liveCommentsAdmin=true;return read(req,res);});
+ if(requireAdmin) app.patch('/api/live-comments/:id/moderation',requireAdmin,async(req,res)=>{
+  const parsed=z.object({session:z.string().min(1).max(300),hidden:z.boolean()}).strict().safeParse(req.body);
+  if(!parsed.success||!mongoose.isValidObjectId(req.params.id))return res.status(400).json({message:'Choose a valid comment and moderation action.'});
+  const session=sessionKey(await getLiveStreamConfig());
+  if(!session||parsed.data.session!==session)return res.status(409).json({message:'The broadcast changed. Refresh the comments.'});
+  const item=await CommentModel.findOneAndUpdate({_id:req.params.id,session},{$set:{hidden:parsed.data.hidden}},{new:true});
+  if(!item)return res.status(404).json({message:'Comment not found in this broadcast.'});
+  return res.set('Cache-Control','no-store').json({item:serialize(item)});
  });
+
  app.post('/api/live-comments',requireAuth,async(req,res)=>{
   const parsed=input.safeParse(req.body);if(!parsed.success)return res.status(400).json({message:'Enter a comment of 1–280 characters and a name of up to 60 characters.'});
   const session=sessionKey(await getLiveStreamConfig());

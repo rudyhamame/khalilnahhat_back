@@ -28,11 +28,11 @@ function createRelayBroadcast(deps) {
   let claimed;
   try {
    const current=await getLiveStreamConfig();
-   if(current.isLive || current.obsRoomName)return res.status(409).json({message:'End the existing broadcast or OBS session first.'});
+   if(current.isLive || current.webrtcRoomName || current.obsRoomName)return res.status(409).json({message:'End the existing broadcast or OBS session first.'});
    await relay.request('health');
    const roomName=`khalil-obs-${randomUUID()}`;
    const title=(typeof req.body?.title==='string' && req.body.title.trim().slice(0,180)) || current.title || defaults.title;
-   claimed=await LiveStreamConfig.findOneAndUpdate({key:defaults.key,isLive:{$ne:true},obsRoomName:{$in:['',null]}},
+   claimed=await LiveStreamConfig.findOneAndUpdate({key:defaults.key,isLive:{$ne:true},webrtcRoomName:{$in:['',null]},obsRoomName:{$in:['',null]}},
     {isLive:false,title,streamUrl:'',broadcastMode:'whep',broadcastSource:'obs',webrtcRoomName:'',obsRoomName:roomName,obsState:'preparing',obsExpiresAt:new Date(Date.now()+120000)},{new:true});
    if(!claimed)return res.status(409).json({message:'Another broadcaster started first.'});
    const saveRecording=claimed.obsSaveRecording!==false;

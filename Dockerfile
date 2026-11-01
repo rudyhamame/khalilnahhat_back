@@ -19,6 +19,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY src ./src
+COPY deploy/obs-relay/live-access.cjs ./deploy/obs-relay/live-access.cjs
 COPY contracts ./contracts
 COPY scripts/separate-stems.py ./scripts/separate-stems.py
 COPY scripts/stem-worker.js ./scripts/stem-worker.js

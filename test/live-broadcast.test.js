@@ -25,8 +25,8 @@ test('stale phone cannot stop a replacement broadcast', async () => {
 });
 test('starting claims the offline singleton atomically', async () => {
   const ctx=setup(); const result=await ctx.call('go-live',{ title:' Phone set ' });
-  assert.equal(result.statusCode,201); assert.deepEqual(ctx.writes[0].filter,{ key:'live',isLive:{$ne:true},obsRoomName:{$in:['',null]} });
-  assert.equal(result.body.item.title,'Phone set');
+  assert.equal(result.statusCode,201); assert.deepEqual(ctx.writes[0].filter,{ key:'live',isLive:{$ne:true},webrtcRoomName:{$in:['',null]},obsRoomName:{$in:['',null]} });
+  assert.equal(result.body.item.title,'Phone set');assert.equal(result.body.item.isLive,false);
 });
 test('concurrent go-live loser receives no publishing token', async () => {
   const ctx=setup({ LiveStreamConfig:{ findOneAndUpdate: async()=>null } });
@@ -93,3 +93,15 @@ test('browser and phone cannot claim or end a waiting OBS session', async()=>{
  assert.equal((await ctx.call('go-live')).statusCode,409);
  assert.equal((await ctx.call('end')).statusCode,409);assert.equal(ctx.writes.length,0);
 });
+
+test('browser preparation cannot replace a pending browser room',async()=>{const ctx=setup();ctx.current.webrtcRoomName='pending';assert.equal((await ctx.call('go-live')).statusCode,409);assert.equal(ctx.writes.length,0);});
+test('ending requires an explicit expected room',async()=>{const ctx=setup();assert.equal((await ctx.call('end')).statusCode,400);assert.equal(ctx.writes.length,0);});
+test('ready requires current publisher media and exact browser ownership',async()=>{
+ const ctx=setup({RoomServiceClient:class{async listParticipants(){return [{identity:'khalil-broadcaster',tracks:[]}];}}});Object.assign(ctx.current,{webrtcRoomName:'room',broadcastSource:'browser'});
+ assert.equal((await ctx.call('ready',{roomName:'old'})).statusCode,409);assert.equal((await ctx.call('ready',{roomName:'room'})).statusCode,409);assert.equal(ctx.writes.length,0);
+ const ok=setup({RoomServiceClient:class{async listParticipants(){return [{identity:'khalil-broadcaster',tracks:[{type:0}]}];}}});Object.assign(ok.current,{webrtcRoomName:'room',broadcastSource:'browser'});assert.equal((await ok.call('ready',{roomName:'room'})).body.item.isLive,true);
+});
+
+test('Android preparation preserves its source and waits for media confirmation',async()=>{const ctx=setup();const response=await ctx.call('go-live',{source:'android',title:'Phone set'});assert.equal(response.body.item.broadcastSource,'android');assert.equal(response.body.item.isLive,false);});
+
+test('failed media revocation keeps the exact reservation for a safe retry',async()=>{const ctx=setup({RoomServiceClient:class{async deleteRoom(){throw new Error('offline');}}});Object.assign(ctx.current,{isLive:true,webrtcRoomName:'owned-room'});const result=await ctx.call('end',{roomName:'owned-room'});assert.equal(result.statusCode,503);assert.equal(ctx.writes.length,0);});

@@ -67,7 +67,7 @@ function registerObsBroadcastRoutes(app, deps) {
     if (typeof req.body?.saveRecording !== 'boolean') return res.status(400).json({ message: 'Choose whether to save the recording.' });
     try {
       await getLiveStreamConfig();
-      const updated = await LiveStreamConfig.findOneAndUpdate({ key: defaults.key, isLive: { $ne: true }, obsRoomName: { $in: ['', null] } },
+      const updated = await LiveStreamConfig.findOneAndUpdate({ key: defaults.key, isLive: { $ne: true }, webrtcRoomName: { $in: ['', null] }, obsRoomName: { $in: ['', null] } },
         { $set: { obsSaveRecording: req.body.saveRecording } }, { new: true });
       if (!updated) return res.status(409).json({ message: 'Choose recording before preparing the OBS connection. End the current connection to change it.' });
       return res.json({ item: serialize(updated) });
@@ -80,10 +80,10 @@ function registerObsBroadcastRoutes(app, deps) {
     try {
       getConfig();
       const current = await getLiveStreamConfig();
-      if (current.isLive || current.obsRoomName) return res.status(409).json({ message: 'End the existing broadcast or OBS session first.' });
+      if (current.isLive || current.webrtcRoomName || current.obsRoomName) return res.status(409).json({ message: 'End the existing broadcast or OBS session first.' });
       const roomName = `khalil-obs-${randomUUID()}`;
       const title = (typeof req.body?.title === 'string' && req.body.title.trim().slice(0, 180)) || current.title || defaults.title;
-      claimed = await LiveStreamConfig.findOneAndUpdate({ key: defaults.key, isLive: { $ne: true }, obsRoomName: { $in: ['', null] } },
+      claimed = await LiveStreamConfig.findOneAndUpdate({ key: defaults.key, isLive: { $ne: true }, webrtcRoomName: { $in: ['', null] }, obsRoomName: { $in: ['', null] } },
         { isLive: false, title, streamUrl: '', broadcastMode: 'webrtc', broadcastSource: 'obs',
           webrtcRoomName: roomName, obsRoomName: roomName, obsState: 'preparing', obsExpiresAt: new Date(Date.now() + 120000) }, { new: true });
       if (!claimed) return res.status(409).json({ message: 'Another broadcaster started first.' });

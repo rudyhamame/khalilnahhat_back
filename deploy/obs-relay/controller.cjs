@@ -104,10 +104,7 @@ async function start() {
    const url=new URL(req.url,'http://localhost');
    if(url.pathname === '/internal/auth' && req.method === 'POST') {
     const data=await body(req); const row=sessions.get(data.path?.replace(/^live\//,''));
-    const active=row && ['waiting','live'].includes(row.state);
-    const query=new URLSearchParams(data.query || '');
-    const valid=active && ((data.action==='read' && data.protocol==='webrtc') ||
-     (data.action==='publish' && data.protocol==='webrtc' && (row.state==='live' || Date.now()<row.expiresAt) && equal(data.password || query.get('pass'),row.publishToken)));
+    const valid=require('./live-access.cjs').authorizeMedia(data,row,TOKEN);
     return json(res,valid?200:403,{});
    }
    const hook=url.pathname.match(/^\/internal\/segments\/live\/(khalil-obs-[a-f0-9-]{36})\/([0-9_-]+\.mp4)$/);

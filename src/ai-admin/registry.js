@@ -130,6 +130,7 @@ function createRegistry({invoke,app}){
  });
  // Classification is a persisted proposal, never an invented write to musical facts.
  add({name:'music_classification_proposal',domain:'Music Archive',description:'Return a classification proposal and supporting rationale for human review; does not alter metadata.',policy:'AUTO',mutation:false,schema:z.object({recordingId:id,proposal:z.string().min(1).max(4000),rationale:z.string().min(1).max(4000)}).strict(),async read(args,actor){await invoke('GET',`${ontology}/recordings/:id`,{actor,params:{id:args.recordingId}});return {proposal:args.proposal,rationale:args.rationale,recordingId:args.recordingId,applied:false};}});
+ require('./live-tools').registerLiveTools({add,invoke});
  const publicEntry=entry=>({name:entry.name,domain:entry.domain,description:entry.description,policy:entry.policy,mutation:entry.mutation,inputSchema:jsonSchema(entry.schema),...(entry.bodySchema?{editorSchema:entry.bodySchema}:{}),route:entry.route||null});
  return {
   entries,hash,subset,

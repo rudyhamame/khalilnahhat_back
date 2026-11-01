@@ -12,7 +12,7 @@ function setup(overrides={}) {
  prepareRecording:async()=>{},
  IngressClient:class {async createIngress(_type,options){assert.equal(options.participantIdentity,'khalil-obs');return {ingressId:'IN_test',url:'rtmps://ingress.example/live',streamKey:'private-test-key'};}async listIngress(){return [{state:{status:media.status}}];} async deleteIngress(id){if(failDelete)throw new Error('network');removed.push(id);}},
  RoomServiceClient:class{async listParticipants(){return [{identity:'khalil-obs',tracks:media.tracks}];}async deleteRoom(name){rooms.push(name);}},...overrides};
- const service=registerObsBroadcastRoutes({get:(path,auth,handler)=>{assert.equal(auth,deps.requireAdmin);routes[path]=handler;},post:(path,auth,handler)=>{assert.equal(auth,deps.requireAdmin);routes[path]=handler;}},deps);
+ const service=registerObsBroadcastRoutes({patch:(path,auth,handler)=>{assert.equal(auth,deps.requireAdmin);routes[path]=handler;},get:(path,auth,handler)=>{assert.equal(auth,deps.requireAdmin);routes[path]=handler;},post:(path,auth,handler)=>{assert.equal(auth,deps.requireAdmin);routes[path]=handler;}},deps);
  return {service,removed,rooms,setRow:values=>{row={...row,...values};},get row(){return row;},setMedia:values=>{media={...media,...values};},failDelete:value=>{failDelete=value;},call:async(path,body={})=>{const res={code:200,set(){},status(code){this.code=code;return this;},json(body){this.body=body;return this;}};await routes['/api/live-stream/obs'+path]({body},res);return res;}};
 }
 test('OBS prepare reserves offline, enables recording, and returns admin-only RTMP credentials',async()=>{
@@ -47,7 +47,7 @@ test('unused OBS connection expires, revoking its key',async()=>{
 test('public serialization excludes all OBS connection secrets, including bootstrap',()=>{
  const fs=require('node:fs'),vm=require('node:vm');const source=fs.readFileSync(require.resolve('../src/server'),'utf8');
  const fn=source.slice(source.indexOf('function serializeLiveStreamConfig('),source.indexOf('function buildMuxPlaybackUrl('));
- const serialize=vm.runInNewContext(fn+';serializeLiveStreamConfig',{defaultLiveStreamConfig:{}});
+ const serialize=vm.runInNewContext(fn+';serializeLiveStreamConfig',{liveBroadcastSession:require('../src/live-interactions').sessionKey,defaultLiveStreamConfig:{}});
  const item=serialize({isLive:true,obsStreamKey:'secret',obsUrl:'private',obsIngressId:'private-id',obsRoomName:'room',obs:{streamKey:'secret'},broadcastSource:'obs'});
  assert.equal(item.broadcastSource,'obs');assert.equal(JSON.stringify(item).includes('secret'),false);assert.equal('obs' in item,false);assert.equal('obsUrl' in item,false);
 });
@@ -61,3 +61,5 @@ test('connected OBS without published media expires and cannot keep a false live
  const c=setup();await c.call('/prepare');c.setMedia({status:2,tracks:[]});c.setRow({obsExpiresAt:new Date(Date.now()-1000)});
  await c.service.synchronize();assert.equal(c.row.isLive,false);assert.equal(c.row.obsRoomName,'');
 });
+
+test('OBS cannot replace a pending Android or browser preparation',async()=>{const c=setup();c.setRow({isLive:false,webrtcRoomName:'pending-camera',broadcastSource:'android'});assert.equal((await c.call('/prepare')).code,409);assert.equal(c.row.webrtcRoomName,'pending-camera');});

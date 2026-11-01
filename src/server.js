@@ -4,7 +4,7 @@ require('dotenv').config();
 const express = require('express');
 const crypto = require('crypto');
 const { notifyLiveTransition } = require('./live-start-emails');
-const { sessionKey: liveBroadcastSession, externalBroadcastId, requestScope, memberName } = require('./live-interactions');
+const { sessionKey: liveBroadcastSession, externalBroadcastId } = require('./live-interactions');
 const cors = require('cors');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
@@ -247,6 +247,7 @@ function createCode(prefix) {
 }
 
 const liveRequestReviewSchema = z.object({
+  session: z.string().min(1).max(300),
   decision: z.enum(['approved', 'rejected']),
   adminNote: z.string().trim().optional().default(''),
 });
@@ -680,7 +681,8 @@ function serializeLiveStreamConfig(config) {
     broadcastSessionId: liveBroadcastSession(config),
     isLive: Boolean(config?.isLive),
     title: config?.title || '',
-    streamUrl: config?.streamUrl || '',
+    streamUrl: '',
+    requiresSignIn: true,
     posterImage: config?.posterImage || '',
     statusLabel: config?.statusLabel || defaultLiveStreamConfig.statusLabel,
     activeSessionId: config?.activeSessionId || '',
@@ -698,6 +700,7 @@ function buildMuxPlaybackUrl(playbackId) {
 function serializeAdminLiveStreamConfig(config) {
   return {
     ...serializeLiveStreamConfig(config),
+    streamUrl: config?.streamUrl || '',
     obs: { roomName: config?.obsRoomName || '', state: config?.obsState || '',
       saveRecording: config?.obsSaveRecording !== false,
       url: config?.obsUrl || '', streamKey: config?.obsStreamKey || '', expiresAt: config?.obsExpiresAt || null,
@@ -1392,9 +1395,11 @@ app.patch('/api/live-stream', requireAdmin, async (request, response) => {
     });
   }
 
+  if (parsed.data.isLive) return response.status(409).json({message:'Members-only live broadcasts require OBS or browser broadcasting.'});
   const previous = await getLiveStreamConfig();
+  if (previous.isLive || previous.webrtcRoomName || previous.obsRoomName) return response.status(409).json({message:'End the current broadcast before changing its source.'});
   const config = await LiveStreamConfig.findOneAndUpdate(
-    { key: defaultLiveStreamConfig.key, obsRoomName: { $in: ['', null] } },
+    { key: defaultLiveStreamConfig.key, isLive:{$ne:true}, webrtcRoomName:{$in:['',null]}, obsRoomName: { $in: ['', null] } },
     { ...parsed.data, broadcastMode: 'youtube', webrtcRoomName: '', broadcastSessionId: externalBroadcastId(previous, parsed.data) },
     { new: true },
   );
@@ -1417,6 +1422,16 @@ app.put('/api/live-stream/goal', requireAdmin, async (request, response) => {
   return response.json({ item: serializeAdminLiveStreamConfig(config) });
 });
 
+app.patch('/api/live-stream/details', requireAdmin, async(request,response)=>{
+ const parsed=z.object({title:z.string().trim().min(1).max(180),roomName:z.string().max(300)}).strict().safeParse(request.body);
+ if(!parsed.success)return response.status(400).json({message:'Enter a broadcast title of 1–180 characters.'});
+ const current=await getLiveStreamConfig(),roomName=current.obsRoomName||current.webrtcRoomName||'';
+ if(roomName!==parsed.data.roomName)return response.status(409).json({message:'The connection changed. Refresh before editing the title.'});
+ const item=await LiveStreamConfig.findOneAndUpdate({key:defaultLiveStreamConfig.key,obsRoomName:current.obsRoomName||{$in:['',null]},webrtcRoomName:current.webrtcRoomName||{$in:['',null]}},{$set:{title:parsed.data.title}},{new:true});
+ if(!item)return response.status(409).json({message:'The connection changed. Refresh before editing.'});
+ return response.json({item:serializeAdminLiveStreamConfig(item)});
+});
+
 app.get('/api/live-stream/admin', requireAdmin, async (_request, response) => {
   response.set('Cache-Control', 'no-store');
   const config = await getLiveStreamConfig();
@@ -1426,7 +1441,7 @@ app.get('/api/live-stream/admin', requireAdmin, async (_request, response) => {
   });
 });
 
-app.get('/api/youtube/search', async (request, response) => {
+app.get('/api/youtube/search', requireAuth, async (request, response) => {
   const parsed = youtubeSearchSchema.safeParse({ query: request.query.q });
 
   if (!parsed.success) {
@@ -1523,230 +1538,17 @@ app.post('/api/live-requests/:id/to-wav', requireAdmin, async (request, response
   }
 });
 
-app.post('/api/live-requests/analyze', async (request, response) => {
-  const parsed = liveRequestAnalysisSchema.safeParse(request.body);
-
-  if (!parsed.success) {
-    return response.status(400).json({
-      message: 'Live request analysis payload failed validation.',
-      errors: parsed.error.flatten().fieldErrors,
-    });
-  }
-
-  const liveSessions = await getOrderedLiveSessions();
-  const analysis = await analyzeLiveRequest(parsed.data.message, liveSessions, {
-    requesterName: parsed.data.requesterName,
-  });
-
-  if (!analysis.metadata.track) {
-    return response.status(400).json({
-      message: 'The request agent could not recognize a song title yet.',
-    });
-  }
-
-  return response.json({
-    analysis: {
-      metadata: analysis.metadata,
-      duplicateSessionId: analysis.duplicateSession?.externalId || '',
-      duplicateTrack: analysis.duplicateSession?.track || '',
-      suggestedInsertAfterId: analysis.insertion.insertAfterId,
-      suggestedInsertBeforeId: analysis.insertion.insertBeforeId,
-      suggestedInsertLabel: analysis.insertion.label,
-      aiSummary: analysis.summary,
-    },
-  });
-});
-
-// Song requests are free; every request waits for Khalil's review before it is used.
-async function createLiveRequest(request, response) {
-  const session = liveBroadcastSession(await getLiveStreamConfig());
-  if (!session || request.body?.session !== session) return response.status(409).json({ message: 'Refresh to request a song for the current live broadcast.' });
-  const parsed = liveRequestCheckoutSchema.safeParse(request.body);
-
-  if (!parsed.success) {
-    return response.status(400).json({
-      message: 'Live request payload failed validation.',
-      errors: parsed.error.flatten().fieldErrors,
-    });
-  }
-
-  const requestGroupId = createCode('GROUP');
-  await LiveRequest.insertMany(parsed.data.requests.map((item) => ({
-    externalId: `live-request-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    requesterName: memberName(request.authUser),
-    requesterEmail: request.authUser.email,
-    requesterUserId: String(request.authUser._id),
-    broadcastSessionId: session,
-    requestGroupId,
-    confirmationCode: createCode('REQ'),
-    message: item.message,
-    ...buildDirectRequestMetadata(item.message),
-    requestStatus: 'pending_admin',
-    paymentStatus: 'none',
-    aiSummary: 'Awaiting Khalil review.',
-  })));
-
-  return response.status(201).json({ message: 'Request sent. Khalil will review it.' });
-}
-
-app.post('/api/live-requests/checkout', requireAuth, createLiveRequest);
-app.post('/api/live-requests', requireAuth, createLiveRequest);
-
-app.get('/api/live-requests/admin', requireAdmin, async (request, response) => {
-  const session = request.query.broadcast === 'current' ? liveBroadcastSession(await getLiveStreamConfig()) : undefined;
-  if (session === null) return response.json({ session: null, items: [] });
-  const requests = await LiveRequest.find({ paymentStatus: { $in: ['paid', 'none'] }, ...(session ? requestScope(session) : {}) }).sort({ createdAt: -1 });
-
-  return response.json({
-    session, items: requests.map(serializeLiveRequest),
-  });
-});
-
-app.delete('/api/live-requests/:id', requireAdmin, async (request, response) => {
-  const deleted = await LiveRequest.findOneAndDelete({ externalId: request.params.id });
-
-  if (!deleted) {
-    return response.status(404).json({
-      message: 'Live request not found.',
-    });
-  }
-
-  return response.json({
-    id: deleted.externalId,
-    message: 'Audience request deleted.',
-  });
-});
-
-app.patch('/api/live-requests/:id/review', requireAdmin, async (request, response) => {
-  const parsed = liveRequestReviewSchema.safeParse(request.body);
-
-  if (!parsed.success) {
-    return response.status(400).json({
-      message: 'Live request review payload failed validation.',
-      errors: parsed.error.flatten().fieldErrors,
-    });
-  }
-
-  const liveRequest = await LiveRequest.findOne({ externalId: request.params.id });
-
-  if (!liveRequest) {
-    return response.status(404).json({
-      message: 'Live request not found.',
-    });
-  }
-
-  if (parsed.data.decision === 'rejected') {
-    liveRequest.requestStatus = 'rejected';
-    liveRequest.adminNote = parsed.data.adminNote;
-    await liveRequest.save();
-
-    return response.json({
-      item: serializeLiveRequest(liveRequest),
-    });
-  }
-
-  const liveSessions = await getOrderedLiveSessions();
-  const analysis = await analyzeLiveRequest(liveRequest.message, liveSessions, {
-    requesterName: liveRequest.requesterName,
-    track: liveRequest.track,
-    artist: liveRequest.artist,
-    duration: liveRequest.duration,
-    genre: liveRequest.genre,
-    genres: liveRequest.genres,
-    subgenres: liveRequest.subgenres,
-    language: liveRequest.language,
-    mood: liveRequest.mood,
-    musicMoods: liveRequest.musicMoods,
-    instruments: liveRequest.instruments,
-    bpm: liveRequest.bpm,
-    musicalKey: liveRequest.musicalKey,
-    vocals: liveRequest.vocals,
-    energy: liveRequest.energy,
-    beat: liveRequest.beat,
-    lyricsSummary: liveRequest.lyricsSummary,
-    lyricsMoods: liveRequest.lyricsMoods,
-    lyricsEnergy: liveRequest.lyricsEnergy,
-    themes: liveRequest.themes,
-    lyricsLanguage: liveRequest.lyricsLanguage,
-    explicit: liveRequest.explicit,
-    sourcePlatform: liveRequest.sourcePlatform,
-    sourceUrl: liveRequest.sourceUrl,
-    thumbnailUrl: liveRequest.thumbnailUrl,
-  });
-
-  const duplicate = analysis.duplicateSession;
-  if (duplicate) {
-    liveRequest.requestStatus = 'duplicate';
-    liveRequest.duplicateSessionExternalId = duplicate.externalId;
-    liveRequest.adminNote =
-      parsed.data.adminNote || `Duplicate found: ${duplicate.track} is already in the live session list.`;
-    await liveRequest.save();
-
-    return response.status(409).json({
-      message: 'This request matches an existing live session item.',
-      item: serializeLiveRequest(liveRequest),
-    });
-  }
-
-  const createdSession = await LiveSession.create({
-    externalId: `live-session-${Date.now()}`,
-    track: liveRequest.track,
-    artist: liveRequest.artist,
-    duration: liveRequest.duration,
-    genre: liveRequest.genre,
-    genres: liveRequest.genres,
-    subgenres: liveRequest.subgenres,
-    language: liveRequest.language,
-    musicMoods: liveRequest.musicMoods,
-    instruments: liveRequest.instruments,
-    bpm: liveRequest.bpm,
-    musicalKey: liveRequest.musicalKey,
-    vocals: liveRequest.vocals,
-    energy: liveRequest.energy,
-    beat: liveRequest.beat,
-    lyricsSummary: liveRequest.lyricsSummary,
-    lyricsMoods: liveRequest.lyricsMoods,
-    lyricsEnergy: liveRequest.lyricsEnergy,
-    themes: liveRequest.themes,
-    lyricsLanguage: liveRequest.lyricsLanguage,
-    explicit: liveRequest.explicit,
-    playState: 'requested',
-    sortOrder: 0,
-    sourcePlatform: liveRequest.sourcePlatform,
-    sourceUrl: liveRequest.sourceUrl,
-    requestExternalId: liveRequest.externalId,
-  });
-
-  const reorderedQueue = buildReorderedQueue(liveSessions, createdSession, analysis.insertion.insertIndex);
-  await Promise.all(
-    reorderedQueue.map(({ session, sortOrder }) =>
-      LiveSession.updateOne(
-        { _id: session._id },
-        { sortOrder },
-      ),
-    ),
-  );
-
-  liveRequest.requestStatus = 'approved';
-  liveRequest.adminNote = parsed.data.adminNote;
-  liveRequest.createdSessionExternalId = createdSession.externalId;
-  liveRequest.suggestedInsertAfterId = analysis.insertion.insertAfterId;
-  liveRequest.suggestedInsertBeforeId = analysis.insertion.insertBeforeId;
-  liveRequest.suggestedInsertLabel = analysis.insertion.label;
-  await liveRequest.save();
-
-  const refreshedLiveSessions = await getOrderedLiveSessions();
-
-  return response.json({
-    item: serializeLiveRequest(liveRequest),
-    liveSessions: refreshedLiveSessions.map(serializeLiveSession),
-  });
+require('./live-requests').registerLiveRequestRoutes(app,{
+ requireAuth,requireAdmin,getLiveStreamConfig,LiveRequest,LiveSession,
+ liveRequestAnalysisSchema,liveRequestCheckoutSchema,liveRequestReviewSchema,
+ getOrderedLiveSessions,analyzeLiveRequest,buildDirectRequestMetadata,createCode,
+ buildReorderedQueue,serializeLiveRequest,serializeLiveSession,
 });
 
 app.post('/api/live-stream/mux', requireAdmin, async (request, response) => {
   try {
     const currentConfig = await getLiveStreamConfig();
-    if (currentConfig.obsRoomName) return response.status(409).json({ message: 'End the OBS session first.' });
+    if (currentConfig.isLive || currentConfig.webrtcRoomName || currentConfig.obsRoomName) return response.status(409).json({ message: 'End the current broadcast first.' });
     const muxLiveStream = await createMuxLiveStream(request.body?.title || currentConfig.title);
     const muxPlaybackId = muxLiveStream.playback_ids?.[0]?.id || '';
     const muxStreamKey = muxLiveStream.stream_key || '';
@@ -1754,7 +1556,7 @@ app.post('/api/live-stream/mux', requireAdmin, async (request, response) => {
     const streamUrl = buildMuxPlaybackUrl(muxPlaybackId);
 
     const updatedConfig = await LiveStreamConfig.findOneAndUpdate(
-      { key: defaultLiveStreamConfig.key, obsRoomName: { $in: ['', null] } },
+      { key: defaultLiveStreamConfig.key, isLive:{$ne:true}, webrtcRoomName:{$in:['',null]}, obsRoomName: { $in: ['', null] } },
       {
         title: request.body?.title?.trim() || currentConfig.title || defaultLiveStreamConfig.title,
         streamUrl,
@@ -1791,35 +1593,7 @@ require('./live-broadcast').registerLiveBroadcastRoutes(app, {
   },
 });
 
-app.post('/api/live-stream/webrtc/viewer-token', async (_request, response) => {
-  try {
-    const currentConfig = await getLiveStreamConfig();
-
-    if (!currentConfig.isLive || currentConfig.broadcastMode !== 'webrtc' || !currentConfig.webrtcRoomName) {
-      return response.status(409).json({
-        message: 'The browser broadcast is not live right now.',
-      });
-    }
-
-    const token = await createLiveKitToken({
-      roomName: currentConfig.webrtcRoomName,
-      identity: `viewer-${crypto.randomUUID()}`,
-      name: 'Viewer',
-      canPublish: false,
-    });
-
-    return response.json({
-      token,
-      url: getLiveKitConfig().wsUrl,
-      roomName: currentConfig.webrtcRoomName,
-    });
-  } catch (error) {
-    console.error('WebRTC viewer token failed:', error);
-    return response.status(error.status || 500).json({
-      message: error.message || 'Unable to issue a viewer token.',
-    });
-  }
-});
+require('./live-access').registerLiveAccess(app, { requireAuth, getLiveStreamConfig, createToken: createLiveKitToken, getConfig: getLiveKitConfig });
 
 const youtubeSessionStore = createYoutubeSessionStore(process.env.YT_DLP_COOKIES_FILE);
 let youtubeConversionActive = false;
@@ -1973,7 +1747,7 @@ require('./availability').registerAvailability(app, { requireAdmin });
 vouchers.registerVouchers(app, { requireAdmin, requireAuth });
 require('./live-recordings').registerLiveRecordings(app, requireAdmin);
 require('./live-suggestions').registerLiveSuggestions(app, { getLiveStreamConfig, requireAuth });
-require('./live-comments').registerLiveComments(app, { getLiveStreamConfig, requireAuth });
+require('./live-comments').registerLiveComments(app, { getLiveStreamConfig, requireAuth, requireAdmin });
 require('./notification-emails').registerNotificationEmails(app, { requireAdmin });
 registerEquipmentRoutes(app, requireAdmin);
 require('./equipment-3d').registerEquipment3D(app,{requireAdmin});

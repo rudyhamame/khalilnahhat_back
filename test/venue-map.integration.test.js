@@ -56,3 +56,24 @@ test('venue directory endpoints are absent and search stays authenticated',async
   assert.equal(calls,10);
  }finally{await new Promise(r=>server.close(r));}
 });
+
+test('searching a city name lists that city\'s venues, never the city itself',async()=>{
+ const express=require('express'),local=express(),calls=[];
+ const guard=(req,res,next)=>{req.authUser={_id:'qa-city'};next();};
+ const city={name:'Toronto',city:'Toronto',result_type:'city',lat:43.65,lon:-79.38,place_id:'city-toronto',formatted:'Toronto, ON, Canada'};
+ const venue={name:'Banquet Palace',formatted:'1 Hall Rd, Toronto, ON, Canada',city:'Toronto',country:'Canada',lat:43.7,lon:-79.4,place_id:'hall-1',categories:['entertainment']};
+ require('../src/venue-map/routes').registerVenueMap(local,{requireAdmin:guard,requireAuth:guard,env:{VENUE_SEARCH_API_KEY:'fixture-secret'},fetchImpl:async url=>{
+  calls.push({path:url.pathname,categories:url.searchParams.get('categories'),filter:url.searchParams.get('filter')});
+  if(url.pathname==='/v1/geocode/search')return new Response(JSON.stringify({results:[city]}));
+  if(url.pathname==='/v2/places')return new Response(JSON.stringify({features:[{properties:venue}]}));
+  throw new Error('unexpected '+url.pathname);
+ }});
+ const server=local.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
+ try{
+  const run=async params=>{const res=await fetch(`http://127.0.0.1:${server.address().port}/api/venue-map/search?`+new URLSearchParams({q:'Toronto',bounds:'-95.2,41.6,-74.3,56.9',...params}));assert.equal(res.status,200);return (await res.json()).items;};
+  let items=await run({type:'banquet_hall'});
+  assert.deepEqual(items.map(item=>item.name),['Banquet Palace']);assert.equal(items[0].venueType,'banquet_hall');
+  assert.equal(calls.at(-1).path,'/v2/places');assert.equal(calls.at(-1).filter,'place:city-toronto');assert.match(calls.at(-1).categories,/community_center/);
+  items=await run({});assert.deepEqual(items.map(item=>item.name),['Banquet Palace']);assert.match(calls.at(-1).categories,/catering/,'no type chosen searches every venue category');
+ }finally{await new Promise(r=>server.close(r));}
+});

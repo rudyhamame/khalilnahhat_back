@@ -21,12 +21,12 @@ function registerLiveBroadcastRoutes(app, deps) {
         { isLive: false, webrtcRoomName: '', statusLabel: defaults.statusLabel }, { new: true },
       );
       return response.json({ received: true });
-    } catch { return response.status(503).json({ message: 'Could not update broadcast status.' }); }
+    } catch { return response.status(503).json({ message: 'Could not update live stream status.' }); }
   });
   app.post('/api/live-stream/webrtc/go-live', requireAdmin, async (request, response) => {
     try {
       const current = await getLiveStreamConfig();
-      if (current.isLive || current.webrtcRoomName || current.obsRoomName) return response.status(409).json({ message: 'A broadcast is already live. End it before starting another.' });
+      if (current.isLive || current.webrtcRoomName || current.obsRoomName) return response.status(409).json({ message: 'A live stream is already active. End it before starting another.' });
       const roomName = `khalil-live-${randomUUID()}`;
       const config = getConfig();
       const token = await createToken({ roomName, identity: 'khalil-broadcaster', name: 'Khalil Nahhat', canPublish: true });
@@ -39,7 +39,7 @@ function registerLiveBroadcastRoutes(app, deps) {
           statusLabel: 'Connecting browser…', broadcastMode: 'webrtc', broadcastSource: source, webrtcRoomName: roomName },
         { new: true },
       );
-      if (!updated) return response.status(409).json({ message: 'Another broadcaster started first. Refresh your live status.' });
+      if (!updated) return response.status(409).json({ message: 'Another source started first. Refresh your live status.' });
       if (prepareRecording) {
         try { await prepareRecording(roomName, title || current.title || defaults.title); }
         catch (error) {
@@ -56,7 +56,7 @@ function registerLiveBroadcastRoutes(app, deps) {
       return response.status(201).json({ item: serialize(updated), token, url: config.wsUrl, roomName });
     } catch (error) {
       console.error('WebRTC go-live failed:', error.message);
-      return response.status(error.status || 500).json({ message: error.status === 503 ? error.message : 'Could not start the broadcast.' });
+      return response.status(error.status || 500).json({ message: error.status === 503 ? error.message : 'Could not start the live stream.' });
     }
   });
   app.post('/api/live-stream/webrtc/ready', requireAdmin, async (request,response) => {
@@ -74,10 +74,10 @@ function registerLiveBroadcastRoutes(app, deps) {
       }
       if(!mediaReady)return response.status(409).json({message:'Publish a camera or microphone before going on air.'});
       const updated=await LiveStreamConfig.findOneAndUpdate({key:defaults.key,webrtcRoomName:roomName,broadcastSource:current.broadcastSource}, {isLive:true,statusLabel:'Live now — DJ Khalil is on air.'},{new:true});
-      if(!updated)return response.status(409).json({message:'The broadcast changed.'});
+      if(!updated)return response.status(409).json({message:'The live stream changed.'});
       await deps.notifyLiveTransition?.(current,updated);
       return response.json({item:serialize(updated)});
-    }catch{return response.status(503).json({message:'Could not confirm the browser broadcast. Retry its status.'});}
+    }catch{return response.status(503).json({message:'Could not confirm the browser live stream. Retry its status.'});}
   });
   app.post('/api/live-stream/webrtc/end', requireAdmin, async (request, response) => {
     try {

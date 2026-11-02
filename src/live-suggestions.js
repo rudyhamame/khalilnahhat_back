@@ -14,7 +14,7 @@ function platform(value){try{const h=new URL(value).hostname.toLowerCase();retur
 function registerLiveSuggestions(app,{getLiveStreamConfig,requireAuth,RequestModel=LiveRequest,clock=Date.now}){
  app.get('/api/live-suggestions',requireAuth,async(req,res)=>{
   const session=sessionKey(await getLiveStreamConfig());
-  if(req.query?.session!==session)return res.status(409).json({message:'The broadcast changed. Refresh your requests.'});
+  if(req.query?.session!==session)return res.status(409).json({message:'The live stream changed. Refresh your requests.'});
   const items=session?await RequestModel.find({...requestScope(session),requesterUserId:String(req.authUser._id)}).sort({createdAt:-1}).limit(20).lean():[];
   return res.set('Cache-Control','no-store').json({session,items:items.map(row=>({id:row.externalId,track:row.track,artist:row.artist,confirmationCode:row.confirmationCode,status:row.requestStatus,createdAt:row.createdAt}))});
  });

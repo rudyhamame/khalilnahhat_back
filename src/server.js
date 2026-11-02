@@ -1437,7 +1437,7 @@ app.get('/api/live-stream/admin', requireAdmin, async (_request, response) => {
   const config = await getLiveStreamConfig();
 
   return response.json({
-    item: serializeAdminLiveStreamConfig(config),
+    item: {...serializeAdminLiveStreamConfig(config),recording:await require('./live-recordings').statusForRoom(config.obsRoomName||config.webrtcRoomName)},
   });
 });
 
@@ -1586,7 +1586,7 @@ require('./live-broadcast').registerLiveBroadcastRoutes(app, {
   requireAdmin, getLiveStreamConfig, LiveStreamConfig, defaults: defaultLiveStreamConfig, notifyLiveTransition,
   createToken: createLiveKitToken, getConfig: getLiveKitConfig,
   serialize: serializeAdminLiveStreamConfig, serializePublic: serializeLiveStreamConfig,
-  RoomServiceClient, IngressClient, randomUUID: crypto.randomUUID, prepareRecording: require('./live-recordings').prepareRecordingRoom, ensureRecording: require('./live-recordings').ensureRecording,
+  RoomServiceClient, IngressClient, randomUUID: crypto.randomUUID, prepareRecording: require('./live-recordings').prepareRecordingRoom, ensureRecording: require('./live-recordings').ensureRecording, recordingStatus: require('./live-recordings').statusForRoom,
   verifyWebhook: async (body, authorization) => {
     const { apiKey, apiSecret } = getLiveKitConfig();
     return new WebhookReceiver(apiKey, apiSecret).receive(body, authorization);

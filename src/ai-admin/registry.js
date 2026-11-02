@@ -51,7 +51,7 @@ function createRegistry({invoke,app}){
   ['catalog_search','Website Catalog','/api/admin/setup-catalog','Read events and services in the website catalog.'],
   ['testimonials_search','Website','/api/content/testimonials/admin','Read testimonials and their replies.'],
   ['media_search','Website','/api/content/media/admin','Read website media.'],
-  ['live_archive_search','Production','/api/admin/live-recordings','Read recorded broadcasts.'],
+  ['live_archive_search','Production','/api/admin/live-recordings','Read recorded live streams.'],
   ['meetings_search','Meetings','/api/meetings/admin','Read meeting schedule.'],
   ['theme_read','Application Administration','/api/seasonal-theme','Read seasonal theme configuration.'],
   ['ai_configuration_read','Application Administration','/api/ai-booking/admin/config','Read AI configuration, model catalog and configured flags. Never exposes API keys.'],

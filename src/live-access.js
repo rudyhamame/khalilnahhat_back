@@ -5,7 +5,7 @@ function registerLiveAccess(app,{requireAuth,getLiveStreamConfig,createToken,get
   res.set('Cache-Control','no-store');
   try {
    const current=await getLiveStreamConfig(),session=sessionKey(current);
-   if(!session||req.body?.session!==session)return res.status(409).json({message:'The broadcast changed. Refresh before reconnecting.'});
+   if(!session||req.body?.session!==session)return res.status(409).json({message:'The live stream changed. Refresh before reconnecting.'});
    if(current.broadcastMode==='whep'&&current.obsRoomName&&relay.configured()) {
     // Construct the URL from trusted relay configuration, never from an arbitrary saved URL.
     const origin=new URL(env.ECHO_OBS_RELAY_URL);if(origin.protocol!=='https:')throw new Error('Invalid relay');

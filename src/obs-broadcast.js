@@ -59,7 +59,7 @@ function registerObsBroadcastRoutes(app, deps) {
   }
   app.get('/api/live-stream/obs', requireAdmin, async (_req, res) => {
     res.set?.('Cache-Control', 'no-store');
-    try { return res.json({ item: serialize(await synchronize()) }); }
+    try { const row=await synchronize();const item=serialize(row);if(deps.recordingStatus)item.recording=await deps.recordingStatus(row.obsRoomName||row.webrtcRoomName);return res.json({item}); }
     catch { return res.status(503).json({ message: 'Could not check OBS. Try again shortly.' }); }
   });
   app.patch('/api/live-stream/obs/recording', requireAdmin, async (req, res) => {
@@ -80,7 +80,7 @@ function registerObsBroadcastRoutes(app, deps) {
     try {
       getConfig();
       const current = await getLiveStreamConfig();
-      if (current.isLive || current.webrtcRoomName || current.obsRoomName) return res.status(409).json({ message: 'End the existing broadcast or OBS session first.' });
+      if (current.isLive || current.webrtcRoomName || current.obsRoomName) return res.status(409).json({ message: 'End the existing live stream or OBS session first.' });
       const roomName = `khalil-obs-${randomUUID()}`;
       const title = (typeof req.body?.title === 'string' && req.body.title.trim().slice(0, 180)) || current.title || defaults.title;
       claimed = await LiveStreamConfig.findOneAndUpdate({ key: defaults.key, isLive: { $ne: true }, webrtcRoomName: { $in: ['', null] }, obsRoomName: { $in: ['', null] } },

@@ -6,39 +6,42 @@ const {RoomEgress,AutoParticipantEgress,EncodedFileOutput,S3Upload,EncodedFileTy
 const {ArchiveItem}=require('./models');
 const {MediaItem}=require('./content');
 const {recordingStorageConfig}=require('./recording-storage');
-const fs=require('fs/promises');
-const {createWriteStream}=require('fs');
-const {pipeline}=require('stream/promises');
-const path=require('path');
-const {prepareRecordingFiles,cloudAssetId,DEFAULT_LIMIT}=require('./recording-files');
+const {createRecordingPipeline}=require('./recording-pipeline');
+const {createRecordingProviders}=require('./recording-providers');
+const {prepareRecordingFiles}=require('./recording-files');
 
+const partSchema={_id:false,publicId:String,delivery:String,bytes:Number,duration:Number,sha256:String};
+const sourceSchema={_id:false,key:String,remote:String,saved:Boolean,cleaned:Boolean,error:String,parts:[partSchema]};
 const schema=new mongoose.Schema({
  roomName:{type:String,unique:true,required:true},title:String,status:{type:String,default:'waiting'},egressId:String,objectKey:String,
- parts:[{_id:false,publicId:String,delivery:String,bytes:Number,duration:Number}],
+ parts:[partSchema],sources:[sourceSchema],legacyParts:[partSchema],
+ leaseToken:{type:String,default:''},cleanupPending:{type:Boolean,default:false},
+ captureState:{type:String,default:'waiting'},captureWarning:{type:String,default:''},captureAttempts:{type:Number,default:0},endObservedAt:Date,captureCheckedAt:Date,captureRequestedAt:Date,
  publicId:String,delivery:{type:String,default:'authenticated'},bytes:{type:Number,default:0},duration:{type:Number,default:0},
  attempts:{type:Number,default:0},nextRetryAt:{type:Date,default:()=>new Date()},leaseUntil:{type:Date,default:()=>new Date(0)},
  deletedAt:{type:Date,default:null},
  provider:{type:String,default:'livekit'},relaySegments:[String],
  error:{type:String,default:''},published:{type:Boolean,default:false},test:{type:Boolean,default:false},
 },{timestamps:true});
+schema.index({deletedAt:1,nextRetryAt:1,leaseUntil:1});
 const LiveRecording=mongoose.models.LiveRecording||mongoose.model('LiveRecording',schema);
 function configured(){return Boolean(recordingStorageConfig()&&process.env.CLOUDINARY_API_SECRET);}
 function store(){
  const config=recordingStorageConfig();
- if(!config)throw Object.assign(new Error('Configure private S3 recording storage before broadcasting.'),{status:503});
+ if(!config)throw Object.assign(new Error('Configure private S3 recording storage before starting a live stream.'),{status:503});
  return new Client({endPoint:config.host,port:config.port,useSSL:config.useSSL,accessKey:config.accessKey,secretKey:config.secretKey,region:config.region});
 }
 function sdk(Class){return new Class(process.env.LIVEKIT_URL,process.env.LIVEKIT_API_KEY,process.env.LIVEKIT_API_SECRET);}
 function recordingParts(row){return row.parts?.length?Array.from(row.parts):row.publicId?[{publicId:row.publicId,delivery:row.delivery||'authenticated',bytes:row.bytes,duration:row.duration}]:[];}
-function view(row){const parts=recordingParts(row);return {id:String(row._id),title:row.title,status:row.status,bytes:row.bytes,durationSec:row.duration,published:row.published,createdAt:row.createdAt,error:row.error||'',canPreview:row.status==='ready'&&parts.length>0,partCount:parts.length,parts:parts.map((part,index)=>({index,bytes:part.bytes,durationSec:part.duration}))};}
+function view(row){const parts=recordingParts(row);return {id:String(row._id),title:row.title,status:row.status,bytes:row.bytes,durationSec:row.duration,published:row.published,createdAt:row.createdAt,error:row.error||'',captureState:row.captureState||'unknown',captureCheckedAt:row.captureCheckedAt||null,warning:row.captureWarning||'',cleanupPending:Boolean(row.cleanupPending),savedPartCount:parts.length,canRetry:['failed','upload_failed'].includes(row.status)||row.captureState==='failed'||(row.status==='partial'&&row.sources?.some(source=>!source.saved)),canRemove:!row.cleanupPending&&(['ready','partial','not_recorded'].includes(row.status)||(['failed','upload_failed'].includes(row.status)&&row.captureState==='ended')),canPreview:['ready','partial'].includes(row.status)&&parts.length>0,partCount:parts.length,parts:parts.map((part,index)=>({index,bytes:part.bytes,durationSec:part.duration}))};}
 function recordingLink(row,partIndex,attachment){
  const parts=recordingParts(row);const index=partIndex===undefined?0:Number(partIndex);
  if(!Number.isInteger(index)||index<0||index>=parts.length)return null;
  const part=parts[index];
  return cloudinary.utils.private_download_url(part.publicId,'mp4',{resource_type:'video',type:part.delivery||'authenticated',expires_at:Math.floor(Date.now()/1000)+180,attachment});
 }
-async function uploadRecordingPart(filename,publicId){
- try {const existing=await cloudinary.api.resource(publicId,{resource_type:'video',type:'authenticated'});if(existing.bytes>0)return existing;}
+async function uploadRecordingPart(filename,publicId,expected={}){
+ try {const existing=await cloudinary.api.resource(publicId,{resource_type:'video',type:'authenticated'});if(existing.public_id!==publicId||!(existing.bytes>0)||(expected.bytes&&existing.bytes!==expected.bytes))throw new Error('Archive identity or size mismatch');return existing;}
  catch(error){if((error.http_code||error.error?.http_code)!==404)throw error;}
  return new Promise((resolve,reject)=>{const stream=cloudinary.uploader.upload_large(filename,{resource_type:'video',type:'authenticated',public_id:publicId,overwrite:false,chunk_size:20*1024*1024,timeout:600000},(error,result)=>error?reject(error):resolve(result));stream.on('error',reject);});
 }
@@ -52,7 +55,7 @@ async function prepareRecordingRoom(roomName,title,test=false){
  if(!configured())throw Object.assign(new Error('Automatic recording storage is not configured.'),{status:503});
  const config=recordingStorageConfig(),BUCKET=config.bucket;
  const client=store();
- if(!await client.bucketExists(BUCKET))throw Object.assign(new Error('Create the private recording staging bucket before broadcasting.'),{status:503});
+ if(!await client.bucketExists(BUCKET))throw Object.assign(new Error('Create the private recording staging bucket before starting a live stream.'),{status:503});
  // Bound visible staging data before another recording. Provider spending caps and
  // version lifecycle rules must be configured separately.
  let used=0;for await(const obj of client.listObjectsV2(BUCKET,'',true)){used+=obj.size||0;}
@@ -62,98 +65,49 @@ async function prepareRecordingRoom(roomName,title,test=false){
  try {
   await sdk(RoomServiceClient).createRoom({name:roomName,emptyTimeout:180,departureTimeout:15,
    egress:new RoomEgress({participant:new AutoParticipantEgress({options:{case:'preset',value:EncodingOptionsPreset.H264_720P_30},fileOutputs:[file]})})});
- }catch(error){await LiveRecording.updateOne({_id:recording._id},{$set:{status:'failed',error:'LiveKit could not enable recording.'}});throw Object.assign(new Error('LiveKit could not enable automatic recording.'),{status:503});}
+ }catch(error){await LiveRecording.updateOne({_id:recording._id},{$set:{status:'failed',captureState:'ended',error:'LiveKit could not enable recording.'}});throw Object.assign(new Error('LiveKit could not enable automatic recording.'),{status:503});}
  return recording;
 }
-async function transferRecording(row){
- const BUCKET=recordingStorageConfig()?.bucket;
- const claimed=await LiveRecording.findOneAndUpdate({_id:row._id,deletedAt:null,status:{$in:['waiting','recording','upload_failed','processing']},leaseUntil:{$lt:new Date()}},{$set:{status:'processing',leaseUntil:new Date(Date.now()+15*60*1000)},$inc:{attempts:1}},{new:true});
- if(!claimed)return;
- let directory;
- try {
-  if(!objectBelongsToRoom(claimed.objectKey,claimed.roomName))throw new Error('Invalid recording object.');
-  directory=await fs.mkdtemp('/var/tmp/echo-recording-');await fs.chmod(directory,0o700);
-  const filename=path.join(directory,'recording.mp4');
-  await pipeline(await store().getObject(BUCKET,claimed.objectKey),createWriteStream(filename,{mode:0o600}));
-  const files=await prepareRecordingFiles(filename,directory,DEFAULT_LIMIT);
-  const parts=[];
-  for(let index=0;index<files.length;index++){
-   const file=files[index];const publicId=cloudAssetId(claimed.roomName,index,files.length);
-   const output=await uploadRecordingPart(file.filename,publicId);
-   if(output.public_id!==publicId||!output.bytes)throw new Error('Cloudinary did not confirm the recording part.');
-   parts.push({publicId:output.public_id,delivery:'authenticated',bytes:output.bytes,duration:output.duration||file.duration});
-  }
-  await LiveRecording.updateOne({_id:claimed._id},{$set:{status:'ready',parts,publicId:parts[0].publicId,delivery:'authenticated',bytes:parts.reduce((n,p)=>n+p.bytes,0),duration:claimed.duration||parts.reduce((n,p)=>n+p.duration,0),error:'',leaseUntil:new Date(0)}});
-  // A cleanup failure must never downgrade a confirmed Cloudinary recording.
-  try {await store().removeObject(BUCKET,claimed.objectKey);await LiveRecording.updateOne({_id:claimed._id},{$set:{objectKey:''}});}catch {console.error('Live Archive staging cleanup pending');}
- }catch(error){
-  await LiveRecording.updateOne({_id:claimed._id},{$set:{status:'upload_failed',error:'Cloudinary transfer did not finish. The staging recording is retained; retry from Live Archive.',leaseUntil:new Date(0),nextRetryAt:new Date(Date.now()+Math.min(claimed.attempts*300,1800)*1000)}});
-  console.error('Live Archive transfer failed:',error.http_code||error.code||error.name);
- }finally{if(directory)await fs.rm(directory,{recursive:true,force:true}).catch(()=>{});}
+async function verifyArchivedPart(part){
+ const stored=await cloudinary.api.resource(part.publicId,{resource_type:'video',type:part.delivery||'authenticated'});
+ if(stored.public_id!==part.publicId||!(stored.bytes>0)||(part.bytes&&stored.bytes!==part.bytes))throw new Error('Saved archive part could not be confirmed');
 }
-// Auto-recording is attached to the room when it is prepared, but LiveKit deletes an empty room after emptyTimeout. If OBS connects
-// later, LiveKit recreates the room WITHOUT recording and the stream is never saved. So recording is also started from the publisher.
-const starting=new Set();
+const pipeline=createRecordingPipeline({Model:LiveRecording,
+ providers:createRecordingProviders({store,bucket:()=>recordingStorageConfig()?.bucket,
+  egress:()=>sdk(EgressClient),rooms:()=>sdk(RoomServiceClient),
+  startCapture:(roomName,identity)=>sdk(EgressClient).startParticipantEgress(roomName,identity,{file:recordingFile(roomName,recordingStorageConfig())},{encodingOptions:EncodingOptionsPreset.H264_720P_30})}),
+ prepareFiles:prepareRecordingFiles,upload:uploadRecordingPart,verify:verifyArchivedPart});
+async function statusForRoom(roomName){
+ if(!roomName)return null;
+ try{const row=await LiveRecording.findOne({roomName,deletedAt:null});return row?view(row):null;}catch{return {status:'unavailable',captureState:'unknown',error:'Recording status could not be checked.'};}
+}
+async function transferRecording(row){return pipeline.run(row._id);}
 async function ensureRecording(roomName){
- if(!configured()||starting.has(roomName))return false;
- starting.add(roomName);
- try {
-  const egress=sdk(EgressClient);
-  if((await egress.listEgress({roomName})).length)return false; // already recording, finished, or failed (failures are reported separately)
-  const publisher=(await sdk(RoomServiceClient).listParticipants(roomName)).find(participant=>participant.tracks?.length);
-  if(!publisher)return false;
-  await egress.startParticipantEgress(roomName,publisher.identity,{file:recordingFile(roomName,recordingStorageConfig())},{encodingOptions:EncodingOptionsPreset.H264_720P_30});
-  return true;
- }finally{starting.delete(roomName);}
+ if(!configured())return false;
+ const row=await LiveRecording.findOne({roomName,deletedAt:null,status:{$nin:['ready','partial','not_recorded']}});
+ if(!row)return false;
+ await pipeline.run(row._id);return true;
 }
-let sweeping=false;
-async function sweepRecordings(){
- if(sweeping)return;sweeping=true;
- try {
-  const pending={deletedAt:null,$or:[{status:{$in:['waiting','recording']}},{status:'upload_failed',attempts:{$lt:3},nextRetryAt:{$lte:new Date()}},{status:'processing',leaseUntil:{$lt:new Date()}}]};
-  const rows=await LiveRecording.find({...pending,provider:'ovh'}).sort({createdAt:1}).limit(10);
-  if(configured())rows.push(...await LiveRecording.find({...pending,provider:{$ne:'ovh'}}).sort({createdAt:1}).limit(10));
-  for(const row of rows){
-   try {
-    if(row.provider==='ovh'){await require('./obs-relay-recordings').transfer(row,{LiveRecording,uploadRecordingPart,prepareRecordingFiles,DEFAULT_LIMIT});continue;}
-    if(row.objectKey){await transferRecording(row);continue;}
-    const jobs=await sdk(EgressClient).listEgress({roomName:row.roomName});
-    const completedFile=job=>job.fileResults?.[0] || (job.result?.case==='file'?job.result.value:null);
-    const complete=jobs.find(job=>[3,6].includes(job.status)&&completedFile(job));
-    if(complete){
-     const file=completedFile(complete);const key=file.filename;
-     if(!objectBelongsToRoom(key,row.roomName))throw new Error('Unexpected recording object.');
-     await LiveRecording.updateOne({_id:row._id},{$set:{objectKey:key,egressId:complete.egressId,status:'recording',duration:Number(file.duration||0)/1e9}});
-     row.objectKey=key;await transferRecording(row);
-    }else if(jobs.some(job=>[0,1,2].includes(job.status))){await LiveRecording.updateOne({_id:row._id},{$set:{status:'recording'}});}
-    else if(!jobs.length&&await ensureRecording(row.roomName).catch(()=>false)){await LiveRecording.updateOne({_id:row._id},{$set:{status:'recording'}});}
-    else if(jobs.some(job=>[4,5].includes(job.status))||Date.now()-row.createdAt.getTime()>5*60*1000){
-     const active=await sdk(RoomServiceClient).listRooms([row.roomName]);
-     if(active.length)continue;
-     await LiveRecording.updateOne({_id:row._id},{$set:{status:jobs.length?'failed':'not_recorded',error:jobs.length?'LiveKit did not finish a recording. No completed file is available.':'This connection ended without a recording file. There is no saved media to recover.'}});
-    }
-   }catch(error){console.error('Live Archive check failed:',error.code||error.name);}
-  }
- }finally{sweeping=false;}
-}
-function registerLiveRecordings(app,requireAdmin){
+async function sweepRecordings(){return pipeline.sweep();}
+let workerTimer;
+function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWorker=true}={}){
  app.get('/api/admin/live-recordings',requireAdmin,async(_req,res)=>res.json({items:(await LiveRecording.find({test:{$ne:true},deletedAt:null}).sort({createdAt:-1}).limit(500)).map(view)}));
  for(const route of ['download','preview']) app.get(`/api/admin/live-recordings/:id/${route}`,requireAdmin,async(req,res)=>{
   res.set('Cache-Control','no-store');
   const row=mongoose.isValidObjectId(req.params.id)?await LiveRecording.findOne({_id:req.params.id,deletedAt:null}):null;
-  if(!row||row.status!=='ready')return res.status(404).json({message:'The recording is not ready.'});
+  if(!row||!['ready','partial'].includes(row.status))return res.status(404).json({message:'The recording is not ready.'});
   const url=recordingLink(row,req.query.part,route==='download');
   if(!url)return res.status(400).json({message:'Select a valid recording part.'});
   res.json({url,expiresIn:180});
  });
  app.post('/api/admin/live-recordings/:id/retry',requireAdmin,async(req,res)=>{
-  const row=mongoose.isValidObjectId(req.params.id)?await LiveRecording.findOneAndUpdate({_id:req.params.id,deletedAt:null,status:{$in:['failed','upload_failed']}},{$set:{attempts:0,status:'upload_failed',nextRetryAt:new Date(),leaseUntil:new Date(0)}},{new:true}):null;
+  const row=mongoose.isValidObjectId(req.params.id)?await LiveRecording.findOneAndUpdate({_id:req.params.id,deletedAt:null,$or:[{status:{$in:['failed','upload_failed']}},{status:'recording',captureState:'failed'},{status:'partial',sources:{$elemMatch:{saved:false}}}],leaseUntil:{$lte:new Date()}},{$set:{attempts:0,captureAttempts:0,status:'upload_failed',nextRetryAt:new Date()}},{new:true}):null;
   if(!row)return res.status(409).json({message:'This recording cannot be retried now.'});
-  res.json({item:view(row)});sweepRecordings().catch(()=>{});
+  res.json({item:view(row)});sweep().catch(()=>{});
  });
  app.delete('/api/admin/live-recordings/:id',requireAdmin,async(req,res)=>{
   if(!mongoose.isValidObjectId(req.params.id))return res.status(400).json({message:'Invalid recording.'});
-  const row=await LiveRecording.findOneAndUpdate({_id:req.params.id,deletedAt:null,status:{$in:['ready','failed','upload_failed','not_recorded']},leaseUntil:{$lt:new Date()}},{$set:{deletedAt:new Date()}},{new:true});
+  const row=await LiveRecording.findOneAndUpdate({_id:req.params.id,deletedAt:null,status:{$in:['ready','partial','failed','upload_failed','not_recorded']},$or:[{status:{$in:['ready','partial','not_recorded']}},{captureState:'ended'}],leaseUntil:{$lt:new Date()},cleanupPending:{$ne:true}},{$set:{deletedAt:new Date()}},{new:true});
   if(!row)return res.status(409).json({message:'This recording is active, saving, or already removed. Refresh and try again.'});
   res.json({deleted:true,id:String(row._id),recoverable:true});
  });
@@ -164,26 +118,38 @@ function registerLiveRecordings(app,requireAdmin){
   res.json({item:view(row)});
  });
  app.post('/api/admin/live-recordings/:id/publish',requireAdmin,async(req,res)=>{
-  const row=mongoose.isValidObjectId(req.params.id)?await LiveRecording.findOne({_id:req.params.id,deletedAt:null}):null;
-  if(!row||row.status!=='ready')return res.status(409).json({message:'Wait for the recording to finish processing.'});
+  if(!mongoose.isValidObjectId(req.params.id))return res.status(400).json({message:'Invalid recording.'});
+  try{
+   const outcome=await pipeline.jobs.run(req.params.id,async lease=>{
+    const row=lease.row;
+    if(!['ready','partial'].includes(row.status))return res.status(409).json({message:'Wait for the recording to finish saving.'});
+    if(row.status==='partial'&&req.body?.allowPartial!==true)return res.status(409).json({message:'Confirm that you want to publish only the saved parts of this incomplete recording.'});
   const parts=recordingParts(row);
   for(let index=0;index<parts.length;index++){
+   await lease.assert();
    const part=parts[index];
    if(part.delivery!=='upload'){
-    const moved=await cloudinary.uploader.rename(part.publicId,part.publicId,{resource_type:'video',type:'authenticated',to_type:'upload',overwrite:false});
-    if(!moved.public_id)return res.status(502).json({message:'Cloudinary did not confirm publication.'});
-    part.delivery='upload';row.parts=parts;row.delivery=parts.every(p=>p.delivery==='upload')?'upload':'authenticated';await row.save();
+    let moved;
+    try{moved=await cloudinary.uploader.rename(part.publicId,part.publicId,{resource_type:'video',type:'authenticated',to_type:'upload',overwrite:false});}
+    catch(error){if((error.http_code||error.error?.http_code)!==404)throw error;moved=await cloudinary.api.resource(part.publicId,{resource_type:'video',type:'upload'});}
+    if(moved.public_id!==part.publicId||(part.bytes&&moved.bytes!==part.bytes))return res.status(502).json({message:'Cloudinary did not confirm publication.'});
+    part.delivery='upload';
+    const updateDelivery=items=>(items||[]).map(item=>({...item.toObject?.()||item,delivery:parts.find(p=>p.publicId===item.publicId)?.delivery||item.delivery}));
+    await lease.save({parts,legacyParts:updateDelivery(row.legacyParts),sources:(row.sources||[]).map(source=>({...source.toObject?.()||source,parts:updateDelivery(source.parts)})),delivery:parts.every(p=>p.delivery==='upload')?'upload':'authenticated'});
    }
    const videoUrl=cloudinary.url(part.publicId,{secure:true,resource_type:'video',type:'upload',format:'mp4'});
    const audioUrl=cloudinary.url(part.publicId,{secure:true,resource_type:'video',type:'upload',format:'mp3'});
    const externalId=`live-${row._id}${parts.length>1?`-part-${index+1}`:''}`;
    const title=`${row.title}${parts.length>1?` · Part ${index+1} of ${parts.length}`:''}`;
    const duration=part.duration||0;
-   await ArchiveItem.findOneAndUpdate({externalId},{$setOnInsert:{title,artist:'DJ Khalil',category:'Live Archive',mediaType:'audio',audioUrl,description:'Audio from a recorded Echo live broadcast.',duration:`${Math.floor(duration/60)}:${String(Math.floor(duration%60)).padStart(2,'0')}`}},{upsert:true});
+   await ArchiveItem.findOneAndUpdate({externalId},{$setOnInsert:{title,artist:'DJ Khalil',category:'Live Archive',mediaType:'audio',audioUrl,description:'Audio from a recorded Echo live stream.',duration:`${Math.floor(duration/60)}:${String(Math.floor(duration%60)).padStart(2,'0')}`}},{upsert:true});
    await MediaItem.findOneAndUpdate({mediaUrl:videoUrl},{$setOnInsert:{kind:'video',title,category:'Live Archive',isPublished:true,durationSec:Math.round(duration)}},{upsert:true});
   }
-  row.published=true;await row.save();res.json({item:view(row)});
+    await lease.save({published:true});return res.json({item:view(row)});
+   });
+   if(outcome?.busy)return res.status(409).json({message:'This recording is being processed. Refresh and try again.'});
+  }catch(error){console.error('Live recording publication failed:',error.code||error.name);return res.status(502).json({message:'Publication did not finish. Refresh the recording before trying again.'});}
  });
- const timer=setInterval(()=>sweepRecordings().catch(()=>{}),15000);timer.unref();
+ if(startWorker&&!workerTimer){workerTimer=setInterval(()=>sweepRecordings().catch(()=>{}),15000);workerTimer.unref();}
 }
-module.exports={LiveRecording,prepareRecordingRoom,ensureRecording,registerLiveRecordings,sweepRecordings,transferRecording,objectBelongsToRoom,view,recordingParts,recordingLink,uploadRecordingPart};
+module.exports={statusForRoom,LiveRecording,prepareRecordingRoom,ensureRecording,registerLiveRecordings,sweepRecordings,transferRecording,objectBelongsToRoom,view,recordingParts,recordingLink,uploadRecordingPart};

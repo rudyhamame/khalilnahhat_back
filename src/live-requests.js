@@ -104,7 +104,7 @@ app.delete('/api/live-requests/:id', requireAdmin, async (request, response) => 
 
 app.post('/api/live-requests/:id/recover', requireAdmin, async(request,response)=>{
  const session=liveBroadcastSession(await getLiveStreamConfig());
- if(!session||request.body?.session!==session)return response.status(409).json({message:'The broadcast changed. Refresh its requests.'});
+ if(!session||request.body?.session!==session)return response.status(409).json({message:'The live stream changed. Refresh its requests.'});
  const item=await LiveRequest.findOne({externalId:request.params.id,...requestScope(session)});
  if(!item)return response.status(404).json({message:'Request not found in this broadcast.'});
  if(item.requestStatus!=='reviewing'||Date.now()-new Date(item.updatedAt).getTime()<120000)return response.status(409).json({message:'This review is still running. Wait two minutes before recovering it.'});
@@ -133,7 +133,7 @@ app.patch('/api/live-requests/:id/review', requireAdmin, async (request, respons
   }
 
   const session = liveBroadcastSession(await getLiveStreamConfig());
-  if (!session || parsed.data.session !== session || (liveRequest.broadcastSessionId || liveRequest.broadcastRoomName) !== session) return response.status(409).json({message:'The broadcast changed. Refresh before reviewing requests.'});
+  if (!session || parsed.data.session !== session || (liveRequest.broadcastSessionId || liveRequest.broadcastRoomName) !== session) return response.status(409).json({message:'The live stream changed. Refresh before reviewing requests.'});
   if (liveRequest.requestStatus !== 'pending_admin') return response.status(409).json({message:'This request has already been reviewed.',item:serializeLiveRequest(liveRequest)});
   if (parsed.data.decision === 'rejected') {
     const rejected = await LiveRequest.findOneAndUpdate({_id:liveRequest._id,requestStatus:'pending_admin'},{$set:{requestStatus:'rejected',adminNote:parsed.data.adminNote}},{new:true});

@@ -21,7 +21,7 @@ function registerLiveComments(app,{getLiveStreamConfig,requireAuth,requireAdmin,
   const parsed=z.object({session:z.string().min(1).max(300),hidden:z.boolean()}).strict().safeParse(req.body);
   if(!parsed.success||!mongoose.isValidObjectId(req.params.id))return res.status(400).json({message:'Choose a valid comment and moderation action.'});
   const session=sessionKey(await getLiveStreamConfig());
-  if(!session||parsed.data.session!==session)return res.status(409).json({message:'The broadcast changed. Refresh the comments.'});
+  if(!session||parsed.data.session!==session)return res.status(409).json({message:'The live stream changed. Refresh the comments.'});
   const item=await CommentModel.findOneAndUpdate({_id:req.params.id,session},{$set:{hidden:parsed.data.hidden}},{new:true});
   if(!item)return res.status(404).json({message:'Comment not found in this broadcast.'});
   return res.set('Cache-Control','no-store').json({item:serialize(item)});

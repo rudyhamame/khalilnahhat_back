@@ -4,7 +4,7 @@ const {EgressClient}=require('livekit-server-sdk');
 const {StreamOutput,StreamProtocol,EncodingOptions,VideoCodec,AudioCodec}=require('@livekit/protocol');
 const platforms=['youtube','instagram'];
 const active=['starting','live','stopping'];
-const schema=new mongoose.Schema({platform:{type:String,enum:platforms,unique:true,required:true},serverUrl:String,secret:{type:String,select:false},roomName:{type:String,default:''},jobId:{type:String,default:''},state:{type:String,default:'idle'},operation:String,error:{type:String,default:''}},{timestamps:true});
+const schema=new mongoose.Schema({platform:{type:String,enum:platforms,unique:true,required:true},serverUrl:String,accessConfirmed:{type:Boolean,default:false},secret:{type:String,select:false},roomName:{type:String,default:''},jobId:{type:String,default:''},state:{type:String,default:'idle'},operation:String,error:{type:String,default:''}},{timestamps:true});
 const Destination=mongoose.models.LiveDestination||mongoose.model('LiveDestination',schema);
 const failure=(status,message)=>Object.assign(new Error(message),{status});
 function encryptionKey(env){const value=env.ECHO_STREAM_DESTINATION_KEY||'';if(!/^[a-f0-9]{64}$/i.test(value))throw failure(503,'Configure ECHO_STREAM_DESTINATION_KEY as a private 64-character hexadecimal key on the API server.');return Buffer.from(value,'hex');}
@@ -18,7 +18,7 @@ function validate(platform,body){
  if(typeof body.streamKey!=='string'||!body.streamKey.trim()||body.streamKey.length>2048||/[\s#]/.test(body.streamKey)||body.streamKey.includes('://'))throw failure(400,'Enter a valid stream key separately.');
  return {serverUrl:url.href.replace(/\/$/,''),streamKey:body.streamKey};
 }
-function view(row){return {platform:row.platform,serverUrl:row.serverUrl||'',configured:Boolean(row.secret),roomName:row.roomName||'',state:row.state||'idle',error:row.error||'',updatedAt:row.updatedAt||null,format:row.platform==='instagram'?'720 × 1280 portrait':'1280 × 720 landscape'};}
+function view(row){return {platform:row.platform,serverUrl:row.serverUrl||'',configured:Boolean(row.secret),accessConfirmed:row.platform==='youtube'||row.accessConfirmed===true,roomName:row.roomName||'',state:row.state||'idle',error:row.error||'',updatedAt:row.updatedAt||null,format:row.platform==='instagram'?'720 × 1280 portrait':'1280 × 720 landscape'};}
 function createDestinationService({Model=Destination,getLiveStreamConfig,env=process.env,client=()=>new EgressClient(env.LIVEKIT_URL,env.LIVEKIT_API_KEY,env.LIVEKIT_API_SECRET)}={}){
  const read=platform=>Model.findOne({platform}).select('+secret');
  const change=(row,patch)=>Model.findOneAndUpdate({_id:row._id,operation:row.operation,state:row.state},{$set:patch},{new:true}).select('+secret');
@@ -45,12 +45,13 @@ function createDestinationService({Model=Destination,getLiveStreamConfig,env=pro
  }
  async function list(){const items=[];for(const platform of platforms){let row=await read(platform);if(row)row=await refresh(row)||row;items.push(row?view(row):view({platform}));}return {items,ready:Boolean(env.LIVEKIT_URL&&env.LIVEKIT_API_KEY&&env.LIVEKIT_API_SECRET&&/^[a-f0-9]{64}$/i.test(env.ECHO_STREAM_DESTINATION_KEY||''))};}
  async function save(platform,body){const value=validate(platform,body),secret=seal(value.streamKey,env);const previous=await read(platform);if(previous&&active.includes(previous.state))throw failure(409,'Stop this destination before replacing its settings.');
-  try{const row=await Model.findOneAndUpdate({platform,state:{$nin:active}},{$set:{serverUrl:value.serverUrl,secret,state:'idle',error:'',operation:crypto.randomUUID(),jobId:'',roomName:''}},{upsert:!previous,new:true}).select('+secret');if(!row)throw failure(409,'Destination changed. Refresh its status.');return view(row);}catch(e){if(e.code===11000)throw failure(409,'Destination changed. Refresh its status.');throw e;}
+  try{const row=await Model.findOneAndUpdate({platform,state:{$nin:active}},{$set:{serverUrl:value.serverUrl,secret,accessConfirmed:platform==='youtube'||body.accessConfirmed===true,state:'idle',error:'',operation:crypto.randomUUID(),jobId:'',roomName:''}},{upsert:!previous,new:true}).select('+secret');if(!row)throw failure(409,'Destination changed. Refresh its status.');return view(row);}catch(e){if(e.code===11000)throw failure(409,'Destination changed. Refresh its status.');throw e;}
  }
  async function start(platform,roomName){
   const live=await getLiveStreamConfig();if(!live.isLive||live.broadcastMode!=='webrtc'||!roomName||live.webrtcRoomName!==roomName)throw failure(409,'Start the browser or Android live stream first. OBS relay output is not supported by these destinations.');
   if(!env.LIVEKIT_URL||!env.LIVEKIT_API_KEY||!env.LIVEKIT_API_SECRET)throw failure(503,'Configure LiveKit on the API server.');
   let row=await read(platform);if(!row?.secret)throw failure(409,'Save this destination’s server URL and stream key first.');
+  if(platform==='instagram'&&!row.accessConfirmed)throw failure(409,'Instagram is prepared for later. Confirm Live Producer access in the studio after the account becomes eligible.');
   const url=outputUrl(row),operation=crypto.randomUUID();
   row=await Model.findOneAndUpdate({_id:row._id,state:{$nin:active}},{$set:{state:'starting',operation,roomName,jobId:'',error:''}},{new:true}).select('+secret');if(!row)throw failure(409,'This destination is already active or awaiting reconciliation.');
   try{

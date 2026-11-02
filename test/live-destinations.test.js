@@ -32,7 +32,7 @@ test('duplicate starts are fenced and a stale room cannot start or stop another 
  await assert.rejects(h.service.save('youtube',body),/Stop this destination/);
 });
 test('Instagram uses portrait; ending one destination does not end the other or Echo',async()=>{
- const h=setup();await h.service.save('youtube',body);await h.service.save('instagram',{serverUrl:'rtmps://live-upload.instagram.com/rtmp',streamKey:'ig-private'});
+ const h=setup();await h.service.save('youtube',body);await h.service.save('instagram',{serverUrl:'rtmps://live-upload.instagram.com/rtmp',streamKey:'ig-private',accessConfirmed:true});
  await h.service.start('youtube','owned');await h.service.start('instagram','owned');assert.equal(h.started[1].options.encodingOptions.height,1280);assert.equal(h.started[1].options.encodingOptions.width,720);
  await h.service.stop('instagram','owned');await h.service.list();assert.deepEqual(h.stopped,['job-2']);assert.equal(h.rows[0].state,'live');assert.equal(h.live.isLive,true);
 });
@@ -61,4 +61,10 @@ test('social-only jobs do not suppress recording recovery or report capture fail
  const provider=createRecordingProviders({egress:()=>({listEgress:async()=>[{egressId:'social',status:1,streamResults:[{url:'redacted'}]},{egressId:'social-failed',status:4,streamResults:[]}]}),rooms:()=>({listParticipants:async()=>[{identity:'khalil-broadcaster',tracks:[{}]}]}),startCapture:async()=>{restarted++;}}).livekit;
  const result=await provider.inspect({roomName:'owned',captureAttempts:0,createdAt:new Date()}, {save:async()=>{}});
  assert.equal(restarted,1);assert.equal(result.captureState,'starting');assert.equal(result.warning,'');
+});
+
+test('Instagram stays ready for later without attempting output before access is confirmed',async()=>{
+ const h=setup();const saved=await h.service.save('instagram',{serverUrl:'rtmps://live-upload.instagram.com/rtmp',streamKey:'ig-future'});
+ assert.equal(saved.accessConfirmed,false);await assert.rejects(h.service.start('instagram','owned'),/Confirm Live Producer access/);assert.equal(h.started.length,0);
+ await h.service.save('youtube',body);await h.service.start('youtube','owned');assert.equal(h.started.length,1);
 });

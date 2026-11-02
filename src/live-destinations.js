@@ -55,7 +55,7 @@ function createDestinationService({Model=Destination,getLiveStreamConfig,env=pro
   row=await Model.findOneAndUpdate({_id:row._id,state:{$nin:active}},{$set:{state:'starting',operation,roomName,jobId:'',error:''}},{new:true}).select('+secret');if(!row)throw failure(409,'This destination is already active or awaiting reconciliation.');
   try{
    const portrait=platform==='instagram';
-   const job=await client().startRoomCompositeEgress(roomName,{stream:new StreamOutput({protocol:StreamProtocol.RTMP,urls:[url]})},{layout:'speaker',encodingOptions:new EncodingOptions({width:portrait?720:1280,height:portrait?1280:720,framerate:30,videoCodec:VideoCodec.H264_BASELINE,videoBitrate:2500,audioCodec:AudioCodec.AAC,audioBitrate:128,audioFrequency:48000,keyFrameInterval:2})});
+   const job=await client().startRoomCompositeEgress(roomName,{stream:new StreamOutput({protocol:StreamProtocol.RTMP,urls:[url]})},{layout:'single-speaker',encodingOptions:new EncodingOptions({width:portrait?720:1280,height:portrait?1280:720,framerate:30,videoCodec:VideoCodec.H264_BASELINE,videoBitrate:2500,audioCodec:AudioCodec.AAC,audioBitrate:128,audioFrequency:48000,keyFrameInterval:2})});
    await change(row,{jobId:job.egressId});row={...row.toObject?.()||row,jobId:job.egressId};
    return view(await refresh(row)||row);
   }catch(error){
@@ -66,7 +66,7 @@ function createDestinationService({Model=Destination,getLiveStreamConfig,env=pro
   }
  }
  async function stop(platform,roomName){let row=await read(platform);if(!row||row.roomName!==roomName)throw failure(409,'This destination session has changed. Refresh before stopping it.');if(!active.includes(row.state))return view(row);
-  row=await change(row,{state:'stopping',error:''});return view(await refresh(row)||row);
+  row=await change(row,{state:'stopping',error:''});if(!row)throw failure(409,'Destination changed. Refresh its status.');return view(await refresh(row)||row);
  }
  let sweeping=false;
  async function sweep(){if(sweeping)return;sweeping=true;try{for(const platform of platforms){const row=await read(platform);if(row)await refresh(row);}}finally{sweeping=false;}}

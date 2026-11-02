@@ -56,3 +56,9 @@ test('all destination endpoints enforce the existing admin guard including reads
  for(const [method,path] of [['GET',''],['PUT','/youtube'],['POST','/youtube/start'],['POST','/instagram/stop']])assert.equal((await fetch(url+'/api/admin/live-destinations'+path,{method})).status,403);
  assert.equal(calls,0);assert.equal((await fetch(url+'/api/admin/live-destinations',{headers:{Authorization:'Bearer admin'}})).status,200);
 });
+test('social-only jobs do not suppress recording recovery or report capture failures',async()=>{
+ const {createRecordingProviders}=require('../src/recording-providers');let restarted=0;
+ const provider=createRecordingProviders({egress:()=>({listEgress:async()=>[{egressId:'social',status:1,streamResults:[{url:'redacted'}]},{egressId:'social-failed',status:4,streamResults:[]}]}),rooms:()=>({listParticipants:async()=>[{identity:'khalil-broadcaster',tracks:[{}]}]}),startCapture:async()=>{restarted++;}}).livekit;
+ const result=await provider.inspect({roomName:'owned',captureAttempts:0,createdAt:new Date()}, {save:async()=>{}});
+ assert.equal(restarted,1);assert.equal(result.captureState,'starting');assert.equal(result.warning,'');
+});

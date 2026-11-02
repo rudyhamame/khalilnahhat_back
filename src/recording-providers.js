@@ -18,7 +18,9 @@ function createRecordingProviders({store,bucket,egress,rooms,startCapture,clock=
  return {
   livekit:{
    async inspect(row,lease){
-    const jobs=await egress().listEgress({roomName:row.roomName});
+    const allJobs=await egress().listEgress({roomName:row.roomName});
+    // Social-only egress is not evidence that a recording is running.
+    const jobs=allJobs.filter(job=>job.egressId===row.egressId||job.fileResults?.length||job.result?.case==='file'||job.request?.value?.fileOutputs?.length);
     let participants=[];try{participants=await rooms().listParticipants(row.roomName);}catch(error){if(!missing(error))throw error;}
     const publisher=participants.find(p=>['khalil-broadcaster','khalil-obs'].includes(p.identity)&&p.tracks?.length);
     const active=jobs.some(activeJob);

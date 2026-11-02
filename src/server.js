@@ -1593,6 +1593,8 @@ require('./live-broadcast').registerLiveBroadcastRoutes(app, {
   },
 });
 
+require('./live-destinations').registerLiveDestinations(app,{requireAdmin,getLiveStreamConfig});
+
 require('./live-access').registerLiveAccess(app, { requireAuth, getLiveStreamConfig, createToken: createLiveKitToken, getConfig: getLiveKitConfig });
 
 const youtubeSessionStore = createYoutubeSessionStore(process.env.YT_DLP_COOKIES_FILE);

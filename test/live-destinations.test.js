@@ -1,0 +1,58 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const express=require('express');
+const {validate,seal,unseal,createDestinationService,registerLiveDestinations}=require('../src/live-destinations');
+const env={ECHO_STREAM_DESTINATION_KEY:'ab'.repeat(32),LIVEKIT_URL:'wss://qa.example',LIVEKIT_API_KEY:'qa',LIVEKIT_API_SECRET:'qa'};
+const body={serverUrl:'rtmps://a.rtmps.youtube.com/live2',streamKey:'private-test-key'};
+function setup(){
+ const rows=[],jobs=[],started=[],stopped=[];
+ const live={isLive:true,broadcastMode:'webrtc',webrtcRoomName:'owned'};
+ const match=(row,filter)=>Object.entries(filter).every(([k,v])=>v&&typeof v==='object'?(!v.$nin||!v.$nin.includes(row[k])):row[k]===v);
+ const query=fn=>({select:async()=>fn()});
+ const Model={findOne:filter=>query(()=>rows.find(row=>match(row,filter))?{...rows.find(row=>match(row,filter))}:null),findOneAndUpdate:(filter,update,opts)=>query(()=>{let row=rows.find(row=>match(row,filter));if(!row&&opts?.upsert){if(rows.some(row=>row.platform===filter.platform))throw Object.assign(new Error('duplicate'),{code:11000});row={platform:filter.platform,_id:String(rows.length+1)};rows.push(row);}if(!row)return null;Object.assign(row,update.$set);return {...row};})};
+ const client={async listEgress({roomName}){return jobs.filter(j=>j.roomName===roomName);},async startRoomCompositeEgress(room,output,options){started.push({room,output,options});const job={roomName:room,egressId:'job-'+started.length,status:1,streamResults:[{url:output.stream.urls[0]}]};jobs.push(job);return job;},async stopEgress(id){stopped.push(id);const job=jobs.find(j=>j.egressId===id);if(job)job.status=3;return job;}};
+ const service=createDestinationService({Model,env,client:()=>client,getLiveStreamConfig:async()=>live});
+ return {service,rows,jobs,live,client,started,stopped};
+}
+test('credentials are authenticated encrypted and RTMPS URLs are strictly allowlisted',()=>{
+ const encrypted=seal(body.streamKey,env);assert.equal(encrypted.includes(body.streamKey),false);assert.equal(unseal(encrypted,env),body.streamKey);
+ assert.throws(()=>unseal(encrypted,{...env,ECHO_STREAM_DESTINATION_KEY:'cd'.repeat(32)}));
+ for(const serverUrl of ['rtmp://a.rtmps.youtube.com/live2','rtmps://127.0.0.1/live2','rtmps://a.rtmps.youtube.com.attacker.test/live2','rtmps://a.rtmps.youtube.com/live2/key','rtmps://user:pass@a.rtmps.youtube.com/live2'])assert.throws(()=>validate('youtube',{...body,serverUrl}));
+ assert.equal(validate('instagram',{serverUrl:'rtmps://live-upload.instagram.com:443/rtmp',streamKey:'valid-key?ds=1'}).streamKey,'valid-key?ds=1');
+});
+test('settings and status never reveal keys, encrypted payload or complete output URLs',async()=>{
+ const h=setup();const saved=await h.service.save('youtube',body);assert.equal(saved.configured,true);assert.ok(!JSON.stringify(saved).includes(body.streamKey));
+ const result=await h.service.start('youtube','owned');assert.equal(result.state,'live');assert.equal(h.started[0].options.encodingOptions.audioFrequency,48000);
+ const status=await h.service.list();for(const secret of [body.streamKey,h.rows[0].secret])assert.ok(!JSON.stringify(status).includes(secret));
+});
+test('duplicate starts are fenced and a stale room cannot start or stop another session',async()=>{
+ const h=setup();await h.service.save('youtube',body);await assert.rejects(h.service.start('youtube','stale'),/Start the browser/);
+ const results=await Promise.allSettled([h.service.start('youtube','owned'),h.service.start('youtube','owned')]);assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(h.started.length,1);
+ await assert.rejects(h.service.stop('youtube','stale'),/session has changed/);assert.equal(h.stopped.length,0);
+ await assert.rejects(h.service.save('youtube',body),/Stop this destination/);
+});
+test('Instagram uses portrait; ending one destination does not end the other or Echo',async()=>{
+ const h=setup();await h.service.save('youtube',body);await h.service.save('instagram',{serverUrl:'rtmps://live-upload.instagram.com/rtmp',streamKey:'ig-private'});
+ await h.service.start('youtube','owned');await h.service.start('instagram','owned');assert.equal(h.started[1].options.encodingOptions.height,1280);assert.equal(h.started[1].options.encodingOptions.width,720);
+ await h.service.stop('instagram','owned');await h.service.list();assert.deepEqual(h.stopped,['job-2']);assert.equal(h.rows[0].state,'live');assert.equal(h.live.isLive,true);
+});
+test('source session replacement stops only its old destination job',async()=>{
+ const h=setup();await h.service.save('youtube',body);await h.service.start('youtube','owned');h.live.webrtcRoomName='replacement';await h.service.sweep();assert.deepEqual(h.stopped,['job-1']);assert.equal(h.live.webrtcRoomName,'replacement');
+});
+test('provider failures are redacted; uncertain starts remain reserved until the source ends',async()=>{
+ const h=setup();await h.service.save('youtube',body);h.client.startRoomCompositeEgress=async()=>{throw new Error(body.streamKey);};
+ await assert.rejects(h.service.start('youtube','owned'),e=>!e.message.includes(body.streamKey));
+ assert.equal(h.rows[0].state,'starting');await h.service.stop('youtube','owned');assert.equal(h.rows[0].state,'stopping');await assert.rejects(h.service.start('youtube','owned'));
+ h.live.isLive=false;h.live.webrtcRoomName='';await h.service.sweep();assert.equal(h.rows[0].state,'ended');
+});
+test('a definite provider rejection permits retry without exposing provider error text',async()=>{
+ const h=setup();await h.service.save('youtube',body);h.client.startRoomCompositeEgress=async()=>{throw Object.assign(new Error(body.streamKey),{status:400});};
+ await assert.rejects(h.service.start('youtube','owned'),/media service rejected/);assert.equal(h.rows[0].state,'failed');assert.ok(!JSON.stringify(await h.service.list()).includes(body.streamKey));
+});
+test('all destination endpoints enforce the existing admin guard including reads',async t=>{
+ const app=express();app.use(express.json());const h=setup();let calls=0;
+ registerLiveDestinations(app,{getLiveStreamConfig:async()=>h.live,requireAdmin:(req,res,next)=>req.headers.authorization==='Bearer admin'?next():res.status(403).json({message:'Admin only'}),service:{...h.service,list:async()=>{calls++;return {items:[]};}},startWorker:false});
+ const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));t.after(()=>server.close());const url='http://127.0.0.1:'+server.address().port;
+ for(const [method,path] of [['GET',''],['PUT','/youtube'],['POST','/youtube/start'],['POST','/instagram/stop']])assert.equal((await fetch(url+'/api/admin/live-destinations'+path,{method})).status,403);
+ assert.equal(calls,0);assert.equal((await fetch(url+'/api/admin/live-destinations',{headers:{Authorization:'Bearer admin'}})).status,200);
+});

@@ -16,7 +16,7 @@ function registerPlanning(app, { requireAuth, serialize }) {
     const sr = await ServiceRequest.findOne({ externalId: req.params.id });
     if (!sr || String(sr.userId) !== String(req.authUser._id)) return res.status(404).json({ message: 'Service request not found.' });
     if (sr.status !== 'confirmed') return res.status(409).json({ message: 'Event planning opens once your booking is confirmed.' });
-    sr.planning = { ...parsed.data, updatedAt: new Date() };
+    sr.planning = { ...parsed.data, djSet: sr.planning?.djSet, updatedAt: new Date() };
     await sr.save();
     return res.json({ item: serialize(sr, false) });
   });

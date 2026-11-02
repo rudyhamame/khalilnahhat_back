@@ -152,7 +152,10 @@ function registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest 
     const fields=['brideName','groomName','timeline','partyEntrances','entranceSongs','firstDance','parentDances','dinnerMusic','cakeCutting','announcements','mustPlay','doNotPlay','musicLinks','specialRequests'];
     const parsed=z.object(Object.fromEntries(fields.map(key=>[key,z.string().trim().max(3000).default('')]))).strict().safeParse(req.body);
     if(!parsed.success) return fail(res,400,'Invalid planning details.');
-    const item=await ServiceRequest.findOneAndUpdate({externalId:req.params.id,status:'confirmed'},{$set:{planning:{...parsed.data,updatedAt:new Date()}}},{new:true});
+    const item=await ServiceRequest.findOne({externalId:req.params.id,status:'confirmed'});
+    if(!item)return fail(res,409,'Planning requires a confirmed booking.');
+    item.planning={...(item.planning||{}),...parsed.data,updatedAt:new Date()};
+    await item.save();
     return item ? res.json({item:serializeRequest(item,true)}) : fail(res,409,'Planning requires a confirmed booking.');
   });
   app.get('/api/admin/archive', requireAdmin, async (_req,res) => {

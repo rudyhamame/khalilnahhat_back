@@ -9,7 +9,7 @@ const {registerEquipment3D,equipmentModelFields}=require('../src/equipment-3d');
 test('GLB upload requires admin, validates the file and creates an owner-scoped stored model',async()=>{
  const app=express();
  const requireAdmin=(req,res,next)=>{if(req.headers['x-test-admin']!=='yes')return res.status(401).json({message:'Admin authentication is required.'});req.user={externalId:'admin-one'};next();};
- registerEquipment3D(app,{requireAdmin,env:{CLOUDINARY_CLOUD_NAME:'test',CLOUDINARY_API_KEY:'test',CLOUDINARY_API_SECRET:'test'}});
+ registerEquipment3D(app,{requireAdmin,uploadAssetImpl:(buffer,options)=>new Promise((resolve,reject)=>cloudinary.uploader.upload_stream(options,(error,result)=>error?reject(error):resolve(result)).end(buffer)),env:{CLOUDINARY_CLOUD_NAME:'test',CLOUDINARY_API_KEY:'test',CLOUDINARY_API_SECRET:'test'}});
  const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));
  const base=`http://127.0.0.1:${server.address().port}/api/admin/equipment-3d`;
  const Job=mongoose.model('Equipment3DJob');const originalCreate=Job.create,originalStream=cloudinary.uploader.upload_stream;

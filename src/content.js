@@ -1,4 +1,4 @@
-const cloudinary = require('cloudinary').v2;
+const {uploadAsset}=require('./cloudinary-assets');
 const mongoose = require('mongoose');
 const multer = require('multer');
 const { z } = require('zod');
@@ -90,8 +90,7 @@ function registerContent(app, requireAdmin) {
   app.post('/api/content/upload', requireAdmin, upload.single('file'), async (req, res) => {
     if (!req.file) return res.status(400).json({ message: 'File is required.' });
     try {
-      const r = await new Promise((resolve, reject) =>
-        cloudinary.uploader.upload_stream({ folder: 'khalil/content', resource_type: 'auto' }, (e, out) => (e ? reject(e) : resolve(out))).end(req.file.buffer));
+      const r = await uploadAsset(req.file.buffer,{folder:'khalil/content',resource_type:/^(audio|video)\//.test(req.file.mimetype)?'video':'image'});
       return res.status(201).json({ url: r.secure_url, durationSec: Math.round(r.duration || 0) });
     } catch (e) {
       console.error('Content upload failed:', e);
@@ -104,8 +103,7 @@ function registerContent(app, requireAdmin) {
     if (!req.file) return res.status(400).json({ message: 'File is required.' });
     if (!/^(image|video)\//.test(req.file.mimetype || '')) return res.status(400).json({ message: 'Only images and videos can be added to the gallery.' });
     try {
-      const r = await new Promise((resolve, reject) =>
-        cloudinary.uploader.upload_stream({ folder: 'Gallery', resource_type: 'auto' }, (e, out) => (e ? reject(e) : resolve(out))).end(req.file.buffer));
+      const r = await uploadAsset(req.file.buffer,{folder:'Gallery',resource_type:req.file.mimetype.startsWith('video/')?'video':'image'});
       return res.status(201).json({ url: r.secure_url, durationSec: Math.round(r.duration || 0) });
     } catch (e) {
       console.error('Gallery upload failed:', e);

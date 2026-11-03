@@ -47,7 +47,7 @@ async function publicSongs(ArchiveModel = ArchiveItem) {
   return visibleSongs(await ArchiveModel.find().sort({ sortOrder: 1, createdAt: -1 }));
 }
 
-function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, CollectionModel = Collection, cloudinaryClient = cloudinary, requireCloudinary = process.env.RENDER === 'true' || process.env.MUSIC_ARCHIVE_STORAGE_PROVIDER === 'cloudinary', useCloudinary = Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) } = {}) {
+function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, CollectionModel = Collection, cloudinaryClient = cloudinary, uploadAssetImpl = require('./cloudinary-assets').createAssetStore({client:cloudinaryClient}).upload, requireCloudinary = process.env.RENDER === 'true' || process.env.MUSIC_ARCHIVE_STORAGE_PROVIDER === 'cloudinary', useCloudinary = Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) } = {}) {
   const models = { collections: CollectionModel, songs: ArchiveModel };
   const ontology = ArchiveModel === ArchiveItem ? require('./music-ontology/routes').registerMusicOntology(app, { requireAdmin, service: require('./music-ontology/service').createService({ deliveryUrl, previewUrl: archiveFiles.previewUrl, ownedAsset }) }) : null;
   async function catalog(admin, { includeOntology = true } = {}) {
@@ -102,7 +102,7 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, C
       if (kind === 'songs' && await model.exists({externalId:req.params.id,workId:{$exists:true,$ne:''}})) return res.status(409).json({message:'Archive this recording through the ontology editor; its references and files are preserved.'});
       const row = kind === 'songs' && ontology ? await ontology.deleteLegacy(req.params.id) : await model.findOneAndDelete({ externalId: req.params.id });
       if (!row) return res.status(404).json({ message: 'This item no longer exists.' });
-      // Keep stored media recoverable; deleting a record does not erase its files.
+      // Unreferenced managed files are removed by the shared cleanup worker.
       res.json({ ok: true });
     });
     app.put(`/api/admin/music-archive/${kind}/order`, requireAdmin, async (req, res) => {
@@ -126,8 +126,7 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, C
     if (requireCloudinary && !useCloudinary) return res.status(503).json({ message: 'Cloudinary storage is not configured. Contact the administrator; your file has not been saved.' });
     try {
       if (!useCloudinary) return res.status(201).json(await archiveFiles.saveLocalFile(file));
-      const result = await new Promise((resolve, reject) => cloudinaryClient.uploader.upload_stream({ folder: 'khalil/music-archive', resource_type: audio ? 'video' : 'image', type: 'authenticated',
-        ...(image ? { transformation: [{ width: 1600, height: 1600, crop: 'limit', quality: 'auto' }] } : {}) }, (error, value) => error ? reject(error) : resolve(value)).end(file.buffer));
+      const result = await uploadAssetImpl(file.buffer,{folder:'khalil/music-archive',resource_type:audio?'video':'image',type:'authenticated',...(image?{transformation:[{width:1600,height:1600,crop:'limit',quality:'auto'}]}:{})});
       res.status(201).json({ url: result.secure_url, previewUrl: deliveryUrl(result.secure_url), duration: result.duration ? `${Math.floor(result.duration / 60)}:${String(Math.floor(result.duration % 60)).padStart(2, '0')}` : '' });
     } catch (error) { console.error('Music archive upload failed:', error); res.status(502).json({ message: 'The file could not be uploaded. Try again.' }); }
   });

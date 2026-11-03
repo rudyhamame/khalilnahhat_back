@@ -1,3 +1,4 @@
+const {uploadAsset}=require('./cloudinary-assets');
 const mongoose = require('mongoose');
 const crypto = require('crypto');
 const fs = require('fs/promises');
@@ -206,11 +207,11 @@ function registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest 
       if(clientId && (!validId(clientId)||!await User.exists({_id:clientId}))) return fail(res,400,'Client not found.');
       if(requestId && (!clientId || !await ServiceRequest.exists({externalId:requestId,userId:clientId}))) return fail(res,400,'That request does not belong to the selected client.');
       const ext=path.extname(req.file.originalname).replace(/[^a-zA-Z0-9.]/g,'').slice(0,12);
-      uploaded=await cloudinary.uploader.upload(req.file.path,{folder:'khalil/private',resource_type:'raw',type:'authenticated',public_id:crypto.randomUUID()+ext,overwrite:false});
+      uploaded=await uploadAsset(req.file.path,{folder:'khalil/private',resource_type:'raw',type:'authenticated',public_id:'file'+ext});
       const file=await StoredFile.create({name:path.basename(req.file.originalname).slice(0,240),publicId:uploaded.public_id,resourceType:'raw',delivery:'authenticated',format:'',bytes:uploaded.bytes,mime:req.file.mimetype,clientId:clientId||null,requestId,note});
       res.status(201).json({item:fileView(file)});
     } catch(error) {
-      if(uploaded) await cloudinary.uploader.destroy(uploaded.public_id,{resource_type:'raw',type:'authenticated'}).catch(()=>{});
+      // Failed associations are collected after the upload grace period; the asset may be shared.
       console.error('Private upload failed:',error.http_code||error.name);
       return fail(res,502,'Storage upload failed. Check Cloudinary settings and file limits.');
     } finally {if(req.file?.path) await fs.unlink(req.file.path).catch(()=>{});}

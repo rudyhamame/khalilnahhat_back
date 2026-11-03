@@ -61,7 +61,7 @@ test('Cloudinary-required uploads fail closed when credentials are missing', asy
 test('uploads require admin, reject executable/image impostor types and store allowed audio as authenticated media', async t => {
   const app = express(); const options = [];
   const fakeCloud = { uploader: { upload_stream: (config, done) => { options.push(config); return { end: () => done(null, { secure_url:'https://res.cloudinary.com/qa/video/upload/audio.mp3',duration:66 }) }; } } };
-  registerMusicArchive(app, { requireAdmin:(req,res,next) => req.headers.authorization === 'admin' ? next() : res.status(401).json({}), cloudinaryClient:fakeCloud, useCloudinary:true });
+  registerMusicArchive(app, { requireAdmin:(req,res,next) => req.headers.authorization === 'admin' ? next() : res.status(401).json({}), cloudinaryClient:fakeCloud, uploadAssetImpl:(buffer,options)=>new Promise((resolve,reject)=>fakeCloud.uploader.upload_stream(options,(error,result)=>error?reject(error):resolve(result)).end(buffer)), useCloudinary:true });
   const server = app.listen(0,'127.0.0.1'); await new Promise(resolve => server.once('listening',resolve));
   t.after(() => new Promise(resolve => server.close(resolve)));
   const url = `http://127.0.0.1:${server.address().port}/api/admin/music-archive/upload`;

@@ -1,5 +1,5 @@
+const {uploadAsset}=require('./cloudinary-assets');
 const {validateSetMembers}=require('./equipment-demand');
-const cloudinary = require('cloudinary').v2;
 const mongoose = require('mongoose');
 const multer = require('multer');
 const { z } = require('zod');
@@ -159,8 +159,7 @@ function registerEquipmentRoutes(app, requireAdmin) {
   app.post('/api/equipment/:id/photo', requireAdmin, upload.single('photo'), async (req, res) => {
     if (!req.file) return res.status(400).json({ message: 'Photo is required.' });
     try {
-      const result = await new Promise((resolve, reject) =>
-        cloudinary.uploader.upload_stream({ folder: 'khalil/equipment' }, (e, r) => (e ? reject(e) : resolve(r))).end(req.file.buffer));
+      const result = await uploadAsset(req.file.buffer,{folder:'khalil/equipment',resource_type:'image'});
       const item = await Equipment.findOneAndUpdate({ slug: req.params.id }, { imageUrl: result.secure_url }, { new: true });
       return item ? res.json({ item: adminView(item) }) : res.status(404).json({ message: 'Equipment not found.' });
     } catch (e) {

@@ -1,3 +1,4 @@
+const {uploadAsset}=require('./cloudinary-assets');
 const {findPasswordAccount}=require('./password-account');
 require('dotenv').config();
 
@@ -494,82 +495,11 @@ function serializeLiveSession(session) {
   };
 }
 
-function uploadAudioBufferToCloudinary(file) {
-  return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        folder: 'khalil/live-sessions',
-        resource_type: 'video',
-        use_filename: true,
-        unique_filename: true,
-        overwrite: false,
-      },
-      (error, result) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        resolve(result);
-      },
-    );
-
-    uploadStream.end(file.buffer);
-  });
-}
-
-function uploadPosterBufferToCloudinary(file) {
-  return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        folder: 'khalil/live-posters',
-        resource_type: 'image',
-        use_filename: true,
-        unique_filename: true,
-        overwrite: false,
-      },
-      (error, result) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve(result);
-      },
-    );
-    uploadStream.end(file.buffer);
-  });
-}
-
-function uploadCoverBufferToCloudinary(file) {
-  return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        folder: 'khalil/song-covers',
-        resource_type: 'image',
-        use_filename: true,
-        unique_filename: true,
-        overwrite: false,
-      },
-      (error, result) => {
-        if (error) reject(error);
-        else resolve(result);
-      },
-    );
-    uploadStream.end(file.buffer);
-  });
-}
-
-async function deleteCloudinaryAudio(publicId) {
-  if (!publicId) {
-    return;
-  }
-
-  try {
-    await cloudinary.uploader.destroy(publicId, { resource_type: 'video' });
-  } catch (error) {
-    console.error('Failed to delete Cloudinary audio asset:', error);
-  }
-}
+function uploadAudioBufferToCloudinary(file){return uploadAsset(file.buffer,{folder:'khalil/live-sessions',resource_type:'video'});}
+function uploadPosterBufferToCloudinary(file){return uploadAsset(file.buffer,{folder:'khalil/live-posters',resource_type:'image'});}
+function uploadCoverBufferToCloudinary(file){return uploadAsset(file.buffer,{folder:'khalil/song-covers',resource_type:'image'});}
+// Asset cleanup runs after reference checks; never destroy shared audio inline.
+async function deleteCloudinaryAudio(){ }
 
 function serializeLiveRequest(request) {
   return {
@@ -1710,11 +1640,13 @@ app.use((_request, response) => {
 
 async function startServer(port = PORT) {
   await connectToDatabase();
+  const stopAssetCleanup=require('./cloudinary-assets').startCleanup();
   if(process.env.ECHO_ADMIN_WORKER_MODE!=='external')await aiAdministrator.start();
 
   const server=app.listen(port, '0.0.0.0', () => {
     console.log(`Khalil app API listening on http://localhost:${port}`);
   });
+  server.once('close',stopAssetCleanup);
   aiBooking.attachAlibabaVoiceSocket(server,aiBookingRoutes.voiceSocketHooks);
   aiAdministrator.attachVoice(server);
   return server;

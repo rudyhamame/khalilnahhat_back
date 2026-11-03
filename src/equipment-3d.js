@@ -1,7 +1,7 @@
+const {uploadAsset}=require('./cloudinary-assets');
 const mongoose=require('mongoose');
 const multer=require('multer');
 const {randomUUID}=require('node:crypto');
-const cloudinary=require('cloudinary').v2;
 const MAX_MB=25;
 const Job=mongoose.models.Equipment3DJob||mongoose.model('Equipment3DJob',new mongoose.Schema({
  externalId:{type:String,unique:true,required:true},owner:{type:String,index:true,required:true},requestId:{type:String,required:true},
@@ -19,7 +19,7 @@ async function equipmentModelFields(req,modelJobId){
  if(!job?.modelUrl)throw fault(400,'Choose a completed 3D model and click Use this model first.');
  return {modelUrl:job.modelUrl,modelJobId:job.externalId};
 }
-function registerEquipment3D(app,{requireAdmin,env=process.env}){
+function registerEquipment3D(app,{requireAdmin,env=process.env,uploadAssetImpl=uploadAsset}){
  const storage=()=>Boolean(env.CLOUDINARY_CLOUD_NAME&&env.CLOUDINARY_API_KEY&&env.CLOUDINARY_API_SECRET);
  const wrap=fn=>async(req,res)=>{res.set('Cache-Control','no-store');try{if(!ownerOf(req))throw fault(401,'Sign in again.');await fn(req,res);}catch(error){const status=error.status||500;if(status>=500)console.warn('Equipment 3D request failed',JSON.stringify({name:error.name,status}));res.status(status).json({message:error.status?error.message:'The 3D upload could not complete. Your equipment is unchanged.'});}};
  const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:MAX_MB*1024*1024,files:1,fields:1}}).single('model');
@@ -29,7 +29,7 @@ function registerEquipment3D(app,{requireAdmin,env=process.env}){
   const buffer=req.file?.buffer;
   if(!buffer||buffer.length<20||buffer.toString('ascii',0,4)!=='glTF'||buffer.readUInt32LE(4)!==2||buffer.readUInt32LE(8)!==buffer.length)throw fault(400,'Choose a valid binary .glb (glTF 2.0) file.');
   const id=randomUUID();
-  const result=await new Promise((resolve,reject)=>cloudinary.uploader.upload_stream({resource_type:'raw',type:'upload',public_id:'khalil/equipment-models/'+id+'.glb'},(error,result)=>error?reject(error):resolve(result)).end(buffer));
+  const result=await uploadAssetImpl(buffer,{resource_type:'raw',type:'upload',folder:'khalil/equipment-models',public_id:'model.glb'});
   if(!result?.secure_url)throw Error('No stored model URL');
   // The job record lets equipmentModelFields verify ownership when the equipment is saved.
   const job=await Job.create({externalId:id,owner:ownerOf(req),requestId:id,mode:'upload',prompt:String(req.file.originalname||'').slice(0,160),status:'SUCCEEDED',modelUrl:result.secure_url});

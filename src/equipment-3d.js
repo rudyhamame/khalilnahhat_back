@@ -34,7 +34,20 @@ function registerEquipment3D(app,{requireAdmin,env=process.env,fetchImpl=fetch})
  };
  const getJob=async req=>{const job=await Job.findOne({externalId:req.params.id,owner:ownerOf(req)});if(!job)throw fault(404,'3D generation not found.');return job;};
  const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:8*1024*1024,files:1,fields:3,fieldSize:4000}}).single('photo');
- app.get('/api/admin/equipment-3d/config',requireAdmin,wrap(async(_req,res)=>res.json({provider:'Meshy',model:'meshy-7.1',configured:configured(),storageConfigured:storage(),photoCredits:30,textCredits:20,textureCredits:10,maxPhotoMB:8})));
+ const MAX_GLB_MB=25;
+ const glbUpload=multer({storage:multer.memoryStorage(),limits:{fileSize:MAX_GLB_MB*1024*1024,files:1,fields:1}}).single('model');
+ app.post('/api/admin/equipment-3d/upload',requireAdmin,(req,res,next)=>glbUpload(req,res,error=>error?res.status(400).json({message:error.code==='LIMIT_FILE_SIZE'?'Choose a .glb under '+MAX_GLB_MB+' MB.':'Could not read the upload.'}):next()),wrap(async(req,res)=>{
+  if(!storage())throw fault(503,'Configure Cloudinary storage before uploading equipment models.');
+  const buffer=req.file?.buffer;
+  if(!buffer||buffer.length<20||buffer.toString('ascii',0,4)!=='glTF'||buffer.readUInt32LE(4)!==2||buffer.readUInt32LE(8)!==buffer.length)throw fault(400,'Choose a valid binary .glb (glTF 2.0) file.');
+  const id=randomUUID();
+  const result=await new Promise((resolve,reject)=>cloudinary.uploader.upload_stream({resource_type:'raw',type:'upload',public_id:'khalil/equipment-models/'+id+'.glb'},(error,result)=>error?reject(error):resolve(result)).end(buffer));
+  if(!result?.secure_url)throw Error('No stored model URL');
+  // The job record lets equipmentModelFields verify ownership when the equipment is saved.
+  const job=await Job.create({externalId:id,owner:ownerOf(req),requestId:id,mode:'upload',prompt:String(req.file.originalname||'').slice(0,160),status:'SUCCEEDED',modelUrl:result.secure_url});
+  res.status(201).json({item:view(job)});
+ }));
+ app.get('/api/admin/equipment-3d/config',requireAdmin,wrap(async(_req,res)=>res.json({maxMB:MAX_GLB_MB,provider:'Meshy',model:'meshy-7.1',configured:configured(),storageConfigured:storage(),photoCredits:30,textCredits:20,textureCredits:10,maxPhotoMB:8})));
  app.get('/api/admin/equipment-3d/jobs',requireAdmin,wrap(async(req,res)=>{
   await Job.updateMany({owner:ownerOf(req),activeKey:ownerOf(req),createdAt:{$lt:new Date(Date.now()-3*86400000)}},{$set:{status:'FAILED',message:'This generation expired. Start a new model.'},$unset:{activeKey:1}});
   res.json({items:(await Job.find({owner:ownerOf(req)}).sort({createdAt:-1}).limit(12).lean()).map(view)});

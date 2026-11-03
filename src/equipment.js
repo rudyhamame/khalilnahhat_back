@@ -17,6 +17,8 @@ const equipmentSchema = new mongoose.Schema(
     imageUrl: { type: String, default: '' },
     modelUrl:{type:String,default:''},modelJobId:{type:String,default:''},
     modelParts:{type:[new mongoose.Schema({name:String,nameAr:String,src:String,x:Number,z:Number,rotation:Number},{_id:false})],default:[]},
+    isSet:{type:Boolean,default:false},
+    setItems:{type:[new mongoose.Schema({equipmentId:String,quantity:Number,x:Number,z:Number,rotation:Number},{_id:false})],default:[]},
     priceCents: { type: Number, default: 0, min: 0 }, // internal only, never in public output
     minQuantity: { type: Number, default: 1, min: 1 },
     quantityOwned: { type: Number, default: 1, min: 0 },
@@ -60,6 +62,7 @@ async function ensureSeed() {
 }
 
 const publicView = (e) => ({
+  isSet:Boolean(e.isSet||(e.setItems||[]).length||(e.modelParts||[]).length),setItems:(e.setItems||[]).map(member=>({equipmentId:member.equipmentId,quantity:member.quantity,x:member.x||0,z:member.z||0,rotation:member.rotation||0})),
   id: e.slug, category: e.category, name: e.name, brandModel: e.brandModel,
   description: e.description, functionSummary: e.functionSummary || '', eventFit: e.eventFit && typeof e.eventFit === 'object' ? e.eventFit : {}, imageUrl: e.imageUrl, modelUrl:e.modelUrl||'', modelParts:(e.modelParts||[]).map(part=>({name:part.name,nameAr:part.nameAr||'',src:part.src,x:part.x||0,z:part.z||0,rotation:part.rotation||0})), minQuantity: e.minQuantity, ...stockView(e),
 });
@@ -76,7 +79,10 @@ const modelPartSchema=z.object({
  x:z.number().finite().min(-100).max(100).default(0),z:z.number().finite().min(-100).max(100).default(0),
  rotation:z.number().finite().min(-360).max(360).default(0),
 }).strict();
+const setItemSchema=z.object({equipmentId:z.string().trim().regex(/^[a-z0-9-]+$/).max(160),quantity:z.number().int().min(1).max(32),x:z.number().finite().min(-100).max(100).default(0),z:z.number().finite().min(-100).max(100).default(0),rotation:z.number().finite().min(-360).max(360).default(0)}).strict();
 const fields = {
+  isSet:z.boolean(),
+  setItems:z.array(setItemSchema).max(32).refine(items=>items.reduce((total,item)=>total+item.quantity,0)<=32,'A set can contain up to 32 pieces.').refine(items=>new Set(items.map(item=>item.equipmentId)).size===items.length,'Each equipment type must appear once.'),
   modelParts:z.array(modelPartSchema).max(32),
   modelJobId:z.string().max(80).nullable(),
   category: z.string().trim().min(1), name: z.string().trim().min(1),

@@ -85,18 +85,21 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
   const identity = req => String(req.authUser?._id || req.authUser?.id || '');
   const safety = req => crypto.createHash('sha256').update(identity(req)).digest('hex');
   const configured = (kind='chat',config=null) => kind==='chat'?Boolean(providerKey(env,config?.chat?.provider)):config?.voice?.provider==='alibaba'?Boolean(env.DASHSCOPE_API_KEY):Boolean(env.OPENAI_API_KEY);
-  const admitted = (req, res, kind, limit,config) => {
+  const admitted = (req, res, kind, limit,config,{bucketKind=kind}={}) => {
     if (!configured(kind,config)) { res.status(503).json({ message: 'AI booking is not configured yet. Personal booking is available.' }); return false; }
-    const now = Date.now(), key = `${identity(req)}:${kind}`;
+    const now = Date.now(), key = `${identity(req)}:${bucketKind}`;
     for (const [id, value] of usage) if (value.reset <= now) usage.delete(id);
     const bucket = usage.get(key) || { count: 0, reset: now + 600000 };
-    if (bucket.count >= limit || usage.size > 5000) { res.status(429).json({ message: 'AI booking limit reached. Please try again later or book personally.' }); return false; }
-    bucket.count++; usage.set(key, bucket); return true;
+    if (bucket.count >= limit || usage.size > 5000) { const retryAfterSeconds=Math.max(1,Math.ceil((bucket.reset-now)/1000));res.set('Retry-After',String(retryAfterSeconds));res.status(429).json({code:'AI_RATE_LIMIT',retryAfterSeconds,message:`${bucketKind==='voice-attempt'?'Voice reconnection limit':`AI ${kind} limit`} reached. Try again in ${retryAfterSeconds} seconds, or continue with the booking form.`});return false; }
+    bucket.count++; usage.set(key, bucket);let refunded=false;
+    return ()=>{if(!refunded&&usage.get(key)===bucket){refunded=true;bucket.count=Math.max(0,bucket.count-1);}};
   };
   const headers = req => ({ Authorization: `Bearer ${env.OPENAI_API_KEY}`, 'OpenAI-Safety-Identifier': safety(req) });
-  const hangup = async id => {
+  const hangup = async (id,{refund=false}={}) => {
     const call = calls.get(id); if (!call) return;
-    calls.delete(id); clearTimeout(call.timer);
+    calls.delete(id); clearTimeout(call.timer);clearTimeout(call.attachTimer);
+    for(const [ticket,value] of socketTickets)if(value.callId===id)socketTickets.delete(ticket);
+    if(refund||(call.provider==='alibaba'&&!call.providerReady))call.refundQuota?.();
     if(configService&&call.ticket&&call.clientUsage)await configService.updateMetrics(call.ticket,{...call.clientUsage,usageSource:'client-reported',durationMs:Date.now()-call.started}).catch(()=>{});
     recordMetric({mode:'voice',sessionDurationMs:Date.now()-call.started,...(call.clientUsage?{usageSource:'client-reported',...call.clientUsage}:{})});
     if(call.provider==='alibaba'){call.close?.();return;}
@@ -111,9 +114,9 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
     const input = inputSchema.safeParse(req.body);
     if (!input.success || input.data.messages.at(-1).role !== 'user') return res.status(400).json({ message: 'Send a valid message and accept the AI notice.' });
     const config=await policy(res,'chat');if(!config)return;
-    if (!admitted(req, res, 'chat', config.chat.requestsPer10Min,config)) return;
     const lock = `${identity(req)}:chat`;
     if (pending.has(lock)) return res.status(429).json({ message: 'Please wait for the current reply.' });
+    if (!admitted(req, res, 'chat', config.chat.requestsPer10Min,config)) return;
     pending.add(lock);
     let stage = 'provider_request';
     const patchOnly=input.data.responseFormat==='patch';
@@ -191,9 +194,12 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
     const config=await policy(res,'voice');if(!config)return;
     const alibaba=config.voice.provider==='alibaba';
     if (!alibaba && (typeof req.body?.sdp !== 'string' || req.body.sdp.length > 30000 || !req.body.sdp.startsWith('v=0'))) return res.status(400).json({ message: 'A valid voice connection and AI consent are required.' });
-    if (!admitted(req, res, 'voice', config.voice.requestsPer10Min,config)) return;
     const owner = identity(req), lock = `${owner}:voice`;
     if (pending.has(lock) || [...calls.values()].some(call => call.owner === owner)) return res.status(409).json({ message: 'End your existing AI call first.' });
+    // Separate bounded connection attempts from the session allowance. Failed
+    // transports can be retried without granting unlimited provider attempts.
+    if(!admitted(req,res,'voice',20,config,{bucketKind:'voice-attempt'}))return;
+    const refundQuota=admitted(req,res,'voice',config.voice.requestsPer10Min,config);if(!refundQuota)return;
     pending.add(lock);
     const started=performance.now();let connected=false,ticket=null;
     const controller=new AbortController();
@@ -204,7 +210,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
         // The browser opens a one-time WebSocket (attachVoiceSocket) that this server bridges to Alibaba Cloud.
         const callId=`ali_${crypto.randomUUID().replaceAll('-','')}`,wsTicket=crypto.randomBytes(24).toString('hex');
         const timer=setTimeout(()=>hangup(callId),config.voice.maxCallSeconds*1000);timer.unref?.();
-        const call={owner,timer,started:Date.now(),ticket,provider:'alibaba'};
+        const call={owner,timer,started:Date.now(),ticket,provider:'alibaba',refundQuota,providerReady:false};
         call.attachTimer=setTimeout(()=>{if(!call.attached)hangup(callId);},30000);call.attachTimer.unref?.();
         calls.set(callId,call);socketTickets.set(wsTicket,{callId,owner,config,expires:Date.now()+30000});
         if(res.destroyed||controller.signal.aborted){await hangup(callId);throw new Error('Voice request canceled');}
@@ -222,13 +228,13 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
       const callId = location.split('/').pop();
       if (!callId || !/^[a-zA-Z0-9_-]+$/.test(callId)) return res.status(502).json({ message: 'Could not establish a managed AI call.' });
       const timer = setTimeout(() => hangup(callId), config.voice.maxCallSeconds*1000); timer.unref?.();
-      calls.set(callId, { owner, timer, started:Date.now(),ticket });
+      calls.set(callId, { owner, timer, started:Date.now(),ticket,refundQuota });
       if(res.destroyed||controller.signal.aborted){await hangup(callId);throw new Error('Voice request canceled');}
       if(ticket){try{await configService.complete(ticket,{connectionMs:Math.round(performance.now()-started)});}catch(error){await hangup(callId);throw error;}}
       connected=true;
       return res.json({ sdp, callId, maxCallSeconds: config.voice.maxCallSeconds });
     } catch(error) { return res.status([400,402,409,503].includes(error.status)?error.status:502).json({ message: error.status?error.message:'AI voice connection failed. No booking was submitted.' }); }
-    finally { pending.delete(lock);res.off('close',disconnected);if(ticket&&!connected)await configService.fail(ticket).catch(()=>{});recordMetric({mode:'voice',model:config.voice.model,status:connected?'connected':'failed',connectionMs:Math.round(performance.now()-started)}); }
+    finally { if(!connected)refundQuota();pending.delete(lock);res.off('close',disconnected);if(ticket&&!connected)await configService.fail(ticket).catch(()=>{});recordMetric({mode:'voice',model:config.voice.model,status:connected?'connected':'failed',connectionMs:Math.round(performance.now()-started)}); }
   });
   app.post('/api/ai-booking/voice/end', requireAuth, async (req, res) => {
     const id = typeof req.body?.callId === 'string' ? req.body.callId : '';
@@ -249,7 +255,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
       const call=calls.get(value.callId);
       if(!call){client.close();return;}
       call.attached=true;clearTimeout(call.attachTimer);
-      call.close=bridgeAlibabaVoice({client,env,model:value.config.voice.model,instructions:instructions()+'\n'+orderInstructions()+'\n'+voiceNavigationInstructions(),tools:[draftTool,voiceNavigationTool],maxOutputTokens:value.config.voice.maxOutputTokens,onClose:()=>hangup(value.callId)});
+      call.close=bridgeAlibabaVoice({client,env,model:value.config.voice.model,instructions:instructions()+'\n'+orderInstructions()+'\n'+voiceNavigationInstructions(),tools:[draftTool,voiceNavigationTool],maxOutputTokens:value.config.voice.maxOutputTokens,onReady:()=>{call.providerReady=true;},onClose:detail=>hangup(value.callId,{refund:detail?.side==='provider'&&detail.code!==1000})});
     },
   };
   return {voiceSocketHooks};

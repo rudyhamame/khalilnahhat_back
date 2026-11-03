@@ -9,10 +9,12 @@ const Asset=mongoose.models.CloudinaryAsset||mongoose.model('CloudinaryAsset',ne
  checkedAt:Date,leaseUntil:Date,attempts:{type:Number,default:0},lastError:String,
 },{timestamps:true}));
 const HOLD_MS=10*60*1000,GRACE_MS=5*60*1000;
+const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
 const identityOptions=(hash,options)=>{
- const {public_id,folder,use_filename,unique_filename,overwrite,...rest}=options;
+ const {public_id,folder,use_filename,unique_filename,overwrite,...given}=options;
+ const rest={resource_type:'image',type:'upload',...given};
  // Keep access policies and processing profiles separate, even for identical bytes.
- const profile=createHash('sha256').update(JSON.stringify(rest)).digest('hex').slice(0,16);
+ const profile=createHash('sha256').update(JSON.stringify(canonical(rest))).digest('hex').slice(0,16);
  const suffix=options.resource_type==='raw'?(/\.[a-z0-9]{1,12}$/i.exec(public_id||'')?.[0]||''):'';
  return {...rest,public_id:`khalil/assets/${profile}/${hash}${suffix}`,overwrite:false,unique_filename:false};
 };
@@ -32,7 +34,11 @@ function createAssetStore({client=cloudinary,Model=Asset,now=()=>new Date()}={})
    // The hold protects a reused asset while its new DB reference is being saved.
    let row;
    try{row=await Model.findOneAndUpdate({key,state:{$ne:'deleting'}},{$set:{holdUntil:new Date(+now()+HOLD_MS),missingSince:null},$setOnInsert:{sha256,cloud,publicId:opts.public_id,resourceType:opts.resource_type||'image',delivery:opts.type||'upload',state:'ready'}},{upsert:true,returnDocument:'after'});}
-   catch(error){if(error.code===11000)throw Object.assign(new Error('This file is being cleaned up. Retry the upload.'),{status:409});throw error;}
+   catch(error){
+    if(error.code!==11000)throw error;
+    row=await Model.findOneAndUpdate({key,state:'ready'},{$set:{holdUntil:new Date(+now()+HOLD_MS),missingSince:null}},{returnDocument:'after'});
+    if(!row)throw Object.assign(new Error('This file is being cleaned up. Retry the upload.'),{status:409});
+   }
    if(row?.result?.secure_url)return row.result;
    const result=await new Promise((resolve,reject)=>{
     const done=(error,result)=>error?reject(error):resolve(result);

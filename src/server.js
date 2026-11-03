@@ -498,9 +498,6 @@ function serializeLiveSession(session) {
 function uploadAudioBufferToCloudinary(file){return uploadAsset(file.buffer,{folder:'khalil/live-sessions',resource_type:'video'});}
 function uploadPosterBufferToCloudinary(file){return uploadAsset(file.buffer,{folder:'khalil/live-posters',resource_type:'image'});}
 function uploadCoverBufferToCloudinary(file){return uploadAsset(file.buffer,{folder:'khalil/song-covers',resource_type:'image'});}
-// Asset cleanup runs after reference checks; never destroy shared audio inline.
-async function deleteCloudinaryAudio(){ }
-
 function serializeLiveRequest(request) {
   return {
     broadcastSessionId: request.broadcastSessionId || request.broadcastRoomName || '',
@@ -1242,7 +1239,7 @@ app.delete('/api/live-sessions/:id', requireAdmin, async (request, response) => 
     });
   }
 
-  await deleteCloudinaryAudio(deleted.audioPublicId);
+  // The asset worker removes audio only after its last reference is gone.
 
   return response.json({
     ok: true,
@@ -1640,6 +1637,7 @@ app.use((_request, response) => {
 
 async function startServer(port = PORT) {
   await connectToDatabase();
+  await require('./cloudinary-assets').Asset.init();
   const stopAssetCleanup=require('./cloudinary-assets').startCleanup();
   if(process.env.ECHO_ADMIN_WORKER_MODE!=='external')await aiAdministrator.start();
 

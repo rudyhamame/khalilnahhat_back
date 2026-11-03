@@ -4,7 +4,7 @@ const {Writable}=require('node:stream');
 const mongoose=require('mongoose');
 const fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path'),net=require('node:net');
 const {spawn,spawnSync}=require('node:child_process');
-const {Asset,createAssetStore,identityOptions,referenced,hasReferences,sweep}=require('../src/cloudinary-assets');
+const {Asset,createAssetStore,identityOptions,referenced,hasReferences,sweep,ownedIdentity,discoverReferenced}=require('../src/cloudinary-assets');
 test('stable identities deduplicate across folders and separate delivery policies',()=>{
  const hash='a'.repeat(64);
  assert.equal(identityOptions(hash,{folder:'Gallery',resource_type:'image'}).public_id,identityOptions(hash,{folder:'khalil/equipment',resource_type:'image'}).public_id);
@@ -14,6 +14,9 @@ test('stable identities deduplicate across folders and separate delivery policie
  assert.ok(referenced({nested:['https://res.cloudinary.com/qa/video/authenticated/s--signature--/c_limit/v123/folder/abc.mp3']},asset));
  assert.equal(referenced('https://res.cloudinary.com/other/video/authenticated/folder/abc.mp3',asset),false);
  assert.equal(referenced('https://res.cloudinary.com/qa/video/authenticated/folder/abcd.mp3',asset),false);
+ assert.equal(ownedIdentity('https://res.cloudinary.com/qa/image/upload/v1/khalil/site-assets/logo.png','qa'),null);
+ assert.equal(ownedIdentity('https://res.cloudinary.com/other/image/upload/v1/Gallery/photo.png','qa'),null);
+ assert.equal(ownedIdentity('https://res.cloudinary.com/qa/image/upload/c_limit/v123/Gallery/photo.png','qa').publicId,'Gallery/photo');
 });
 test('uploads, shared references, direct DB deletion, failed cleanup and upload/delete races',{timeout:60000},async t=>{
  if(spawnSync('mongod',['--version'],{stdio:'ignore'}).status!==0)return t.skip('mongod required');
@@ -32,6 +35,9 @@ test('uploads, shared references, direct DB deletion, failed cleanup and upload/
  const db=mongoose.connection.db;
  await db.collection('owners').insertMany([{name:'gallery',url:first[0].secure_url},{name:'equipment',image:first[0].secure_url}]);
  let row=await Asset.findOne().lean();assert.ok(await hasReferences(row));
+ await db.collection('musicaudioassets').insertOne({externalId:'audio-reused',url:first[0].secure_url});
+ await db.collection('recordings').insertOne({audioAssetId:'audio-reused'});
+ assert.ok(await hasReferences(row));await db.collection('recordings').deleteMany({});
  await Asset.updateOne({_id:row._id},{$set:{holdUntil:new Date(0)}});
  await db.collection('owners').deleteOne({name:'gallery'});
  await sweep({client});assert.equal(deleted.length,0,'shared image preserved');
@@ -49,4 +55,10 @@ test('uploads, shared references, direct DB deletion, failed cleanup and upload/
  await assert.rejects(store.upload(Buffer.from('hello'),options),/being cleaned up/);
  await Asset.updateOne({_id:row._id},{$set:{state:'ready',holdUntil:new Date(0),missingSince:new Date(0)}});
  await sweep({client,now:later,check:async()=>{throw Error('DB unavailable');}});assert.equal(deleted.length,1,'fail closed when reference scan fails');
+ await db.collection('old_gallery').insertOne({url:'https://res.cloudinary.com/qa/image/upload/v123/Gallery/legacy.png'});
+ await discoverReferenced({cloud:'qa'});
+ const legacy=await Asset.findOne({publicId:'Gallery/legacy'}).lean();assert.ok(legacy,'existing referenced upload adopted');
+ await Asset.updateOne({_id:legacy._id},{$set:{holdUntil:new Date(0),missingSince:new Date(0)}});
+ await db.collection('old_gallery').deleteMany({});
+ await sweep({client,now:later});assert.ok(deleted.some(item=>item.id==='Gallery/legacy'),'legacy asset collected after direct DB removal');
 });

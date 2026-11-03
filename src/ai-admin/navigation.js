@@ -2,6 +2,7 @@ const sections={
  'recordings':'Recordings','collections':'Collections','work-elements':'Work Elements','dj-work-type':'DJ Work Type','dj-service-builder':'DJ Service Builder',
  'live-stream':'Live stream','live-archive':'Live Recordings','clients':'Registered Clients','bookings':'Booking requests','testimonials':"Clients’ Testimonials",'meetings':'Meeting requests',
  'youtube':'YouTube','gallery':'Gallery','prices':'Events, Services & Equipment','transactions':'Transactions','availability':'Availability','vouchers':'Vouchers',
+ 'notifications':'Notifications','service-overview-operations-guide':'Service Overview & Operations Guide',
  'ai-administrator':'Echo AI Administrator','ai-configuration':'ECHO AI Configuration','ai-billing':'Echo AI billing','seasonal-theme':'Seasonal theme',
 };
 const normalize=value=>String(value).toLowerCase().replace(/[’']/g,'').replace(/[-_]/g,' ').replace(/\s+/g,' ').trim();

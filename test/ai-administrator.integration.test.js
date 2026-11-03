@@ -133,8 +133,32 @@ test('AI Administrator: real editor adapters, durable approvals, verification, a
   }finally{await new Promise(resolve=>server.close(resolve));}
  });
  await t.test('every registered read capability has a real handler and bounded result',async()=>{
-  for(const entry of registry.entries.values()){if(entry.mutation||['music_classification_proposal','booking_quote_proposal'].includes(entry.name))continue;const args=entry.name==='music_recording_get'?{id:recording.id}:entry.name==='music_work_get'?{id:work.id}:entry.name==='music_vocabulary_get'?{id:(await models.Vocabulary.findOne()).externalId}:entry.schema.parse(entry.schema.shape.q?{q:''}:{});const result=await registry.executeRead(entry.name,args,admin);assert.ok(result,entry.name);}
+  for(const entry of registry.entries.values()){if(entry.mutation||['music_classification_proposal','booking_quote_proposal'].includes(entry.name))continue;if(['voucher_redemptions_read','notification_template_preview','availability_read','ai_billing_usage_read'].includes(entry.name))continue;const args=entry.name==='administrator_open_section'?{section:'recordings'}:entry.name==='music_recording_get'?{id:recording.id}:entry.name==='music_work_get'?{id:work.id}:entry.name==='music_vocabulary_get'?{id:(await models.Vocabulary.findOne()).externalId}:entry.schema.parse(entry.schema.shape.q?{q:''}:{});const result=await registry.executeRead(entry.name,args,admin);assert.ok(result,entry.name);}
  });
  await t.test('HTTP task ownership, auth, runtime inventory and denied credentials',async()=>{const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));try{const url=`http://127.0.0.1:${server.address().port}/api/admin/ai-administrator`;assert.equal((await fetch(url)).status,401);assert.equal((await fetch(url,{headers:{Authorization:'Bearer qa-customer-token'}})).status,401);const response=await fetch(url,{headers:{Authorization:'Bearer qa-admin-token'}});assert.equal(response.status,200);const data=await response.json();assert.ok(data.capabilities.length>=32);assert.ok(data.inventory.some(row=>row.coverage==='unsupported'));assert.ok(!JSON.stringify(data).includes('qa-admin-token'));}finally{await new Promise(resolve=>server.close(resolve));}});
+ await t.test('native parity adapters: vouchers, templates, availability and work types use the real approval pipeline',async()=>{
+  const voucher=await approve(await run('voucher_create',{body:{code:'NATIVE-QA',kind:'percent',percent:12,active:true}}));
+  assert.equal(voucher.percent,12);assert.equal((await approve(await run('voucher_update',{id:voucher.id,body:{active:false}}))).active,false);
+  assert.equal((await registry.executeRead('voucher_redemptions_read',{id:voucher.id},admin)).items.length,0);
+  const templates=await registry.executeRead('notification_templates_read',{},admin);const template=templates.items.find(row=>row.id==='service-quote');
+  const preview=await registry.executeRead('notification_template_preview',{id:template.id,body:{subject:'Native QA quote'}},admin);assert.equal(preview.sent,false);assert.ok(preview.text.includes('ECHO-1042'));
+  const changed=await approve(await run('notification_template_update',{id:template.id,body:{subject:'Native QA quote'}}));assert.equal(changed.subject,'Native QA quote');assert.equal(changed.revision,template.revision+1);assert.equal(changed.body,template.body);
+  const date=new Date().getUTCFullYear()+'-12-29';
+  await approve(await run('availability_block_update',{dates:[date],blocked:true,note:'Native QA travel'}));
+  const availability=await registry.executeRead('availability_read',{year:Number(date.slice(0,4))},admin);assert.ok(availability.blocked.some(row=>row.date===date&&row.note==='Native QA travel'));
+  await approve(await run('availability_block_update',{dates:[date],blocked:false,note:''}));
+  const type=await approve(await run('work_type_create',{body:{name:'Native QA type',amount:'INDIVIDUAL',details:'Original supplied text'}}));
+  const typeAfter=await approve(await run('work_type_update',{id:type.id,body:{detailsArabic:'وصف'}}));assert.equal(typeAfter.name,type.name);assert.equal(typeAfter.details,'Original supplied text');assert.equal(typeAfter.detailsArabic,'وصف');
+  for(const tool of ['work_elements_read','work_types_read','vouchers_search','ai_usage_read','youtube_session_status'])await registry.executeRead(tool,{},admin);
+ });
+ await t.test('native parity adapters: confirmed event sets persist and disabled AI configuration is approved and verified',async()=>{
+  const {ServiceRequest}=require('../src/models');
+  const booking=await ServiceRequest.create({externalId:'native-dj-set-qa',userId:customer._id,customerUsername:customer.username,customerName:'Native QA',customerEmail:'native@example.invalid',status:'confirmed',items:[]});
+  const result=await approve(await run('dj_service_set_update',{id:booking.externalId,djSet:{segments:[{id:'arrival',title:'Arrival',startsAt:'18:00',endsAt:'18:30',recordingIds:[],notes:''}],notes:'Supplied plan'}}));assert.equal(result.djSet.segments[0].title,'Arrival');
+  const changed=await approve(await run('ai_configuration_update',{body:{voice:{...require('../src/ai-configuration').defaults({}).voice,enabled:false}}}));assert.equal(changed.voice.enabled,false);
+  for(const tool of ['ai_billing_accounts_read','ai_billing_invoices_read'])assert.ok(Array.isArray((await registry.executeRead(tool,{},admin)).items));
+  assert.ok(Array.isArray((await registry.executeRead('ai_billing_usage_read',{owner},admin)).items));
+ });
+
  const evidence={generatedAt:new Date().toISOString(),database:'isolated ephemeral MongoDB replica set',registered:registry.list().length,verifiedCapabilities:[...verifiedCapabilities].sort(),unverifiedCapabilities:registry.list().filter(entry=>!verifiedCapabilities.has(entry.name)).map(entry=>entry.name)};await fs.mkdir(path.join(__dirname,'../artifacts/ai-administrator'),{recursive:true});await fs.writeFile(path.join(__dirname,'../artifacts/ai-administrator/capability-verification.json'),JSON.stringify(evidence,null,2)+'\n');if(process.env.ECHO_ADMIN_LIVE_MODEL_TEST==='1')await fs.writeFile(path.join(__dirname,'../artifacts/ai-administrator/live-provider-check.json'),JSON.stringify({at:new Date().toISOString(),provider:'OpenAI Responses API',model:'gpt-4o-mini',database:evidence.database,operation:'Authorized recording search through the same real registry and engine',passed:true},null,2)+'\n');
 });

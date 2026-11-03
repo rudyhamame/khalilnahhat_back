@@ -24,3 +24,24 @@ test('set models reject unsafe URLs, invalid placement and excessive piece count
  for(const patch of [{x:Infinity},{z:101},{rotation:361},{name:''}])assert.equal(updateSchema.safeParse({modelParts:[{...part,...patch}]}).success,false);
  assert.equal(updateSchema.safeParse({modelParts:Array(33).fill(part)}).success,false);
 });
+
+test('set membership and quantities persist without requiring a 3D model',()=>{
+ const parsed=updateSchema.parse({isSet:true,setItems:[{equipmentId:'speaker',quantity:2}],priceCents:25000});
+ const document=new Equipment({slug:'speaker-set',category:'sound',name:'Speaker set',...parsed});
+ assert.equal(document.validateSync(),undefined);
+ const view=publicView(document.toObject());
+ assert.equal(view.isSet,true);
+ assert.deepEqual(view.setItems,[{equipmentId:'speaker',quantity:2,x:0,y:0,z:0,rotation:0}]);
+ assert.deepEqual(view.modelParts,[]);
+ for(const quantity of [0,-1,1.5,33])assert.equal(updateSchema.safeParse({setItems:[{equipmentId:'speaker',quantity}]}).success,false);
+ assert.equal(updateSchema.safeParse({setItems:[{equipmentId:'speaker',quantity:2},{equipmentId:'speaker',quantity:2}]}).success,false);
+ assert.equal(updateSchema.safeParse({setItems:[{equipmentId:'speaker',quantity:20},{equipmentId:'monitor',quantity:20}]}).success,false);
+});
+
+test('set pieces and equipment groups preserve vertical placement',()=>{
+ const parsed=updateSchema.parse({setItems:[{equipmentId:'speaker',quantity:2,x:3,y:.535}],modelParts:[{name:'Speaker',src:'/echo/models/speaker.glb',x:3,y:.535}]});
+ const document=new Equipment({slug:'stacked',name:'Stacked',category:'sound',...parsed});
+ const view=publicView(document.toObject());
+ assert.equal(view.setItems[0].y,.535);assert.equal(view.modelParts[0].y,.535);
+ assert.equal(updateSchema.safeParse({setItems:[{equipmentId:'speaker',quantity:2,y:-1}]}).success,false);
+});

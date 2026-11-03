@@ -55,3 +55,15 @@ test('bridge keeps both WebSockets alive and identifies the closing side once',a
  await new Promise(resolve=>{close=bridgeAlibabaVoice({client,env:{DASHSCOPE_API_KEY:'fake'},model:'m',WebSocketImpl:Upstream,readyTimeoutMs:1000,heartbeatMs:10,onReady:()=>ready++,onClose:()=>closed++});upstream.emit('open');upstream.emit('message',Buffer.from('{"type":"session.updated"}'));const check=setInterval(()=>{if(upstream.pings>=2){clearInterval(check);resolve();}},5);});
  assert.equal(ready,1);assert.ok(client.pings>=2);close();close();assert.equal(closed,1);
 });
+test('Alibaba eligibility errors remain visible and are not replaced by a later 1006',()=>{
+ const {voiceProviderError,createTranslator}=require('../src/ai-voice-alibaba');
+ const error=voiceProviderError({code:'AccessDenied.Unpurchased',message:'Access denied'});
+ assert.equal(error.retryable,false);assert.match(error.message,/Model Studio is not activated/);
+ assert.equal(createTranslator({}).toClient({type:'error',error:{code:'AccessDenied.Unpurchased',message:'Access denied'}})[0].error.code,'AccessDenied.Unpurchased');
+ const client=new Socket();let upstream,detail;
+ class Upstream extends Socket{constructor(){super();upstream=this;}}
+ bridgeAlibabaVoice({client,env:{DASHSCOPE_API_KEY:'fake'},model:'m',WebSocketImpl:Upstream,onClose:value=>{detail=value;}});
+ upstream.emit('message',Buffer.from('{"code":"AccessDenied.Unpurchased","message":"Access denied"}'));
+ upstream.emit('close',1006,Buffer.alloc(0));
+ assert.equal(detail.providerCode,'AccessDenied.Unpurchased');assert.equal(client.sent.length,1);assert.equal(client.sent[0].error.code,'AccessDenied.Unpurchased');assert.equal(client.readyState,3);
+});

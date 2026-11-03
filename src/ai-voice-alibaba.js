@@ -14,6 +14,16 @@ function realtimeUrl(env,model){
 const text=content=>(Array.isArray(content)?content:[]).map(part=>typeof part?.text==='string'?part.text:'').join('\n').trim();
 const count=value=>Number.isInteger(value)&&value>=0?value:undefined;
 
+function voiceProviderError(event){
+ const code=String(event.error?.code||event.code||'VOICE_PROVIDER_ERROR');
+ const messages={
+  'AccessDenied.Unpurchased':'Alibaba Cloud Model Studio is not activated or this account/workspace is not eligible for the selected voice model. Enable model access in Model Studio, or choose an available model.',
+  'AccessDenied':'The Alibaba API key does not allow this voice model. Check its Model Studio permissions.',
+  'Arrearage':'Alibaba Cloud denied voice access because of the account billing status. Check the account in Model Studio.',
+ };
+ return {code,message:messages[code]||String(event.error?.message||event.message||'Alibaba Cloud voice error'),retryable:!(/AccessDenied|InvalidApiKey|Arrearage|OUT_OF_SERVICE/i.test(code))};
+}
+
 // Half a second of 16 kHz mono PCM16 silence: lets the model take the first turn without the caller saying anything.
 const SILENCE=Buffer.alloc(16000).toString('base64');
 function sessionUpdate({instructions,tools,voice,maxOutputTokens,manual=false}){
@@ -85,7 +95,7 @@ function createTranslator({instructions,tools,voice,maxOutputTokens}){
   },
   // Alibaba event -> events for the browser, in the shapes the page already understands.
   toClient(event){
-   if(!event?.type&&typeof event?.code==='string'&&typeof event?.message==='string')return [{type:'error',error:{message:event.code==='AccessDenied'?'The Alibaba API key does not allow this voice model. Check its Model Studio permissions.':event.message}}];
+   if(!event?.type&&typeof event?.code==='string'&&typeof event?.message==='string')return [{type:'error',error:voiceProviderError(event)}];
    switch(event?.type){
     case 'session.updated':{
      const purpose=state.configurationAcks.shift();
@@ -118,7 +128,7 @@ function createTranslator({instructions,tools,voice,maxOutputTokens}){
       ...(input!==undefined||output!==undefined?{usage:{...(input!==undefined?{input_tokens:input}:{}),...(output!==undefined?{output_tokens:output}:{}),...(cached!==undefined?{input_token_details:{cached_tokens:cached}}:{})}}:{})}};
      return [done];
     }
-    case 'error':return [{type:'error',error:{message:String(event.error?.message||'Alibaba Cloud voice error')}}];
+    case 'error':return [{type:'error',error:voiceProviderError(event)}];
     default:return [];
    }
   },
@@ -129,7 +139,7 @@ function createTranslator({instructions,tools,voice,maxOutputTokens}){
 function bridgeAlibabaVoice({client,env=process.env,model,voice=env.DASHSCOPE_VOICE||'Tina',instructions,tools,maxOutputTokens,onClose=()=>{},onReady=()=>{},WebSocketImpl=WebSocket,heartbeatMs=20000,readyTimeoutMs=20000}){
  const translator=createTranslator({instructions,tools,voice,maxOutputTokens});
  const upstream=new WebSocketImpl(realtimeUrl(env,model),{headers:{Authorization:`Bearer ${env.DASHSCOPE_API_KEY}`},handshakeTimeout:15000});
- const queued=[];let ready=false,closed=false,heartbeat,readyTimer;
+ const queued=[];let ready=false,closed=false,heartbeat,readyTimer,providerFailure=null;
  let lastPong=Date.now();upstream.on('pong',()=>{lastPong=Date.now();});
  const started=Date.now();
  const logEnd=(side,code)=>console.info('[alibaba-voice]',JSON.stringify({side,code,ready,durationMs:Date.now()-started}));
@@ -138,7 +148,7 @@ function bridgeAlibabaVoice({client,env=process.env,model,voice=env.DASHSCOPE_VO
  upstream.on('open',()=>{lastPong=Date.now();send(upstream,translator.open());});
  readyTimer=setTimeout(()=>fail('session setup timeout','The voice provider did not finish connecting. Reconnect or continue in chat.'),readyTimeoutMs);readyTimer.unref?.();
  heartbeat=setInterval(()=>{if(closed||upstream.readyState!==1)return;if(Date.now()-lastPong>heartbeatMs*3){fail('heartbeat timeout','The voice connection stopped responding. Reconnect or continue in chat.');return;}try{upstream.ping?.();if(client.readyState===1)client.ping?.();}catch{fail('heartbeat failed','The voice connection was lost. Reconnect or continue in chat.');}},heartbeatMs);heartbeat.unref?.();
- upstream.on('message',raw=>{if(closed)return;let event;try{event=JSON.parse(raw.toString());}catch{return;}if(event.type==='error'||(!event.type&&event.code))console.error('[alibaba-voice]',JSON.stringify({event:'provider_error',code:event.error?.code||event.code||'unknown'}));if(event.type==='session.updated'&&!ready){ready=true;clearTimeout(readyTimer);onReady();for(const pending of queued.splice(0))send(upstream,pending);send(client,{type:'bridge.ready'});}for(const out of translator.toClient(event))send(client,out);for(const out of translator.drain())send(upstream,out);});
+ upstream.on('message',raw=>{if(closed)return;let event;try{event=JSON.parse(raw.toString());}catch{return;}if(event.type==='error'||(!event.type&&event.code))console.error('[alibaba-voice]',JSON.stringify({event:'provider_error',code:event.error?.code||event.code||'unknown'}));if(event.type==='session.updated'&&!ready){ready=true;clearTimeout(readyTimer);onReady();for(const pending of queued.splice(0))send(upstream,pending);send(client,{type:'bridge.ready'});}for(const out of translator.toClient(event)){if(out.type==='error')providerFailure=out.error;send(client,out);}if(providerFailure?.retryable===false){close({side:'provider',code:1008,providerCode:providerFailure.code});return;}for(const out of translator.drain())send(upstream,out);});
  // Log why Alibaba ended the call (never the key) and tell the browser, so a drop is diagnosable.
  const fail=(reason,message)=>{if(closed)return;console.error('[alibaba-voice]',reason);send(client,{type:'error',error:{message,code:'VOICE_TRANSPORT_FAILED',retryable:true}});close({side:'provider',code:1006});};
  upstream.on('unexpected-response',(request,response)=>fail(`handshake HTTP ${response.statusCode}`,`Alibaba rejected the voice connection (HTTP ${response.statusCode}). Check the API key, region and model access.`));
@@ -147,7 +157,7 @@ function bridgeAlibabaVoice({client,env=process.env,model,voice=env.DASHSCOPE_VO
   if(closed)return;
   logEnd('provider',code);
   const detail=String(reason||'').slice(0,160);
-  send(client,{type:'error',error:{message:code===1000?'The voice provider ended this session. Reconnect to continue.':`The voice provider disconnected (code ${code}${detail?`: ${detail}`:''}). Reconnect to continue.`}});
+  if(!providerFailure)send(client,{type:'error',error:{message:code===1000?'The voice provider ended this session. Reconnect to continue.':`The voice provider disconnected (code ${code}${detail?`: ${detail}`:''}). Reconnect to continue.`}});
   close({side:'provider',code});
  });
  client.on('message',raw=>{
@@ -157,4 +167,4 @@ function bridgeAlibabaVoice({client,env=process.env,model,voice=env.DASHSCOPE_VO
  client.on('close',code=>{if(!closed)logEnd('browser',code);close({side:'browser',code});});client.on('error',()=>{if(!closed)logEnd('browser_error',null);close({side:'browser',code:1006});});
  return ()=>close();
 }
-module.exports={bridgeAlibabaVoice,createTranslator,realtimeUrl,sessionUpdate};
+module.exports={bridgeAlibabaVoice,createTranslator,realtimeUrl,sessionUpdate,voiceProviderError};

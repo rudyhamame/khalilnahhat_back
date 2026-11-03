@@ -31,3 +31,19 @@ configuration acknowledgement; this change does not alter that translator.
 
 These backend changes require deployment. No real customer call or live
 Alibaba account validation was performed as part of these local tests.
+
+## Live eligibility diagnosis (2026-11-03)
+
+Render application logs showed `AccessDenied.Unpurchased` at 01:35:32 Eastern,
+followed by upstream close 1006, `ready:false`, after 2,972 ms. The selected model
+was `qwen3.8-omni-flash-realtime`. This establishes provider eligibility/service
+activation as the reported rejection, rather than proving a transport outage.
+Alibaba's error-code documentation describes this code as service activation or
+model eligibility. Verify the account/workspace associated with the deployed API
+key and the chosen region. Enabling a service or accepting provider terms must be
+completed by the account owner. No activation, purchase, API-key change or provider
+switch was performed here.
+
+The bridge now preserves the provider error code and actionable explanation and
+closes the rejected session immediately. A later socket close cannot overwrite it
+with the generic 1006 notice. This additional change is local until deployed.

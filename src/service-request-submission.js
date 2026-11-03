@@ -28,6 +28,9 @@ function registerServiceRequestSubmission(app, { requireAuth, ServiceRequest, Eq
     }
 
     const user = request.authUser;
+    const draftVoucher=parsed.data.order?.additional?.voucherCode?.trim().toUpperCase();
+    if(draftVoucher&&parsed.data.voucherCode&&draftVoucher!==parsed.data.voucherCode.trim().toUpperCase())return response.status(400).json({message:'The voucher changed. Review the current draft code before submitting.'});
+    if(draftVoucher&&!parsed.data.voucherCode)parsed.data.voucherCode=draftVoucher;
     const submissionPayload = { items: parsed.data.items, event: parsed.data.event || null, order: parsed.data.order || null, voucherCode: parsed.data.voucherCode || '' };
     const submissionHash = parsed.data.clientSubmissionId ? fingerprintSubmission(submissionPayload) : undefined;
     const findExistingSubmission = async () => ServiceRequest.findOne({ userId: user._id, clientSubmissionId: parsed.data.clientSubmissionId }).select('+submissionHash');

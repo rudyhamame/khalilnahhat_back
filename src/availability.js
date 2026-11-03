@@ -30,15 +30,18 @@ async function bookingDays(year){
 }
 const yearOf=req=>{const year=Number(req.query.year),current=new Date().getUTCFullYear();return Number.isInteger(year)&&year>=current-5&&year<=current+15?year:null;};
 const blockedIn=async year=>(await Block.find({date:{$gte:`${year}-01-01`,$lte:`${year}-12-31`}}).select('date note -_id').sort({date:1}).lean());
+// Shared public view: never expose booking identities or private block notes to clients or AI.
+async function availabilitySnapshot(year){
+ const days=await bookingDays(year);
+ for(const row of await blockedIn(year))days[row.date]=[{start:0,end:1440}];
+ return {year,timezone:'America/Toronto',source:'confirmed_bookings',days,updatedAt:new Date().toISOString()};
+}
 function registerAvailability(app,{requireAdmin}={}){
  app.get('/api/availability',async(req,res)=>{
   const year=yearOf(req);
   if(year===null)return res.status(400).json({message:'Choose a year within the availability calendar range.'});
   try{
-   const days=await bookingDays(year);
-   // Days the owner blocked by hand look fully booked to the public calendar.
-   for(const row of await blockedIn(year))days[row.date]=[{start:0,end:1440}];
-   res.set('Cache-Control','no-store');res.json({year,timezone:'America/Toronto',source:'confirmed_bookings',days,updatedAt:new Date().toISOString()});
+   res.set('Cache-Control','no-store');res.json(await availabilitySnapshot(year));
   }catch{res.status(503).json({message:'Availability is temporarily unavailable. Please retry.'});}
  });
  if(!requireAdmin)return;
@@ -61,4 +64,4 @@ function registerAvailability(app,{requireAdmin}={}){
   }catch{res.status(503).json({message:'Could not save availability. Please retry.'});}
  });
 }
-module.exports={registerAvailability,bookingDays};
+module.exports={registerAvailability,bookingDays,availabilitySnapshot};

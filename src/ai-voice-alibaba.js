@@ -65,8 +65,10 @@ function createTranslator({instructions,tools,voice,maxOutputTokens}){
      // The browser seeds the booking context as a user text item before voice
      // input. Qwen Omni Realtime does not accept message items from
      // conversation.item.create; keep the text in session instructions instead.
-     state.context=`${state.context}\n${text(item.content)}`.trim().slice(0,6000);
-     return [configure({type:'session.update',session:{instructions:`${instructions}\n${state.context}`.slice(0,30000)}},'context')];
+     state.context=text(item.content).slice(0,100000);
+     // A refresh during the greeting must survive the switch back to listening.
+     if(state.opening&&state.afterOpening){state.afterOpening.session.instructions=`${instructions}\n${state.context}`.slice(0,130000);return [];}
+     return [configure({type:'session.update',session:{instructions:`${instructions}\n${state.context}`.slice(0,130000)}},'context')];
     }
     if(item.type==='function_call_output'&&typeof item.call_id==='string'){
      state.hasConversation=true;const result={type:'function_call_output',call_id:item.call_id,output:String(item.output??'')};
@@ -83,8 +85,8 @@ function createTranslator({instructions,tools,voice,maxOutputTokens}){
     if(typeof event.response?.instructions==='string'&&event.response.instructions.trim()!==''&&!state.hasConversation){
      const context=state.context,extra=[context,event.response.instructions].filter(Boolean).join('\n');
      state.context='';state.opening=true;state.awaitingOpeningConfig=true;
-     state.afterOpening={type:'session.update',session:{instructions:`${instructions}\n${context}`.trim().slice(0,30000),turn_detection:sessionUpdate({instructions,tools,voice,maxOutputTokens}).session.turn_detection}};
-     return [configure(sessionUpdate({instructions:`${instructions}\n${extra}`.slice(0,30000),tools,voice,maxOutputTokens,manual:true}),'opening')];
+     state.afterOpening={type:'session.update',session:{instructions:`${instructions}\n${context}`.trim().slice(0,130000),turn_detection:sessionUpdate({instructions,tools,voice,maxOutputTokens}).session.turn_detection}};
+     return [configure(sessionUpdate({instructions:`${instructions}\n${extra}`.slice(0,130000),tools,voice,maxOutputTokens,manual:true}),'opening')];
     }
     state.context='';
     if(!state.hasConversation)return [];

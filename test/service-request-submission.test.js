@@ -66,10 +66,12 @@ test('canonical submissions retain the brief but enforce account identity and re
  const core=require('../src/event-order');
  let order=core.createEventOrder();
  for(const [key,value] of Object.entries({'customer.fullName':'Forged Name','customer.email':'forged@example.invalid','customer.phone':'4165550100','customer.contactMethod':'email','event.type':'wedding','event.date':'2099-10-12','event.startTime':'18:00','event.endTime':'01:00','event.guestCount':100,'event.venue.name':'Test Hall','event.venue.address':'1 Example Street','event.venue.city':'Toronto','event.venue.postalCode':'M1A 1A1','event.venue.area':'gta','event.venue.setting':'indoor',services:['dj']}))order=core.updateOrderField(order,key,value);
+ order.additional.voucherCode='TEST';
  const f=await fixture(t);
+ assert.equal((await f.post({...payload(),order,voucherCode:'OTHER'})).status,400);
  assert.equal((await f.post({...payload(),order,items:[{serviceId:'svc-lighting',name:'Lighting',category:'service',quantity:1}]})).status,400);
  assert.equal((await f.post({...payload(),order,status:'confirmed',unitPrice:1})).status,201);
- assert.equal(f.saved[0].order.customer.fullName,'Test Client');assert.equal(f.saved[0].order.customer.email,'test@example.invalid');assert.equal(f.saved[0].status,'pending');assert.equal(f.saved[0].order.event.venue.name,'Test Hall');
+ assert.equal(f.saved[0].order.customer.fullName,'Test Client');assert.equal(f.saved[0].order.customer.email,'test@example.invalid');assert.equal(f.saved[0].status,'pending');assert.equal(f.counters.reserve,1);assert.equal(f.saved[0].voucher.code,'TEST');assert.equal(f.saved[0].order.event.venue.name,'Test Hall');
 });
 
 test('a successful request can be replayed after its equipment leaves the active catalog',async t=>{

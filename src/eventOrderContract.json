@@ -412,6 +412,14 @@
      "label": "Anything else we should know? (optional)",
      "ar": "أي شيء آخر نحتاج معرفته؟ (اختياري)",
      "type": "textarea"
+    },
+    {
+     "key": "additional.voucherCode",
+     "label": "Voucher code",
+     "ar": "رمز القسيمة",
+     "type": "text",
+     "maxLength": 24,
+     "hidden": true
     }
    ]
   }

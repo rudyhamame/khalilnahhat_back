@@ -3,8 +3,8 @@ const {z}=require('zod');
 const {publicSongs}=require('./music-archive');
 const {isArchiveAudio}=require('./archive-player');
 const audioSchema=z.object({enabled:z.boolean(),archiveIds:z.array(z.string().trim().min(1).max(120)).max(3).refine(ids=>new Set(ids).size===ids.length,'Choose each recording only once.')}).strict().refine(value=>!value.enabled||value.archiveIds.length>0,'Choose a recording before enabling Christmas audio.');
-const defaults={revision:0,enabled:false,lights:true,snow:false,audio:{enabled:false,archiveIds:[]}};
-const themeSchema=z.object({revision:z.number().int().min(0),enabled:z.boolean(),lights:z.boolean(),snow:z.boolean(),audio:audioSchema.default(defaults.audio)}).strict();
+const defaults={revision:0,enabled:false,lights:true,snow:false,photoIds:[],audio:{enabled:false,archiveIds:[]}};
+const themeSchema=z.object({revision:z.number().int().min(0),enabled:z.boolean(),lights:z.boolean(),snow:z.boolean(),photoIds:z.array(z.string().trim().min(1).max(60)).max(10).refine(ids=>new Set(ids).size===ids.length,'Choose each photo only once.').default([]),audio:audioSchema.default(defaults.audio)}).strict();
 const normalize=value=>({...defaults,...value,audio:{...defaults.audio,...value?.audio}});
 const Model=mongoose.models.SeasonalTheme||mongoose.model('SeasonalTheme',new mongoose.Schema({_id:String,value:mongoose.Schema.Types.Mixed,updatedBy:String},{timestamps:true}));
 const store={load:()=>Model.findById('vp1').lean(),async save(value,owner){

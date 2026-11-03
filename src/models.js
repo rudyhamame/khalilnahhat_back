@@ -260,6 +260,8 @@ const serviceRequestItemSchema = new mongoose.Schema(
 const serviceRequestSchema = new mongoose.Schema(
   {
     externalId: { type: String, required: true, unique: true, trim: true },
+    clientSubmissionId: { type: String, default: undefined, trim: true },
+    submissionHash: { type: String, default: undefined, select: false },
     userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User', index: true },
     customerName: { type: String, required: true, trim: true },
     customerUsername: { type: String, required: true, trim: true },
@@ -293,6 +295,10 @@ const serviceRequestSchema = new mongoose.Schema(
     quotedAt: { type: Date, default: null },
   },
   { timestamps: true },
+);
+serviceRequestSchema.index(
+  { userId: 1, clientSubmissionId: 1 },
+  { unique: true, partialFilterExpression: { clientSubmissionId: { $type: 'string' } } },
 );
 
 const servicePriceSchema = new mongoose.Schema(

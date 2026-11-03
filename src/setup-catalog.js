@@ -11,7 +11,7 @@ const image=z.string().trim().max(2048).refine(value=>!value||value.startsWith('
 const fields={
  name:z.string().trim().min(1).max(160),nameAr:z.string().trim().max(160).default(''),
  description:z.string().trim().max(2000).default(''),descriptionAr:z.string().trim().max(2000).default(''),
- imageUrl:image.default(''),category:z.string().trim().max(80).regex(/^$|^[a-z0-9]+(?:-[a-z0-9]+)*$/).default(''),
+ imageUrl:image.default(''),galleryImages:z.array(image.min(1)).max(12).default([]),category:z.string().trim().max(80).regex(/^$|^[a-z0-9]+(?:-[a-z0-9]+)*$/).default(''),
  bookingType:z.enum(['wedding','engagement','birthday','corporate','party','graduation','other']).default('other'),
  equipmentIds:z.array(z.string().min(1).max(160)).max(100).default([]),
  isActive:z.boolean().default(true),sortOrder:z.number().int().min(0).max(10000).default(0),
@@ -49,4 +49,4 @@ function registerSetupCatalog(app,{requireAdmin}){
   res.json({removed:true,id:id.data});
  }));
 }
-module.exports={registerSetupCatalog,list};
+module.exports={registerSetupCatalog,list,fields};

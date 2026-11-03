@@ -1,7 +1,13 @@
 import contract from './eventOrderContract.json' with { type: 'json' };
 export { contract };
 export const fields = contract.sections.flatMap(section => section.fields.map(field => ({ ...field, gate: section.gate })));
-export const aiFields = fields.filter(field => !field.private && !field.manualOnly);
+const planningFields=['brideName','groomName','timeline','partyEntrances','entranceSongs','firstDance','parentDances','dinnerMusic','cakeCutting','announcements','mustPlay','doNotPlay','specialRequests'].map(key=>({key:'planning.'+key,label:key,type:'textarea'}));
+planningFields.push({key:'planning.musicUploads',label:'Planning music references',type:'links'});
+export const aiFields = [...fields,...planningFields,{key:'equipment',label:'Equipment and complete sets',type:'equipment'}];
+export function decodePatchValue(field,value){
+ if(typeof value==='string'&&(value==='null'||['number','coordinate','boolean','multi','links','equipment'].includes(field.type))){try{return JSON.parse(value);}catch{return undefined;}}
+ return value;
+}
 export const getPath = (object, path) => path.split('.').reduce((value, key) => value?.[key], object);
 function put(object, path, value) {
   const keys=path.split('.'); let target=object;
@@ -19,6 +25,7 @@ export function createEventOrder() {
   return order;
 }
 export function validValue(field, value) {
+  if(field.type==='equipment')return Array.isArray(value)&&value.length<=100&&new Set(value.map(item=>item?.id)).size===value.length&&value.every(item=>item&&typeof item.id==='string'&&/^[a-z0-9-]+$/.test(item.id)&&item.id.length<=160&&Number.isSafeInteger(item.quantity)&&item.quantity>0&&item.quantity<=10000);
   if(value===null)return !['multi','links'].includes(field.type);
   if(field.type==='coordinate')return typeof value==='number'&&Number.isFinite(value)&&Math.abs(value)<=field.max;
   if(field.type==='number')return typeof value==='number'&&Number.isInteger(value)&&value>=0&&value<=(field.max||100000);
@@ -35,6 +42,7 @@ function safeLink(value){try{const u=new URL(value);return u.protocol==='https:'
 export function normalizeEventOrder(input) {
   const order=createEventOrder();
   for(const field of fields){const value=getPath(input,field.key);if(value!==undefined&&validValue(field,value))put(order,field.key,Array.isArray(value)?[...new Set(value)]:value);}
+  for(const field of planningFields){const value=getPath(input,field.key);if(value!==undefined&&validValue(field,value))put(order,field.key,value);}
   if(['manual','ai'].includes(input?.source))order.source=input.source;
   if(Array.isArray(input?.equipment))order.equipment=input.equipment.filter(item=>item&&typeof item.id==='string'&&item.id.length<=160&&Number.isInteger(item.quantity)&&item.quantity>0&&item.quantity<=10000).slice(0,100).map(item=>({id:item.id,name:String(item.name||'').slice(0,240),quantity:item.quantity}));
   return order;
@@ -46,12 +54,9 @@ export function updateOrderField(order,path,value,{ai=false}={}) {
 }
 export function applyOrderPatch(order,patch) {
   if(!Array.isArray(patch))return order;
-  return patch.slice(0,40).reduce((current,change)=>{
+  return patch.slice(0,100).reduce((current,change)=>{
     const field=aiFields.find(item=>item.key===change?.path);if(!field)return current;
-    let value=change.value;
-    if(typeof value==='string'&&['number','boolean','multi','links'].includes(field.type)){
-      try{value=JSON.parse(value);}catch{return current;}
-    }
+    const value=decodePatchValue(field,change.value);
     return updateOrderField(current,field.key,value,{ai:true});
   },order);
 }
@@ -61,9 +66,9 @@ export function missingOrderFields(order) {
 export function validateEventOrder(input,{submission=false,today=new Date().toLocaleDateString('en-CA',{timeZone:contract.timezone})}={}) {
   const errors=[];
   if(input?.schemaVersion!==contract.version)errors.push('schemaVersion');
-  for(const field of fields){const value=getPath(input,field.key);if(value!==undefined&&!validValue(field,value))errors.push(field.key);}
+  for(const field of [...fields,...planningFields]){const value=getPath(input,field.key);if(value!==undefined&&!validValue(field,value))errors.push(field.key);}
   if(input?.event?.timezone!==contract.timezone)errors.push('event.timezone');
-  if(!Array.isArray(input?.equipment)||input.equipment.length>100||normalizeEventOrder(input).equipment.length!==input.equipment.length)errors.push('equipment');
+  if(!validValue(aiFields.find(field=>field.key==='equipment'),input?.equipment))errors.push('equipment');
   if(submission){
     errors.push(...missingOrderFields(input).map(field=>field.key));
     if(input?.event?.date&&input.event.date<today)errors.push('event.date');
@@ -87,18 +92,33 @@ export function orderToLegacy(order) {
   return legacy;
 }
 export function aiOrderContext(order) {
-  return Object.fromEntries(aiFields.map(field=>[field.key,getPath(order,field.key)]).filter(([,value])=>isAnswered(value)));
+  return Object.fromEntries(aiFields.map(field=>[field.key,getPath(order,field.key)??(['multi','links','equipment'].includes(field.type)?[]:null)]));
 }
 
 // Opening line for a voice call: greet, say what the assistant is for, recap the draft, then offer help with what is still empty.
 export function voiceGreetingInstructions(order, ar = false) {
   const text = value => (Array.isArray(value) ? value.join(', ') : String(value)).slice(0, 80);
   const label = field => (ar && field.ar) || field.label;
-  const filled = aiFields.filter(field => isAnswered(getPath(order, field.key))).slice(0, 10).map(field => `${label(field)}: ${text(getPath(order, field.key))}`);
-  const open = missingOrderFields(order).filter(field => aiFields.includes(field)).slice(0, 4).map(label);
+  const filled = aiFields.filter(field => !field.private&&field.type!=='equipment'&&isAnswered(getPath(order, field.key))).slice(0, 10).map(field => `${label(field)}: ${text(getPath(order, field.key))}`);
+  const open = missingOrderFields(order).filter(field => !field.private&&aiFields.includes(field)).slice(0, 4).map(label);
   const draft = filled.length ? filled.join('; ') : (ar ? 'لا توجد تفاصيل بعد' : 'nothing filled in yet');
   const left = open.length ? open.join('; ') : (ar ? 'لا شيء مهم ناقص' : 'nothing important is missing');
   return ar
     ? `ابدأ الكلام فوراً دون انتظار العميل، بالعربية، في ثلاث أو أربع جمل قصيرة جداً وبنبرة دافئة: (١) تحية موجزة. (٢) جملة واحدة تعرّف بدورك: مساعد الحجز الآلي لإيكو الذي يساعد في تعبئة طلب الفعالية. (٣) ملخص مختصر لمسودة الحجز الحالية: ${draft}. (٤) اسأل إن كان يريد مساعدة في الحقول التي لم تُعبأ بعد، وسمِّ أهمها: ${left}. لا تذكر أرقاماً أو بيانات لم تُذكر هنا، ولا تطل. استخدم update_event_draft لتحديث المسودة فقط.`
     : `Start speaking right away without waiting for the customer, in three or four very short sentences with a warm tone: (1) a brief greeting. (2) One sentence on your role: Echo’s AI booking assistant, here to help fill in the event request. (3) A brief summary of the current booking draft: ${draft}. (4) Ask whether they would like help with the fields still empty, naming the most important: ${left}. Do not invent details beyond these, and keep it under about fifteen seconds. Use update_event_draft for draft changes only.`;
+}
+
+// Qwen Omni Realtime starts responses only after receiving user audio. Use the
+// browser's speech engine for the opening line so a call still starts warmly
+// before the live model begins listening.
+export function voiceGreetingText(order, ar = false) {
+  const text = value => (Array.isArray(value) ? value.join(', ') : String(value)).slice(0, 80);
+  const label = field => (ar && field.ar) || field.label;
+  const filled = aiFields.filter(field => !field.private&&field.type!=='equipment'&&isAnswered(getPath(order, field.key))).slice(0, 5).map(field => `${label(field)}: ${text(getPath(order, field.key))}`);
+  const open = missingOrderFields(order).filter(field => !field.private&&aiFields.includes(field)).slice(0, 3).map(label);
+  const draft = filled.length ? filled.join('؛ ') : (ar ? 'لا توجد تفاصيل بعد' : 'nothing filled in yet');
+  const left = open.length ? open.join('، ') : (ar ? 'لا شيء مهم ناقص' : 'nothing important is missing');
+  return ar
+    ? `مرحباً، أنا مساعد الحجز الآلي من إيكو، وسأساعدك في تجهيز طلب الفعالية. هذه هي التفاصيل التي جمعناها حتى الآن: ${draft}. هل تريد أن نكمل معاً؟ يمكننا البدء بـ ${left}.`
+    : `Hello, I’m Echo’s AI booking assistant, and I can help prepare your event request. Here’s what we have so far: ${draft}. Would you like to continue together? We can start with ${left}.`;
 }

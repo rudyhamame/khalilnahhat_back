@@ -115,7 +115,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
   return true;
  }
  async function saveWorkType(input,id=null){
-  const schema=z.object({languageIds:z.array(z.string().trim().min(1).max(160)).max(100).refine(values=>new Set(values).size===values.length,'Choose distinct languages.').optional(),artworkUrl:z.string().trim().max(2048).optional(),name:z.string().trim().min(1).max(120),nameArabic:z.string().trim().max(120).default(''),amount:z.enum(contract.recordingAmounts),details:z.string().trim().max(2000).default(''),detailsArabic:z.string().trim().max(2000).default(''),revision:z.number().int().positive().optional()}).strict();
+  const schema=z.object({languageIds:z.array(z.string().trim().min(1).max(160)).max(100).refine(values=>new Set(values).size===values.length,'Choose distinct languages.').optional(),artworkUrl:z.string().trim().max(2048).optional(),name:z.string().trim().min(1).max(120),nameArabic:z.string().trim().max(120).default(''),amount:z.enum(contract.recordingAmounts).optional(),details:z.string().trim().max(2000).default(''),detailsArabic:z.string().trim().max(2000).default(''),revision:z.number().int().positive().optional()}).strict();
   const value=schema.parse(input), code=(id||value.name).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,120);
   if(!code)fail('Enter a work type name.');
   if(code==='ORIGINAL')fail('Original is reserved for work without a DJ treatment.');
@@ -124,11 +124,10 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
   if(value.languageIds?.length&&await Vocabulary.countDocuments({externalId:{$in:value.languageIds},kind:'language'})!==value.languageIds.length)fail('Choose existing language terms.');
   if(value.artworkUrl&&value.artworkUrl!==old?.artworkUrl&&!await MediaItem.exists({kind:'photo',mediaUrl:value.artworkUrl}))fail('Choose artwork from Gallery.');
   if(old&&value.revision!==old.revision)fail('This DJ work type changed. Reload before editing.',409);
-  if(old&&old.amount!==value.amount&&(await Work.exists({workKind:id})||await ArchiveItem.exists({recordingType:id})))fail('Move this work type to another recording content group only after it is unused.');
   const conflict=await DjWorkType.findOne({normalizedName:norm(value.name),externalId:{$ne:code}}).lean();
   if(conflict)fail('A DJ work type with this name already exists.',409);
   const sortOrder=old?.sortOrder??((await DjWorkType.findOne().sort({sortOrder:-1}).select('sortOrder').lean())?.sortOrder??-1)+1;
-  const data={languageIds:value.languageIds??old?.languageIds??[],artworkUrl:value.artworkUrl??old?.artworkUrl??'',name:value.name,nameArabic:value.nameArabic,normalizedName:norm(value.name),amount:value.amount,details:value.details,detailsArabic:value.detailsArabic,sortOrder,revision:(old?.revision||0)+1};
+  const data={languageIds:value.languageIds??old?.languageIds??[],artworkUrl:value.artworkUrl??old?.artworkUrl??'',name:value.name,nameArabic:value.nameArabic,normalizedName:norm(value.name),amount:value.amount||old?.amount||'INDIVIDUAL',details:value.details,detailsArabic:value.detailsArabic,sortOrder,revision:(old?.revision||0)+1};
   if(old){old.set(data);await old.save();return {id:old.externalId,...data};}
   try{const row=await DjWorkType.create({externalId:code,...data});return {id:row.externalId,name:row.name,nameArabic:row.nameArabic,amount:row.amount,details:row.details,detailsArabic:row.detailsArabic,languageIds:row.languageIds||[],artworkUrl:row.artworkUrl||'',revision:row.revision};}
   catch(error){if(error.code===11000)fail('A DJ work type with this name already exists.',409);throw error;}
@@ -202,7 +201,6 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
   return transaction(async session=>{
    const type=await DjWorkType.findOne({externalId:v.recordingType}).session(session);
    if(!type)fail('Choose an existing DJ work type.');
-   if(v.recordingAmount&&v.recordingAmount!==type.amount)fail('Recording type does not belong to the selected recording content group.');
    const old=id?await ArchiveModel.findOne({externalId:id}).session(session):null;
    if(id&&!old)fail('Recording not found.',404);
    if(old&&v.revision!==(old.ontologyRevision||0))fail('This recording changed. Reload before editing.',409);
@@ -227,7 +225,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    if(timing&&(timing.audioUrl!==v.audioUrl||!componentWorkIds.includes(timing.workId)))fail('Timed lyrics must match the recording audio and one of its content entries.');
    if(timing&&!await Work.exists({externalId:timing.workId,type:'SONG'}).session(session))fail('Timed lyrics require a lyrical content entry.');
    const duration=v.durationSeconds==null?'':`${Math.floor(v.durationSeconds/60)}:${String(Math.floor(v.durationSeconds%60)).padStart(2,'0')}`;
-   const data={lyricsTiming:timing||null,title:v.title,recordingType:v.recordingType,recordingAmount:type.amount,componentWorkIds,workId:v.workId,audioAssetId,sourceRecordingIds:v.sourceRecordingIds,sourceWorkIds:v.sourceWorkIds,publicationStatus:v.publicationStatus,archivalStatus:v.archivalStatus,versionLabel:v.versionLabel,productionNotes:v.productionNotes,provenance:provenance(v.provenance,actor),ontologyRevision:(old?.ontologyRevision||0)+1,description:v.description,date:v.releaseDate,audioUrl:v.audioUrl,coverImage:v.coverImage,duration,published:v.publicationStatus==='PUBLISHED'&&v.archivalStatus==='ACTIVE',mediaType:'audio'};
+   const data={lyricsTiming:timing||null,title:v.title,recordingType:v.recordingType,recordingAmount:v.recordingAmount||type.amount||'INDIVIDUAL',componentWorkIds,workId:v.workId,audioAssetId,sourceRecordingIds:v.sourceRecordingIds,sourceWorkIds:v.sourceWorkIds,publicationStatus:v.publicationStatus,archivalStatus:v.archivalStatus,versionLabel:v.versionLabel,productionNotes:v.productionNotes,provenance:provenance(v.provenance,actor),ontologyRevision:(old?.ontologyRevision||0)+1,description:v.description,date:v.releaseDate,audioUrl:v.audioUrl,coverImage:v.coverImage,duration,published:v.publicationStatus==='PUBLISHED'&&v.archivalStatus==='ACTIVE',mediaType:'audio'};
    if(migration){for(const key of ['title','description','date','audioUrl','coverImage','duration','mediaType'])delete data[key];data.ontologyMigrationId=migration.runId;await mongoose.connection.collection('musicontologymigrationbackups').insertOne({_id:`${migration.runId}:${recordId}`,runId:migration.runId,recordingId:recordId,before:plain(old),afterRevision:data.ontologyRevision,createdAt:new Date()},{session});}
    let row;
    if(old){old.set(data);row=await old.save({session});}else row=(await ArchiveModel.create([{...data,externalId:recordId,category:'Music Archive',artist:''}],{session}))[0];
@@ -269,7 +267,6 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
   const v=V.recording.parse(input);
   await ensureWorkTypes();
   const type=await DjWorkType.findOne({externalId:v.recordingType}).lean();if(!type)fail('Choose an existing DJ work type.');
-  if(v.recordingAmount&&v.recordingAmount!==type.amount)fail('Recording type does not belong to the selected recording content group.');
   if(!await Work.exists({externalId:v.workId}))fail('Choose an existing musical work.');
   const componentIds=[...new Set([v.workId,...(v.componentWorkIds||[])])];
   if(componentIds.length>100||await Work.countDocuments({externalId:{$in:componentIds}})!==componentIds.length)fail('Choose up to 100 existing recording component works.');

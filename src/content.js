@@ -68,7 +68,20 @@ function crud(app, requireAdmin, base, Model, fields, required, publicFilter) {
   app.get(base, async (req, res) => res.json({ items: (await Model.find({ isPublished: true, ...publicFilter(req) }).sort({ sortOrder: 1, createdAt: -1 })).map(view) }));
 }
 
+// One-time import of the former built-in sample reviews into the admin "Clients' Testimonials" list.
+// They are fictional sample text, so they arrive UNPUBLISHED: edit or replace them, then publish.
+const ContentSeed = mongoose.models.ContentSeed || mongoose.model('ContentSeed', new mongoose.Schema({ key: { type: String, unique: true } }));
+async function importSampleTestimonials() {
+  try {
+    if (await ContentSeed.exists({ key: 'sample-testimonials-v1' })) return;
+    await ContentSeed.create({ key: 'sample-testimonials-v1' });
+    const sample = require('../contracts/demo-testimonials.json');
+    await Testimonial.insertMany(sample.map((row, index) => ({ ...row, isPublished: false, sortOrder: index })));
+  } catch (error) { if (error.code !== 11000) console.warn('Sample testimonial import failed', error.name); }
+}
+
 function registerContent(app, requireAdmin) {
+  if (mongoose.connection.readyState === 1) importSampleTestimonials(); else mongoose.connection.once('open', importSampleTestimonials);
   crud(app, requireAdmin, '/api/content/testimonials', Testimonial, testimonialFields, { name: true, text: true }, () => ({}));
   crud(app, requireAdmin, '/api/content/media', MediaItem, mediaFields, { kind: true, title: true, mediaUrl: true },
     (req) => (['mix', 'video', 'photo'].includes(req.query.kind) ? { kind: req.query.kind } : {}));

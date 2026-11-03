@@ -1,0 +1,17 @@
+{
+ "movingheads": "https://res.cloudinary.com/nqiooluk/raw/upload/v1793064133/khalil/site-assets/cc69f53ad3b2/echo/models/intimidator-moving-head.glb",
+ "trussing": "https://res.cloudinary.com/nqiooluk/raw/upload/v1793069096/khalil/site-assets/02c356cde147/echo/models/trussing.glb",
+ "uplights": "https://res.cloudinary.com/nqiooluk/raw/upload/v1793064494/khalil/site-assets/5f7776b39e8e/echo/models/uplight.glb",
+ "qsc-k122": "https://res.cloudinary.com/nqiooluk/raw/upload/v1793067301/khalil/site-assets/b098af6b50a1/echo/models/qsc-k122.glb",
+ "elite-15": "https://res.cloudinary.com/nqiooluk/raw/upload/v1793066463/khalil/site-assets/b8a70681ddd4/echo/models/elite-15.glb",
+ "es18p": "https://res.cloudinary.com/nqiooluk/raw/upload/v1793064132/khalil/site-assets/7f685d12a92f/echo/models/es18p-subwoofer.glb",
+ "shure-mics": "/echo/models/shure-microphone.glb",
+ "soundcraft": "https://res.cloudinary.com/nqiooluk/raw/upload/v1793069639/khalil/site-assets/d199a260351c/echo/models/soundcraft.glb",
+ "smoke": "https://res.cloudinary.com/nqiooluk/raw/upload/v1793070223/khalil/site-assets/c815e3126c50/echo/models/smoke.glb",
+ "sparklers": "https://res.cloudinary.com/nqiooluk/raw/upload/v1793066807/khalil/site-assets/a730df59271d/echo/models/sparklers.glb",
+ "dry-ice": "https://res.cloudinary.com/nqiooluk/raw/upload/v1793066802/khalil/site-assets/e2dcccf4d004/echo/models/dry-ice.glb",
+ "co2-gun": "https://res.cloudinary.com/nqiooluk/raw/upload/v1793070469/khalil/site-assets/d5970de1189f/echo/models/co2-gun.glb",
+ "led-screen": "https://res.cloudinary.com/nqiooluk/raw/upload/v1793070020/khalil/site-assets/ae2da9d1dfb2/echo/models/led-screen.glb",
+ "projector": "https://res.cloudinary.com/dtoxkii3q/raw/upload/v1793072520/khalil/site-assets/30f47e450052/echo/models/projector.glb",
+ "jbl-system": "/echo/models/jbl-complete-set.glb"
+}

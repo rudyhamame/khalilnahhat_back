@@ -11,7 +11,8 @@
     "music-ontology:audit": "node scripts/music-ontology-migrate.js audit",
     "test:ai-administrator": "node --test test/ai-administrator.integration.test.js",
     "ai-administrator:worker": "node scripts/ai-administrator-worker.js",
-    "ai-administrator:audit": "node scripts/audit-admin-capabilities.js"
+    "ai-administrator:audit": "node scripts/audit-admin-capabilities.js",
+    "test:booking": "node --test test/client-booking-lifecycle.test.js test/service-request-submission.test.js test/service-request-idempotency.test.js test/quote-validation.test.js src/event-order.test.js"
   },
   "keywords": [
     "express",

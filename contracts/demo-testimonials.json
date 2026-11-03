@@ -1,0 +1,56 @@
+[
+ {
+  "name": "Maya Darwish",
+  "eventType": "Wedding",
+  "text": "The entrance, the first dance, the packed dance floor—every part of the night felt connected.",
+  "textAr": "من دخول العروسين إلى الرقصة الأولى وحلبة الرقص، بدت كل لحظة من السهرة متناغمة."
+ },
+ {
+  "name": "Adam Bennett",
+  "eventType": "Private celebration",
+  "text": "A thoughtful mix of old favourites and fresh tracks. Everyone found a reason to get up and dance.",
+  "textAr": "مزيج جميل من الأغاني المحبوبة والإيقاعات الجديدة، جعل الجميع يشاركون الرقص."
+ },
+ {
+  "name": "Layla Mansour",
+  "eventType": "Engagement party",
+  "text": "Arabic favourites flowed into our English playlist so naturally. The atmosphere felt personal to us.",
+  "textAr": "انتقلت الأغاني العربية إلى قائمتنا الإنجليزية بانسيابية، وكان الجو يعكس ذوقنا."
+ },
+ {
+  "name": "Daniel Clarke",
+  "eventType": "Corporate event",
+  "text": "Clear sound for the speeches, subtle lighting for dinner, and a completely different energy for the party.",
+  "textAr": "صوت واضح للكلمات وإضاءة هادئة للعشاء، ثم طاقة مختلفة تماماً وقت الاحتفال."
+ },
+ {
+  "name": "Rania Haddad",
+  "eventType": "Wedding",
+  "text": "We wanted a celebration that brought both families together. The music gave everyone a place on the dance floor.",
+  "textAr": "أردنا احتفالاً يجمع العائلتين، وقد منحت الموسيقى الجميع مكاناً على حلبة الرقص."
+ },
+ {
+  "name": "Omar Saleh",
+  "eventType": "Birthday celebration",
+  "text": "The room looked incredible, and the music kept building without overwhelming the conversation early on.",
+  "textAr": "كان المكان رائعاً، وتصاعدت حيوية الموسيقى تدريجياً دون أن تطغى على الأحاديث في البداية."
+ },
+ {
+  "name": "Sofia Martin",
+  "eventType": "Anniversary party",
+  "text": "Our favourite songs felt like the thread running through the evening. Warm, joyful, and beautifully paced.",
+  "textAr": "كانت أغانينا المفضلة خيطاً يجمع لحظات الأمسية؛ أجواء دافئة ومبهجة وإيقاع متوازن."
+ },
+ {
+  "name": "Karim Nassar",
+  "eventType": "Wedding reception",
+  "text": "From the welcome music to the last song, the evening had a lovely sense of momentum.",
+  "textAr": "من موسيقى الاستقبال حتى الأغنية الأخيرة، حافظت الأمسية على حيوية جميلة."
+ },
+ {
+  "name": "Elena Brooks",
+  "eventType": "Company celebration",
+  "text": "The sound and visuals worked together beautifully. It felt like one complete experience, not separate pieces.",
+  "textAr": "تناغم الصوت والصورة بشكل جميل، فبدت الأمسية تجربة متكاملة وليست عناصر منفصلة."
+ }
+]

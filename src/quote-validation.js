@@ -17,7 +17,7 @@ const eventSchema = z.object({
 // Catalog rules are authoritative; never trust localStorage names or minimum quantities.
 function normalizeQuoteItems(items, catalog) {
   const seen = new Set();
-  return items.map((i) => {
+  const normalized=items.map((i) => {
     if (seen.has(i.serviceId)) throw new Error('Each equipment or service can appear only once.');
     seen.add(i.serviceId);
     if (i.serviceId.startsWith('svc-')) {
@@ -29,5 +29,7 @@ function normalizeQuoteItems(items, catalog) {
     if (!Number.isInteger(i.quantity) || i.quantity < eq.minQuantity) throw new Error(`${eq.name} requires a minimum quantity of ${eq.minQuantity}.`);
     return { serviceId: eq.slug, name: eq.name, category: eq.category, quantity: i.quantity };
   });
+  require('./equipment-demand').equipmentDemand(normalized,catalog);
+  return normalized;
 }
 module.exports = { eventSchema, normalizeQuoteItems, validDate };

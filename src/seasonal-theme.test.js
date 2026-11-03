@@ -29,7 +29,7 @@ test('audio settings reference only published archive recordings and retain old 
   assert.equal((await put({enabled:true,archiveIds:[]})).status,400);
   assert.equal((await put({enabled:true,archiveIds:['christmas-song','christmas-song']})).status,400);
   assert.equal((await put({enabled:true,archiveIds:['a','b','c','d']})).status,400);
-  assert.equal((await put({enabled:true,archiveIds:['removed-or-unpublished']})).status,400);
+  const pruned=await (await put({enabled:true,archiveIds:['removed-or-unpublished']})).json();assert.deepEqual(pruned.item.audio,{enabled:false,archiveIds:[]});
   assert.equal((await put({enabled:true,archiveIds:['christmas-song'],url:'https://example.com/unapproved.mp3'})).status,400);
   const result=await (await put({enabled:true,archiveIds:['christmas-song']})).json();assert.deepEqual(result.item.audio,{enabled:true,archiveIds:['christmas-song']});
   assert.deepEqual((await (await fetch(url)).json()).item.audio,result.item.audio);

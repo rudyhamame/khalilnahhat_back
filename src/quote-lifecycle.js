@@ -36,8 +36,8 @@ async function sweepQuotes({notifications=notificationEmails,Model=ServiceReques
   }
 }
 
-function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize }) {
-  const find = (id) => ServiceRequest.findOne({ externalId: id });
+function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Model = ServiceRequest }) {
+  const find = (id) => Model.findOne({ externalId: id });
   const notFound = (res) => res.status(404).json({ message: 'Service request not found.' });
   const own = (req, sr) => sr && String(sr.userId) === String(req.authUser._id);
 

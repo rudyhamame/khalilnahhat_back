@@ -19,9 +19,9 @@ test('manual and AI produce the same event fields without treating ranges as a n
   assert.equal(ai.event.guestCount,150);assert.equal(ai.event.type,'wedding');assert.deepEqual(ai.services,['dj']);
   assert.equal(core.applyOrderPatch(ai,[{path:'event.date',value:'2099-02-30'}]).event.date,null);
 });
-test('AI cannot set contact fields, grant permissions, inject unknown keys or confirm orders',()=>{
+test('AI can edit client draft contact fields but cannot inject unknown keys or confirm orders',()=>{
   const order=core.applyOrderPatch(core.createEventOrder(),[{path:'customer.email',value:'attack@example.invalid'},{path:'studio.rights.confirmed',value:'true'},{path:'status',value:'confirmed'},{path:'__proto__.polluted',value:'yes'}]);
-  assert.equal(order.customer.email,null);assert.equal(order.studio,undefined);assert.equal(order.status,undefined);assert.equal({}.polluted,undefined);
+  assert.equal(order.customer.email,'attack@example.invalid');assert.equal(order.studio,undefined);assert.equal(order.status,undefined);assert.equal({}.polluted,undefined);
 });
 test('submission validates required details; overnight times are valid',()=>{
   const order=completed();assert.deepEqual(core.validateEventOrder(order,{submission:true}),[]);
@@ -54,4 +54,12 @@ test('dialect catalog has unique ids matching the contract, with English and Ara
   const order=core.updateOrderField(core.createEventOrder(),'music.dialects',['levantine-syrian-aleppine','unknown']);
   assert.deepEqual(order.music.dialects,['levantine-syrian-aleppine','unknown']);
   assert.deepEqual(core.updateOrderField(core.createEventOrder(),'music.dialects',['made-up']).music.dialects,[]);
+});
+
+test('full client draft edits include contacts, venue, planning, equipment and explicit clearing',()=>{
+ let order=core.applyOrderPatch(core.createEventOrder(),[{path:'customer.phone',value:'4165550123'},{path:'event.venue.address',value:'Client supplied address'},{path:'planning.mustPlay',value:'Requested song'},{path:'equipment',value:'[{"id":"speaker","quantity":2}]'}]);
+ assert.equal(order.customer.phone,'4165550123');assert.equal(order.event.venue.address,'Client supplied address');assert.equal(order.equipment[0].quantity,2);assert.equal(core.normalizeEventOrder(order).planning.mustPlay,'Requested song');
+ assert.equal(core.aiOrderContext(order)['equipment'][0].id,'speaker');
+ order=core.applyOrderPatch(order,[{path:'customer.phone',value:'null'},{path:'equipment',value:'[]'}]);assert.equal(order.customer.phone,null);assert.deepEqual(order.equipment,[]);
+ assert.equal(core.applyOrderPatch(order,[{path:'status',value:'confirmed'}]).status,undefined);
 });

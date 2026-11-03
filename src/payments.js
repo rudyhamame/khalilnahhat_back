@@ -1,3 +1,4 @@
+const {equipmentDemand}=require('./equipment-demand');
 const mongoose = require('mongoose');
 const { z } = require('zod');
 const { ServiceRequest } = require('./models');
@@ -34,21 +35,25 @@ const recordSchema = z.object({
 });
 
 // Equipment with stockTracked must fit alongside every other booking on that date.
-async function stockProblem(sr) {
+async function stockProblem(sr, EquipmentModel = Equipment, BookingModel = EventBooking) {
   const wanted = sr.items.filter((i) => !i.serviceId.startsWith('svc-'));
   if (!wanted.length) return '';
-  const tracked = await Equipment.find({ slug: { $in: wanted.map((i) => i.serviceId) }, stockTracked: true });
-  if (!tracked.length) return '';
-  const others = await EventBooking.find({ eventDate: sr.event.eventDate, requestId: { $ne: sr.externalId } });
+  const catalog = await EquipmentModel.find({});
+  let demand;
+  try{demand=equipmentDemand(wanted,catalog);}catch(error){return error.message;}
+  const tracked=catalog.filter(row=>row.stockTracked!==false&&Number.isSafeInteger(row.quantityOwned));
+  const others = await BookingModel.find({ eventDate: sr.event.eventDate, requestId: { $ne: sr.externalId } });
   for (const eq of tracked) {
+    const requested=demand.find(row=>row.slug===eq.slug)?.quantity||0;
+    if(!requested)continue;
     const used = others.flatMap((b) => b.equipment).filter((e) => e.slug === eq.slug).reduce((s, e) => s + e.quantity, 0);
-    if (used + wanted.find((i) => i.serviceId === eq.slug).quantity > eq.quantityOwned) return `${eq.name} is not available in the requested quantity on that date.`;
+    if (used + requested > eq.quantityOwned) return `${eq.name} is not available in the requested quantity on that date.`;
   }
   return '';
 }
 
-function registerPayments(app, { requireAuth, requireAdmin, serialize }) {
-  const find = (id) => ServiceRequest.findOne({ externalId: id });
+function registerPayments(app, { requireAuth, requireAdmin, serialize, Model = ServiceRequest, BookingModel = EventBooking, EquipmentModel = Equipment, sendConfirmation = sendBookingConfirmation }) {
+  const find = (id) => Model.findOne({ externalId: id });
   const fail = (res, code, message) => res.status(code).json({ message });
 
   app.post('/api/service-requests/:id/payments', requireAdmin, async (req, res) => {
@@ -71,12 +76,12 @@ function registerPayments(app, { requireAuth, requireAdmin, serialize }) {
     let booking = null;
     if (kind === 'deposit' && net + cents >= toCents(sr.depositAmount)) {
       if (!sr.event?.eventDate) return fail(res, 400, 'This request has no event date.');
-      const problem = await stockProblem(sr);
+      const problem = await stockProblem(sr, EquipmentModel, BookingModel);
       if (problem) return fail(res, 409, problem);
       try {
-        booking = await EventBooking.create({
+        booking = await BookingModel.create({
           requestId: sr.externalId, userId: sr.userId, eventDate: sr.event.eventDate, paidAt: receivedAt || new Date(),
-          equipment: sr.items.filter((i) => !i.serviceId.startsWith('svc-')).map((i) => ({ slug: i.serviceId, quantity: i.quantity })),
+          equipment: equipmentDemand(sr.items,await EquipmentModel.find({})),
         });
       } catch (e) {
         if (e.code === 11000) return fail(res, 409, 'That date is already booked by another confirmed event.');
@@ -89,10 +94,10 @@ function registerPayments(app, { requireAuth, requireAdmin, serialize }) {
     try {
       await sr.save();
     } catch (e) {
-      if (booking) await EventBooking.deleteOne({ _id: booking._id });
+      if (booking) await BookingModel.deleteOne({ _id: booking._id });
       throw e;
     }
-    if (booking) sendBookingConfirmation(sr, cents).catch((e) => console.error('Booking confirmation email failed:', e));
+    if (booking) sendConfirmation(sr, cents).catch((e) => console.error('Booking confirmation email failed:', e));
     return res.status(201).json({ item: serialize(sr, true) });
   });
 
@@ -122,8 +127,8 @@ function registerPayments(app, { requireAuth, requireAdmin, serialize }) {
   });
 
   app.get('/api/bookings/confirmed', requireAdmin, async (_req, res) => {
-    const items = await EventBooking.find().sort({ eventDate: 1 });
-    const reqs = await ServiceRequest.find({ externalId: { $in: items.map((b) => b.requestId) } });
+    const items = await BookingModel.find().sort({ eventDate: 1 });
+    const reqs = await Model.find({ externalId: { $in: items.map((b) => b.requestId) } });
     const byId = new Map(reqs.map((r) => [r.externalId, r]));
     res.json({ items: items.map((b) => ({ eventDate: b.eventDate, requestId: b.requestId, customerName: byId.get(b.requestId)?.customerName || '',
       venue: byId.get(b.requestId)?.event?.venueName || '', equipment: b.equipment, paidAt: b.paidAt })) });
@@ -131,7 +136,7 @@ function registerPayments(app, { requireAuth, requireAdmin, serialize }) {
 
   // Admin payment ledger across all requests, newest first.
   app.get('/api/transactions', requireAdmin, async (_req, res) => {
-    const reqs = await ServiceRequest.find({ 'payments.0': { $exists: true } });
+    const reqs = await Model.find({ 'payments.0': { $exists: true } });
     const items = reqs.flatMap((sr) => sr.payments.map((p) => ({
       id: String(p._id), type: p.method, status: p.voided ? 'void' : 'recorded', paymentStatus: p.voided ? 'void' : p.kind === 'refund' ? 'refunded' : 'paid',
       amountTotal: p.amountCents, currency: 'CAD', customerEmail: sr.customerEmail, requestGroupId: sr.externalId, serviceId: p.kind,

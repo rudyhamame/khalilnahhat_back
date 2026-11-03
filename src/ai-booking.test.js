@@ -5,7 +5,7 @@ const {registerAiBooking,draftSchema,instructions,normalizeDraft}=require('./ai-
 const draft={eventType:'wedding',eventDate:'2027-06-20',startTime:'18:00',endTime:'23:00',services:['dj','lighting'],guests:'100',musicStyle:'mixed',notes:'Wedding with DJ and lighting.'};
 async function fixture(t,options={}){
   const app=express();app.use(express.json());
-  registerAiBooking(app,{configService:options.configService||null,requireAuth:(req,res,next)=>{if(req.headers.authorization!=='Bearer unit-test')return res.status(401).json({message:'Sign in is required.'});req.authUser={id:'unit-user'};next();},env:options.env||{OPENAI_API_KEY:'test-only'},recordMetric:options.recordMetric||(()=>{}),fetchImpl:options.fetchImpl||(()=>{throw new Error('Unexpected provider request');})});
+  registerAiBooking(app,{loadSetupCatalog:async()=>[],configService:options.configService||null,requireAuth:(req,res,next)=>{if(req.headers.authorization!=='Bearer unit-test')return res.status(401).json({message:'Sign in is required.'});req.authUser={id:'unit-user'};next();},env:options.env||{OPENAI_API_KEY:'test-only'},recordMetric:options.recordMetric||(()=>{}),fetchImpl:options.fetchImpl||(()=>{throw new Error('Unexpected provider request');})});
   const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
   t.after(()=>new Promise(resolve=>server.close(resolve)));
   return (path,body,auth=true,extraHeaders={})=>fetch(`http://127.0.0.1:${server.address().port}/api/ai-booking/${path}`,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',...(auth?{Authorization:'Bearer unit-test'}:{}),...extraHeaders},body:body?JSON.stringify(body):undefined});
@@ -34,14 +34,14 @@ test('empty summary text preserves the draft for review without claiming submiss
     assert.equal(r.status,200);const body=await r.json();assert.deepEqual(body.draft,draft);assert.match(body.reply,/review your event details/);assert.match(body.reply,/No booking has been submitted/);
   }
 });
-test('AI order updates are allowlisted and private review fields never enter order context',async t=>{
+test('AI draft updates accept client contact fields but reject unknown and malformed paths',async t=>{
   const request=await fixture(t,{fetchImpl:async(_url,options)=>{
-    const sent=JSON.parse(options.body);assert.doesNotMatch(sent.input[0].content,/private@example.invalid/);
+    const sent=JSON.parse(options.body);assert.match(JSON.stringify(sent.input),/private@example.invalid/);
     assert.ok(sent.text.format.schema.required.includes('orderPatch'));
     return Response.json({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({reply:'What date?',draft,orderPatch:[{path:'event.guestCount',value:'150'},{path:'customer.email',value:'private@example.invalid'},{path:'studio.rights.confirmed',value:'true'},{path:'event.guestCount',value:'100–150'}]})}]}]});
   }});
   const response=await request('chat',{consent:true,order:{'event.type':'wedding','customer.email':'private@example.invalid'},messages:[{role:'user',content:'We expect 150 guests.'}]});
-  assert.equal(response.status,200);assert.deepEqual((await response.json()).orderPatch,[{path:'event.guestCount',value:'150'}]);
+  assert.equal(response.status,200);assert.deepEqual((await response.json()).orderPatch,[{path:'event.guestCount',value:'150'},{path:'customer.email',value:'private@example.invalid'}]);
 });
 test('draft normalization clears invalid fields while preserving valid facts',()=>{
   assert.deepEqual(normalizeDraft({...draft,eventDate:'2027-02-30',startTime:'29:90',services:['unknown'],guests:'100001'}),{...draft,eventDate:'',startTime:'',services:[],guests:''});
@@ -67,7 +67,7 @@ test('voice sessions have server-owned settings and an ownership-checked end',as
   let hangups=0;
   const request=await fixture(t,{fetchImpl:async(url,options)=>{
     if(url.endsWith('/hangup')){hangups++;return new Response(null,{status:200});}
-    const session=JSON.parse(options.body.get('session'));assert.equal(session.type,'realtime');assert.equal(session.model,'gpt-realtime-2.1-mini');assert.deepEqual(session.tools.map(tool=>tool.name),['update_event_draft']);assert.match(session.instructions,/cannot reserve dates/);
+    const session=JSON.parse(options.body.get('session'));assert.equal(session.type,'realtime');assert.equal(session.model,'gpt-realtime-2.1-mini');assert.deepEqual(session.tools.map(tool=>tool.name),['update_event_draft','show_app_section']);assert.match(session.instructions,/cannot reserve dates/);
     return new Response('v=0\r\nanswer',{status:201,headers:{location:'https://api.openai.com/v1/realtime/calls/rtc_unit_test'}});
   }});
   const r=await request('voice',{consent:true,sdp:'v=0\r\noffer'});assert.equal(r.status,200);assert.equal((await r.json()).maxCallSeconds,300);
@@ -79,12 +79,12 @@ test('modern chat requests one shared patch and records usage without content',a
   const metrics=[];
   const request=await fixture(t,{recordMetric:value=>metrics.push(value),fetchImpl:async(_url,options)=>{
     const body=JSON.parse(options.body);
-    assert.deepEqual(body.text.format.schema.required,['reply','orderPatch']);
-    assert.deepEqual(Object.keys(body.text.format.schema.properties),['reply','orderPatch']);
+    assert.deepEqual(body.text.format.schema.required,['reply','orderPatch','section']);
+    assert.deepEqual(Object.keys(body.text.format.schema.properties),['reply','section','orderPatch']);
     return Response.json({status:'completed',usage:{input_tokens:120,output_tokens:30,input_tokens_details:{cached_tokens:80}},output:[{content:[{type:'output_text',text:JSON.stringify({reply:'Which date?',orderPatch:[{path:'event.type',value:'wedding'},{path:'customer.email',value:'private@example.invalid'}]})}]}]});
   }});
   const response=await request('chat',{consent:true,responseFormat:'patch',messages:[{role:'user',content:'PRIVATE wedding information'}]});
-  assert.deepEqual(await response.json(),{reply:'Which date?',orderPatch:[{path:'event.type',value:'wedding'}]});
+  assert.deepEqual(await response.json(),{reply:'Which date?',orderPatch:[{path:'event.type',value:'wedding'},{path:'customer.email',value:'private@example.invalid'}]});
   assert.equal(metrics[0].inputTokens,120);assert.equal(metrics[0].cachedInputTokens,80);assert.equal(metrics[0].outputTokens,30);
   assert.doesNotMatch(JSON.stringify(metrics),/PRIVATE|wedding|private@example/);
 });
@@ -98,7 +98,7 @@ test('streamed reply arrives before the validated final patch',async t=>{
     const body=new ReadableStream({async start(controller){
       controller.enqueue(encoder.encode('data: '+JSON.stringify({type:'response.output_text.delta',delta:'{"reply":"Hello'})+'\n\n'));
       await gate;
-      const result={reply:'Hello there',orderPatch:[{path:'event.type',value:'wedding'}]};
+      const result={reply:'Hello there',orderPatch:[{path:'event.type',value:'wedding'},{path:'customer.email',value:'private@example.invalid'}]};
       controller.enqueue(encoder.encode('data: '+JSON.stringify({type:'response.completed',response:{status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify(result)}]}]}})+'\n\n'));controller.close();
     }});
     return new Response(body,{headers:{'Content-Type':'text/event-stream'}});
@@ -109,7 +109,7 @@ test('streamed reply arrives before the validated final patch',async t=>{
   assert.match(first,/reply.delta/);assert.match(first,/Hello/);assert.doesNotMatch(first,/orderPatch/);
   release();let remaining='';while(true){const chunk=await reader.read();if(chunk.done)break;remaining+=decoder.decode(chunk.value);}
   const complete=remaining.trim().split('\n').map(JSON.parse).find(event=>event.type==='complete');
-  assert.deepEqual(complete.orderPatch,[{path:'event.type',value:'wedding'}]);
+  assert.deepEqual(complete.orderPatch,[{path:'event.type',value:'wedding'},{path:'customer.email',value:'private@example.invalid'}]);
 });
 test('stream interruption returns an error event and never a draft patch',async t=>{
   const text='data: '+JSON.stringify({type:'response.output_text.delta',delta:'{"reply":"Hello","orderPatch":['})+'\n\n';
@@ -173,11 +173,11 @@ test('OpenRouter free chat preserves validated order patches and never calls pai
   // a bare \\S constrains the reply to one character. Use length constraints.
   assert.equal(body.response_format.json_schema.schema.properties.reply.pattern,undefined);
   assert.equal(body.response_format.json_schema.schema.properties.reply.minLength,8);
-  assert.doesNotMatch(JSON.stringify(body.messages),/private@example.invalid/);
+  assert.match(JSON.stringify(body.messages),/private@example.invalid/);
   return Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify({reply:'What date would you like?',orderPatch:[{path:'event.type',value:'wedding'},{path:'customer.email',value:'private@example.invalid'}]})}}],usage:{prompt_tokens:100,completion_tokens:20}});
  }});
  const result=await request('chat',{consent:true,responseFormat:'patch',order:{'customer.email':'private@example.invalid'},messages:[{role:'user',content:'A wedding'}]},true,{Accept:'application/x-ndjson'});
- assert.equal(result.status,200);const events=(await result.text()).trim().split('\n').map(JSON.parse);assert.equal(events[0].type,'complete');assert.deepEqual(events[0].orderPatch,[{path:'event.type',value:'wedding'}]);assert.ok(sent.every(url=>!url.includes('openai.com')));
+ assert.equal(result.status,200);const events=(await result.text()).trim().split('\n').map(JSON.parse);assert.equal(events[0].type,'complete');assert.deepEqual(events[0].orderPatch,[{path:'event.type',value:'wedding'},{path:'customer.email',value:'private@example.invalid'}]);assert.ok(sent.every(url=>!url.includes('openai.com')));
 });
 test('Alibaba voice issues a one-time socket ticket and bridges it to the provider',async t=>{
  const {WebSocketServer,WebSocket}=require('ws');const {attachAlibabaVoiceSocket}=require('./ai-booking');const {defaults}=require('./ai-configuration');
@@ -200,4 +200,10 @@ test('Alibaba voice issues a one-time socket ticket and bridges it to the provid
  await fetch(`http://${base}/api/ai-booking/voice/end`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer unit-test'},body:JSON.stringify({callId:body.callId})});
  const again=await fetch(`http://${base}/api/ai-booking/voice`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer unit-test'},body:JSON.stringify({consent:true})});assert.equal(again.status,200);
  await again.json();browser.close();
+});
+
+test('text assistant can follow a question viewport without changing the draft',async t=>{
+ const request=await fixture(t,{fetchImpl:async()=>Response.json({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({reply:'What venue are you planning to use?',orderPatch:[],section:'simulation'})}]}]})});
+ const response=await request('chat',{consent:true,responseFormat:'patch',messages:[{role:'user',content:'Help me with the venue'}]});
+ assert.equal(response.status,200);assert.equal((await response.json()).section,'simulation');
 });

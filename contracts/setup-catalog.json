@@ -112,7 +112,7 @@
     "bookingType": "other",
     "description": "Live DJ sets, custom wedding entrance mixes, MC announcements.",
     "descriptionAr": "عروض حيّة، ميكسات دخول مخصصة للأعراس، وتقديم الفقرات.",
-    "imageUrl": "https://res.cloudinary.com/nqiooluk/image/upload/v1793064090/khalil/site-assets/29c75d573b48/echo/dj-services-cover-v1.webp",
+    "imageUrl": "",
     "category": "dj",
     "priceId": "service-dj",
     "equipmentIds": [
@@ -129,7 +129,7 @@
     "bookingType": "other",
     "description": "From powered speakers to a concert-level system.",
     "descriptionAr": "من سماعات QSC إلى نظام JBL بمستوى الحفلات.",
-    "imageUrl": "https://res.cloudinary.com/nqiooluk/image/upload/v1793064142/khalil/site-assets/ef45b01a838e/echo/sound-systems-cover-v1.webp",
+    "imageUrl": "",
     "category": "sound",
     "priceId": "service-sound",
     "equipmentIds": [
@@ -151,7 +151,7 @@
     "bookingType": "other",
     "description": "Moving heads, trussing and wireless uplights.",
     "descriptionAr": "رؤوس متحركة وهياكل وإضاءة لاسلكية للأجواء.",
-    "imageUrl": "https://res.cloudinary.com/nqiooluk/image/upload/v1793064106/khalil/site-assets/4d2b7b997237/echo/lighting-cover-v1.webp",
+    "imageUrl": "",
     "category": "lighting",
     "priceId": "service-lighting",
     "equipmentIds": [
@@ -170,7 +170,7 @@
     "bookingType": "other",
     "description": "LED screens and projection, customised to your event.",
     "descriptionAr": "شاشات من ست وحدات، مخصصة لفعاليتك.",
-    "imageUrl": "https://res.cloudinary.com/nqiooluk/image/upload/v1793064106/khalil/site-assets/813f1b66133b/echo/led-walls-cover-v1.webp",
+    "imageUrl": "",
     "category": "video",
     "priceId": "service-video",
     "equipmentIds": [
@@ -188,7 +188,7 @@
     "bookingType": "other",
     "description": "Smoke, cold sparks, dry ice and CO₂.",
     "descriptionAr": "دخان، شرارات باردة، ثلج جاف وCO₂.",
-    "imageUrl": "https://res.cloudinary.com/nqiooluk/image/upload/v1793064143/khalil/site-assets/3bd4d0849a5b/echo/special-effects-cover-v1.webp",
+    "imageUrl": "",
     "category": "effects",
     "priceId": "service-effects",
     "equipmentIds": [
@@ -208,7 +208,7 @@
     "bookingType": "other",
     "description": "Audio, projection, MC and full production.",
     "descriptionAr": "صوت وعرض وتقديم وإنتاج كامل كعرض واحد متكامل.",
-    "imageUrl": "https://res.cloudinary.com/nqiooluk/image/upload/v1793064084/khalil/site-assets/0d149e65f0f8/echo/corporate-events-cover-v1.webp",
+    "imageUrl": "",
     "category": "corporate",
     "priceId": "service-corporate",
     "equipmentIds": [

@@ -38,7 +38,7 @@ function sessionUpdate({instructions,tools,voice,maxOutputTokens,manual=false}){
 
 // Pure translation, kept separate from the sockets so it can be tested without a network.
 function createTranslator({instructions,tools,voice,maxOutputTokens}){
- const state={context:'',calls:[],hasConversation:false,opening:false,awaitingOpeningConfig:false,restoring:false,afterOpening:null,restore:[],speech:false,turnPending:false,responseActive:false,pendingOutputs:[],outputAcks:new Set(),continuationRequested:false,configurationAcks:[]};
+ const state={context:'',calls:[],hasConversation:false,opening:false,awaitingOpeningConfig:false,restoring:false,afterOpening:null,restore:[],speech:false,turnPending:false,responseActive:false,pendingOutputs:[],outputAcks:new Set(),continuationRequested:false,configurationAcks:[],toolItems:new Map()};
  // Match successful session.updated events to our ordered outbound updates.
  // Optional configuration fields are not reliable acknowledgement identifiers.
  const configure=(event,purpose)=>{state.configurationAcks.push(purpose);return event;};
@@ -50,6 +50,21 @@ function createTranslator({instructions,tools,voice,maxOutputTokens}){
   if(state.pendingOutputs.length)events.push(...state.pendingOutputs.splice(0).map(outputEvent));
   if(state.continuationRequested&&!state.outputAcks.size){state.continuationRequested=false;state.responseActive=true;events.push({type:'response.create'});}
   return events;
+ };
+ const rememberTool=item=>{
+  const prior=state.toolItems.get(item.call_id)||state.toolItems.get(item.id||item.item_id)||{};
+  const value={...prior,...item};
+  if(value.call_id)state.toolItems.set(value.call_id,value);
+  if(value.id||value.item_id)state.toolItems.set(value.id||value.item_id,value);
+  return value;
+ };
+ const completeTool=item=>{
+  const value=rememberTool(item);
+  if(typeof value.call_id!=='string'||typeof value.name!=='string'||typeof value.arguments!=='string')return [];
+  const call={type:'function_call',call_id:value.call_id,name:value.name,arguments:value.arguments};
+  const existing=state.calls.findIndex(item=>item.call_id===call.call_id);
+  if(existing<0)state.calls.push(call);else state.calls[existing]=call;
+  return [{...call,type:'response.function_call_arguments.done'}];
  };
  return {
   open:()=>configure(sessionUpdate({instructions,tools,voice,maxOutputTokens}),'initial'),
@@ -107,7 +122,13 @@ function createTranslator({instructions,tools,voice,maxOutputTokens}){
      }else if(purpose==='listening'&&state.restoring){state.restoring=false;return [{type:'bridge.listening'}];}
      return [];
     }
+    case 'response.output_item.added':
+     if(event.item?.type==='function_call')rememberTool(event.item);
+     return [];
+    case 'response.output_item.done':
+     return event.item?.type==='function_call'&&event.item.status!=='incomplete'?completeTool(event.item):[];
     case 'conversation.item.created':
+     if(event.item?.type==='function_call')rememberTool(event.item);
      if(event.item?.type==='function_call_output')state.outputAcks.delete(event.item.call_id);
      return [];
     case 'input_audio_buffer.committed':state.hasConversation=true;state.turnPending=true;return [];
@@ -118,11 +139,9 @@ function createTranslator({instructions,tools,voice,maxOutputTokens}){
     case 'conversation.item.input_audio_transcription.completed':state.hasConversation=true;return [{type:event.type,transcript:String(event.transcript||''),item_id:event.item_id||crypto.randomUUID()}];
     case 'input_audio_buffer.speech_started':state.speech=true;state.turnPending=true;return [{type:event.type}];
     case 'input_audio_buffer.speech_stopped':state.speech=false;return [{type:event.type}];
-    case 'response.function_call_arguments.done':
-     if(typeof event.call_id==='string'&&typeof event.name==='string')state.calls.push({type:'function_call',call_id:event.call_id,name:event.name,arguments:String(event.arguments||'')});
-     // Navigation can move the page as soon as its arguments are complete, before spoken audio.
-     return event.name==='show_app_section'?[{type:event.type,call_id:event.call_id,name:event.name,arguments:String(event.arguments||'')}]:[];
+    case 'response.function_call_arguments.done':return completeTool(event);
     case 'response.done':{
+     for(const item of event.response?.output||[])if(item.type==='function_call')completeTool(item);
      state.responseActive=false;
      if(state.opening){state.opening=false;state.restoring=true;state.restore.push({type:'input_audio_buffer.clear'},configure(state.afterOpening,'listening'));}
      const raw=event.response?.usage||{},input=count(raw.input_tokens??raw.prompt_tokens),output=count(raw.output_tokens??raw.completion_tokens),cached=count(raw.input_tokens_details?.cached_tokens);

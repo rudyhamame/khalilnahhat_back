@@ -15,22 +15,27 @@ test('the model speaks the opening greeting on a silent turn, then server VAD re
  const context=t.toUpstream({type:'conversation.item.create',item:{type:'message',role:'user',content:[{type:'input_text',text:'CTX'}]}});
  assert.equal(context[0].type,'session.update');assert.match(context[0].session.instructions,/BASE\nCTX/);
  const out=t.toUpstream({type:'response.create',response:{instructions:'GREET'}});
- assert.deepEqual(out.map(event=>event.type),['session.update','input_audio_buffer.append','input_audio_buffer.commit','response.create']);
+ assert.deepEqual(out.map(event=>event.type),['session.update']);
  assert.equal(out[0].session.turn_detection,null);assert.match(out[0].session.instructions,/GREET/);
- assert.ok(out[1].audio.length>1000);
+ t.toClient({type:'session.updated'}); // Booking context acknowledgement.
+ assert.deepEqual(t.drain(),[]);
+ t.toClient({type:'session.updated'}); // Manual opening configuration acknowledgement.
+ const opening=t.drain();assert.deepEqual(opening.map(event=>event.type),['input_audio_buffer.append','input_audio_buffer.commit','response.create']);assert.ok(opening[0].audio.length>1000);
  assert.deepEqual(t.drain(),[]);
  t.toClient({type:'response.created',response:{id:'r1'}});
  t.toClient({type:'response.done',response:{id:'r1'}});
- const back=t.drain();assert.equal(back.length,1);assert.equal(back[0].session.turn_detection.type,'server_vad');
+ const back=t.drain();assert.deepEqual(back.map(event=>event.type),['input_audio_buffer.clear','session.update']);assert.equal(back[1].session.turn_detection.type,'server_vad');
  assert.deepEqual(t.drain(),[]);
  const later=make();
  assert.deepEqual(later.toUpstream({type:'response.create'}),[]);
  later.toClient({type:'input_audio_buffer.committed'});
- assert.deepEqual(later.toUpstream({type:'response.create'}),[{type:'response.create'}]);
+ assert.deepEqual(later.toUpstream({type:'response.create'}),[]);
+ later.toClient({type:'response.created',response:{id:'later'}});later.toClient({type:'response.done',response:{id:'later'}});
+ assert.deepEqual(later.drain(),[{type:'response.create'}]);
 });
 test('function calls surface on response.done and tool output is forwarded',()=>{
  const t=make();
- assert.deepEqual(t.toClient({type:'response.function_call_arguments.done',name:'update_event_draft',call_id:'c1',arguments:'{"updates":[]}'}),[]);
+ assert.equal(t.toClient({type:'response.function_call_arguments.done',name:'update_event_draft',call_id:'c1',arguments:'{"updates":[]}'})[0].name,'update_event_draft');
  const [done]=t.toClient({type:'response.done',response:{id:'r1',status:'completed',usage:{input_tokens:10,output_tokens:5}}});
  assert.equal(done.response.output[0].call_id,'c1');assert.equal(done.response.usage.input_tokens,10);
  assert.deepEqual(t.toClient({type:'response.done',response:{id:'r2'}})[0].response.output,[]);

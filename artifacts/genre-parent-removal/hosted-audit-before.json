@@ -1,0 +1,2571 @@
+{
+  "auditedAt": "2026-11-04T20:03:57.235Z",
+  "api": "https://echo-khalil-api.onrender.com",
+  "activeGenres": 117,
+  "genresWithParent": 95,
+  "items": [
+    {
+      "normalizedName": "acoustic",
+      "kind": "genre",
+      "parentId": "genre-f91e7ad9-da80-42e7-9e16-dfc8e1dc28e2",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-e74dc299-366f-4b66-b54e-f4edf8d0185b",
+      "name": "Acoustic",
+      "revision": 4,
+      "updatedAt": "2026-11-04T19:58:56.077Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-e74dc299-366f-4b66-b54e-f4edf8d0185b"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "afro house",
+      "parentId": "genre-89e5e2e0-9492-4934-a425-5cc113c8485a",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-c86e315b-c91d-4a92-af4e-681cb6aa3752",
+      "name": "Afro house",
+      "revision": 4,
+      "updatedAt": "2026-10-31T05:02:09.273Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-c86e315b-c91d-4a92-af4e-681cb6aa3752"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "afro-cuban jazz",
+      "parentId": "genre-9d2a2c4b-f321-4fbd-b5f7-958634297846",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-5325f697-8d90-49a7-b405-1a7437c8fa1c",
+      "name": "Afro-Cuban jazz",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:04:15.662Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-5325f697-8d90-49a7-b405-1a7437c8fa1c"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "afrobeats",
+      "parentId": "genre-8d0bf984-234e-449c-9aba-c1f929547a3e",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-6aac8d02-8231-43b3-9e04-d3a40ff7c51f",
+      "name": "Afrobeats",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:05:44.664Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-6aac8d02-8231-43b3-9e04-d3a40ff7c51f"
+    },
+    {
+      "normalizedName": "alternative rock",
+      "parentId": "genre-38eb15c1-d016-4b5b-95d1-a158fc9b9bfc",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-28564aa5-4730-4af2-9426-a31a70eff6b7",
+      "name": "Alternative rock",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:23.521Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-28564aa5-4730-4af2-9426-a31a70eff6b7"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "amapiano",
+      "parentId": "genre-89e5e2e0-9492-4934-a425-5cc113c8485a",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-da3191c0-9598-44dd-ac27-9ea31f2d0479",
+      "name": "Amapiano",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:05:14.594Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-da3191c0-9598-44dd-ac27-9ea31f2d0479"
+    },
+    {
+      "normalizedName": "ambient",
+      "parentId": "genre-bab920a3-1783-4829-8d5f-1c1832a9869d",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-5306169f-8cc4-4128-a9af-6ceb40e46b66",
+      "name": "Ambient",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:05:32.962Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-5306169f-8cc4-4128-a9af-6ceb40e46b66"
+    },
+    {
+      "normalizedName": "arabic classical",
+      "parentId": "genre-4453219a-e2e5-4504-8aea-4f7977aca491",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-a413cd37-fe97-4536-9309-a4582aa685c4",
+      "name": "Arabic classical",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:06:19.597Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-a413cd37-fe97-4536-9309-a4582aa685c4"
+    },
+    {
+      "normalizedName": "arabic hip-hop",
+      "parentId": "genre-04e02fe6-948f-4aa8-9c5a-a91e8b203d93",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-4c6b41ba-a436-4e2a-97b9-a3e67c5c7a9f",
+      "name": "Arabic hip-hop",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:51.179Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-4c6b41ba-a436-4e2a-97b9-a3e67c5c7a9f"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "arabic pop",
+      "parentId": "genre-4e4f82a5-c62c-4d87-9593-296f585cf738",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-eefcb5b5-4a5c-4565-9c19-2811dc3933d4",
+      "name": "Arabic pop",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:02:54.844Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-eefcb5b5-4a5c-4565-9c19-2811dc3933d4"
+    },
+    {
+      "normalizedName": "bachata",
+      "kind": "genre",
+      "parentId": "",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-75782059-5c78-48c6-91b1-afb3000ca336",
+      "name": "Bachata",
+      "revision": 2,
+      "updatedAt": "2026-10-31T04:59:42.475Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-65f5f8e5-5b2e-4efb-8246-bbad45d67ab7"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-75782059-5c78-48c6-91b1-afb3000ca336"
+    },
+    {
+      "normalizedName": "bebop",
+      "kind": "genre",
+      "parentId": "genre-b5976bcc-e128-4973-a4dd-f9ad76bc9c15",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-bd134327-505e-4acd-8fae-9ee42f01b1bc",
+      "name": "Bebop",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:04:06.754Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-bd134327-505e-4acd-8fae-9ee42f01b1bc"
+    },
+    {
+      "normalizedName": "bhangra",
+      "parentId": "genre-8d0bf984-234e-449c-9aba-c1f929547a3e",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-367aece2-234b-4f23-b63a-8b2a2b3d0458",
+      "name": "Bhangra",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:05:46.871Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-367aece2-234b-4f23-b63a-8b2a2b3d0458"
+    },
+    {
+      "normalizedName": "bluegrass",
+      "kind": "genre",
+      "parentId": "genre-8623e8e6-c8bb-424c-8212-c47cf5ccf52a",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-be6323a1-2db1-4d57-88d7-213ca4c88809",
+      "name": "Bluegrass",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:02:36.042Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-be6323a1-2db1-4d57-88d7-213ca4c88809"
+    },
+    {
+      "normalizedName": "blues",
+      "kind": "genre",
+      "parentId": "",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-d3547f7f-da6d-4025-9e51-cca2d30972ef",
+      "name": "Blues",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:00:31.436Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-d3547f7f-da6d-4025-9e51-cca2d30972ef"
+    },
+    {
+      "normalizedName": "blues rock",
+      "kind": "genre",
+      "parentId": "genre-38eb15c1-d016-4b5b-95d1-a158fc9b9bfc",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-5d2b2f17-f606-4912-9539-4a5fafc6cafa",
+      "name": "Blues rock",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:35.018Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-5d2b2f17-f606-4912-9539-4a5fafc6cafa"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "bollywood",
+      "parentId": "genre-4e4f82a5-c62c-4d87-9593-296f585cf738",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-48b58af2-8290-4646-ba7f-cdd04891f3f4",
+      "name": "Bollywood",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:01.546Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-f3da82f8-b9cc-4695-a764-f870d54c8216"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-48b58af2-8290-4646-ba7f-cdd04891f3f4"
+    },
+    {
+      "normalizedName": "boom bap",
+      "parentId": "genre-04e02fe6-948f-4aa8-9c5a-a91e8b203d93",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-4ee03ca9-270d-4853-b5c7-1f07cb36a568",
+      "name": "Boom bap",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:44.174Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-4ee03ca9-270d-4853-b5c7-1f07cb36a568"
+    },
+    {
+      "normalizedName": "bossa nova",
+      "kind": "genre",
+      "parentId": "genre-12423cb7-6257-4847-9f1c-7c11ae519b2e",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-74ed1fd0-8c4c-4c18-a1fb-4f064dd0ae38",
+      "name": "Bossa nova",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:04:18.317Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-d1e18628-b44c-4d57-933e-641c13d9de8e"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-74ed1fd0-8c4c-4c18-a1fb-4f064dd0ae38"
+    },
+    {
+      "normalizedName": "breakbeat",
+      "parentId": "genre-6d30d4a3-b15f-4476-ab99-9ec126b01028",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-6a52fc32-7216-4a8c-80a3-01822e5a14f4",
+      "name": "Breakbeat",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:04:46.252Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-6a52fc32-7216-4a8c-80a3-01822e5a14f4"
+    },
+    {
+      "normalizedName": "chamber music",
+      "parentId": "genre-4453219a-e2e5-4504-8aea-4f7977aca491",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-9efa3088-9b53-40ac-ae9f-ac48f8fc5bed",
+      "name": "Chamber music",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:04:25.486Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-9efa3088-9b53-40ac-ae9f-ac48f8fc5bed"
+    },
+    {
+      "normalizedName": "chillout",
+      "parentId": "genre-cffe99b9-bb28-42fc-a4fb-b06b43e858d3",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-205c7fd6-c5c5-4b8f-acf9-afee4018c6ff",
+      "name": "Chillout",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:05:37.442Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-205c7fd6-c5c5-4b8f-acf9-afee4018c6ff"
+    },
+    {
+      "normalizedName": "christian music",
+      "parentId": "",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-27442b06-a492-45b1-94ff-37302427ec81",
+      "name": "Christian music",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:00:38.816Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-27442b06-a492-45b1-94ff-37302427ec81"
+    },
+    {
+      "normalizedName": "classic rock",
+      "parentId": "genre-38eb15c1-d016-4b5b-95d1-a158fc9b9bfc",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-e7b0f108-cf98-4295-a5f7-67d53777ed9e",
+      "name": "Classic rock",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:25.711Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-e7b0f108-cf98-4295-a5f7-67d53777ed9e"
+    },
+    {
+      "normalizedName": "classical",
+      "parentId": "",
+      "kind": "genre",
+      "__v": 0,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-4453219a-e2e5-4504-8aea-4f7977aca491",
+      "name": "Classical",
+      "revision": 1,
+      "updatedAt": "2026-10-31T03:57:06.665Z",
+      "id": "genre-4453219a-e2e5-4504-8aea-4f7977aca491"
+    },
+    {
+      "normalizedName": "contemporary r&b",
+      "parentId": "genre-4667f5b2-d57f-4712-b6e3-74381633aaf7",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-80294eb2-d2fc-42cc-b22c-5e83b62bc877",
+      "name": "Contemporary R&B",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:53.244Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-80294eb2-d2fc-42cc-b22c-5e83b62bc877"
+    },
+    {
+      "normalizedName": "country",
+      "kind": "genre",
+      "parentId": "",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-8623e8e6-c8bb-424c-8212-c47cf5ccf52a",
+      "name": "Country",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:00:44.269Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-8623e8e6-c8bb-424c-8212-c47cf5ccf52a"
+    },
+    {
+      "normalizedName": "cumbia",
+      "kind": "genre",
+      "parentId": "",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-d85526f8-32f6-443e-9ae9-44cec24e3637",
+      "name": "Cumbia",
+      "revision": 2,
+      "updatedAt": "2026-10-31T04:59:44.831Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-65f5f8e5-5b2e-4efb-8246-bbad45d67ab7"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-d85526f8-32f6-443e-9ae9-44cec24e3637"
+    },
+    {
+      "normalizedName": "dabke",
+      "parentId": "genre-60e6d2e1-4a18-4987-b2a4-b907717f3f9d",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-0266925e-0639-4d8f-8c03-cdba915192de",
+      "name": "Dabke",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:02:33.612Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-0266925e-0639-4d8f-8c03-cdba915192de"
+    },
+    {
+      "kind": "genre",
+      "parentId": "genre-4e4f82a5-c62c-4d87-9593-296f585cf738",
+      "normalizedName": "dance pop",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-b815bf9f-814f-42c9-ba52-970405b9757c",
+      "name": "Dance pop",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:02:38.346Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-b815bf9f-814f-42c9-ba52-970405b9757c"
+    },
+    {
+      "normalizedName": "dancehall",
+      "parentId": "genre-9a81844e-d6ea-44e7-a179-d9bf414e1f2c",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-3a8b4da1-102e-4b06-9d5b-dca3f6165962",
+      "name": "Dancehall",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:04:31.785Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-3a8b4da1-102e-4b06-9d5b-dca3f6165962"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "deep house",
+      "parentId": "genre-89e5e2e0-9492-4934-a425-5cc113c8485a",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-d3da7e11-d741-4495-9ca1-be55134720dd",
+      "name": "Deep house",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:04:55.852Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-d3da7e11-d741-4495-9ca1-be55134720dd"
+    },
+    {
+      "normalizedName": "dembow",
+      "parentId": "genre-dcc63688-dd0f-493a-b063-a96af8716912",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-6b8080d1-15a3-4db2-af89-3242de59ed87",
+      "name": "Dembow",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:21.103Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-65f5f8e5-5b2e-4efb-8246-bbad45d67ab7"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-6b8080d1-15a3-4db2-af89-3242de59ed87"
+    },
+    {
+      "normalizedName": "disco",
+      "parentId": "genre-c8f3b6a7-637d-4420-bbdf-3963663e21eb",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-a5f328b9-e7b5-44cc-872c-a9412cb6b4a7",
+      "name": "Disco",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:59.614Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-a5f328b9-e7b5-44cc-872c-a9412cb6b4a7"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "disco house",
+      "parentId": "genre-89e5e2e0-9492-4934-a425-5cc113c8485a",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-edf35ae5-3dd9-4939-b54b-53511c639ca2",
+      "name": "Disco house",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:05:10.134Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-edf35ae5-3dd9-4939-b54b-53511c639ca2"
+    },
+    {
+      "normalizedName": "downtempo",
+      "parentId": "genre-bab920a3-1783-4829-8d5f-1c1832a9869d",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-cffe99b9-bb28-42fc-a4fb-b06b43e858d3",
+      "name": "Downtempo",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:05:35.186Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-cffe99b9-bb28-42fc-a4fb-b06b43e858d3"
+    },
+    {
+      "normalizedName": "drill",
+      "parentId": "genre-04e02fe6-948f-4aa8-9c5a-a91e8b203d93",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-45433423-00f1-40b7-88d4-e84a7800297f",
+      "name": "Drill",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:49.048Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-45433423-00f1-40b7-88d4-e84a7800297f"
+    },
+    {
+      "normalizedName": "drum and bass",
+      "parentId": "genre-6d30d4a3-b15f-4476-ab99-9ec126b01028",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-9a03128f-1e38-4cdb-b078-b48351dd9133",
+      "name": "Drum and bass",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:04:43.907Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-9a03128f-1e38-4cdb-b078-b48351dd9133"
+    },
+    {
+      "normalizedName": "dub",
+      "parentId": "genre-9a81844e-d6ea-44e7-a179-d9bf414e1f2c",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-29a000e3-8601-4aca-8fc9-677d663b0fb3",
+      "name": "Dub",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:04:29.593Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-29a000e3-8601-4aca-8fc9-677d663b0fb3"
+    },
+    {
+      "normalizedName": "dubstep",
+      "parentId": "genre-c6dafd15-dbad-40c5-a07b-c25fda745bb8",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-fc0dc079-e8b1-4e71-aa1d-34154114c8c0",
+      "name": "Dubstep",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:05:30.681Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-fc0dc079-e8b1-4e71-aa1d-34154114c8c0"
+    },
+    {
+      "normalizedName": "edm",
+      "parentId": "",
+      "kind": "genre",
+      "__v": 0,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-6d30d4a3-b15f-4476-ab99-9ec126b01028",
+      "name": "EDM",
+      "revision": 1,
+      "updatedAt": "2026-10-31T03:57:06.665Z",
+      "id": "genre-6d30d4a3-b15f-4476-ab99-9ec126b01028"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "egyptian pop",
+      "parentId": "genre-eefcb5b5-4a5c-4565-9c19-2811dc3933d4",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-43f58d67-2915-4e82-b051-438d3a8bd0a9",
+      "name": "Egyptian pop",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:03.963Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-43f58d67-2915-4e82-b051-438d3a8bd0a9"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "electro house",
+      "parentId": "genre-89e5e2e0-9492-4934-a425-5cc113c8485a",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-9272f664-1204-4b6e-87d2-609abdfd880a",
+      "name": "Electro house",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:05:12.367Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-9272f664-1204-4b6e-87d2-609abdfd880a"
+    },
+    {
+      "normalizedName": "electronica",
+      "parentId": "genre-6d30d4a3-b15f-4476-ab99-9ec126b01028",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-bab920a3-1783-4829-8d5f-1c1832a9869d",
+      "name": "Electronica",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:04:51.486Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-bab920a3-1783-4829-8d5f-1c1832a9869d"
+    },
+    {
+      "kind": "genre",
+      "parentId": "genre-4e4f82a5-c62c-4d87-9593-296f585cf738",
+      "normalizedName": "electropop",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-1a4c2356-94e0-4a2d-a7ae-b260085526df",
+      "name": "Electropop",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:02:40.480Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-1a4c2356-94e0-4a2d-a7ae-b260085526df"
+    },
+    {
+      "normalizedName": "film score",
+      "parentId": "genre-607662c2-825f-4c0d-83ee-e7e8a92cc9a3",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-a72efd53-0d43-4917-a80f-57de26abcfa8",
+      "name": "Film score",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:04:27.526Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-a72efd53-0d43-4917-a80f-57de26abcfa8"
+    },
+    {
+      "normalizedName": "flamenco",
+      "kind": "genre",
+      "parentId": "genre-f91e7ad9-da80-42e7-9e16-dfc8e1dc28e2",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-8cc17c15-7cfe-45ac-ac96-a53baf45c422",
+      "name": "Flamenco",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:02:31.417Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-65f5f8e5-5b2e-4efb-8246-bbad45d67ab7"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-8cc17c15-7cfe-45ac-ac96-a53baf45c422"
+    },
+    {
+      "normalizedName": "folk",
+      "kind": "genre",
+      "parentId": "",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-f91e7ad9-da80-42e7-9e16-dfc8e1dc28e2",
+      "name": "Folk",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:00:51.188Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-f91e7ad9-da80-42e7-9e16-dfc8e1dc28e2"
+    },
+    {
+      "normalizedName": "funk",
+      "parentId": "",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-c8f3b6a7-637d-4420-bbdf-3963663e21eb",
+      "name": "Funk",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:00:53.274Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-c8f3b6a7-637d-4420-bbdf-3963663e21eb"
+    },
+    {
+      "normalizedName": "gospel",
+      "parentId": "genre-27442b06-a492-45b1-94ff-37302427ec81",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-8dc2673e-1b4b-42cc-b0d4-ba960e532b80",
+      "name": "Gospel",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:04:04.652Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-8dc2673e-1b4b-42cc-b0d4-ba960e532b80"
+    },
+    {
+      "normalizedName": "hard rock",
+      "parentId": "genre-38eb15c1-d016-4b5b-95d1-a158fc9b9bfc",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-92fe6b68-4979-4995-9879-3a4a2b523df2",
+      "name": "Hard rock",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:28.190Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-92fe6b68-4979-4995-9879-3a4a2b523df2"
+    },
+    {
+      "normalizedName": "hardstyle",
+      "parentId": "genre-6d30d4a3-b15f-4476-ab99-9ec126b01028",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-15f13cce-f698-4ecf-b436-4bb61ab83e3e",
+      "name": "Hardstyle",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:04:48.681Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-15f13cce-f698-4ecf-b436-4bb61ab83e3e"
+    },
+    {
+      "normalizedName": "heavy metal",
+      "kind": "genre",
+      "parentId": "genre-b0864a7e-823e-428f-983a-f22830b71780",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-b0f02592-11d5-4be2-a313-0a897fd32277",
+      "name": "Heavy metal",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:39.671Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-b0f02592-11d5-4be2-a313-0a897fd32277"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "highlife",
+      "parentId": "genre-6aac8d02-8231-43b3-9e04-d3a40ff7c51f",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-d29f1e33-f91f-4ca8-80b3-b2085bdbcaf2",
+      "name": "Highlife",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:05:51.047Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-d29f1e33-f91f-4ca8-80b3-b2085bdbcaf2"
+    },
+    {
+      "normalizedName": "hip-hop",
+      "parentId": "",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-04e02fe6-948f-4aa8-9c5a-a91e8b203d93",
+      "name": "Hip-hop",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:01:01.028Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-04e02fe6-948f-4aa8-9c5a-a91e8b203d93"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "house",
+      "parentId": "genre-6d30d4a3-b15f-4476-ab99-9ec126b01028",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-89e5e2e0-9492-4934-a425-5cc113c8485a",
+      "name": "House",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:04:37.104Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-89e5e2e0-9492-4934-a425-5cc113c8485a"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "indie pop",
+      "parentId": "genre-4e4f82a5-c62c-4d87-9593-296f585cf738",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-ca0735fa-924e-40b4-a375-49f3ca7993c8",
+      "name": "Indie pop",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:02:45.312Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-ca0735fa-924e-40b4-a375-49f3ca7993c8"
+    },
+    {
+      "normalizedName": "indie rock",
+      "parentId": "genre-38eb15c1-d016-4b5b-95d1-a158fc9b9bfc",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-d321522c-699e-4d56-81ad-7c8546a4e3a4",
+      "name": "Indie rock",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:30.409Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-d321522c-699e-4d56-81ad-7c8546a4e3a4"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "j-pop",
+      "parentId": "genre-4e4f82a5-c62c-4d87-9593-296f585cf738",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-e601b98c-44d2-46ff-9bab-e7c9ff6f9212",
+      "name": "J-pop",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:02:48.161Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-ff6e2c19-ed16-4024-9f59-cd8163c15cd1"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-e601b98c-44d2-46ff-9bab-e7c9ff6f9212"
+    },
+    {
+      "normalizedName": "jazz",
+      "kind": "genre",
+      "parentId": "",
+      "__v": 0,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-b5976bcc-e128-4973-a4dd-f9ad76bc9c15",
+      "name": "Jazz",
+      "revision": 1,
+      "updatedAt": "2026-10-31T03:57:06.665Z",
+      "id": "genre-b5976bcc-e128-4973-a4dd-f9ad76bc9c15"
+    },
+    {
+      "normalizedName": "jungle",
+      "parentId": "genre-9a03128f-1e38-4cdb-b078-b48351dd9133",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-556395fb-4164-4077-8a4e-90c7b6a8298f",
+      "name": "Jungle",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:05:26.014Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-556395fb-4164-4077-8a4e-90c7b6a8298f"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "k-pop",
+      "parentId": "genre-4e4f82a5-c62c-4d87-9593-296f585cf738",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-12aa3c07-966b-4b69-8664-9f80b566ea4b",
+      "name": "K-pop",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:02:50.403Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-eedbb388-27b2-4a7e-86e8-dc560dd5f089"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-12aa3c07-966b-4b69-8664-9f80b566ea4b"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "khaliji",
+      "parentId": "genre-eefcb5b5-4a5c-4565-9c19-2811dc3933d4",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-dc7f1b8e-8bdf-4182-bbbb-ede2503535c9",
+      "name": "Khaliji",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:08.718Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-dc7f1b8e-8bdf-4182-bbbb-ede2503535c9"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "latin jazz",
+      "parentId": "genre-b5976bcc-e128-4973-a4dd-f9ad76bc9c15",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-9d2a2c4b-f321-4fbd-b5f7-958634297846",
+      "name": "Latin jazz",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:04:13.384Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-9d2a2c4b-f321-4fbd-b5f7-958634297846"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "latin pop",
+      "parentId": "genre-4e4f82a5-c62c-4d87-9593-296f585cf738",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-dc1db36c-a1be-44a4-abb8-1628572bcdd2",
+      "name": "Latin pop",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:02:52.463Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-65f5f8e5-5b2e-4efb-8246-bbad45d67ab7"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-dc1db36c-a1be-44a4-abb8-1628572bcdd2"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "lebanese pop",
+      "parentId": "genre-eefcb5b5-4a5c-4565-9c19-2811dc3933d4",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-e8af97b7-133f-4ce3-9d80-f444807ece8d",
+      "name": "Lebanese pop",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:06.535Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-e8af97b7-133f-4ce3-9d80-f444807ece8d"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "levantine folk",
+      "parentId": "genre-f91e7ad9-da80-42e7-9e16-dfc8e1dc28e2",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-60e6d2e1-4a18-4987-b2a4-b907717f3f9d",
+      "name": "Levantine folk",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:02:26.918Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-60e6d2e1-4a18-4987-b2a4-b907717f3f9d"
+    },
+    {
+      "normalizedName": "lounge",
+      "parentId": "genre-205c7fd6-c5c5-4b8f-acf9-afee4018c6ff",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-3ee77d12-724b-4171-8d8b-e36fc8d881aa",
+      "name": "Lounge",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:05:42.359Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-3ee77d12-724b-4171-8d8b-e36fc8d881aa"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "mahraganat",
+      "parentId": "genre-510f04d6-9f00-4171-b49b-def4592c589b",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-155c5f90-c332-4d30-85b1-9ee7e2c82ede",
+      "name": "Mahraganat",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:16.060Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-155c5f90-c332-4d30-85b1-9ee7e2c82ede"
+    },
+    {
+      "normalizedName": "mambo",
+      "kind": "genre",
+      "parentId": "",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-34b601f4-0cea-4d6a-a5d1-4dba9fd20c0c",
+      "name": "Mambo",
+      "revision": 2,
+      "updatedAt": "2026-10-31T04:59:51.898Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-65f5f8e5-5b2e-4efb-8246-bbad45d67ab7"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-34b601f4-0cea-4d6a-a5d1-4dba9fd20c0c"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "mawwal",
+      "parentId": "genre-a413cd37-fe97-4536-9309-a4582aa685c4",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-65c94986-e5fc-4af8-bc10-8c77437598fc",
+      "name": "Mawwal",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:06:24.665Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-65c94986-e5fc-4af8-bc10-8c77437598fc"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "melodic house",
+      "parentId": "genre-89e5e2e0-9492-4934-a425-5cc113c8485a",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-2b4cc76a-1675-401b-a38a-8c8b1251afcb",
+      "name": "Melodic house",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:05:02.873Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-2b4cc76a-1675-401b-a38a-8c8b1251afcb"
+    },
+    {
+      "normalizedName": "melodic techno",
+      "parentId": "genre-67a74250-7897-4d79-b7b2-f0a96d258cea",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-ba1f920e-e141-475e-8ab5-4babd9af5be4",
+      "name": "Melodic techno",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:05:19.141Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-ba1f920e-e141-475e-8ab5-4babd9af5be4"
+    },
+    {
+      "normalizedName": "merengue",
+      "kind": "genre",
+      "parentId": "",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-e7c8c35b-5dab-4b34-94cb-7cec03abe2b0",
+      "name": "Merengue",
+      "revision": 2,
+      "updatedAt": "2026-10-31T04:59:54.159Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-65f5f8e5-5b2e-4efb-8246-bbad45d67ab7"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-e7c8c35b-5dab-4b34-94cb-7cec03abe2b0"
+    },
+    {
+      "normalizedName": "metal",
+      "kind": "genre",
+      "parentId": "genre-38eb15c1-d016-4b5b-95d1-a158fc9b9bfc",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-b0864a7e-823e-428f-983a-f22830b71780",
+      "name": "Metal",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:37.450Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-b0864a7e-823e-428f-983a-f22830b71780"
+    },
+    {
+      "normalizedName": "minimal techno",
+      "parentId": "genre-67a74250-7897-4d79-b7b2-f0a96d258cea",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-08491861-3d1d-4a98-bcb2-93a216373ec2",
+      "name": "Minimal techno",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:05:16.819Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-08491861-3d1d-4a98-bcb2-93a216373ec2"
+    },
+    {
+      "normalizedName": "neo-soul",
+      "parentId": "genre-0503b562-b8de-4141-bf3c-79595dd254cf",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-ce0c1594-d8db-4228-9e73-9435584123ff",
+      "name": "Neo-soul",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:57.475Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-ce0c1594-d8db-4228-9e73-9435584123ff"
+    },
+    {
+      "normalizedName": "nu-disco",
+      "parentId": "genre-a5f328b9-e7b5-44cc-872c-a9412cb6b4a7",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-6531e1ac-30af-49db-b8a9-76c219d5ca0e",
+      "name": "Nu-disco",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:04:02.392Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-6531e1ac-30af-49db-b8a9-76c219d5ca0e"
+    },
+    {
+      "normalizedName": "opera",
+      "parentId": "genre-4453219a-e2e5-4504-8aea-4f7977aca491",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-6fbb3283-89cd-4c67-b8fc-35387109e88f",
+      "name": "Opera",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:06:15.029Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-d41a8f28-c971-4f71-9997-fbe5d968c35b"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-6fbb3283-89cd-4c67-b8fc-35387109e88f"
+    },
+    {
+      "normalizedName": "orchestral",
+      "parentId": "genre-4453219a-e2e5-4504-8aea-4f7977aca491",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-90f5a9b1-9515-479d-a4f0-ee2746eef0f4",
+      "name": "Orchestral",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:06:17.316Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-90f5a9b1-9515-479d-a4f0-ee2746eef0f4"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "organic house",
+      "parentId": "genre-89e5e2e0-9492-4934-a425-5cc113c8485a",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-624c44f0-f067-4395-8bf3-83d4367f1709",
+      "name": "Organic house",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:05:05.217Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-624c44f0-f067-4395-8bf3-83d4367f1709"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "persian pop",
+      "parentId": "genre-4e4f82a5-c62c-4d87-9593-296f585cf738",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-9b20d06a-d016-44a6-940e-40a04b79d714",
+      "name": "Persian pop",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:02:56.870Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-fd768a95-356b-4fc6-a3e4-6a1b6e7d1092"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-9b20d06a-d016-44a6-940e-40a04b79d714"
+    },
+    {
+      "normalizedName": "pop",
+      "parentId": "",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-4e4f82a5-c62c-4d87-9593-296f585cf738",
+      "name": "Pop",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:01:09.944Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-4e4f82a5-c62c-4d87-9593-296f585cf738"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "progressive house",
+      "parentId": "genre-89e5e2e0-9492-4934-a425-5cc113c8485a",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-610b1170-d3ee-4a06-b0a5-b6b2992b3d8b",
+      "name": "Progressive house",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:05:00.609Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-610b1170-d3ee-4a06-b0a5-b6b2992b3d8b"
+    },
+    {
+      "normalizedName": "progressive trance",
+      "parentId": "genre-2764b600-a07d-48f1-b125-30535dfb0bb8",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-1e3082e0-3fbb-418c-b5da-adcdc2f076d8",
+      "name": "Progressive trance",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:05:21.435Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-1e3082e0-3fbb-418c-b5da-adcdc2f076d8"
+    },
+    {
+      "normalizedName": "psytrance",
+      "parentId": "genre-2764b600-a07d-48f1-b125-30535dfb0bb8",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-573cd403-48c5-4928-86e2-d3309a8ef855",
+      "name": "Psytrance",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:05:23.616Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-573cd403-48c5-4928-86e2-d3309a8ef855"
+    },
+    {
+      "normalizedName": "punk rock",
+      "parentId": "genre-38eb15c1-d016-4b5b-95d1-a158fc9b9bfc",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-f93278f6-53c3-42c4-8947-22c0df8c131b",
+      "name": "Punk rock",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:32.686Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-f93278f6-53c3-42c4-8947-22c0df8c131b"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "qawwali",
+      "parentId": "genre-8d0bf984-234e-449c-9aba-c1f929547a3e",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-7c083e2a-1777-4ac1-8009-d2ec945dd387",
+      "name": "Qawwali",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:05:48.936Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-bbca2a5a-59ba-45a9-9996-0fead8dffc18"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-7c083e2a-1777-4ac1-8009-d2ec945dd387"
+    },
+    {
+      "normalizedName": "r&b",
+      "parentId": "",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-4667f5b2-d57f-4712-b6e3-74381633aaf7",
+      "name": "R&B",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:01:13.478Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-4667f5b2-d57f-4712-b6e3-74381633aaf7"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "rai",
+      "parentId": "genre-eefcb5b5-4a5c-4565-9c19-2811dc3933d4",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-b9069b37-40eb-42fe-b62e-9e72f292f7d9",
+      "name": "Rai",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:11.198Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-b9069b37-40eb-42fe-b62e-9e72f292f7d9"
+    },
+    {
+      "normalizedName": "rap",
+      "parentId": "genre-04e02fe6-948f-4aa8-9c5a-a91e8b203d93",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-502b31e2-d9af-4e9e-9d87-9a8f0e61013b",
+      "name": "Rap",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:42.005Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-502b31e2-d9af-4e9e-9d87-9a8f0e61013b"
+    },
+    {
+      "normalizedName": "reggae",
+      "parentId": "",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-9a81844e-d6ea-44e7-a179-d9bf414e1f2c",
+      "name": "Reggae",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:01:27.511Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-9a81844e-d6ea-44e7-a179-d9bf414e1f2c"
+    },
+    {
+      "normalizedName": "reggaeton",
+      "parentId": "genre-dc1db36c-a1be-44a4-abb8-1628572bcdd2",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-dcc63688-dd0f-493a-b063-a96af8716912",
+      "name": "Reggaeton",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:18.688Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-65f5f8e5-5b2e-4efb-8246-bbad45d67ab7"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-dcc63688-dd0f-493a-b063-a96af8716912"
+    },
+    {
+      "normalizedName": "rock",
+      "parentId": "",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-38eb15c1-d016-4b5b-95d1-a158fc9b9bfc",
+      "name": "Rock",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:01:25.650Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-38eb15c1-d016-4b5b-95d1-a158fc9b9bfc"
+    },
+    {
+      "normalizedName": "salsa",
+      "kind": "genre",
+      "parentId": "",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-48724421-65c9-435d-a6f0-4095f02d7dde",
+      "name": "Salsa",
+      "revision": 2,
+      "updatedAt": "2026-10-31T04:59:57.750Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-65f5f8e5-5b2e-4efb-8246-bbad45d67ab7"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-48724421-65c9-435d-a6f0-4095f02d7dde"
+    },
+    {
+      "normalizedName": "samba",
+      "kind": "genre",
+      "parentId": "",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-12423cb7-6257-4847-9f1c-7c11ae519b2e",
+      "name": "Samba",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:00:03.374Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-d1e18628-b44c-4d57-933e-641c13d9de8e"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-12423cb7-6257-4847-9f1c-7c11ae519b2e"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "shaabi",
+      "parentId": "genre-eefcb5b5-4a5c-4565-9c19-2811dc3933d4",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-510f04d6-9f00-4171-b49b-def4592c589b",
+      "name": "Shaabi",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:13.396Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-510f04d6-9f00-4171-b49b-def4592c589b"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "singer-songwriter",
+      "parentId": "genre-f91e7ad9-da80-42e7-9e16-dfc8e1dc28e2",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-9e2991d5-5d9c-40f1-b3fe-880802e16aac",
+      "name": "Singer-songwriter",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:02:24.678Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-9e2991d5-5d9c-40f1-b3fe-880802e16aac"
+    },
+    {
+      "normalizedName": "ska",
+      "parentId": "genre-9a81844e-d6ea-44e7-a179-d9bf414e1f2c",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-0624def1-00ea-4e34-9d30-f12715416cfd",
+      "name": "Ska",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:04:34.352Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-0624def1-00ea-4e34-9d30-f12715416cfd"
+    },
+    {
+      "normalizedName": "smooth jazz",
+      "kind": "genre",
+      "parentId": "genre-b5976bcc-e128-4973-a4dd-f9ad76bc9c15",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-b97c3742-deaa-4d7a-bbb0-8736fd1c4502",
+      "name": "Smooth jazz",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:04:11.353Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-b97c3742-deaa-4d7a-bbb0-8736fd1c4502"
+    },
+    {
+      "normalizedName": "soul",
+      "parentId": "genre-4667f5b2-d57f-4712-b6e3-74381633aaf7",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-0503b562-b8de-4141-bf3c-79595dd254cf",
+      "name": "Soul",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:55.321Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-0503b562-b8de-4141-bf3c-79595dd254cf"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "soulful house",
+      "parentId": "genre-89e5e2e0-9492-4934-a425-5cc113c8485a",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-febc2b71-8820-443e-ae34-be9c20943568",
+      "name": "Soulful house",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:05:07.643Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-febc2b71-8820-443e-ae34-be9c20943568"
+    },
+    {
+      "normalizedName": "soundtrack",
+      "parentId": "",
+      "kind": "genre",
+      "__v": 0,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-607662c2-825f-4c0d-83ee-e7e8a92cc9a3",
+      "name": "Soundtrack",
+      "revision": 1,
+      "updatedAt": "2026-10-31T03:57:06.665Z",
+      "id": "genre-607662c2-825f-4c0d-83ee-e7e8a92cc9a3"
+    },
+    {
+      "normalizedName": "swing",
+      "kind": "genre",
+      "parentId": "genre-b5976bcc-e128-4973-a4dd-f9ad76bc9c15",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-d52ea925-583e-41aa-94c1-a1e9ab47e1c0",
+      "name": "Swing",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:04:09.057Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-d52ea925-583e-41aa-94c1-a1e9ab47e1c0"
+    },
+    {
+      "kind": "genre",
+      "parentId": "genre-4e4f82a5-c62c-4d87-9593-296f585cf738",
+      "normalizedName": "synth-pop",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-99440618-1d79-46bd-a9fe-ae57770b6ead",
+      "name": "Synth-pop",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:02:42.705Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-99440618-1d79-46bd-a9fe-ae57770b6ead"
+    },
+    {
+      "normalizedName": "tango",
+      "kind": "genre",
+      "parentId": "",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-3a5a63d7-0c56-47a8-ace4-f222bd738d04",
+      "name": "Tango",
+      "revision": 2,
+      "updatedAt": "2026-10-31T04:59:59.399Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-65f5f8e5-5b2e-4efb-8246-bbad45d67ab7"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-3a5a63d7-0c56-47a8-ace4-f222bd738d04"
+    },
+    {
+      "normalizedName": "tarab",
+      "parentId": "genre-a413cd37-fe97-4536-9309-a4582aa685c4",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-983c622a-e350-4211-8a5a-7738b85ea00c",
+      "name": "Tarab",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:06:22.367Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-983c622a-e350-4211-8a5a-7738b85ea00c"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "tech house",
+      "parentId": "genre-89e5e2e0-9492-4934-a425-5cc113c8485a",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-659196e6-b273-40e3-8591-06ec35bdc1bd",
+      "name": "Tech house",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:04:58.137Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-659196e6-b273-40e3-8591-06ec35bdc1bd"
+    },
+    {
+      "normalizedName": "techno",
+      "parentId": "genre-6d30d4a3-b15f-4476-ab99-9ec126b01028",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-67a74250-7897-4d79-b7b2-f0a96d258cea",
+      "name": "Techno",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:04:39.174Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-67a74250-7897-4d79-b7b2-f0a96d258cea"
+    },
+    {
+      "normalizedName": "trance",
+      "parentId": "genre-6d30d4a3-b15f-4476-ab99-9ec126b01028",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-2764b600-a07d-48f1-b125-30535dfb0bb8",
+      "name": "Trance",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:04:41.553Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-2764b600-a07d-48f1-b125-30535dfb0bb8"
+    },
+    {
+      "normalizedName": "trap",
+      "parentId": "genre-04e02fe6-948f-4aa8-9c5a-a91e8b203d93",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-878d123b-2ddd-4cc5-b164-548263925682",
+      "name": "Trap",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:03:46.720Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-878d123b-2ddd-4cc5-b164-548263925682"
+    },
+    {
+      "normalizedName": "trip-hop",
+      "parentId": "genre-cffe99b9-bb28-42fc-a4fb-b06b43e858d3",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-05dfa9be-6f85-4c80-80aa-2a7f9e3be807",
+      "name": "Trip-hop",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:05:39.821Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-05dfa9be-6f85-4c80-80aa-2a7f9e3be807"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "turkish folk",
+      "parentId": "genre-f91e7ad9-da80-42e7-9e16-dfc8e1dc28e2",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-d80255c6-a209-4162-84a3-e0b2b4418e01",
+      "name": "Turkish folk",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:02:29.096Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-7a6e8153-234e-4af8-be09-201319661595"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-d80255c6-a209-4162-84a3-e0b2b4418e01"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "turkish pop",
+      "parentId": "genre-4e4f82a5-c62c-4d87-9593-296f585cf738",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-1561c97c-1e99-4082-8fb3-6fba63efd5cb",
+      "name": "Turkish pop",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:02:59.126Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-7a6e8153-234e-4af8-be09-201319661595"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-1561c97c-1e99-4082-8fb3-6fba63efd5cb"
+    },
+    {
+      "normalizedName": "uk bass",
+      "parentId": "genre-6d30d4a3-b15f-4476-ab99-9ec126b01028",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-c6dafd15-dbad-40c5-a07b-c25fda745bb8",
+      "name": "UK bass",
+      "revision": 2,
+      "updatedAt": "2026-10-31T05:04:53.582Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-c6dafd15-dbad-40c5-a07b-c25fda745bb8"
+    },
+    {
+      "normalizedName": "uk garage",
+      "parentId": "genre-c6dafd15-dbad-40c5-a07b-c25fda745bb8",
+      "kind": "genre",
+      "__v": 1,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-874ee058-1f99-4571-a1b6-41924c5472a0",
+      "name": "UK garage",
+      "revision": 3,
+      "updatedAt": "2026-10-31T05:05:28.476Z",
+      "description": "",
+      "isoCode": "",
+      "languageIds": [
+        "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+      ],
+      "provenance": {
+        "source": "",
+        "note": "",
+        "recordedBy": "6ad107462635e99c992c0f5a"
+      },
+      "id": "genre-874ee058-1f99-4571-a1b6-41924c5472a0"
+    },
+    {
+      "kind": "genre",
+      "normalizedName": "world fusion",
+      "parentId": "",
+      "__v": 0,
+      "archived": false,
+      "createdAt": "2026-10-31T03:57:06.665Z",
+      "externalId": "genre-8d0bf984-234e-449c-9aba-c1f929547a3e",
+      "name": "World fusion",
+      "revision": 1,
+      "updatedAt": "2026-10-31T03:57:06.665Z",
+      "id": "genre-8d0bf984-234e-449c-9aba-c1f929547a3e"
+    }
+  ]
+}

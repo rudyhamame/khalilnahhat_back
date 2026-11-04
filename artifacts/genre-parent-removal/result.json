@@ -1,0 +1,11 @@
+{
+  "database": "khalil",
+  "collection": "musicvocabularies",
+  "totalGenres": 117,
+  "updated": 95,
+  "remainingParents": 0,
+  "operation": "Clear genre parentId; preserve genre IDs and content; increment revisions.",
+  "backup": "genres-before-2026-11-04T20-07-21-392Z.json",
+  "sha256": "5e55e6c9b814704dc8296daa94e15cc4c65becd3cfb2512d87cf171495c8a39d",
+  "verifiedThroughHostedApi": true
+}

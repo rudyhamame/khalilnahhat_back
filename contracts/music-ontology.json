@@ -33,6 +33,7 @@
     "region",
     "artist",
     "musician",
+    "lyricist",
     "concept",
     "rhythm",
     "genre",
@@ -49,7 +50,7 @@
     "ARRANGER",
     "OTHER"
   ],
-  "keyPattern": "^[A-G](?:#|b)? (?:major|minor)$",
+  "keyPattern": "^[A-G](?:#|b)? (?:major|minor|dorian|phrygian|lydian|mixolydian|locrian|harmonic minor|melodic minor)$",
   "filters": [
     "q",
     "recordingType",

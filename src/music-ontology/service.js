@@ -73,7 +73,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
   const rows=await Vocabulary.find({externalId:{$in:ids},kind:{$in:[].concat(kind)}}).session(session).lean();
   if(new Set(rows.map(r=>r.externalId)).size!==new Set(ids).size)fail(`Choose existing ${kind} references.`);
  }
- async function creditsCheck(credits,session,kind='artist'){await references(credits.map(c=>c.artistId),kind,session);}
+ async function creditsCheck(credits,session,kind=['artist','lyricist']){await references(credits.map(c=>c.artistId),kind,session);}
  const provenance=(p,actor)=>({...p,recordedBy:actor||'admin'});
  const defaultWorkTypes=[
   {id:'MIX',name:'Mix',nameArabic:'ميكس',amount:'MULTIPLE',details:'A curated sequence of tracks blended into one continuous listening experience.',detailsArabic:'مجموعة مقطوعات مختارة ومنسّقة في تجربة استماع متصلة.'},
@@ -201,7 +201,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
   for(const item of items||[]){
    const l=item.lyrics;
    for(const credit of [...item.musicianCredits,...(l?.lyricistCredits||[]),...(l?.vocalistCredits||[])]){
-    const person=await Vocabulary.findOne({externalId:credit.artistId,kind:{$in:['artist','musician']},archived:{$ne:true}}).session(session);
+    const person=await Vocabulary.findOne({externalId:credit.artistId,kind:{$in:['artist','musician','lyricist']},archived:{$ne:true}}).session(session);
     if(!person)fail('Choose an existing person for each item credit.');
    }
    for(const credit of item.musicianCredits){

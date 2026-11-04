@@ -35,7 +35,7 @@ function createWorkElements(service){
   if(key==='bpm'&&(!Number.isFinite(Number(value))||Number(value)<=0||Number(value)>1000))fail('Enter BPM between 0 and 1000.');
   if(key==='duration'&&(!Number.isFinite(Number(value))||Number(value)<0||Number(value)>86400))fail('Enter duration in seconds, up to 86400.');
   if(key==='releaseYear'&&(!/^\d{4}$/.test(value)||Number(value)<1000||Number(value)>2100))fail('Enter a release year between 1000 and 2100.');
-  if(key==='key'&&!/^[A-G](?:#|b)? (?:major|minor)$/.test(value))fail('Use a musical key such as C major or F# minor.');
+  if(key==='key'&&!new RegExp(service.contract.keyPattern).test(value))fail('Use a musical key such as C major or F# minor.');
   if(key==='releaseDate'&&(!/^\d{4}-\d{2}-\d{2}$/.test(value)||isNaN(Date.parse(value))||new Date(value).toISOString().slice(0,10)!==value))fail('Enter a valid date as YYYY-MM-DD.');
   if(key==='translationRefs'){try{if(!['http:','https:'].includes(new URL(value).protocol))fail('Enter an HTTP or HTTPS link.');}catch{fail('Enter an HTTP or HTTPS link.');}}
  }

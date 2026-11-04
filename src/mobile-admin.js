@@ -68,7 +68,7 @@ function registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest 
     const client=await User.findOne({_id:req.params.id,isAdmin:{$ne:true},username:{$nin:[...ADMIN_USERNAMES]}});
     if(!client) return fail(res,404,'Client not found.');
     client.isBlocked=parsed.data.blocked;
-    if(client.isBlocked) client.sessionToken='';
+    if(client.isBlocked) {client.sessionToken='';client.androidSessionToken='';}
     await client.save();
     res.json({item:clientView(client)});
   });

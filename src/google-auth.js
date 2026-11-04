@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const {issueSession}=require('./account-sessions');
 const { OAuth2Client } = require('google-auth-library');
 const { createSessionToken, hashPassword } = require('./security');
 
@@ -61,9 +62,8 @@ function registerGoogleAuth(app, { User, serializeUser, isAdminUser, clientId = 
       }
       if (user.isBlocked) return res.status(403).json({ message: 'This account is blocked. Contact support.' });
       if ((user.isAdmin || isAdminUser(user)) && !canUseAdminGoogle(user, email)) return res.status(403).json({ message: 'Administrator accounts must sign in with their email address and password.' });
-      user.sessionToken = createSessionToken();
-      await user.save();
-      return res.json({ token: user.sessionToken, user: serializeUser(user) });
+      const token = await issueSession(user,req,isAdminUser);
+      return res.json({ token, user: serializeUser(user) });
     } catch (error) {
       return res.status(error.code === 11000 ? 409 : 503).json({ message: 'Could not complete Google sign-in. Please try again.' });
     }

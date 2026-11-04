@@ -54,7 +54,7 @@ function registerAccount(app, { requireAuth, getFrontendUrl }) {
     if (!parsed.success) return res.status(400).json({ message: 'Choose a password of at least 8 characters.' });
     const user = await User.findOneAndUpdate(
       { resetTokenHash: sha(parsed.data.token), resetExpires: { $gt: new Date() } },
-      { passwordHash: hashPassword(parsed.data.password), sessionToken: createSessionToken(), resetTokenHash: '', resetExpires: null, emailVerified: true },
+      { passwordHash: hashPassword(parsed.data.password), sessionToken: createSessionToken(), androidSessionToken: '', resetTokenHash: '', resetExpires: null, emailVerified: true },
     );
     return user ? res.json({ ok: true }) : res.status(400).json({ message: 'This reset link is invalid or expired.' });
   });

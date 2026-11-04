@@ -1,4 +1,4 @@
-const hidden=/^(password|passwordHash|sessionToken|token|apiKey|secret|authorization|obsStreamKey|muxStreamKey|streamKey|accessKey|privateKey|credentials|resetTokenHash|verifyTokenHash|verificationToken|resetToken|refreshToken|accessToken|cookie|cookies|dashscopeApiKey|openaiApiKey)$/i;
+const hidden=/^(password|passwordHash|sessionToken|androidSessionToken|token|apiKey|secret|authorization|obsStreamKey|muxStreamKey|streamKey|accessKey|privateKey|credentials|resetTokenHash|verifyTokenHash|verificationToken|resetToken|refreshToken|accessToken|cookie|cookies|dashscopeApiKey|openaiApiKey)$/i;
 function redact(value,depth=0){
  if(depth>18)return '[depth limit]';
  if(value instanceof Date)return value.toISOString();

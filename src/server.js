@@ -1,3 +1,4 @@
+const accountSessions = require('./account-sessions');
 const {uploadAsset}=require('./cloudinary-assets');
 const {findPasswordAccount}=require('./password-account');
 require('dotenv').config();
@@ -751,13 +752,13 @@ async function authFromRequest(request) {
     return null;
   }
 
-  return User.findOne({ sessionToken: token });
+  return User.findOne(accountSessions.sessionQuery(token));
 }
 
 async function requireAdmin(request, response, next) {
   const user = await authFromRequest(request);
 
-  if (!isAdminUser(user)) {
+  if (!isAdminUser(user) || user.isBlocked) {
     return response.status(401).json({
       message: 'Admin authentication is required.',
     });
@@ -768,7 +769,7 @@ async function requireAdmin(request, response, next) {
     await user.save();
   }
 
-  request.user = user;
+  request.user = accountSessions.sessionActor(user, request.headers.authorization.slice(7));
   return next();
 }
 
@@ -917,11 +918,10 @@ app.post('/api/auth/login', async (request, response) => {
     user.isAdmin = true;
   }
 
-  user.sessionToken = createSessionToken();
-  await user.save();
+  const token = await accountSessions.issueSession(user, request, isAdminUser);
 
   return response.json({
-    token: user.sessionToken,
+    token,
     user: serializeUser(user),
   });
 });
@@ -970,8 +970,7 @@ app.post('/api/auth/logout', async (request, response) => {
   const user = await authFromRequest(request);
 
   if (user) {
-    user.sessionToken = '';
-    await user.save();
+    await accountSessions.revokeSession(User,user,request.headers.authorization.slice(7));
   }
 
   response.json({
@@ -1626,7 +1625,7 @@ registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize: serializeSer
 
 const aiAdministrator=require('./ai-admin/routes').registerAiAdministrator(app,{
  requireAdmin,configService:aiConfiguration,
- authorize:async owner=>{if(!require('mongoose').isValidObjectId(owner))return null;const user=await User.findById(owner);return isAdminUser(user)&&user.sessionToken?user:null;},
+ authorize:async (owner,token,binding)=>{if(!require('mongoose').isValidObjectId(owner))return null;const user=await User.findById(owner);const active=accountSessions.selectSession(user,token,binding);return isAdminUser(user)&&active?accountSessions.sessionActor(user,active):null;},
 });
 
 app.use((_request, response) => {

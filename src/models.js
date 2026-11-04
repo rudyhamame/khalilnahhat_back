@@ -11,6 +11,7 @@ const userSchema = new mongoose.Schema(
     isAdmin: { type: Boolean, default: false },
     isBlocked: { type: Boolean, default: false, index: true },
     sessionToken: { type: String, default: '' },
+    androidSessionToken: { type: String, default: '' },
     googleSubject: { type: String, unique: true, sparse: true },
     emailVerified: { type: Boolean, default: false },
     verifyTokenHash: { type: String, default: '' },

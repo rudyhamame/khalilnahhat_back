@@ -64,6 +64,10 @@ function createWorkElements(service){
  async function remove(key,id,revision){
   const def=definition(key);if(['fixed','recording','work'].includes(def.source))fail('Manage these identities in their recording or content editor.');
   if(def.source==='workType'){const row=(await service.listWorkTypes()).find(item=>item.id===id);if(!row||row.revision!==revision)fail('This option changed. Reload before deleting.',409);return service.deleteWorkType(id);}
+  if(def.source==='vocabulary'){
+   const paths={language:['items.lyrics.languageId'],dialect:['items.lyrics.dialectId'],genre:['items.sound.genreIds'],rhythm:['items.sound.rhythmId','items.sound.rhythmIds'],artist:['items.lyrics.vocalistCredits.artistId','items.lyrics.lyricistCredits.artistId','items.musicianCredits.artistId'],lyricist:['items.lyrics.lyricistCredits.artistId'],musician:['items.musicianCredits.artistId'],instrument:['items.musicianCredits.instrumentId']}[key]||[];
+   if(paths.length&&await ArchiveItem.exists({$or:paths.map(path=>({[path]:id}))}))fail('This option is used by a recording. Remove its assignments first.',409);
+  }
   if(key==='instrument'&&(await Vocabulary.exists({kind:'musician',instrumentId:id,archived:{$ne:true}})||await ArchiveItem.exists({'items.musicianCredits.instrumentId':id})))fail('This instrument is assigned to a musician. Remove its assignments first.',409);
   if(def.source==='vocabulary'&&await Vocabulary.exists({parentId:id,archived:{$ne:true}}))fail('Remove this option’s child entries first.',409);
   if(def.source!=='vocabulary'&&!mongoose.isValidObjectId(id))fail('Option not found.',404);

@@ -13,6 +13,8 @@ async function fixture(){
  const M=require('../../src/music-ontology/models');const {ArchiveItem}=require('../../src/models');const archive=require('../../src/music-archive');
  await Promise.all([...Object.values(M).filter(m=>m?.init),ArchiveItem].map(m=>m.init()));
  const service=archive.ontologyService();
+ await service.listWorkTypes();
+ await service.saveWorkType({name:'Production',amount:'INDIVIDUAL'});
  const language=await service.saveVocabulary({kind:'language',name:'Arabic',isoCode:'ar'},null,'qa');
  const genre=await service.saveVocabulary({kind:'genre',name:'Arabic Pop'},null,'qa');
  const artist=await service.saveVocabulary({kind:'artist',name:'Khalil'},null,'qa');

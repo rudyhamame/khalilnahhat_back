@@ -1,0 +1,38 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const {fixture}=require('./helpers/music-ontology-fixture.cjs');
+const V=require('../src/music-ontology/validation');
+test('recording item schema rejects invalid branches, duplicate ids and unordered timing',()=>{
+ const item={id:'a',name:'A',hasLyrics:false};
+ const base={title:'Mix',recordingType:'MIX',recordingAmount:'MULTIPLE',items:[item]};
+ assert.equal(V.recording.parse(base).items[0].lyrics,null);
+ assert.equal(V.recording.safeParse({...base,items:[item,item]}).success,false);
+ assert.equal(V.recording.safeParse({...base,items:[{...item,lyrics:{text:'not allowed'}}]}).success,false);
+ assert.equal(V.recording.safeParse({...base,recordingAmount:'INDIVIDUAL',items:[item,{...item,id:'b'}]}).success,false);
+ assert.equal(V.recording.safeParse({...base,items:[{...item,hasLyrics:true,lyrics:{startSec:20,endSec:10}}]}).success,false);
+});
+test('HTTP create, reload, edit and rollback preserve recording-owned items without shared-work writes',{timeout:120000},async t=>{
+ const db=await fixture();t.after(()=>db.stop());
+ const req=async(path,method='GET',body,auth=true)=>{const res=await fetch(db.origin+'/api'+path,{method,headers:{'Content-Type':'application/json',...(auth?{Authorization:'Bearer qa-admin'}:{})},body:body?JSON.stringify(body):undefined});return {status:res.status,body:await res.json()};};
+ const {Work,Version}=db.service.models;const count=await Work.countDocuments();
+ const old=(await req('/admin/music-ontology/recordings/'+db.ids[0])).body.item;
+ const timing={audioUrl:old.storedAudioUrl,model:'whisper-1',lines:[{start:1,end:2,text:'First line'}]};
+ const person={artistId:db.artist,detail:'Fixture credit'};
+ const items=[{id:'song-1',name:'Lyrical item',releaseYear:1998,hasLyrics:true,musicianCredits:[person,person],lyrics:{languageId:db.language,text:'First line',startSec:0,endSec:10,timedLyrics:timing,concept:'Love',sentenceConcept:'A song about love.',lyricistCredits:[person,person],vocalistCredits:[person]}},{id:'music-2',name:'Instrumental item',releaseYear:2002,hasLyrics:false,musicianCredits:[person]}];
+ const payload={title:'Independent multiple recording',recordingType:'MIX',recordingAmount:'MULTIPLE',audioUrl:old.storedAudioUrl,durationSeconds:20,publicationStatus:'DRAFT',items};
+ const created=await req('/admin/music-ontology/recordings','POST',payload);assert.equal(created.status,201,JSON.stringify(created.body));const row=created.body.item;
+ assert.equal(row.ontologyStatus,'ITEMS');assert.equal(row.items.length,2);assert.equal(row.items[0].releaseYear,1998);assert.equal(row.items[1].releaseYear,2002);assert.equal(row.items[1].lyrics,null);assert.equal(row.items[0].lyrics.lyricistCredits.length,2);assert.deepEqual(row.items[0].lyrics.timedLyrics.lines,timing.lines);
+ assert.equal(await Work.countDocuments(),count);assert.equal(row.workId,null);assert.deepEqual(row.componentWorkIds,[]);
+ assert.equal((await req('/music-ontology/recordings/'+row.id,'GET',null,false)).status,404);
+ assert.equal((await req('/admin/music-ontology/recordings','POST',payload,false)).status,401);
+ const changed=structuredClone(payload);changed.items[0].name='Edited item';changed.revision=row.revision;
+ const updated=await req('/admin/music-ontology/recordings/'+row.id,'PUT',changed);assert.equal(updated.status,200,JSON.stringify(updated.body));assert.equal(updated.body.item.items[0].name,'Edited item');assert.equal((await req('/admin/music-ontology/recordings/'+row.id)).body.item.items[1].releaseYear,2002);
+ assert.equal((await req('/admin/music-ontology/recordings/'+row.id,'PUT',changed)).status,409);
+ const invalid=structuredClone(changed);invalid.revision=updated.body.item.revision;invalid.items[0].lyrics.timedLyrics.audioUrl='wrong-audio';
+ assert.equal((await req('/admin/music-ontology/recordings/'+row.id,'PUT',invalid)).status,400);assert.equal((await req('/admin/music-ontology/recordings/'+row.id)).body.item.revision,updated.body.item.revision);
+ const badCredit=structuredClone(payload);badCredit.items[0].musicianCredits=[{artistId:'missing',detail:''}];assert.equal((await req('/admin/music-ontology/recordings','POST',badCredit)).status,400);
+ const before=await Version.countDocuments();const badDialect=structuredClone(payload);badDialect.items[0].lyrics.dialectId='missing';assert.equal((await req('/admin/music-ontology/recordings','POST',badDialect)).status,400);assert.equal(await Version.countDocuments(),before);
+ const published=await req('/admin/music-ontology/recordings/'+row.id,'PUT',{...changed,revision:updated.body.item.revision,publicationStatus:'PUBLISHED'});assert.equal(published.status,200,JSON.stringify(published.body));assert.equal((await req('/music-ontology/recordings/'+row.id,'GET',null,false)).body.item.items.length,2);
+ const filtered=await req('/admin/music-ontology/recordings?language='+db.language+'&q=Edited');assert.ok(filtered.body.items.some(r=>r.id===row.id));
+ const legacy=(await req('/admin/music-ontology/recordings/'+db.ids[0])).body.item;assert.equal(legacy.work.id,old.work.id);assert.equal(await Work.countDocuments(),count);
+});

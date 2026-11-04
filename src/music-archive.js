@@ -87,7 +87,7 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, C
       res.status(201).json({ item: serialize(row) });
     });
     app.patch(`/api/admin/music-archive/${kind}/:id`, requireAdmin, async (req, res) => {
-      if (kind === 'songs' && await model.exists({externalId:req.params.id,workId:{$exists:true,$ne:''}})) return res.status(409).json({message:'Edit this recording through the ontology editor.'});
+      if (kind === 'songs' && await model.exists({externalId:req.params.id,$or:[{workId:{$exists:true,$ne:''}},{'items.0':{$exists:true}}]})) return res.status(409).json({message:'Edit this recording through the ontology editor.'});
       // PATCH must preserve omitted fields; creation defaults must not detach songs.
       const patchInput = z.object(Object.fromEntries(Object.entries(inputs[kind].shape).map(([key, field]) => [key, (field instanceof z.ZodDefault ? field.removeDefault() : field).optional()]))).strict();
       const parsed = patchInput.safeParse(req.body);
@@ -99,7 +99,7 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, C
       res.json({ item: serialize(row) });
     });
     app.delete(`/api/admin/music-archive/${kind}/:id`, requireAdmin, async (req, res) => {
-      if (kind === 'songs' && await model.exists({externalId:req.params.id,workId:{$exists:true,$ne:''}})) return res.status(409).json({message:'Archive this recording through the ontology editor; its references and files are preserved.'});
+      if (kind === 'songs' && await model.exists({externalId:req.params.id,$or:[{workId:{$exists:true,$ne:''}},{'items.0':{$exists:true}}]})) return res.status(409).json({message:'Archive this recording through the ontology editor; its references and files are preserved.'});
       const row = kind === 'songs' && ontology ? await ontology.deleteLegacy(req.params.id) : await model.findOneAndDelete({ externalId: req.params.id });
       if (!row) return res.status(404).json({ message: 'This item no longer exists.' });
       // Unreferenced managed files are removed by the shared cleanup worker.

@@ -149,7 +149,8 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    if(old&&value.kind!=='genre'&&value.parentId!==old.parentId)fail('Parent identity cannot be changed for this entity; create a separate entity.');
    if(old&&value.revision!==old.revision)fail('This entity changed. Reload before editing.',409);
    if(value.languageIds?.length)await references(value.languageIds,'language',session);
-   const data={...value,languageIds:value.languageIds??old?.languageIds??[],externalId:id||makeId(value.kind),normalizedName:norm(value.name),provenance:provenance(value.provenance,actor),revision:(old?.revision||0)+1};
+   if(value.instrumentId){if(value.kind!=='musician')fail('Only musicians have an instrument dependency.');const instrument=await Vocabulary.findOne({externalId:value.instrumentId,kind:'instrument',archived:{$ne:true}}).session(session);if(!instrument)fail('Choose an existing instrument for this musician.');}
+   const data={...value,...(value.kind==='musician'?{instrumentId:value.instrumentId!==undefined?value.instrumentId:old?.instrumentId}:{}),languageIds:value.languageIds??old?.languageIds??[],externalId:id||makeId(value.kind),normalizedName:norm(value.name),provenance:provenance(value.provenance,actor),revision:(old?.revision||0)+1};
    if(old){old.set(data);await old.save({session});return plain(old);}
    return plain((await Vocabulary.create([data],{session}))[0]);
   });
@@ -202,6 +203,11 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    for(const credit of [...item.musicianCredits,...(l?.lyricistCredits||[]),...(l?.vocalistCredits||[])]){
     const person=await Vocabulary.findOne({externalId:credit.artistId,kind:{$in:['artist','musician']},archived:{$ne:true}}).session(session);
     if(!person)fail('Choose an existing person for each item credit.');
+   }
+   for(const credit of item.musicianCredits){
+    if(!credit.instrumentId)continue;
+    const instrument=await Vocabulary.findOne({externalId:credit.instrumentId,kind:'instrument',archived:{$ne:true}}).session(session);
+    if(!instrument)fail('Choose an existing instrument for each musician credit.');
    }
    if(l?.languageId)await references([l.languageId],'language',session);
    if(l?.dialectId){const dialect=await Vocabulary.findOne({externalId:l.dialectId,kind:'dialect',archived:{$ne:true}}).session(session);if(!dialect||!l.languageId||dialect.parentId&&dialect.parentId!==l.languageId)fail('Choose a dialect for the item language.');}

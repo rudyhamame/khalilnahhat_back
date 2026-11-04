@@ -44,7 +44,7 @@ function matchesWork(r,f={}){
 const amountFor=type=>Object.keys(contract.recordingTypeGroups).find(key=>contract.recordingTypeGroups[key].includes(type))||null;
 function matches(r,f={}){
  if(f.recordingAmount&&(r.recordingAmount||amountFor(r.recordingType))!==f.recordingAmount)return false;
- const components=r.componentWorks?.length?r.componentWorks:[r.work];
+ const components=r.items?.length?r.items.map(item=>({title:item.name,type:item.hasLyrics?'SONG':'MUSIC',lyrics:item.lyrics?{language:{id:item.lyrics.languageId},dialect:{id:item.lyrics.dialectId},artistCredits:[...item.lyrics.lyricistCredits,...item.lyrics.vocalistCredits]}:null,melody:{musicianCredits:item.musicianCredits}})):r.componentWorks?.length?r.componentWorks:[r.work];
  return components.some(work=>matchesWork({...r,work},f));
 }
 // A work type's 1-minute sample is a recording of that type plus the second where the minute starts.
@@ -196,6 +196,19 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    const row=(await Work.create([{...data,externalId:makeId('work')}],{session}))[0];return row.externalId;
   });
  }
+ async function checkRecordingItems(items,audioUrl,durationSeconds,session=null){
+  for(const item of items||[]){
+   const l=item.lyrics;
+   for(const credit of [...item.musicianCredits,...(l?.lyricistCredits||[]),...(l?.vocalistCredits||[])]){
+    const person=await Vocabulary.findOne({externalId:credit.artistId,kind:{$in:['artist','musician']},archived:{$ne:true}}).session(session);
+    if(!person)fail('Choose an existing person for each item credit.');
+   }
+   if(l?.languageId)await references([l.languageId],'language',session);
+   if(l?.dialectId){const dialect=await Vocabulary.findOne({externalId:l.dialectId,kind:'dialect',archived:{$ne:true}}).session(session);if(!dialect||!l.languageId||dialect.parentId&&dialect.parentId!==l.languageId)fail('Choose a dialect for the item language.');}
+   if(l?.timedLyrics&&(l.timedLyrics.audioUrl!==audioUrl||!audioUrl))fail('Item timed lyrics must match the recording audio.');
+   if(durationSeconds!=null&&(l?.endSec>durationSeconds||l?.timedLyrics?.lines?.some(line=>line.end>durationSeconds)))fail('Item timed lyrics must stay inside the recording duration.');
+  }
+ }
  async function saveRecording(input,id,actor,migration=null){
   const v=V.recording.parse(input);
   return transaction(async session=>{
@@ -204,9 +217,12 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    const old=id?await ArchiveModel.findOne({externalId:id}).session(session):null;
    if(id&&!old)fail('Recording not found.',404);
    if(old&&v.revision!==(old.ontologyRevision||0))fail('This recording changed. Reload before editing.',409);
-   const work=await Work.findOne({externalId:v.workId}).session(session);
-   if(!work)fail('Choose an existing musical work.');
-   const componentWorkIds=[...new Set([v.workId,...(v.componentWorkIds??old?.componentWorkIds??[])])];
+   const work=v.workId?await Work.findOne({externalId:v.workId}).session(session):null;
+   if(v.workId&&!work)fail('Choose an existing musical work.');
+   const itemValues=v.items===undefined?plain(old)?.items:v.items;
+   if((v.recordingAmount||type.amount)==='INDIVIDUAL'&&itemValues?.length>1)fail('Individual recordings have one item.');
+   await checkRecordingItems(itemValues,v.audioUrl,v.durationSeconds,session);
+   const componentWorkIds=[...new Set([v.workId,...(v.componentWorkIds??old?.componentWorkIds??[])].filter(Boolean))];
    if(componentWorkIds.length>100)fail('Choose at most 100 component works.');
    if(await Work.countDocuments({externalId:{$in:componentWorkIds}}).session(session)!==componentWorkIds.length)fail('Choose existing recording component works.');
    if(v.audioUrl&&!ownedAsset(v.audioUrl)||v.coverImage&&!ownedAsset(v.coverImage))fail('Choose media uploaded to this website.');
@@ -225,7 +241,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    if(timing&&(timing.audioUrl!==v.audioUrl||!componentWorkIds.includes(timing.workId)))fail('Timed lyrics must match the recording audio and one of its content entries.');
    if(timing&&!await Work.exists({externalId:timing.workId,type:'SONG'}).session(session))fail('Timed lyrics require a lyrical content entry.');
    const duration=v.durationSeconds==null?'':`${Math.floor(v.durationSeconds/60)}:${String(Math.floor(v.durationSeconds%60)).padStart(2,'0')}`;
-   const data={lyricsTiming:timing||null,title:v.title,recordingType:v.recordingType,recordingAmount:v.recordingAmount||type.amount||'INDIVIDUAL',componentWorkIds,workId:v.workId,audioAssetId,sourceRecordingIds:v.sourceRecordingIds,sourceWorkIds:v.sourceWorkIds,publicationStatus:v.publicationStatus,archivalStatus:v.archivalStatus,versionLabel:v.versionLabel,productionNotes:v.productionNotes,provenance:provenance(v.provenance,actor),ontologyRevision:(old?.ontologyRevision||0)+1,description:v.description,date:v.releaseDate,audioUrl:v.audioUrl,coverImage:v.coverImage,duration,published:v.publicationStatus==='PUBLISHED'&&v.archivalStatus==='ACTIVE',mediaType:'audio'};
+   const data={...(itemValues!==undefined?{items:itemValues}:{}),lyricsTiming:timing||null,title:v.title,recordingType:v.recordingType,recordingAmount:v.recordingAmount||type.amount||'INDIVIDUAL',componentWorkIds,workId:v.workId,audioAssetId,sourceRecordingIds:v.sourceRecordingIds,sourceWorkIds:v.sourceWorkIds,publicationStatus:v.publicationStatus,archivalStatus:v.archivalStatus,versionLabel:v.versionLabel,productionNotes:v.productionNotes,provenance:provenance(v.provenance,actor),ontologyRevision:(old?.ontologyRevision||0)+1,description:v.description,date:v.releaseDate,audioUrl:v.audioUrl,coverImage:v.coverImage,duration,published:v.publicationStatus==='PUBLISHED'&&v.archivalStatus==='ACTIVE',mediaType:'audio'};
    if(migration){for(const key of ['title','description','date','audioUrl','coverImage','duration','mediaType'])delete data[key];data.ontologyMigrationId=migration.runId;await mongoose.connection.collection('musicontologymigrationbackups').insertOne({_id:`${migration.runId}:${recordId}`,runId:migration.runId,recordingId:recordId,before:plain(old),afterRevision:data.ontologyRevision,createdAt:new Date()},{session});}
    let row;
    if(old){old.set(data);row=await old.save({session});}else row=(await ArchiveModel.create([{...data,externalId:recordId,category:'Music Archive',artist:''}],{session}))[0];
@@ -256,7 +272,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    const artist=[...new Set([...inferredRecordingCredits(componentWorks),...componentWorks.flatMap(c=>[...(c.credits||[]),...(c.melody?.musicianCredits||[]),...(c.lyrics?.artistCredits||[])])].map(c=>vocabulary.get(c.artistId)?.name).filter(Boolean))].join(', ')||(!r.workId?r.artist||'':'');
    const timing=r.lyricsTiming?.audioUrl===r.audioUrl&&componentWorks.some(work=>work.id===r.lyricsTiming?.workId&&work.type==='SONG')&&r.lyricsTiming?.lines?.length?r.lyricsTiming:null;
    const type=workTypes.get(r.recordingType)||null;
-   return {lyricsTiming:timing?{workId:timing.workId,model:timing.model,lines:timing.lines,...(admin?{audioUrl:timing.audioUrl}:{})}:null,id:r.externalId,title:r.title,description:r.description||'',recordingType:type?r.recordingType:null,recordingTypeDefinition:type,recordingAmount:r.recordingAmount||type?.amount||amountFor(r.recordingType),componentWorkIds,componentWorks,workId:r.workId||null,work:w,ontologyStatus:r.workId?'MAPPED':'UNMAPPED',recordingMetadata:inferredRecordingMetadata(componentWorks),credits:inferredRecordingCredits(componentWorks),sourceRecordingIds:r.sourceRecordingIds||[],sourceWorkIds:r.sourceWorkIds||[],publicationStatus:r.publicationStatus||(r.published!==false?'PUBLISHED':'DRAFT'),archivalStatus:r.archivalStatus||'ACTIVE',revision:r.ontologyRevision||0,versionLabel:r.versionLabel||'',productionNotes:r.productionNotes||'',provenance:r.provenance||null,audio:{assetId:r.audioAssetId||null,url:deliver(r.audioUrl||a?.url||''),durationSeconds:r.duration?String(r.duration).split(':').reduce((t,n)=>t*60+Number(n),0):(a?.durationSeconds??null)},audioUrl:deliver(r.audioUrl||''),coverImage:deliver(r.coverImage||r.image||''),artist,duration:r.duration||'',date:r.date||'',releaseDate:r.date||'',createdAt:r.createdAt,updatedAt:r.updatedAt,sortOrder:r.sortOrder||0,published:r.published!==false,...(admin?{storedAudioUrl:r.audioUrl||'',storedCoverImage:r.coverImage||r.image||''}:{})};
+   return {...(r.items!==undefined?{items:r.items.map(item=>({...item,lyrics:item.lyrics?{...item.lyrics,timedLyrics:item.lyrics.timedLyrics?.audioUrl===r.audioUrl?{...item.lyrics.timedLyrics,audioUrl:admin?item.lyrics.timedLyrics.audioUrl:deliveryUrl(item.lyrics.timedLyrics.audioUrl)}:null}:null}))}:{}),lyricsTiming:timing?{workId:timing.workId,model:timing.model,lines:timing.lines,...(admin?{audioUrl:timing.audioUrl}:{})}:null,id:r.externalId,title:r.title,description:r.description||'',recordingType:type?r.recordingType:null,recordingTypeDefinition:type,recordingAmount:r.recordingAmount||type?.amount||amountFor(r.recordingType),componentWorkIds,componentWorks,workId:r.workId||null,work:w,ontologyStatus:r.items?.length?'ITEMS':r.workId?'MAPPED':'UNMAPPED',recordingMetadata:inferredRecordingMetadata(componentWorks),credits:inferredRecordingCredits(componentWorks),sourceRecordingIds:r.sourceRecordingIds||[],sourceWorkIds:r.sourceWorkIds||[],publicationStatus:r.publicationStatus||(r.published!==false?'PUBLISHED':'DRAFT'),archivalStatus:r.archivalStatus||'ACTIVE',revision:r.ontologyRevision||0,versionLabel:r.versionLabel||'',productionNotes:r.productionNotes||'',provenance:r.provenance||null,audio:{assetId:r.audioAssetId||null,url:deliver(r.audioUrl||a?.url||''),durationSeconds:r.duration?String(r.duration).split(':').reduce((t,n)=>t*60+Number(n),0):(a?.durationSeconds??null)},audioUrl:deliver(r.audioUrl||''),coverImage:deliver(r.coverImage||r.image||''),artist,duration:r.duration||'',date:r.date||'',releaseDate:r.date||'',createdAt:r.createdAt,updatedAt:r.updatedAt,sortOrder:r.sortOrder||0,published:r.published!==false,...(admin?{storedAudioUrl:r.audioUrl||'',storedCoverImage:r.coverImage||r.image||''}:{})};
   });
  }
  async function list(admin=false,filters={}){
@@ -267,8 +283,9 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
   const v=V.recording.parse(input);
   await ensureWorkTypes();
   const type=await DjWorkType.findOne({externalId:v.recordingType}).lean();if(!type)fail('Choose an existing DJ work type.');
-  if(!await Work.exists({externalId:v.workId}))fail('Choose an existing musical work.');
-  const componentIds=[...new Set([v.workId,...(v.componentWorkIds||[])])];
+  if(v.workId&&!await Work.exists({externalId:v.workId}))fail('Choose an existing musical work.');
+  await checkRecordingItems(v.items,v.audioUrl,v.durationSeconds);
+  const componentIds=[...new Set([v.workId,...(v.componentWorkIds||[])].filter(Boolean))];
   if(componentIds.length>100||await Work.countDocuments({externalId:{$in:componentIds}})!==componentIds.length)fail('Choose up to 100 existing recording component works.');
   if(v.audioUrl&&!ownedAsset(v.audioUrl)||v.coverImage&&!ownedAsset(v.coverImage))fail('Choose media uploaded to this website.');
   if(v.audioUrl&&!require('../music-archive-files').localAssetPattern.test(v.audioUrl)&&!/\/video\/(upload|authenticated)\//.test(v.audioUrl))fail('Choose an uploaded audio asset.');

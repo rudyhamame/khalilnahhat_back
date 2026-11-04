@@ -17,7 +17,9 @@ const DjWorkType=model('DjWorkType',{languageIds:{type:[String],default:[]},artw
 const DjWorkTypeSeed=model('DjWorkTypeSeed',{});
 const AudioAsset=model('MusicAudioAsset',{url:{type:String,required:true,unique:true},mime:String,durationSeconds:Number,originalName:String,provenance});
 const Version=model('MusicRecordingVersion',{recordingId:{type:String,index:true,required:true},number:Number,snapshot:Schema.Types.Mixed,changedBy:String},[[{recordingId:1,number:1},{unique:true}]]);
+const itemCredit={_id:false,artistId:{type:String,required:true},detail:String};
 const RecordingFields={
+ items:{type:[{_id:false,id:{type:String,required:true},name:{type:String,required:true},releaseYear:Number,hasLyrics:{type:Boolean,required:true},musicianCredits:[itemCredit],lyrics:{type:{_id:false,languageId:String,dialectId:String,concept:String,sentenceConcept:String,text:String,startSec:Number,endSec:Number,timedLyrics:{audioUrl:String,model:String,lines:[{_id:false,start:Number,end:Number,text:String}]},lyricistCredits:[itemCredit],vocalistCredits:[itemCredit]},default:null}}],default:undefined},
  lyricsTiming:{audioUrl:String,workId:String,model:String,lines:{type:[{_id:false,start:Number,end:Number,text:String}],default:undefined}},
  recordingType:{type:String,index:true},workId:{type:String,index:true},recordingAmount:{type:String,enum:contract.recordingAmounts,index:true},componentWorkIds:{type:[String],index:true},audioAssetId:String,
  recordingMetadata:{bpm:Number,key:String,bpms:{type:[Number],default:undefined},keys:{type:[String],default:undefined},genreIds:{type:[String],default:undefined},states:{type:Map,of:state}},credits:[credit],sourceRecordingIds:{type:[String],index:true},sourceWorkIds:{type:[String],index:true},

@@ -28,7 +28,7 @@ function matchesWork(r,f={}){
  const has=(items,id)=>!id||items?.some(v=>(typeof v==='string'?v:v.id||v.artistId)===id);
  if(f.recordingType&&r.recordingType!==f.recordingType||f.workType&&w?.type!==f.workType)return false;
  if(f.publicationStatus&&r.publicationStatus!==f.publicationStatus||f.archivalStatus&&r.archivalStatus!==f.archivalStatus)return false;
- if(f.language&&l?.language?.id!==f.language&&!l?.languages?.some(item=>item.id===f.language)||f.dialect&&l?.dialect?.id!==f.dialect)return false;
+ if(f.language&&l?.language?.id!==f.language&&!l?.languages?.some(item=>item.id===f.language)||f.dialect&&l?.dialect?.id!==f.dialect&&!l?.dialects?.some(item=>item.id===f.dialect))return false;
  if(!has(l?.regions,f.region)||(!has(l?.concepts,f.concept)&&l?.primaryConcept?.id!==f.concept)||(!has(m?.genres,f.genre)&&!has(r.recordingMetadata?.genreIds,f.genre)))return false;
  if(f.lyricArtist&&!has(l?.lyricistCredits??l?.artistCredits,f.lyricArtist))return false;
  if(!has(m?.instruments,f.instrument)||!has(m?.musicianCredits,f.musician))return false;
@@ -44,7 +44,7 @@ function matchesWork(r,f={}){
 const amountFor=type=>Object.keys(contract.recordingTypeGroups).find(key=>contract.recordingTypeGroups[key].includes(type))||null;
 function matches(r,f={}){
  if(f.recordingAmount&&(r.recordingAmount||amountFor(r.recordingType))!==f.recordingAmount)return false;
- const components=r.items?.length?r.items.map(item=>({title:item.name,type:item.hasLyrics?'SONG':'MUSIC',lyrics:item.lyrics?{language:{id:item.lyrics.languageId},dialect:{id:item.lyrics.dialectId},lyricistCredits:item.lyrics.lyricistCredits,vocalistCredits:item.lyrics.vocalistCredits,artistCredits:[...item.lyrics.lyricistCredits,...item.lyrics.vocalistCredits]}:null,melody:{...item.sound,rhythm:item.sound?.rhythmId?{id:item.sound.rhythmId}:null,genres:(item.sound?.genreIds||[]).map(id=>({id})),instruments:item.musicianCredits.filter(credit=>credit.instrumentId).map(credit=>({id:credit.instrumentId})),musicianCredits:item.musicianCredits}})):r.componentWorks?.length?r.componentWorks:[r.work];
+ const components=r.items?.length?r.items.map(item=>({title:item.name,type:item.hasLyrics?'SONG':'MUSIC',lyrics:item.lyrics?{language:{id:item.lyrics.languageId},dialect:{id:item.lyrics.dialectId},languages:(item.lyrics.languageIds??(item.lyrics.languageId?[item.lyrics.languageId]:[])).map(id=>({id})),dialects:(item.lyrics.dialectIds??(item.lyrics.dialectId?[item.lyrics.dialectId]:[])).map(id=>({id})),lyricistCredits:item.lyrics.lyricistCredits,vocalistCredits:item.lyrics.vocalistCredits,artistCredits:[...item.lyrics.lyricistCredits,...item.lyrics.vocalistCredits]}:null,melody:{...item.sound,rhythm:item.sound?.rhythmId?{id:item.sound.rhythmId}:null,genres:(item.sound?.genreIds||[]).map(id=>({id})),instruments:item.musicianCredits.filter(credit=>credit.instrumentId).map(credit=>({id:credit.instrumentId})),musicianCredits:item.musicianCredits}})):r.componentWorks?.length?r.componentWorks:[r.work];
  return components.some(work=>matchesWork({...r,work},f));
 }
 // A work type's 1-minute sample is a recording of that type plus the second where the minute starts.
@@ -212,8 +212,9 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
     const instrument=await Vocabulary.findOne({externalId:credit.instrumentId,kind:'instrument',archived:{$ne:true}}).session(session);
     if(!instrument)fail('Choose an existing instrument for each musician credit.');
    }
-   if(l?.languageId)await references([l.languageId],'language',session);
-   if(l?.dialectId){const dialect=await Vocabulary.findOne({externalId:l.dialectId,kind:'dialect',archived:{$ne:true}}).session(session);if(!dialect||!l.languageId||dialect.parentId&&dialect.parentId!==l.languageId)fail('Choose a dialect for the item language.');}
+   const languageIds=l?.languageIds??(l?.languageId?[l.languageId]:[]),dialectIds=l?.dialectIds??(l?.dialectId?[l.dialectId]:[]);
+   if(languageIds.length)await references(languageIds,'language',session);
+   for(const id of dialectIds){const dialect=await Vocabulary.findOne({externalId:id,kind:'dialect',archived:{$ne:true}}).session(session);if(!dialect||!languageIds.length||dialect.parentId&&!languageIds.includes(dialect.parentId))fail('Choose dialects for the selected item languages.');}
    if(l?.timedLyrics&&(l.timedLyrics.audioUrl!==audioUrl||!audioUrl))fail('Item timed lyrics must match the recording audio.');
    if(durationSeconds!=null&&(l?.endSec>durationSeconds||l?.timedLyrics?.lines?.some(line=>line.end>durationSeconds)))fail('Item timed lyrics must stay inside the recording duration.');
   }

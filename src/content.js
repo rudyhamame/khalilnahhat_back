@@ -44,14 +44,17 @@ const mediaFields = {
 
 const view = (d) => ({ id: d.id, ...d.toObject({ versionKey: false, transform: (_doc, o) => { delete o._id; delete o.createdAt; delete o.updatedAt; return o; } }) });
 
-function crud(app, requireAdmin, base, Model, fields, required, publicFilter) {
+function crud(app, requireAdmin, base, Model, fields, required, publicFilter, onCreate) {
   const create = z.object(fields).partial().required(required);
   const update = z.object(fields).partial();
   const bad = (res) => res.status(400).json({ message: 'Content failed validation.' });
   app.get(`${base}/admin`, requireAdmin, async (_req, res) => res.json({ items: (await Model.find().sort({ sortOrder: 1, createdAt: -1 })).map(view) }));
   app.post(base, requireAdmin, async (req, res) => {
     const p = create.safeParse(req.body);
-    return p.success ? res.status(201).json({ item: view(await Model.create(p.data)) }) : bad(res);
+    if (!p.success) return bad(res);
+    const item = await Model.create(p.data);
+    if (onCreate) await onCreate(item);
+    return res.status(201).json({item: view(item)});
   });
   app.patch(`${base}/:id`, requireAdmin, async (req, res) => {
     const p = update.safeParse(req.body);
@@ -83,8 +86,9 @@ async function importSampleTestimonials() {
 function registerContent(app, requireAdmin) {
   if (mongoose.connection.readyState === 1) importSampleTestimonials(); else mongoose.connection.once('open', importSampleTestimonials);
   crud(app, requireAdmin, '/api/content/testimonials', Testimonial, testimonialFields, { name: true, text: true }, () => ({}));
+  const albums = require('./gallery-albums').registerGalleryAlbums(app, requireAdmin, {MediaItem, ContentSeed});
   crud(app, requireAdmin, '/api/content/media', MediaItem, mediaFields, { kind: true, title: true, mediaUrl: true },
-    (req) => (['mix', 'video', 'photo'].includes(req.query.kind) ? { kind: req.query.kind } : {}));
+    (req) => (['mix', 'video', 'photo'].includes(req.query.kind) ? { kind: req.query.kind } : {}), albums.autoAssign);
 
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
   app.post('/api/content/upload', requireAdmin, upload.single('file'), async (req, res) => {

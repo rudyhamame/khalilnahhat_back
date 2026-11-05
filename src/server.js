@@ -14,6 +14,7 @@ const { AccessToken, RoomServiceClient, WebhookReceiver, IngressClient } = requi
 const { z } = require('zod');
 const { connectToDatabase, MONGODB_DB_NAME } = require('./db');
 const { ADMIN_USERNAME, ADMIN_USERNAMES, ADMIN_GOOGLE_EMAILS, defaultLiveStreamConfig } = require('./default-data');
+const {isAdminUser}=require('./admin-role');
 const {
   ArchiveItem,
   Booking,
@@ -391,10 +392,6 @@ function isFutureDate(dateString) {
 
 function createReference(prefix) {
   return `${prefix}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-}
-
-function isAdminUser(user) {
-  return Boolean(user) && ADMIN_USERNAMES.has(user.username?.toLowerCase());
 }
 
 function serializeUser(user) {
@@ -806,7 +803,7 @@ app.use(
   }),
 );
 
-app.use(express.json({ type: ['application/json', 'application/webhook+json'], verify(request, _response, buffer) {
+app.use(express.json({ limit: '8mb', type: ['application/json', 'application/webhook+json'], verify(request, _response, buffer) {
   if (request.path === '/api/live-stream/webrtc/webhook') request.rawBody = buffer.toString('utf8');
 } }));
 
@@ -1613,6 +1610,7 @@ require('./stem-separation').registerStemSeparation(app, { requireAdmin });
 require('./music-archive').registerMusicArchive(app, { requireAdmin });
 require('./dj-service-builder').registerDjServiceBuilder(app, { requireAdmin });
 require('./setup-catalog').registerSetupCatalog(app, { requireAdmin });
+require('./echo-project-chat').registerEchoProjectChat(app, { requireAdmin });
 require('./availability').registerAvailability(app, { requireAdmin });
 vouchers.registerVouchers(app, { requireAdmin, requireAuth });
 require('./live-recordings').registerLiveRecordings(app, requireAdmin);

@@ -16,6 +16,7 @@ const { Model: SimulationDraft } = require('./simulation-drafts');
 const { Equipment } = require('./equipment');
 const { hashPassword } = require('./security');
 const { ADMIN_USERNAMES } = require('./default-data');
+const {isAdminUser}=require('./admin-role');
 
 User.schema.add({ adminNotes: { type: String, default: '', maxlength: 6000 } });
 const fileSchema = new mongoose.Schema({
@@ -71,6 +72,18 @@ function registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest 
     if(client.isBlocked) {client.sessionToken='';client.androidSessionToken='';}
     await client.save();
     res.json({item:clientView(client)});
+  });
+  app.post('/api/admin/clients/:id/admin', requireAdmin, async (req,res) => {
+    const actor=req.user?._id||req.user?.id;
+    if(!validId(req.params.id)||!z.object({}).strict().safeParse(req.body).success)return fail(res,400,'Invalid administrator grant request.');
+    if(!validId(actor))return fail(res,403,'A verified administrator account is required.');
+    const client=await User.findById(req.params.id);
+    if(!client)return fail(res,404,'Client not found.');
+    if(client.isBlocked)return fail(res,409,'Unblock this client before granting administrator access.');
+    if(isAdminUser(client))return res.json({granted:true,item:clientView(client)});
+    const updated=await User.findOneAndUpdate({_id:client._id,isBlocked:{$ne:true},adminGrantedAt:null},{$set:{isAdmin:true,adminGrantedAt:new Date(),adminGrantedBy:actor}},{new:true,runValidators:true});
+    if(!updated)return fail(res,409,'This account changed. Refresh the client list and try again.');
+    return res.json({granted:true,item:clientView(updated)});
   });
   app.delete('/api/admin/clients/:id', requireAdmin, async (req,res) => {
     if(!validId(req.params.id)) return fail(res,400,'Invalid client.');

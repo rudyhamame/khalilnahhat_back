@@ -114,21 +114,25 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, C
       res.json({ ok: true });
     });
   }
+  app.get('/api/admin/music-archive/export-formats',requireAdmin,(_req,res)=>res.set('Cache-Control','no-store').json({formats:[{id:'mp3',label:'MP3',bitrateKbps:192},{id:'aac',label:'AAC (M4A)',bitrateKbps:160}]}));
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024, files: 1, fields: 1 } });
   const parseFile = (req,res,next) => upload.single('file')(req,res,error => error ? res.status(error.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({message:error.code === 'LIMIT_FILE_SIZE' ? 'Choose a file under 100 MB.' : 'Choose one file to upload.'}) : next());
   app.post('/api/admin/music-archive/upload', requireAdmin, parseFile, async (req, res) => {
-    const file = req.file;
+    let file = req.file;
     if (file && !file.size) return res.status(400).json({message:'Choose a file that contains audio or an image.'});
     const audio = file && /^audio\/(mpeg|mp3|wav|x-wav|wave|ogg|mp4|x-m4a|aac|x-aac|flac|x-flac|webm)$/.test(file.mimetype);
     const image = file && /^image\/(?!svg)[a-z0-9.+-]+$/i.test(file.mimetype);
     if (!audio && !image) return res.status(400).json({ message: 'Choose an MP3, WAV, M4A, Ogg, AAC, FLAC, WebM audio file or an image (JPG, PNG, WebP, GIF, AVIF, HEIC, TIFF, BMP…). SVG is not accepted.' });
     if (image && file.size > 10 * 1024 * 1024) return res.status(400).json({ message: 'Cover images must be under 10 MB.' });
     if (requireCloudinary && !useCloudinary) return res.status(503).json({ message: 'Cloudinary storage is not configured. Contact the administrator; your file has not been saved.' });
+    const exportFormat=req.body?.exportFormat;
+    if(exportFormat!==undefined&&(!audio||!['mp3','aac'].includes(exportFormat)||!/^audio\/(wav|x-wav|wave)$/.test(file.mimetype)))return res.status(400).json({message:'Compressed trim export requires WAV audio and an MP3 or AAC format.'});
     try {
-      if (!useCloudinary) return res.status(201).json(await archiveFiles.saveLocalFile(file));
+      if(exportFormat)file=await require('./compress-trimmed-audio').compressTrimmedAudio(file,exportFormat);
+      if (!useCloudinary) return res.status(201).json({...await archiveFiles.saveLocalFile(file),...(exportFormat?{exportFormat,sizeBytes:file.size}:{})});
       const result = await uploadAssetImpl(file.buffer,{folder:'khalil/music-archive',resource_type:audio?'video':'image',type:'authenticated',...(image?{transformation:[{width:1600,height:1600,crop:'limit',quality:'auto'}]}:{})});
-      res.status(201).json({ url: result.secure_url, previewUrl: deliveryUrl(result.secure_url), duration: result.duration ? `${Math.floor(result.duration / 60)}:${String(Math.floor(result.duration % 60)).padStart(2, '0')}` : '' });
-    } catch (error) { console.error('Music archive upload failed:', error); res.status(502).json({ message: 'The file could not be uploaded. Try again.' }); }
+      res.status(201).json({ ...(exportFormat?{exportFormat,sizeBytes:file.size}:{}),url: result.secure_url, previewUrl: deliveryUrl(result.secure_url), duration: result.duration ? `${Math.floor(result.duration / 60)}:${String(Math.floor(result.duration % 60)).padStart(2, '0')}` : '' });
+    } catch (error) { console.error('Music archive upload failed:', error); res.status(error.status||502).json({ message: error.status?error.message:'The file could not be uploaded. Try again.' }); }
   });
   archiveFiles.registerArchiveFiles(app,{publicSongs:async()=>(await catalog(false,{includeOntology:false})).songs,Collection:CollectionModel});
 }

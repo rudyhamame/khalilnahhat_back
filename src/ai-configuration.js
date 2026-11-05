@@ -2,6 +2,7 @@ const {createOpenRouter}=require('./openrouter');
 const mongoose=require('mongoose');
 const {z}=require('zod');
 const crypto=require('node:crypto');
+const {GROQ_MODEL,GROQ_RATE_PER_MINUTE}=require('./speech-to-text-models');
 const CHECKED='2026-10-29';
 const catalog=[
  {id:'whisper-1',mode:'stt',label:'Whisper · timed lyrics',deprecated:true,timestamps:true,rates:{audioMinute:0.006}},
@@ -15,11 +16,12 @@ const catalog=[
 catalog.push({id:'qwen3.8-omni-flash-realtime',provider:'alibaba',mode:'voice',label:'Qwen3.8 Omni Flash Realtime',rates:{textInput:0.23,textCached:0.23,textOutput:0.7,audioInput:0.93,audioCached:0.93,audioOutput:1.87},checkedOn:CHECKED,source:'https://www.alibabacloud.com/help/en/model-studio/model-pricing'});
 // Alibaba Cloud speech-to-text (plain transcripts only; it returns no timestamps). USD per audio minute, from the per-second Singapore list price; edit here if Model Studio pricing changes.
 catalog.push({id:'qwen3-asr-flash',provider:'alibaba',mode:'stt',label:'Qwen3-ASR-Flash',rates:{audioMinute:0.0021},checkedOn:CHECKED,source:'https://www.alibabacloud.com/help/en/model-studio/qwen-asr-api-reference'});
+catalog.push({id:GROQ_MODEL,provider:'groq',mode:'stt',label:'Whisper Large V3 Turbo',timestamps:true,rates:{audioMinute:GROQ_RATE_PER_MINUTE},minimumSeconds:10,checkedOn:'2026-11-04',source:'https://console.groq.com/docs/speech-to-text'});
 const money=z.number().finite().min(0).max(100000);
 const rates=z.object({textInput:money,textCached:money,textOutput:money,audioInput:money.optional(),audioCached:money.optional(),audioOutput:money.optional()}).strict();
 const modeSchema=kind=>z.object({enabled:z.boolean(),model:z.string().trim().min(1).max(200).refine(id=>kind==='chat'||catalog.some(item=>item.mode===kind&&item.id===id),'Choose a supported model for this mode.'),providerRates:rates,maxOutputTokens:z.number().int().min(256).max(4096),requestsPer10Min:z.number().int().min(1).max(kind==='chat'?200:20)}).strict();
 const sttDefaults=()=>({enabled:true,provider:'openai',model:'whisper-1',providerRates:{audioMinute:0.006},requestsPer10Min:6});
-const sttSchema=z.object({enabled:z.boolean(),provider:z.enum(['openai','alibaba']).default('openai'),model:z.enum(['whisper-1','qwen3-asr-flash']),providerRates:z.object({audioMinute:money}).strict(),requestsPer10Min:z.number().int().min(1).max(20)}).strict().refine(value=>catalog.some(item=>item.mode==='stt'&&item.id===value.model&&item.provider===value.provider),{message:'Choose a speech-to-text model that belongs to the selected provider.'});
+const sttSchema=z.object({enabled:z.boolean(),provider:z.enum(['openai','alibaba','groq']).default('openai'),model:z.enum(['whisper-1','qwen3-asr-flash',GROQ_MODEL]),providerRates:z.object({audioMinute:money}).strict(),requestsPer10Min:z.number().int().min(1).max(20)}).strict().refine(value=>catalog.some(item=>item.mode==='stt'&&item.id===value.model&&item.provider===value.provider),{message:'Choose a speech-to-text model that belongs to the selected provider.'});
 const configSchema=z.object({stt:sttSchema.optional(),revision:z.number().int().min(0),chat:modeSchema('chat').extend({provider:z.enum(['openai','openrouter','poe','alibaba','ollama']).default('openai'),freeOnly:z.boolean().default(true)}),voice:modeSchema('voice').extend({provider:z.enum(['openai','alibaba']).default('openai'),maxCallSeconds:z.number().int().min(30).max(900)}),customerPricing:z.object({policy:z.enum(['included','manual_invoice']),currency:z.enum(['CAD','USD']),chatReplyCents:z.number().int().min(0).max(100000),voiceSessionCents:z.number().int().min(0).max(100000)}).strict()}).strict().superRefine((config,ctx)=>{
  {const voiceModel=catalog.find(item=>item.mode==='voice'&&item.id===config.voice.model);if(voiceModel&&voiceModel.provider!==config.voice.provider)ctx.addIssue({code:'custom',path:['voice','model'],message:'This voice model belongs to a different provider.'});}
  for(const mode of ['chat','voice']){
@@ -57,7 +59,7 @@ const mongoStore={
 const error=(status,message)=>Object.assign(new Error(message),{status});
 function providerEstimate(config,mode,metrics){
  if(mode==='chat'&&['ollama','poe'].includes(config.chat.provider))return null;
- if(mode==='stt')return Number.isFinite(metrics.durationSeconds)&&metrics.durationSeconds>=0?Number((metrics.durationSeconds/60*config.stt.providerRates.audioMinute).toFixed(8)):null;
+ if(mode==='stt')return Number.isFinite(metrics.durationSeconds)&&metrics.durationSeconds>=0?Number(((config.stt.provider==='groq'?Math.max(10,metrics.durationSeconds):metrics.durationSeconds)/60*config.stt.providerRates.audioMinute).toFixed(8)):null;
  if(mode==='voice'||!Number.isInteger(metrics.inputTokens)||!Number.isInteger(metrics.outputTokens))return null;
  const r=config.chat.providerRates,cached=Math.min(metrics.inputTokens,Math.max(0,metrics.cachedInputTokens||0));
  return Number((((metrics.inputTokens-cached)*r.textInput+cached*r.textCached+metrics.outputTokens*r.textOutput)/1e6).toFixed(8));
@@ -72,7 +74,7 @@ function createAiConfiguration({store=mongoStore,env=process.env,fetchImpl=fetch
   async describe(){
    const results=await Promise.allSettled([openrouter.models(),openrouter.ollama.models(),openrouter.poe.models()]);
    const catalogError=results.map((result,index)=>result.status==='rejected'?`${['OpenRouter','Ollama Cloud','Poe'][index]} catalog unavailable. Reload to retry.`:'').filter(Boolean).join(' ');
-   return {item:await load(),catalog:[...catalog,...(results[0].status==='fulfilled'?results[0].value:[]),...openrouter.alibaba.models(),...(results[1].status==='fulfilled'?results[1].value:[]),...(results[2].status==='fulfilled'?results[2].value:[])],providers:{openai:{configured:Boolean(env.OPENAI_API_KEY)},openrouter:{configured:Boolean(env.OPENROUTER_API_KEY)},poe:{configured:openrouter.poe.configured()},alibaba:{configured:openrouter.alibaba.configured()},ollama:{configured:openrouter.ollama.configured()}},catalogError};
+   return {item:await load(),catalog:[...catalog,...(results[0].status==='fulfilled'?results[0].value:[]),...openrouter.alibaba.models(),...(results[1].status==='fulfilled'?results[1].value:[]),...(results[2].status==='fulfilled'?results[2].value:[])],providers:{groq:{configured:Boolean(env.GROQ_API_KEY)},openai:{configured:Boolean(env.OPENAI_API_KEY)},openrouter:{configured:Boolean(env.OPENROUTER_API_KEY)},poe:{configured:openrouter.poe.configured()},alibaba:{configured:openrouter.alibaba.configured()},ollama:{configured:openrouter.ollama.configured()}},catalogError};
   },
   async save(body,owner){
    const old=await load();
@@ -100,8 +102,9 @@ function createAiConfiguration({store=mongoStore,env=process.env,fetchImpl=fetch
     parsed.data[mode].providerRates={...model.rates};
    }
    if(parsed.data.voice.provider==='alibaba'&&parsed.data.voice.enabled&&!env.DASHSCOPE_API_KEY)throw error(503,'Configure DASHSCOPE_API_KEY on the server before enabling Alibaba Cloud voice.');
+   if(parsed.data.stt.provider==='groq'&&parsed.data.stt.enabled&&!env.GROQ_API_KEY)throw error(503,'Configure GROQ_API_KEY in the Render API environment before enabling Groq speech-to-text.');
    if(parsed.data.stt.provider==='alibaba'&&parsed.data.stt.enabled&&!env.DASHSCOPE_API_KEY)throw error(503,'Configure DASHSCOPE_API_KEY on the server before enabling Alibaba Cloud speech-to-text.');
-   for(const mode of ['chat','voice','stt'])if(!(mode==='chat'&&parsed.data.chat.provider!=='openai')&&!(mode==='voice'&&parsed.data.voice.provider==='alibaba')&&!(mode==='stt'&&parsed.data.stt.provider==='alibaba')&&parsed.data[mode].enabled&&(old[mode].model!==parsed.data[mode].model||(old[mode].provider||'openai')!==(parsed.data[mode].provider||'openai')||!old.revision)){
+   for(const mode of ['chat','voice','stt'])if(!(mode==='chat'&&parsed.data.chat.provider!=='openai')&&!(mode==='voice'&&parsed.data.voice.provider==='alibaba')&&!(mode==='stt'&&parsed.data.stt.provider!=='openai')&&parsed.data[mode].enabled&&(old[mode].model!==parsed.data[mode].model||(old[mode].provider||'openai')!==(parsed.data[mode].provider||'openai')||!old.revision)){
     if(!env.OPENAI_API_KEY)throw error(503,'Configure the provider API key on the server before enabling a model.');
     const response=await fetchImpl(`https://api.openai.com/v1/models/${encodeURIComponent(parsed.data[mode].model)}`,{headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},signal:AbortSignal.timeout(10000)});
     if(!response.ok)throw error(400,`The configured OpenAI account cannot access ${parsed.data[mode].model}.`);

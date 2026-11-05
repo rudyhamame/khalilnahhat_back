@@ -6,7 +6,9 @@ function sessionField(user,request,isAdminUser) {
  return isAdminUser(user)&&String(request.headers?.['x-echo-client']||'').toLowerCase()==='android'?'androidSessionToken':'sessionToken';
 }
 async function issueSession(user,request,isAdminUser) {
- const token=createSessionToken();user[sessionField(user,request,isAdminUser)]=token;await user.save();return token;
+ const token=createSessionToken();user[sessionField(user,request,isAdminUser)]=token;
+ if(isAdminUser(user))user.lastLoginAt=new Date();
+ await user.save();return token;
 }
 function sessionQuery(token) {return {$or:[{sessionToken:token},{androidSessionToken:token}]};}
 function sessionActor(user,token) {return {...(user.toObject?user.toObject():user),id:String(user._id||user.id),sessionToken:token};}

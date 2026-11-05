@@ -14,6 +14,7 @@ const userSchema = new mongoose.Schema(
     isBlocked: { type: Boolean, default: false, index: true },
     sessionToken: { type: String, default: '' },
     androidSessionToken: { type: String, default: '' },
+    lastLoginAt: { type: Date, default: null },
     googleSubject: { type: String, unique: true, sparse: true },
     emailVerified: { type: Boolean, default: false },
     verifyTokenHash: { type: String, default: '' },

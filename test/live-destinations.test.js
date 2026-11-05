@@ -9,10 +9,10 @@ function setup(){
  const live={isLive:true,broadcastMode:'webrtc',webrtcRoomName:'owned'};
  const match=(row,filter)=>Object.entries(filter).every(([k,v])=>v&&typeof v==='object'?(!v.$nin||!v.$nin.includes(row[k])):row[k]===v);
  const query=fn=>({select:async()=>fn()});
- const Model={findOne:filter=>query(()=>rows.find(row=>match(row,filter))?{...rows.find(row=>match(row,filter))}:null),findOneAndUpdate:(filter,update,opts)=>query(()=>{let row=rows.find(row=>match(row,filter));if(!row&&opts?.upsert){if(rows.some(row=>row.platform===filter.platform))throw Object.assign(new Error('duplicate'),{code:11000});row={platform:filter.platform,_id:String(rows.length+1)};rows.push(row);}if(!row)return null;Object.assign(row,update.$set);return {...row};})};
+ const Model={findOne:filter=>query(()=>rows.find(row=>match(row,filter))?{...rows.find(row=>match(row,filter))}:null),findOneAndUpdate:(filter,update,opts)=>query(()=>{let row=rows.find(row=>match(row,filter));if(!row&&opts?.upsert){if(rows.some(row=>row.platform===filter.platform))throw Object.assign(new Error('duplicate'),{code:11000});row={platform:filter.platform,_id:String(rows.length+1)};rows.push(row);}if(!row)return null;Object.assign(row,update.$set);for(const key of Object.keys(update.$unset||{}))delete row[key];return {...row};})};
  const client={async listEgress({roomName}){return jobs.filter(j=>j.roomName===roomName);},async startRoomCompositeEgress(room,output,options){started.push({room,output,options});const job={roomName:room,egressId:'job-'+started.length,status:1,streamResults:[{url:output.stream.urls[0]}]};jobs.push(job);return job;},async stopEgress(id){stopped.push(id);const job=jobs.find(j=>j.egressId===id);if(job)job.status=3;return job;}};
  const service=createDestinationService({Model,env,client:()=>client,getLiveStreamConfig:async()=>live});
- return {service,rows,jobs,live,client,started,stopped};
+ return {service,rows,jobs,live,client,started,stopped,Model};
 }
 test('credentials are authenticated encrypted and RTMPS URLs are strictly allowlisted',()=>{
  const encrypted=seal(body.streamKey,env);assert.equal(encrypted.includes(body.streamKey),false);assert.equal(unseal(encrypted,env),body.streamKey);
@@ -53,7 +53,7 @@ test('all destination endpoints enforce the existing admin guard including reads
  const app=express();app.use(express.json());const h=setup();let calls=0;
  registerLiveDestinations(app,{getLiveStreamConfig:async()=>h.live,requireAdmin:(req,res,next)=>req.headers.authorization==='Bearer admin'?next():res.status(403).json({message:'Admin only'}),service:{...h.service,list:async()=>{calls++;return {items:[]};}},startWorker:false});
  const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));t.after(()=>server.close());const url='http://127.0.0.1:'+server.address().port;
- for(const [method,path] of [['GET',''],['PUT','/youtube'],['POST','/youtube/start'],['POST','/instagram/stop']])assert.equal((await fetch(url+'/api/admin/live-destinations'+path,{method})).status,403);
+ for(const [method,path] of [['GET',''],['PUT','/youtube'],['POST','/youtube/start'],['POST','/instagram/stop'],['DELETE','/youtube'],['DELETE','/instagram']])assert.equal((await fetch(url+'/api/admin/live-destinations'+path,{method})).status,403);
  assert.equal(calls,0);assert.equal((await fetch(url+'/api/admin/live-destinations',{headers:{Authorization:'Bearer admin'}})).status,200);
 });
 test('social-only jobs do not suppress recording recovery or report capture failures',async()=>{
@@ -67,4 +67,46 @@ test('Instagram stays ready for later without attempting output before access is
  const h=setup();const saved=await h.service.save('instagram',{serverUrl:'rtmps://live-upload.instagram.com/rtmp',streamKey:'ig-future'});
  assert.equal(saved.accessConfirmed,false);await assert.rejects(h.service.start('instagram','owned'),/Confirm Live Producer access/);assert.equal(h.started.length,0);
  await h.service.save('youtube',body);await h.service.start('youtube','owned');assert.equal(h.started.length,1);
+});
+const instagram={serverUrl:'rtmps://live-upload.instagram.com/rtmp',streamKey:'ig-private?auth=fixture',accessConfirmed:true};
+for(const platform of ['youtube','instagram'])test(`${platform}: deleting its saved key removes the encrypted secret and requires a new key before streaming`,async()=>{
+ const h=setup();await h.service.save('youtube',body);await h.service.save('instagram',instagram);
+ const settings=platform==='youtube'?body:instagram;
+ const result=await h.service.removeKey(platform);
+ assert.equal(result.configured,false);assert.equal(result.serverUrl,settings.serverUrl);assert.equal(result.accessConfirmed,true);
+ assert.equal(h.rows.find(row=>row.platform===platform).secret,undefined,'encrypted credential is removed from storage');
+ assert.equal((await h.service.list()).items.find(row=>row.platform!==platform).configured,true,'the other key is retained');
+ assert.ok(!JSON.stringify(result).includes(settings.streamKey));
+ await assert.rejects(h.service.start(platform,'owned'),/Save this destination/);assert.equal(h.started.length,0);
+ assert.equal((await h.service.removeKey(platform)).configured,false,'deleting an absent key is idempotent');
+ await h.service.save(platform,settings);assert.equal((await h.service.start(platform,'owned')).state,'live');
+});
+test('active and uncertain outputs retain their saved key until stopped',async()=>{
+ const h=setup();await h.service.save('youtube',body);const secret=h.rows[0].secret;
+ for(const state of ['starting','live','stopping']){h.rows[0].state=state;await assert.rejects(h.service.removeKey('youtube'),/Stop this output/);assert.equal(h.rows[0].secret,secret);}
+});
+test('deleting a key fences a stream start that already read the old key',async()=>{
+ const h=setup();await h.service.save('youtube',body);const update=h.Model.findOneAndUpdate;
+ h.Model.findOneAndUpdate=(filter,patch,options)=>patch.$set?.state==='starting'?{select:async()=>{await h.service.removeKey('youtube');return update(filter,patch,options).select();}}:update(filter,patch,options);
+ await assert.rejects(h.service.start('youtube','owned'),/destination changed/);
+ assert.equal(h.started.length,0);assert.equal(h.rows[0].secret,undefined);
+});
+test('a stream start that wins the race blocks deletion of the now active key',async()=>{
+ const h=setup();await h.service.save('youtube',body);const update=h.Model.findOneAndUpdate,secret=h.rows[0].secret;
+ h.Model.findOneAndUpdate=(filter,patch,options)=>patch.$unset?.secret?{select:async()=>{await h.service.start('youtube','owned');return update(filter,patch,options).select();}}:update(filter,patch,options);
+ await assert.rejects(h.service.removeKey('youtube'),/Destination changed/);
+ assert.equal(h.started.length,1);assert.equal(h.rows[0].secret,secret);assert.equal(h.rows[0].state,'live');
+});
+test('authenticated delete endpoints confirm key removal on both platforms without media service setup',async t=>{
+ const h=setup();await h.service.save('youtube',body);await h.service.save('instagram',instagram);
+ const service=createDestinationService({Model:h.Model,env:{},getLiveStreamConfig:async()=>h.live});
+ const app=express();registerLiveDestinations(app,{requireAdmin:(req,res,next)=>req.headers.authorization==='Bearer admin'?next():res.status(403).end(),service,startWorker:false});
+ const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
+ for(const platform of ['youtube','instagram']){
+  const url=`http://127.0.0.1:${server.address().port}/api/admin/live-destinations/${platform}`;
+  assert.equal((await fetch(url,{method:'DELETE'})).status,403);
+  assert.ok(h.rows.find(row=>row.platform===platform).secret);
+  const response=await fetch(url,{method:'DELETE',headers:{Authorization:'Bearer admin'}});assert.equal(response.status,200);
+  const value=await response.json();assert.equal(value.deleted,true);assert.equal(value.item.platform,platform);assert.equal(value.item.configured,false);
+ }
 });

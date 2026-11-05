@@ -47,13 +47,22 @@ function createDestinationService({Model=Destination,getLiveStreamConfig,env=pro
  async function save(platform,body){const value=validate(platform,body),secret=seal(value.streamKey,env);const previous=await read(platform);if(previous&&active.includes(previous.state))throw failure(409,'Stop this destination before replacing its settings.');
   try{const row=await Model.findOneAndUpdate({platform,state:{$nin:active}},{$set:{serverUrl:value.serverUrl,secret,accessConfirmed:platform==='youtube'||body.accessConfirmed===true,state:'idle',error:'',operation:crypto.randomUUID(),jobId:'',roomName:''}},{upsert:!previous,new:true}).select('+secret');if(!row)throw failure(409,'Destination changed. Refresh its status.');return view(row);}catch(e){if(e.code===11000)throw failure(409,'Destination changed. Refresh its status.');throw e;}
  }
+ async function removeKey(platform){
+  if(!platforms.includes(platform))throw failure(404,'Unknown streaming destination.');
+  const previous=await read(platform);
+  if(!previous)return view({platform});
+  if(active.includes(previous.state))throw failure(409,'Stop this output before deleting its saved stream key.');
+  const row=await Model.findOneAndUpdate({_id:previous._id,operation:previous.operation,state:{$nin:active}},{$unset:{secret:1},$set:{state:'idle',error:'',operation:crypto.randomUUID(),jobId:'',roomName:''}},{new:true}).select('+secret');
+  if(!row)throw failure(409,'Destination changed. Refresh its status before deleting the key.');
+  return view(row);
+ }
  async function start(platform,roomName){
   const live=await getLiveStreamConfig();if(!live.isLive||live.broadcastMode!=='webrtc'||!roomName||live.webrtcRoomName!==roomName)throw failure(409,'Start the browser or Android live stream first. OBS relay output is not supported by these destinations.');
   if(!env.LIVEKIT_URL||!env.LIVEKIT_API_KEY||!env.LIVEKIT_API_SECRET)throw failure(503,'Configure LiveKit on the API server.');
   let row=await read(platform);if(!row?.secret)throw failure(409,'Save this destination’s server URL and stream key first.');
   if(platform==='instagram'&&!row.accessConfirmed)throw failure(409,'Instagram is prepared for later. Confirm Live Producer access in the studio after the account becomes eligible.');
   const url=outputUrl(row),operation=crypto.randomUUID();
-  row=await Model.findOneAndUpdate({_id:row._id,state:{$nin:active}},{$set:{state:'starting',operation,roomName,jobId:'',error:''}},{new:true}).select('+secret');if(!row)throw failure(409,'This destination is already active or awaiting reconciliation.');
+  row=await Model.findOneAndUpdate({_id:row._id,operation:row.operation,secret:row.secret,state:{$nin:active}},{$set:{state:'starting',operation,roomName,jobId:'',error:''}},{new:true}).select('+secret');if(!row)throw failure(409,'This destination changed, is already active or is awaiting reconciliation. Refresh before retrying.');
   try{
    const portrait=platform==='instagram';
    const job=await client().startRoomCompositeEgress(roomName,{stream:new StreamOutput({protocol:StreamProtocol.RTMP,urls:[url]})},{layout:'single-speaker',encodingOptions:new EncodingOptions({width:portrait?720:1280,height:portrait?1280:720,framerate:30,videoCodec:VideoCodec.H264_BASELINE,videoBitrate:2500,audioCodec:AudioCodec.AAC,audioBitrate:128,audioFrequency:48000,keyFrameInterval:2})});
@@ -71,13 +80,14 @@ function createDestinationService({Model=Destination,getLiveStreamConfig,env=pro
  }
  let sweeping=false;
  async function sweep(){if(sweeping)return;sweeping=true;try{for(const platform of platforms){const row=await read(platform);if(row)await refresh(row);}}finally{sweeping=false;}}
- return {list,save,start,stop,sweep};
+ return {list,save,removeKey,start,stop,sweep};
 }
 function registerLiveDestinations(app,{requireAdmin,getLiveStreamConfig,service=createDestinationService({getLiveStreamConfig}),startWorker=true}){
  const wrap=fn=>async(req,res)=>{res.set('Cache-Control','no-store');try{res.json(await fn(req));}catch(e){res.status(e.status||503).json({message:e.status?e.message:'Streaming destinations are temporarily unavailable.'});}};
  app.get('/api/admin/live-destinations',requireAdmin,wrap(()=>service.list()));
  for(const platform of platforms){
   app.put('/api/admin/live-destinations/'+platform,requireAdmin,wrap(async req=>({item:await service.save(platform,req.body||{})})));
+  app.delete('/api/admin/live-destinations/'+platform,requireAdmin,wrap(async()=>({deleted:true,item:await service.removeKey(platform)})));
   for(const action of ['start','stop'])app.post('/api/admin/live-destinations/'+platform+'/'+action,requireAdmin,wrap(async req=>({item:await service[action](platform,req.body?.roomName)})));
  }
  if(startWorker){const timer=setInterval(()=>service.sweep().catch(()=>{}),15000);timer.unref?.();}

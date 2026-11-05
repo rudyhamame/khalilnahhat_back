@@ -27,3 +27,16 @@ test('stale logout cannot clear a replacement login; blocking rejects every sess
 test('client header does not grant administrator status or extra sessions to customers',()=>{
  assert.equal(sessionField({username:'customer'},android,isAdmin),'sessionToken');
 });
+test('each admin sign-in saves its actual login time with the session, for browser and Android',async()=>{
+ const {User}=require('./models');assert.equal(User.schema.path('lastLoginAt').instance,'Date');
+ for(const request of [browser,android]){
+  const previous=new Date('2020-01-01T00:00:00Z');let saved;
+  const user={_id:'admin',username:'administrator',lastLoginAt:previous,save:async function(){saved=this.lastLoginAt;}};
+  const before=Date.now();const token=await issueSession(user,request,isAdmin);
+  assert.ok(saved instanceof Date);assert.ok(saved.getTime()>=before&&saved.getTime()<=Date.now());
+  assert.equal(user[sessionField(user,request,isAdmin)],token);
+  selectSession(user,token);sessionActor(user,token);assert.equal(user.lastLoginAt,saved,'session reads do not change the login time');
+ }
+ const customer={username:'customer',save:async()=>{}};
+ await issueSession(customer,android,isAdmin);assert.equal(customer.lastLoginAt,undefined);
+});

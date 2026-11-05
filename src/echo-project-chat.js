@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { z } = require('zod');
 const {User}=require('./models');
 const {isAdminUser}=require('./admin-role');
+const {ADMIN_USERNAMES}=require('./default-data');
 
 const Message = mongoose.models.EchoProjectChatMessage || mongoose.model('EchoProjectChatMessage', new mongoose.Schema({
   senderId: { type: String, required: true },
@@ -36,8 +37,9 @@ function registerEchoProjectChat(app, { requireAdmin }) {
     const id=userId(req);
     const [read,present]=await Promise.all([ReadState.findById(id).lean(),Presence.find({lastSeenAt:{$gt:new Date(Date.now()-ONLINE_WINDOW_MS)}}).lean()]);
     const ids=[...new Set(present.map(item=>item.userId))];
-    const [unreadCount,users,envelopes]=await Promise.all([Message.countDocuments({senderId:{$ne:id},...afterCursor(read)}),ids.length?User.find({_id:{$in:ids},isBlocked:{$ne:true}}).select('_id username firstName lastName email isAdmin adminGrantedAt adminGrantedBy').lean():[],Message.find({senderId:{$ne:id}}).select('_id senderId').sort({createdAt:-1,_id:-1}).limit(200).lean()]);
-    return {unreadCount,deliveryItems:envelopes.map(item=>({id:String(item._id),senderId:item.senderId})),onlineAdmins:users.filter(isAdminUser).map(user=>({id:String(user._id),name:[user.firstName,user.lastName].filter(Boolean).join(' ')||user.username||user.email||'Admin'})).sort((a,b)=>a.name.localeCompare(b.name))};
+    const [unreadCount,users,envelopes]=await Promise.all([Message.countDocuments({senderId:{$ne:id},...afterCursor(read)}),User.find({isBlocked:{$ne:true},$or:[{username:{$in:[...ADMIN_USERNAMES]}},{isAdmin:true,adminGrantedAt:{$ne:null},adminGrantedBy:{$ne:null}}]}).select('_id username firstName lastName email isAdmin adminGrantedAt adminGrantedBy lastLoginAt').lean(),Message.find({senderId:{$ne:id}}).select('_id senderId').sort({createdAt:-1,_id:-1}).limit(200).lean()]);
+    const admins=users.filter(isAdminUser).map(user=>({id:String(user._id),name:[user.firstName,user.lastName].filter(Boolean).join(' ')||user.username||user.email||'Admin',lastLoginAt:user.lastLoginAt||null,online:ids.includes(String(user._id))})).sort((a,b)=>a.name.localeCompare(b.name));
+    return {unreadCount,deliveryItems:envelopes.map(item=>({id:String(item._id),senderId:item.senderId})),admins,onlineAdmins:admins.filter(user=>user.online)};
   };
   app.get('/api/echo-project-chat/status',requireAdmin,async(req,res)=>{
     if(!userId(req))return res.status(401).json({message:'Sign in to use project chat.'});

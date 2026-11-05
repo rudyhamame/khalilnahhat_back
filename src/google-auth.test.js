@@ -70,6 +70,7 @@ test('approved verified Google account links the existing admin and returns to t
   const api=await setup(t,{adminGoogleEmail:adminEmail,profile:{email:adminEmail},users:[adminAccount]});
   await api.config();let result=await api.post();assert.equal(result.status,200);assert.equal(result.data.user.id,adminAccount._id);assert.equal(result.data.user.isAdmin,true);assert.equal(api.records[0].username,'administrator');assert.equal(api.records[0].passwordHash,adminAccount.passwordHash);assert.equal(api.records[0].googleSubject,'google-subject');assert.equal(api.stats().created,0);
   await api.config();result=await api.post();assert.equal(result.status,200);assert.equal(result.data.user.id,adminAccount._id);assert.equal(api.stats().created,0);
+  assert.ok(api.records[0].lastLoginAt instanceof Date,'Google admin login records its successful login time');
 });
 for(const [name,options,status] of [
   ['unverified approved admin',{profile:{email:adminEmail,email_verified:false},users:[adminAccount]},401],
@@ -81,7 +82,7 @@ for(const [name,options,status] of [
   ['email changes during link',{profile:{email:adminEmail},users:[adminAccount],beforeLink:records=>{records[0].email='other@gmail.com';}},409],
   ['reserved identity changes during link',{profile:{email:adminEmail},users:[adminAccount],beforeLink:records=>{records[0].username='another-user';}},409],
 ])test(`Google admin protection rejects ${name}`,async t=>{
-  const api=await setup(t,{adminGoogleEmail:adminEmail,...options});await api.config();const result=await api.post();assert.equal(result.status,status);assert.equal(result.data.token,undefined);assert.equal(api.records[0].sessionToken,undefined);assert.equal(api.stats().created,0);
+  const api=await setup(t,{adminGoogleEmail:adminEmail,...options});await api.config();const result=await api.post();assert.equal(result.status,status);assert.equal(result.data.token,undefined);assert.equal(api.records[0].sessionToken,undefined);assert.equal(api.records[0].lastLoginAt,undefined);assert.equal(api.stats().created,0);
 });
 test('allowlisted email alone never promotes an ordinary client to administrator',async t=>{
   const api=await setup(t,{adminGoogleEmail:adminEmail,profile:{email:adminEmail},users:[{_id:'client',username:'ordinary-client',email:adminEmail,isAdmin:false}]});await api.config();const result=await api.post();assert.equal(result.status,200);assert.equal(result.data.user.isAdmin,false);assert.equal(result.data.user.id,'client');

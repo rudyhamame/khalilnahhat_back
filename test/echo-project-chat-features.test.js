@@ -69,6 +69,23 @@ test('online presence deduplicates tabs, ignores stale or revoked admins and sta
  f.people[1].isAdmin=false;assert.equal((await f.request('/status')).data.onlineAdmins.length,0);
  assert.equal((await f.request('/presence','POST',{clientId:tab1,online:true,userId:b})).status,400);
 });
+test('admin login times remain visible offline, exclude clients and blocked admins, and cannot be supplied by presence',async t=>{
+ const f=await fixture(t),at=new Date('2026-11-05T14:30:00Z');f.people[0].lastLoginAt=at;
+ const status=(await f.request('/status')).data;
+ assert.deepEqual(status.admins.map(row=>row.name),['Khalil','Rudy']);
+ assert.equal(status.admins[0].lastLoginAt,at.toISOString());assert.equal(status.admins[0].online,false);
+ assert.equal(status.admins[1].lastLoginAt,null,'old accounts have no fabricated login date');
+ const body={clientId:'11111111-1111-4111-8111-111111111111',online:true};
+ const online=(await f.request('/presence','POST',body)).data;
+ assert.equal(online.onlineAdmins[0].lastLoginAt,at.toISOString());assert.equal(online.admins[0].online,true);
+ assert.equal(f.people[0].lastLoginAt,at,'heartbeats do not count as login');
+ assert.equal((await f.request('/presence','POST',{...body,lastLoginAt:'2099-01-01'})).status,400);
+ f.people[1].isBlocked=true;
+ assert.deepEqual((await f.request('/status')).data.admins.map(row=>row.id),[a]);
+ f.people[1].isBlocked=false;f.people[1].isAdmin=false;
+ assert.deepEqual((await f.request('/status')).data.admins.map(row=>row.id),[a]);
+ for(const key of ['email','sessionToken','androidSessionToken','adminGrantedBy'])assert.ok(!(key in online.admins[0]));
+});
 test('text edits require ownership and the previous version; deletes support all your message types',async t=>{
  const f=await fixture(t),own=f.add(1,a),other=f.add(2,b),image=f.add(3,a,{type:'image',data:'image'}),voice=f.add(4,a,{type:'audio',data:'voice'});
  assert.equal((await f.request('/'+other._id,'PATCH',{content:'Changed',expectedContent:other.content})).status,409);

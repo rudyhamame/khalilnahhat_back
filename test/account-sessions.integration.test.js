@@ -11,9 +11,14 @@ test('real HTTP administrator browser and Android sessions coexist and revoke in
  const user=await User.create({firstName:'Admin',lastName:'QA',username:ADMIN_USERNAME,email:'sessions@example.invalid',phoneNumber:'000',passwordHash:hashPassword('Test-password-328!'),isAdmin:true});
  server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));const base=`http://127.0.0.1:${server.address().port}/api`;
  const call=async(route,token,body,client)=>{const res=await fetch(base+route,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`} :{}),...(client?{'X-Echo-Client':client}:{})},...(body?{body:JSON.stringify(body)}:{})});return {status:res.status,data:await res.json()};};
- const login=async client=>{const result=await call('/auth/login',null,{email:user.email,password:'Test-password-328!'},client);assert.equal(result.status,200,JSON.stringify(result.data));return result.data.token;};
+ const login=async client=>{const before=Date.now();const result=await call('/auth/login',null,{email:user.email,password:'Test-password-328!'},client);assert.equal(result.status,200,JSON.stringify(result.data));const saved=await User.findById(user._id).lean();assert.ok(saved.lastLoginAt instanceof Date);assert.ok(saved.lastLoginAt.getTime()>=before&&saved.lastLoginAt.getTime()<=Date.now());return result.data.token;};
+ assert.equal((await call('/auth/login',null,{email:user.email,password:'wrong-password'})).status,401);
+ assert.equal((await User.findById(user._id).lean()).lastLoginAt,null,'failed login does not record a successful login');
  const [phone,web]=await Promise.all([login('android'),login()]);
  for(const token of [phone,web]){assert.equal((await call('/auth/me',token)).status,200);assert.equal((await call('/admin/overview',token)).status,200);}
+ const savedLogin=(await User.findById(user._id).lean()).lastLoginAt;
+ await call('/auth/me',web);await call('/auth/login',null,{email:user.email,password:'wrong-password'});
+ assert.equal((await User.findById(user._id).lean()).lastLoginAt.getTime(),savedLogin.getTime(),'session checks and failed logins preserve the last successful login');
  const web2=await login();assert.equal((await call('/auth/me',web)).status,401);assert.equal((await call('/auth/me',phone)).status,200);
  assert.equal((await call('/auth/logout',web2,{})).status,200);assert.equal((await call('/auth/me',web2)).status,401);assert.equal((await call('/auth/me',phone)).status,200);
  const web3=await login();await call('/auth/logout',phone,{});assert.equal((await call('/auth/me',phone)).status,401);assert.equal((await call('/auth/me',web3)).status,200);

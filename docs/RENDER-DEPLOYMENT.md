@@ -11,6 +11,12 @@ Configure credentials in Render's environment editor. The repository `.env.examp
 
 Local Vite previews on port 5176 forward all API groups, including AI booking and stems, to the same Render API by default. A deliberate isolated development session may override individual targets, but production does not require the optional local helpers. The former local backend, conversion worker and reverse connection are disabled.
 
+## Administrator access
+
+An existing administrator can use **Registered Clients → Give admin** to promote a registered, unblocked account. The confirmation grants full administrator access. The backend records `adminGrantedAt` and `adminGrantedBy` alongside the role; ordinary profile updates and sign-up cannot set those fields. The owner/environment username allowlist remains authoritative, and older advisory `isAdmin` flags alone do not grant access.
+
+Promoted accounts retain their existing account identity, passwords, and Google link. They can refresh the app to reload the administrator dashboard and continue using verified Google sign-in. Both the API and frontend must include this feature before the button can grant access.
+
 ## Private recording staging
 
 LiveKit needs an S3-compatible destination before the existing transfer worker stores final private recordings in Cloudinary. Cloudinary archive previews and downloads do not need the staging host after a recording is safely transferred.

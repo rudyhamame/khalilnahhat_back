@@ -1,7 +1,7 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');
 const {clientUpdate,clientCreate,clientView,fileView}=require('../src/mobile-admin');
 test('client mutations cannot grant admin, replace credentials or change usernames',()=>{
- for(const key of ['isAdmin','passwordHash','sessionToken','resetTokenHash','username'])assert.equal(clientUpdate.safeParse({[key]:'changed'}).success,false);
+ for(const key of ['isAdmin','adminGrantedAt','adminGrantedBy','passwordHash','sessionToken','resetTokenHash','username'])assert.equal(clientUpdate.safeParse({[key]:'changed'}).success,false);
  assert.equal(clientCreate.safeParse({username:'client',firstName:'A',lastName:'B',email:'ab@example.com',isAdmin:true}).success,false);
 });
 test('client responses exclude passwords, session and reset secrets',()=>{

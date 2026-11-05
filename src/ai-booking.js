@@ -85,7 +85,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
   };
   const identity = req => String(req.authUser?._id || req.authUser?.id || '');
   const safety = req => crypto.createHash('sha256').update(identity(req)).digest('hex');
-  const configured = (kind='chat',config=null) => kind==='chat'?Boolean(providerKey(env,config?.chat?.provider)):config?.voice?.provider==='alibaba'?Boolean(env.DASHSCOPE_API_KEY):Boolean(env.OPENAI_API_KEY);
+  const configured = (kind='chat',config=null) => kind==='chat'?Boolean(providerKey(env,config?.chat?.provider)):config?.voice?.provider==='alibaba'?Boolean(env.DASHSCOPE_API_KEY):config?.voice?.provider==='openrouter'?Boolean(env.OPENROUTER_API_KEY&&config.chat.provider==='openrouter'&&config.chat.enabled):Boolean(env.OPENAI_API_KEY);
   const admitted = (req, res, kind, limit,config,{bucketKind=kind}={}) => {
     if (!configured(kind,config)) { res.status(503).json({ message: 'AI booking is not configured yet. Personal booking is available.' }); return false; }
     const now = Date.now(), key = `${identity(req)}:${bucketKind}`;
@@ -195,6 +195,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
   app.post('/api/ai-booking/voice', requireAuth, async (req, res) => {
     if (req.body?.consent !== true) return res.status(400).json({ message: 'A valid voice connection and AI consent are required.' });
     const config=await policy(res,'voice');if(!config)return;
+    if(config.voice.provider==='openrouter')return res.status(400).json({message:'OpenRouter voice uses browser speech turns and does not create a realtime server call.'});
     const alibaba=config.voice.provider==='alibaba';
     if (!alibaba && (typeof req.body?.sdp !== 'string' || req.body.sdp.length > 30000 || !req.body.sdp.startsWith('v=0'))) return res.status(400).json({ message: 'A valid voice connection and AI consent are required.' });
     const owner = identity(req), lock = `${owner}:voice`;

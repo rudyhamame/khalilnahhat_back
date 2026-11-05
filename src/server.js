@@ -1611,6 +1611,8 @@ require('./music-archive').registerMusicArchive(app, { requireAdmin });
 require('./dj-service-builder').registerDjServiceBuilder(app, { requireAdmin });
 require('./setup-catalog').registerSetupCatalog(app, { requireAdmin });
 require('./echo-project-chat').registerEchoProjectChat(app, { requireAdmin });
+require('./echo-project-chat-audio').registerEchoProjectChatAudio(app, { requireAdmin });
+require('./echo-project-chat-calls').registerEchoProjectChatCalls(app, { requireAdmin, getConfig: getLiveKitConfig });
 require('./availability').registerAvailability(app, { requireAdmin });
 vouchers.registerVouchers(app, { requireAdmin, requireAuth });
 require('./live-recordings').registerLiveRecordings(app, requireAdmin);

@@ -16,7 +16,7 @@ const formats=new Set(['.mp3','.mp4','.mpeg','.mpga','.m4a','.wav','.webm']);
 
 // Admin tool: returns editable lyrics and recording-specific playback timing.
 function registerLyricsTranscription(app,{requireAdmin,configService,fetchImpl=fetch,env=process.env}){
- const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:MAX_BYTES,files:1,fields:3,fieldSize:4096}}).single('file');
+ const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:MAX_BYTES,files:1,fields:4,fieldSize:4096}}).single('file');
  const requests=new Map(),active=new Set();
  app.get('/api/admin/music-ontology/lyrics-transcription/status',requireAdmin,async(_req,res)=>{
   res.set('Cache-Control','no-store');
@@ -40,9 +40,11 @@ function registerLyricsTranscription(app,{requireAdmin,configService,fetchImpl=f
    if(!env[target.keyName])return res.status(503).json({message:`Configure ${target.keyName} on the API server to use ${target.label} ${timed?'timed lyrics':'speech-to-text'}.`});
    if(req.body?.timestamps!==undefined&&!['true','false'].includes(req.body.timestamps))return res.status(400).json({message:'Invalid timestamp option.'});
    const sourceAudioUrl=typeof req.body?.audioUrl==='string'?req.body.audioUrl:'';
+   const draftAudioId=typeof req.body?.draftAudioId==='string'?req.body.draftAudioId:'';
+   if(draftAudioId&&(!/^[a-f0-9-]{36}$/i.test(draftAudioId)||!req.file||sourceAudioUrl))return res.status(400).json({message:'Choose a valid browser audio draft.'});
    if(sourceAudioUrl&&(!ownedAsset(sourceAudioUrl)||(!archiveFiles.localAssetPattern.test(sourceAudioUrl)&&!/^https:\/\/res\.cloudinary\.com\/[^/]+\/video\/(upload|authenticated)\//.test(sourceAudioUrl))))return res.status(400).json({message:'Choose audio uploaded to this website.'});
    if(!req.file&&!sourceAudioUrl)return res.status(400).json({message:'Choose an audio file or upload the recording audio first.'});
-   if(timed&&!sourceAudioUrl)return res.status(400).json({message:'Timed lyrics must use the recording’s uploaded audio so they match playback.'});
+   if(timed&&!sourceAudioUrl&&!draftAudioId)return res.status(400).json({message:'Timed lyrics must use the recording audio or its browser draft so they match playback.'});
    const language=req.body?.language||'';
    if(typeof language!=='string'||language&&!/^[a-z]{2,3}$/.test(language))return res.status(400).json({message:'Choose a supported language or automatic detection.'});
    if(active.has(owner))return res.status(409).json({message:'A transcription is already running. Wait for it to finish.'});
@@ -107,7 +109,7 @@ function registerLyricsTranscription(app,{requireAdmin,configService,fetchImpl=f
    await configService.complete(ticket,{...(Number.isFinite(duration)?{durationSeconds:duration}:{}),fileBytes:file.size},false);ticket=null;
    const segments=timed&&Array.isArray(result.segments)?result.segments.map(row=>({start:row.start,end:row.end,text:typeof row.text==='string'?row.text.trim():''})).filter(row=>Number.isFinite(row.start)&&Number.isFinite(row.end)&&row.start>=0&&row.end>row.start&&row.text).sort((a,b)=>a.start-b.start):[];
    if(timed&&!segments.length)return res.status(422).json({message:'No timed lyric lines were detected. Try a clearer recording.'});
-   res.json({text:timed?segments.map(row=>row.text).join('\n'):result.text,model,segments,sourceAudioUrl:timed?sourceAudioUrl:'',languages:[...new Set([result.language,...(Array.isArray(result.languages)?result.languages:[])].map(languageCode).filter(Boolean))]});
+   res.json({text:timed?segments.map(row=>row.text).join('\n'):result.text,model,segments,sourceAudioUrl:timed?(sourceAudioUrl||`browser-audio:${draftAudioId}`):'',languages:[...new Set([result.language,...(Array.isArray(result.languages)?result.languages:[])].map(languageCode).filter(Boolean))]});
   }catch(error){
    if(ticket)await configService.fail(ticket).catch(()=>{});
    res.status(error.status||502).json({message:error.status===400?error.message:error.name==='TimeoutError'?'Transcription timed out. Try a shorter audio file.':'Could not transcribe this audio. Your existing lyrics are unchanged.'});

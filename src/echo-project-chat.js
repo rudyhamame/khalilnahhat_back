@@ -6,7 +6,7 @@ const {isAdminUser}=require('./admin-role');
 const Message = mongoose.models.EchoProjectChatMessage || mongoose.model('EchoProjectChatMessage', new mongoose.Schema({
   senderId: { type: String, required: true },
   senderName: { type: String, required: true },
-  content: { type: String, required: true, maxlength: 2000 },
+  content: { type: String, default: '', required: function () { return !this.attachment?.data; }, maxlength: 2000 },
   editedAt: {type:Date,default:null},
   attachment: { type: { type: String, enum: ['image', 'audio'] }, name: String, mimeType: String, data: String },
 }, { timestamps: true }));

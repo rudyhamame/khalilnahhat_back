@@ -1571,6 +1571,10 @@ registerAiConfiguration(app,{
   requireAdmin: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, adminCheck: isAdminUser }),
   service:aiConfiguration,
 });
+require('./recording-atom-detection').registerRecordingAtomDetection(app,{
+  requireAdmin: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, adminCheck: isAdminUser }),
+  configService:aiConfiguration,
+});
 require('./recording-ai-completion').registerRecordingAiCompletion(app,{
   requireAdmin: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, adminCheck: isAdminUser }),
   configService:aiConfiguration,

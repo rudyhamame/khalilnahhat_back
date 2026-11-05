@@ -200,6 +200,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
  async function checkRecordingItems(items,audioUrl,durationSeconds,session=null){
   for(const item of items||[]){
    const l=item.lyrics;
+   if(durationSeconds!=null&&item.audioRange?.endSec>durationSeconds)fail('Atom audio ranges must stay inside the recording duration.');
    const rhythmIds=item.sound?.rhythmIds??(item.sound?.rhythmId?[item.sound.rhythmId]:[]);
    if(rhythmIds.length)await references(rhythmIds,'rhythm',session);
    if(item.sound?.genreIds?.length)await references(item.sound.genreIds,'genre',session);

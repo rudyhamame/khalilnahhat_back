@@ -1,22 +1,71 @@
 const mongoose = require('mongoose');
 const { z } = require('zod');
+const {User}=require('./models');
+const {isAdminUser}=require('./admin-role');
 
 const Message = mongoose.models.EchoProjectChatMessage || mongoose.model('EchoProjectChatMessage', new mongoose.Schema({
   senderId: { type: String, required: true },
   senderName: { type: String, required: true },
   content: { type: String, required: true, maxlength: 2000 },
+  editedAt: {type:Date,default:null},
   attachment: { type: { type: String, enum: ['image', 'audio'] }, name: String, mimeType: String, data: String },
 }, { timestamps: true }));
+Message.schema.index({createdAt:-1,_id:-1});
+
+const ReadState=mongoose.models.EchoProjectChatReadState||mongoose.model('EchoProjectChatReadState',new mongoose.Schema({
+  _id:String,readAt:{type:Date,default:()=>new Date(0)},readId:{type:mongoose.Schema.Types.ObjectId,default:()=>new mongoose.Types.ObjectId('000000000000000000000000')},
+}));
+const presenceSchema=new mongoose.Schema({_id:String,userId:{type:String,required:true},lastSeenAt:{type:Date,required:true}});
+presenceSchema.index({lastSeenAt:1},{expireAfterSeconds:90});
+const Presence=mongoose.models.EchoProjectChatPresence||mongoose.model('EchoProjectChatPresence',presenceSchema);
+const ONLINE_WINDOW_MS=45000;
+const afterCursor=read=>read?{$or:[{createdAt:{$gt:read.readAt}},{createdAt:read.readAt,_id:{$gt:read.readId}}]}:{};
 
 function registerEchoProjectChat(app, { requireAdmin }) {
   const actor = req => req.user || req.authUser;
   const userId = req => String(actor(req)?._id || actor(req)?.id || '');
-  const serialize = item => ({ id: String(item._id), senderId: item.senderId, senderName: item.senderName, content: item.content, attachment: item.attachment?.data ? item.attachment : undefined, createdAt: item.createdAt });
+  const status=async req=>{
+    const id=userId(req);
+    const [read,present]=await Promise.all([ReadState.findById(id).lean(),Presence.find({lastSeenAt:{$gt:new Date(Date.now()-ONLINE_WINDOW_MS)}}).lean()]);
+    const ids=[...new Set(present.map(item=>item.userId))];
+    const [unreadCount,users]=await Promise.all([Message.countDocuments({senderId:{$ne:id},...afterCursor(read)}),ids.length?User.find({_id:{$in:ids},isBlocked:{$ne:true}}).select('_id username firstName lastName email isAdmin adminGrantedAt adminGrantedBy').lean():[]]);
+    return {unreadCount,onlineAdmins:users.filter(isAdminUser).map(user=>({id:String(user._id),name:[user.firstName,user.lastName].filter(Boolean).join(' ')||user.username||user.email||'Admin'})).sort((a,b)=>a.name.localeCompare(b.name))};
+  };
+  app.get('/api/echo-project-chat/status',requireAdmin,async(req,res)=>{
+    if(!userId(req))return res.status(401).json({message:'Sign in to use project chat.'});
+    try{res.set('Cache-Control','no-store').json(await status(req));}catch{res.status(503).json({message:'Chat notifications are temporarily unavailable.'});}
+  });
+  app.post('/api/echo-project-chat/presence',requireAdmin,async(req,res)=>{
+    if(!userId(req))return res.status(401).json({message:'Sign in to use project chat.'});
+    const parsed=z.object({clientId:z.string().uuid(),online:z.boolean()}).strict().safeParse(req.body);
+    if(!parsed.success)return res.status(400).json({message:'Invalid chat presence request.'});
+    try{
+      const id=userId(req),key=id+':'+parsed.data.clientId;
+      if(!parsed.data.online){await Presence.deleteOne({_id:key,userId:id});return res.json({online:false});}
+      await Presence.updateOne({_id:key},{$set:{userId:id,lastSeenAt:new Date()}},{upsert:true});
+      res.set('Cache-Control','no-store').json(await status(req));
+    }catch{res.status(503).json({message:'Online status is temporarily unavailable.'});}
+  });
+  app.post('/api/echo-project-chat/read',requireAdmin,async(req,res)=>{
+    if(!userId(req))return res.status(401).json({message:'Sign in to use project chat.'});
+    const parsed=z.object({messageId:z.string().regex(/^[a-f\d]{24}$/i)}).strict().safeParse(req.body);
+    if(!parsed.success)return res.status(400).json({message:'Invalid read receipt.'});
+    try{
+      const message=await Message.findById(parsed.data.messageId).select('_id createdAt').lean();
+      if(!message)return res.status(404).json({message:'Message not found.'});
+      const id=userId(req);
+      await ReadState.updateOne({_id:id},{$setOnInsert:{readAt:new Date(0),readId:new mongoose.Types.ObjectId('000000000000000000000000')}},{upsert:true});
+      // A slow receipt from another tab must never move the read position back.
+      await ReadState.updateOne({_id:id,$or:[{readAt:{$lt:message.createdAt}},{readAt:message.createdAt,readId:{$lt:message._id}}]},{$set:{readAt:message.createdAt,readId:message._id}});
+      res.set('Cache-Control','no-store').json(await status(req));
+    }catch{res.status(503).json({message:'Messages could not be marked as read.'});}
+  });
+  const serialize = item => ({ id: String(item._id), senderId: item.senderId, senderName: item.senderName, content: item.content, attachment: item.attachment?.data ? item.attachment : undefined, createdAt: item.createdAt,editedAt:item.editedAt||null });
   app.get('/api/echo-project-chat', requireAdmin, async (req, res) => {
     if (!userId(req)) return res.status(401).json({ message: 'Sign in to use project chat.' });
     try {
-      const items = await Message.find().sort({ createdAt: 1, _id: 1 }).limit(200).lean();
-      res.set('Cache-Control', 'no-store').json({ items: items.map(serialize) });
+      const items = await Message.find().sort({ createdAt: -1, _id: -1 }).limit(200).lean();
+      res.set('Cache-Control', 'no-store').json({ items: items.reverse().map(serialize) });
     } catch { res.status(503).json({ message: 'Project chat is temporarily unavailable.' }); }
   });
   app.post('/api/echo-project-chat', requireAdmin, async (req, res) => {
@@ -35,6 +84,25 @@ function registerEchoProjectChat(app, { requireAdmin }) {
       res.status(201).json({ item: serialize(item.toObject()) });
     } catch { res.status(503).json({ message: 'Message could not be sent. Please try again.' }); }
   });
+  app.delete('/api/echo-project-chat/:id',requireAdmin,async(req,res)=>{
+    if(!userId(req))return res.status(401).json({message:'Sign in to use project chat.'});
+    if(!/^[a-f\d]{24}$/i.test(req.params.id))return res.status(400).json({message:'Invalid message.'});
+    try{
+      const removed=await Message.findOneAndDelete({_id:req.params.id,senderId:userId(req)});
+      if(!removed)return res.status(404).json({message:'Your message was not found.'});
+      res.json({deleted:true,id:String(removed._id)});
+    }catch{res.status(503).json({message:'Message could not be deleted. Please try again.'});}
+  });
+  app.patch('/api/echo-project-chat/:id',requireAdmin,async(req,res)=>{
+    if(!userId(req))return res.status(401).json({message:'Sign in to use project chat.'});
+    const parsed=z.object({content:z.string().trim().min(1).max(2000),expectedContent:z.string().max(2000)}).strict().safeParse(req.body);
+    if(!/^[a-f\d]{24}$/i.test(req.params.id)||!parsed.success)return res.status(400).json({message:'Enter a text message of 1–2000 characters.'});
+    try{
+      const item=await Message.findOneAndUpdate({_id:req.params.id,senderId:userId(req),content:parsed.data.expectedContent,'attachment.data':{$exists:false}},{$set:{content:parsed.data.content,editedAt:new Date()}},{new:true,runValidators:true});
+      if(!item)return res.status(409).json({message:'Your text message changed or is no longer available. Reload it before editing.'});
+      res.json({item:serialize(item.toObject())});
+    }catch{res.status(503).json({message:'Message could not be edited. Please try again.'});}
+  });
 }
 
-module.exports = { registerEchoProjectChat, Message };
+module.exports = { registerEchoProjectChat, Message, ReadState, Presence, ONLINE_WINDOW_MS, afterCursor };

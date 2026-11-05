@@ -20,6 +20,14 @@ presenceSchema.index({lastSeenAt:1},{expireAfterSeconds:90});
 const Presence=mongoose.models.EchoProjectChatPresence||mongoose.model('EchoProjectChatPresence',presenceSchema);
 const ONLINE_WINDOW_MS=45000;
 const afterCursor=read=>read?{$or:[{createdAt:{$gt:read.readAt}},{createdAt:read.readAt,_id:{$gt:read.readId}}]}:{};
+const Receipt=mongoose.models.EchoProjectChatReceipt||mongoose.model('EchoProjectChatReceipt',new mongoose.Schema({
+  _id:String,messageId:{type:String,required:true,index:true},userId:{type:String,required:true},deliveredAt:{type:Date,required:true},seenAt:Date,
+}));
+function deliveryTimes(item,receipts=[]){
+  const others=receipts.filter(receipt=>receipt.userId!==item.senderId);
+  const first=key=>{const dates=others.map(receipt=>receipt[key]).filter(Boolean).map(value=>new Date(value)).filter(value=>Number.isFinite(value.getTime()));return dates.length?new Date(Math.min(...dates.map(value=>value.getTime()))):null;};
+  return {sentAt:item.createdAt,deliveredAt:first('deliveredAt'),seenAt:first('seenAt')};
+}
 
 function registerEchoProjectChat(app, { requireAdmin }) {
   const actor = req => req.user || req.authUser;
@@ -28,8 +36,8 @@ function registerEchoProjectChat(app, { requireAdmin }) {
     const id=userId(req);
     const [read,present]=await Promise.all([ReadState.findById(id).lean(),Presence.find({lastSeenAt:{$gt:new Date(Date.now()-ONLINE_WINDOW_MS)}}).lean()]);
     const ids=[...new Set(present.map(item=>item.userId))];
-    const [unreadCount,users]=await Promise.all([Message.countDocuments({senderId:{$ne:id},...afterCursor(read)}),ids.length?User.find({_id:{$in:ids},isBlocked:{$ne:true}}).select('_id username firstName lastName email isAdmin adminGrantedAt adminGrantedBy').lean():[]]);
-    return {unreadCount,onlineAdmins:users.filter(isAdminUser).map(user=>({id:String(user._id),name:[user.firstName,user.lastName].filter(Boolean).join(' ')||user.username||user.email||'Admin'})).sort((a,b)=>a.name.localeCompare(b.name))};
+    const [unreadCount,users,envelopes]=await Promise.all([Message.countDocuments({senderId:{$ne:id},...afterCursor(read)}),ids.length?User.find({_id:{$in:ids},isBlocked:{$ne:true}}).select('_id username firstName lastName email isAdmin adminGrantedAt adminGrantedBy').lean():[],Message.find({senderId:{$ne:id}}).select('_id senderId').sort({createdAt:-1,_id:-1}).limit(200).lean()]);
+    return {unreadCount,deliveryItems:envelopes.map(item=>({id:String(item._id),senderId:item.senderId})),onlineAdmins:users.filter(isAdminUser).map(user=>({id:String(user._id),name:[user.firstName,user.lastName].filter(Boolean).join(' ')||user.username||user.email||'Admin'})).sort((a,b)=>a.name.localeCompare(b.name))};
   };
   app.get('/api/echo-project-chat/status',requireAdmin,async(req,res)=>{
     if(!userId(req))return res.status(401).json({message:'Sign in to use project chat.'});
@@ -60,12 +68,25 @@ function registerEchoProjectChat(app, { requireAdmin }) {
       res.set('Cache-Control','no-store').json(await status(req));
     }catch{res.status(503).json({message:'Messages could not be marked as read.'});}
   });
-  const serialize = item => ({ id: String(item._id), senderId: item.senderId, senderName: item.senderName, content: item.content, attachment: item.attachment?.data ? item.attachment : undefined, createdAt: item.createdAt,editedAt:item.editedAt||null });
+  app.post('/api/echo-project-chat/receipts',requireAdmin,async(req,res)=>{
+    if(!userId(req))return res.status(401).json({message:'Sign in to use project chat.'});
+    const parsed=z.object({messageIds:z.array(z.string().regex(/^[a-f\d]{24}$/i)).min(1).max(200),seen:z.boolean()}).strict().safeParse(req.body);
+    if(!parsed.success)return res.status(400).json({message:'Invalid message receipt.'});
+    try{
+      const id=userId(req),now=new Date();
+      const messages=await Message.find({_id:{$in:[...new Set(parsed.data.messageIds)]},senderId:{$ne:id}}).select('_id').lean();
+      if(messages.length)await Receipt.bulkWrite(messages.map(message=>({updateOne:{filter:{_id:String(message._id)+':'+id},update:{$setOnInsert:{messageId:String(message._id),userId:id,deliveredAt:now},...(parsed.data.seen?{$min:{seenAt:now}}:{})},upsert:true}})));
+      res.json({acknowledged:true});
+    }catch{res.status(503).json({message:'Message receipt could not be saved.'});}
+  });
+  const serialize = (item,receipts=[]) => ({ id: String(item._id), senderId: item.senderId, senderName: item.senderName, content: item.content, attachment: item.attachment?.data ? item.attachment : undefined, createdAt: item.createdAt,editedAt:item.editedAt||null,...deliveryTimes(item,receipts) });
   app.get('/api/echo-project-chat', requireAdmin, async (req, res) => {
     if (!userId(req)) return res.status(401).json({ message: 'Sign in to use project chat.' });
     try {
       const items = await Message.find().sort({ createdAt: -1, _id: -1 }).limit(200).lean();
-      res.set('Cache-Control', 'no-store').json({ items: items.reverse().map(serialize) });
+      const receipts=items.length?await Receipt.find({messageId:{$in:items.map(item=>String(item._id))}}).lean():[];
+      const byMessage=new Map();for(const receipt of receipts){const rows=byMessage.get(receipt.messageId)||[];rows.push(receipt);byMessage.set(receipt.messageId,rows);}
+      res.set('Cache-Control', 'no-store').json({ items: items.reverse().map(item=>serialize(item,byMessage.get(String(item._id)))) });
     } catch { res.status(503).json({ message: 'Project chat is temporarily unavailable.' }); }
   });
   app.post('/api/echo-project-chat', requireAdmin, async (req, res) => {
@@ -90,6 +111,7 @@ function registerEchoProjectChat(app, { requireAdmin }) {
     try{
       const removed=await Message.findOneAndDelete({_id:req.params.id,senderId:userId(req)});
       if(!removed)return res.status(404).json({message:'Your message was not found.'});
+      await Receipt.deleteMany({messageId:String(removed._id)}).catch(()=>{});
       res.json({deleted:true,id:String(removed._id)});
     }catch{res.status(503).json({message:'Message could not be deleted. Please try again.'});}
   });
@@ -100,9 +122,10 @@ function registerEchoProjectChat(app, { requireAdmin }) {
     try{
       const item=await Message.findOneAndUpdate({_id:req.params.id,senderId:userId(req),content:parsed.data.expectedContent,'attachment.data':{$exists:false}},{$set:{content:parsed.data.content,editedAt:new Date()}},{new:true,runValidators:true});
       if(!item)return res.status(409).json({message:'Your text message changed or is no longer available. Reload it before editing.'});
-      res.json({item:serialize(item.toObject())});
+      const receipts=await Receipt.find({messageId:String(item._id)}).lean();
+      res.json({item:serialize(item.toObject(),receipts)});
     }catch{res.status(503).json({message:'Message could not be edited. Please try again.'});}
   });
 }
 
-module.exports = { registerEchoProjectChat, Message, ReadState, Presence, ONLINE_WINDOW_MS, afterCursor };
+module.exports = { registerEchoProjectChat, Message, ReadState, Presence, Receipt, ONLINE_WINDOW_MS, afterCursor, deliveryTimes };

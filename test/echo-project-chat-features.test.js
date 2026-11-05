@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const express=require('express');
 const {User}=require('../src/models');
 const {isAdminUser}=require('../src/admin-role');
-const {registerEchoProjectChat,Message,ReadState,Presence,Receipt,ONLINE_WINDOW_MS}=require('../src/echo-project-chat');
+const {registerEchoProjectChat,Topic,Message,ReadState,Presence,Receipt,ONLINE_WINDOW_MS}=require('../src/echo-project-chat');
 const a='aaaaaaaaaaaaaaaaaaaaaaaa',b='bbbbbbbbbbbbbbbbbbbbbbbb',c='cccccccccccccccccccccccc';
 const id=n=>n.toString(16).padStart(24,'0');
 const scalar=v=>v instanceof Date?v.getTime():v&&typeof v==='object'?String(v):v;
@@ -11,6 +11,7 @@ const field=(row,path)=>path.split('.').reduce((value,key)=>value?.[key],row);
 function matches(row,filter){
  return Object.entries(filter).every(([key,want])=>{
   if(key==='$or')return want.some(branch=>matches(row,branch));
+  if(key==='$and')return want.every(branch=>matches(row,branch));
   const value=field(row,key);
   if(want&&typeof want==='object'&&!(want instanceof Date)&&!want._bsontype)return Object.entries(want).every(([op,target])=>({
    $gt:()=>scalar(value)>scalar(target),$lt:()=>scalar(value)<scalar(target),$ne:()=>scalar(value)!==scalar(target),$exists:()=>Boolean(value!==undefined)===target,$in:()=>target.some(item=>scalar(value)===scalar(item)),
@@ -21,14 +22,18 @@ function matches(row,filter){
 function query(rows){let result=[...rows];return {select(){return this;},sort(order){result.sort((x,y)=>{for(const [key,direction] of Object.entries(order)){if(scalar(x[key])<scalar(y[key]))return -direction;if(scalar(x[key])>scalar(y[key]))return direction;}return 0;});return this;},limit(n){result=result.slice(0,n);return this;},async lean(){return result;}};}
 async function fixture(t){
  const people=[{_id:a,username:'khalilnahhat',firstName:'Khalil',isBlocked:false},{_id:b,username:'rudy',firstName:'Rudy',isAdmin:true,adminGrantedAt:new Date(),adminGrantedBy:a},{_id:c,username:'client',firstName:'Client'}];
- const messages=[],reads=new Map(),presence=new Map(),receipts=new Map(),restore=[];
+ const topics=[],messages=[],reads=new Map(),presence=new Map(),receipts=new Map(),restore=[];
  const replace=(object,key,value)=>{restore.push(()=>object[key]=original);const original=object[key];object[key]=value;};
+ replace(Topic,'find',()=>query(topics));
+ replace(Topic,'exists',async filter=>topics.some(row=>String(row._id)===filter._id));
  replace(User,'find',filter=>query(people.filter(row=>matches(row,filter))));
  replace(Message,'find',(filter={})=>query(messages.filter(row=>matches(row,filter))));
+ replace(Message,'aggregate',async stages=>{const counts=new Map();for(const row of messages.filter(row=>matches(row,stages[0].$match))){const id=row.topicId||'general';counts.set(id,(counts.get(id)||0)+1);}return [...counts].map(([_id,count])=>({_id,count}));});
  replace(Message,'countDocuments',async filter=>messages.filter(row=>matches(row,filter)).length);
  replace(Message,'findById',value=>{const item=messages.find(row=>String(row._id)===String(value));return {select(){return this;},async lean(){return item||null;}};});
  replace(Message,'findOneAndDelete',async filter=>{const index=messages.findIndex(row=>matches(row,filter));return index===-1?null:messages.splice(index,1)[0];});
  replace(Message,'findOneAndUpdate',async(filter,update)=>{const row=messages.find(item=>matches(item,filter));if(!row)return null;Object.assign(row,update.$set);return {...row,toObject:()=>row};});
+ replace(ReadState,'find',filter=>query([...reads.values()].filter(row=>matches(row,filter))));
  replace(ReadState,'findById',value=>({lean:async()=>reads.get(String(value))||null}));
  replace(ReadState,'updateOne',async(filter,update,options)=>{let row=reads.get(filter._id);if(!row&&options?.upsert){row={_id:filter._id,...update.$setOnInsert};reads.set(filter._id,row);}if(row&&matches(row,filter))Object.assign(row,update.$set||{});});
  replace(Presence,'find',filter=>query([...presence.values()].filter(row=>matches(row,filter))));

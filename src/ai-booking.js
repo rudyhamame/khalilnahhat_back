@@ -1,3 +1,4 @@
+const {piperConfigured,registerPiperTts}=require('./piper-tts');
 const {createOpenRouter,providerKey}=require('./openrouter');
 const {WebSocketServer}=require('ws');
 const {bridgeAlibabaVoice}=require('./ai-voice-alibaba');
@@ -87,7 +88,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
   };
   const identity = req => String(req.authUser?._id || req.authUser?.id || '');
   const safety = req => crypto.createHash('sha256').update(identity(req)).digest('hex');
-  const configured = (kind='chat',config=null) => kind==='chat'?Boolean(providerKey(env,config?.chat?.provider)):config?.voice?.provider==='alibaba'?Boolean(env.DASHSCOPE_API_KEY):config?.voice?.provider==='openrouter'?Boolean(env.OPENROUTER_API_KEY&&config.chat.provider==='openrouter'&&config.chat.enabled):Boolean(env.OPENAI_API_KEY);
+  const configured = (kind='chat',config=null) => kind==='chat'?Boolean(providerKey(env,config?.chat?.provider)):config?.tts?.provider==='piper'?Boolean(piperConfigured(env)&&config.chat.enabled&&providerKey(env,config.chat.provider)):config?.voice?.provider==='alibaba'?Boolean(env.DASHSCOPE_API_KEY):config?.voice?.provider==='openrouter'?Boolean(env.OPENROUTER_API_KEY&&config.chat.provider==='openrouter'&&config.chat.enabled):Boolean(env.OPENAI_API_KEY);
   const admitted = (req, res, kind, limit,config,{bucketKind=kind}={}) => {
     if (!configured(kind,config)) { res.status(503).json({ message: 'AI booking is not configured yet. Personal booking is available.' }); return false; }
     const now = Date.now(), key = `${identity(req)}:${bucketKind}`;
@@ -108,6 +109,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
     if(call.provider==='alibaba'){call.close?.();return;}
     try { await fetchImpl(`https://api.openai.com/v1/realtime/calls/${encodeURIComponent(id)}/hangup`, { method: 'POST', headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}` }, signal: AbortSignal.timeout(10000) }); } catch { /* Provider session also closes with the peer connection. */ }
   };
+  registerPiperTts(app,{requireAuth,policy,admitted,fetchImpl,env});
   app.get('/api/ai-booking/status',async(_req,res)=>{const config=await policy(res);if(config){res.set('Cache-Control','no-store');res.json({configured:configured('chat',config),voiceConfigured:configured('voice',config),requiresSignIn:true,maxCallSeconds:config.voice.maxCallSeconds,...(configService?{policy:publicPolicy(config)}:{})});}});
   app.get('/api/ai-booking/booking-data',requireAuth,async(req,res)=>{try{res.set('Cache-Control','no-store').json(await loadBookingData(Number(req.query.year)));}catch(error){res.status(error.status||503).json({message:error.status===400?error.message:'Booking data could not be loaded. Please retry.'});}});
   const venueContext=require('./venue-context').createVenueContext({fetchImpl});

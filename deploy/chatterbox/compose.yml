@@ -1,0 +1,27 @@
+services:
+  chatterbox:
+    build: .
+    restart: "on-failure:3"
+    ports:
+      - "127.0.0.1:8810:8000"
+    environment:
+      TTS_API_KEY: ${TTS_API_KEY:?Set a random TTS_API_KEY}
+      HF_HOME: /models
+    volumes:
+      - models:/models
+      - ./voices:/voices:ro
+    gpus: all
+    mem_limit: 8g
+    cpus: 2
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  models:

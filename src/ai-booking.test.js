@@ -222,7 +222,7 @@ test('text has voice-equivalent navigation instructions and returns venue faces 
  const request=await fixture(t,{fetchImpl:async(_url,options)=>{sent=JSON.parse(options.body);return Response.json({output:[{content:[{type:'output_text',text:JSON.stringify({reply:'Here is the venue view.',section:'availability',face:'venue',orderPatch:[{path:'event.type',value:'party'}]})}]}]});}});
  const response=await request('chat',{consent:true,responseFormat:'patch',messages:[{role:'user',content:'Make it a party and show me the venue.'}]});
  assert.equal(response.status,200);const result=await response.json();assert.equal(result.section,'availability');assert.equal(result.face,'venue');assert.equal(result.orderPatch[0].value,'party');
- assert.match(sent.instructions,/same homepage and shared booking draft as voice/);assert.match(sent.instructions,/applies the patch before navigation/);assert.match(sent.instructions,/face=venue/);assert.deepEqual(sent.text.format.schema.properties.face.enum,['none','calendar','venue']);
+ assert.match(sent.instructions,/same homepage and shared booking draft as voice/);assert.match(sent.instructions,/applies and saves client-provided edits automatically/);assert.match(sent.instructions,/face=venue/);assert.deepEqual(sent.text.format.schema.properties.face.enum,['none','calendar','venue']);
 });
 
 test('text never forwards an arbitrary navigation face',async t=>{

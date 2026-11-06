@@ -19,5 +19,5 @@ test('final function items and response output are supported without argument-do
  }
 });
 test('draft selection language is distinct from business reservation',()=>{
- assert.match(orderInstructions(),/November fourteen/);assert.match(orderInstructions(),/NOT as a request for a business reservation/);assert.match(orderInstructions(),/event.type/);assert.match(draftTool.description,/lock in/);assert.match(orderInstructions(),/event.startTime=18:00/);assert.match(orderInstructions(),/event.endTime=02:30/);
+ assert.match(orderInstructions(),/automatically confirmed AI tasks/);assert.match(orderInstructions(),/cannot submit, reserve, accept quotes or pay/);assert.match(orderInstructions(),/event.type/);assert.match(draftTool.description,/saved automatically/);assert.match(orderInstructions(),/6 PM becomes 18:00/);assert.match(orderInstructions(),/2:30 AM becomes 02:30/);
 });

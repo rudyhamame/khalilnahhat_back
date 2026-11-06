@@ -15,6 +15,15 @@ function put(object, path, value) {
   target[keys.at(-1)]=value;
 }
 export const isAnswered = value => value !== null && value !== undefined && value !== '' && (!Array.isArray(value) || value.length > 0);
+// Account contact prefills and an automatically offered voucher do not mean
+// the visitor has started planning an event.
+export function hasEventDraftContent(order) {
+  return aiFields.some(field=>{
+    if(field.key.startsWith('customer.')||['additional.voucherCode','event.venue.country','event.venue.source','event.venue.sourceId','event.venue.sourceAttribution'].includes(field.key)||field.type==='coordinate')return false;
+    const value=getPath(order,field.key);
+    return typeof value==='string'?value.trim().length>0:isAnswered(value)&&value!==false;
+  });
+}
 export function createEventOrder() {
   const order={schemaVersion:contract.version,source:'manual'};
   for(const field of fields)put(order,field.key,['multi','links'].includes(field.type)?[]:null);

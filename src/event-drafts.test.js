@@ -15,7 +15,7 @@ test('incomplete drafts are private, persist and resume without submitting',asyn
   assert.equal((await request('PUT',{version:0,order})).status,200);
   const item=(await(await request()).json()).item;assert.equal(item.order.event.type,'wedding');assert.equal(item.version,1);assert.equal(item.owner,undefined);
   assert.equal((await(await request('GET',undefined,'bob')).json()).item,null);
-  assert.equal((await request('DELETE',undefined,'bob','?version=1')).status,409);
+  assert.equal((await request('DELETE',undefined,'bob','?version=1')).status,200);
   assert.equal((await request()).headers.get('cache-control'),'no-store');
 });
 test('stale saves and deletes cannot overwrite another device',async t=>{

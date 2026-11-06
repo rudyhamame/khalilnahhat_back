@@ -364,6 +364,8 @@ const serviceRequestQuoteSchema = z.object({
   validDays: z.coerce.number().int().min(1).max(60).optional(),
   taxPercent: z.coerce.number().min(0).max(30).optional(),
   depositAmount: z.coerce.number().min(0).optional(),
+  discountType: z.enum(['amount','percent']).optional(),
+  discountValue: z.coerce.number().min(0).optional(),
   paymentInstructions: z.string().trim().max(1000).optional(),
 });
 
@@ -988,11 +990,11 @@ app.get('/api/service-requests/mine', requireAuth, async (request, response) => 
 });
 
 app.get('/api/service-requests/admin', requireAdmin, async (_request, response) => {
-  const requests = await ServiceRequest.find().sort({ createdAt: -1 });
-
-  return response.json({
-    items: requests.map((item) => serializeServiceRequest(item, true)),
-  });
+  const [requests,equipment,prices]=await Promise.all([ServiceRequest.find().sort({createdAt:-1}),Equipment.find().select('slug priceCents'),ServicePrice.find({isActive:true}).select('serviceId amountCents')]);
+  const defaults=new Map([...prices.map(item=>[item.serviceId,Number(item.amountCents)/100]),...equipment.map(item=>[item.slug,Number(item.priceCents)/100])]);
+  const serviceAliases={'svc-dj':'service-dj','svc-sound':'service-sound','svc-lighting':'service-lighting','svc-led':'service-video','svc-fx':'service-effects','svc-corporate':'service-corporate'};
+  for(const [bookingId,priceId] of Object.entries(serviceAliases)){if(defaults.has(priceId))defaults.set(bookingId,defaults.get(priceId));}
+  return response.json({items:requests.map(item=>{const result=serializeServiceRequest(item,true);return {...result,items:result.items.map(line=>({...line,defaultUnitPrice:defaults.has(line.serviceId)?defaults.get(line.serviceId):null}))};})});
 });
 
 app.patch('/api/service-requests/:id/quote', requireAdmin, async (request, response) => {
@@ -1026,6 +1028,11 @@ app.patch('/api/service-requests/:id/quote', requireAdmin, async (request, respo
     });
   }
 
+  const discountType=parsed.data.discountType||serviceRequest.discountType||'amount';
+  const discountValue=parsed.data.discountValue??serviceRequest.discountValue??0;
+  const subtotal=serviceRequest.items.reduce((sum,item)=>sum+Math.round(quoteByServiceId.get(item.serviceId)*100)*item.quantity,0)/100;
+  if((discountType==='percent'&&discountValue>100)||(discountType==='amount'&&discountValue>subtotal))return response.status(400).json({message:'Discount cannot exceed 100% or the services subtotal.'});
+  serviceRequest.discountType=discountType;serviceRequest.discountValue=discountValue;
   serviceRequest.items.forEach((item) => {
     item.unitPrice = quoteByServiceId.get(item.serviceId);
   });

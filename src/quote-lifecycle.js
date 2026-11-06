@@ -5,15 +5,8 @@ const { notificationEmails } = require('./notification-emails');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SWEEP_MS = 10 * 60 * 1000;
-const round2 = (n) => Math.round(n * 100) / 100;
 
-function quoteTotals(sr) {
-  const subtotal = sr.items.reduce((sum, i) => sum + Number(i.unitPrice || 0) * i.quantity, 0);
-  const tax = round2((subtotal * (sr.taxPercent ?? 0)) / 100);
-  const total = round2(subtotal + tax);
-  const deposit = Math.min(Number(sr.depositAmount || 0), total);
-  return { subtotal: round2(subtotal), taxPercent: sr.taxPercent ?? 0, tax, total, deposit, balance: round2(total - deposit) };
-}
+const {quoteTotals}=require('./quote-totals');
 
 const isExpired = (sr) => ['quoted', 'accepted'].includes(sr.status) && sr.expiresAt && sr.expiresAt <= new Date();
 

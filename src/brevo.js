@@ -123,10 +123,9 @@ async function sendServiceQuoteNotification(serviceRequest) {
   const khalilEmail = process.env.SERVICE_REQUEST_NOTIFICATION_EMAIL?.trim()
     || DEFAULT_NOTIFICATION_EMAIL;
   const customerServicesUrl = process.env.CUSTOMER_SERVICES_URL?.trim();
-  const total = serviceRequest.items.reduce(
-    (sum, item) => sum + Number(item.unitPrice || 0) * item.quantity,
-    0,
-  );
+  const totals=require('./quote-totals').quoteTotals(serviceRequest);
+  const total=totals.total;
+  const pricingSummary=[`Subtotal: ${formatCad(totals.subtotal)}`, ...(totals.discount>0?[`Discount: −${formatCad(totals.discount)}`]:[]), `Tax (${totals.taxPercent}%): ${formatCad(totals.tax)}`];
   const itemRows = serviceRequest.items.map((item) => {
     const lineTotal = Number(item.unitPrice || 0) * item.quantity;
 
@@ -154,7 +153,7 @@ async function sendServiceQuoteNotification(serviceRequest) {
     },
     subject: 'Your DJ Khalil Nahhat service quote is ready',
     tags: ['service-quote'],
-    notificationContext: {customerName:serviceRequest.customerName,requestId:serviceRequest.requestNumber||serviceRequest.externalId,details:serviceRequest.items.map(item=>`${item.name} × ${item.quantity} — ${formatCad(Number(item.unitPrice||0)*item.quantity)}`).join('\n'),total:formatCad(total),adminNote:serviceRequest.adminNote||'',actionUrl:customerServicesUrl||''},
+    notificationContext: {customerName:serviceRequest.customerName,requestId:serviceRequest.requestNumber||serviceRequest.externalId,details:[...serviceRequest.items.map(item=>`${item.name} × ${item.quantity} — ${formatCad(Number(item.unitPrice||0)*item.quantity)}`),...pricingSummary].join('\n'),total:formatCad(total),adminNote:serviceRequest.adminNote||'',actionUrl:customerServicesUrl||''},
     htmlContent: `<!doctype html>
       <html>
         <body style="margin:0;background:#080808;color:#f4f1ed;font-family:Arial,sans-serif;">
@@ -177,6 +176,7 @@ async function sendServiceQuoteNotification(serviceRequest) {
               <tbody>${itemRows}</tbody>
             </table>
             <div style="padding:18px;background:#181818;text-align:right;border:1px solid #292929;border-top:0;">
+              ${pricingSummary.map(line=>`<p style="margin:0 0 8px;color:#b8b3ad;font-size:13px;">${escapeHtml(line)}</p>`).join('')}
               <span style="display:block;color:#b8b3ad;font-size:11px;letter-spacing:1.5px;">QUOTE TOTAL</span>
               <strong style="font-size:28px;color:#ef3939;">${formatCad(total)}</strong>
             </div>

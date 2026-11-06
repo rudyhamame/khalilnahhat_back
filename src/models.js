@@ -282,6 +282,8 @@ const serviceRequestSchema = new mongoose.Schema(
     currency: { type: String, default: 'CAD', trim: true },
     validDays: { type: Number, default: 7, min: 1 },
     taxPercent: { type: Number, default: 13, min: 0 },
+    discountType: { type: String, enum: ['amount','percent'], default: 'amount' },
+    discountValue: { type: Number, default: 0, min: 0 },
     depositAmount: { type: Number, default: 0, min: 0 },
     expiresAt: { type: Date, default: null },
     reminderSentAt: { type: Date, default: null },

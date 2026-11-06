@@ -12,7 +12,7 @@ const { validDate } = require('./quote-validation');
 const { orderPatchJsonSchema, sanitizeOrderPatch, draftTool, orderInstructions, createEventOrder, applyOrderPatch, aiOrderContext } = require('./event-order');
 
 const SERVICES = ['dj', 'sound', 'lighting', 'led', 'fx', 'rental', 'corporate'];
-const voiceLanguageInstructions=language=>language?'\nVoice-call language: The client explicitly selected '+(language==='ar-SA'?'Arabic':'English')+'. Use that language for your opening greeting, questions, acknowledgements and spoken replies. Do not infer a language switch from names, addresses, accents or isolated foreign words. Switch only when the client explicitly requests another language.':'';
+const voiceLanguageInstructions=language=>language?'\nVoice-call language: The client explicitly selected '+(language==='ar-SA'?'Arabic':'English')+'. Use that language for your opening greeting, questions, acknowledgements and spoken replies. Do not infer a language switch from names, addresses, accents or isolated foreign words. Switch only when the client explicitly requests another language. Background noise, speaker echo, unclear sounds and old transcripts are not language requests. Never restart your greeting after unclear input; briefly ask the client to repeat their answer to the current booking question.':'';
 const claimsDraftChange=reply=>typeof reply==='string'&&(/\bI(?:['’]ve| have)?\s+(?:added|queued|proposed|prepared|updated|set|selected|saved|changed|included)\b/iu.test(reply)||/^\s*(?:added|queued|proposed|updated|selected|saved)\b/iu.test(reply)||/(?:أضفت|اقترحت|جهزت|تمت إضافة|تم تحديث|تم حفظ)/u.test(reply));
 const DRAFT_PROPERTIES = {
   eventType: { type: 'string', enum: ['wedding', 'engagement', 'birthday', 'corporate', 'party', 'graduation', 'other', ''] },
@@ -250,7 +250,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
       }
       const form = new FormData(); form.set('sdp', req.body.sdp);
       form.set('session', JSON.stringify({ type: 'realtime', model: config.voice.model, instructions: instructions()+'\n'+bookingDataInstructions+'\n'+orderInstructions()+'\n'+voiceNavigationInstructions()+voiceLanguageInstructions(language), tools:[draftTool,voiceNavigationTool,bookingDataTool], tool_choice:'auto', max_output_tokens: config.voice.maxOutputTokens,
-        audio: { input: { transcription: { model: 'gpt-4o-mini-transcribe' }, turn_detection: { type: 'server_vad' } }, output: { voice: 'marin' } },
+        audio: { input: { noise_reduction: { type: 'far_field' }, transcription: { model: 'gpt-4o-mini-transcribe', language: language==='ar-SA'?'ar':'en' }, turn_detection: { type: 'server_vad', prefix_padding_ms: 500, silence_duration_ms: 1800 } }, output: { voice: 'marin' } },
       }));
       const upstream = await fetchImpl('https://api.openai.com/v1/realtime/calls', { method: 'POST', headers: headers(req), body: form, signal: AbortSignal.any([controller.signal,AbortSignal.timeout(45000)]) });
       if (!upstream.ok) return res.status(502).json({ message: 'The AI voice service could not connect. Try chat or personal booking.' });

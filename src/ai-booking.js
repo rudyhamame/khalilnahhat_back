@@ -12,6 +12,7 @@ const { validDate } = require('./quote-validation');
 const { orderPatchJsonSchema, sanitizeOrderPatch, draftTool, orderInstructions, createEventOrder, applyOrderPatch, aiOrderContext } = require('./event-order');
 
 const SERVICES = ['dj', 'sound', 'lighting', 'led', 'fx', 'rental', 'corporate'];
+const voiceLanguageInstructions=language=>language?'\nVoice-call language: The client explicitly selected '+(language==='ar-SA'?'Arabic':'English')+'. Use that language for your opening greeting, questions, acknowledgements and spoken replies. Do not infer a language switch from names, addresses, accents or isolated foreign words. Switch only when the client explicitly requests another language.':'';
 const claimsDraftChange=reply=>typeof reply==='string'&&(/\bI(?:['’]ve| have)?\s+(?:added|queued|proposed|prepared|updated|set|selected|saved|changed|included)\b/iu.test(reply)||/^\s*(?:added|queued|proposed|updated|selected|saved)\b/iu.test(reply)||/(?:أضفت|اقترحت|جهزت|تمت إضافة|تم تحديث|تم حفظ)/u.test(reply));
 const DRAFT_PROPERTIES = {
   eventType: { type: 'string', enum: ['wedding', 'engagement', 'birthday', 'corporate', 'party', 'graduation', 'other', ''] },
@@ -217,6 +218,8 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
   });
   app.post('/api/ai-booking/voice', requireAuth, async (req, res) => {
     if (req.body?.consent !== true) return res.status(400).json({ message: 'A valid voice connection and AI consent are required.' });
+    const language=req.body?.language;
+    if(language!==undefined&&!['en-CA','ar-SA'].includes(language))return res.status(400).json({message:'Choose English or Arabic for the voice call.'});
     const config=await policy(res,'voice');if(!config)return;
     if(config.voice.provider==='openrouter')return res.status(400).json({message:'OpenRouter voice uses browser speech turns and does not create a realtime server call.'});
     const alibaba=config.voice.provider==='alibaba';
@@ -237,7 +240,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
         // The browser opens a one-time WebSocket (attachVoiceSocket) that this server bridges to Alibaba Cloud.
         const callId=`ali_${crypto.randomUUID().replaceAll('-','')}`,wsTicket=crypto.randomBytes(24).toString('hex');
         const timer=setTimeout(()=>hangup(callId),config.voice.maxCallSeconds*1000);timer.unref?.();
-        const call={owner,timer,started:Date.now(),ticket,provider:'alibaba',refundQuota,providerReady:false};
+        const call={owner,timer,started:Date.now(),ticket,provider:'alibaba',language,refundQuota,providerReady:false};
         call.attachTimer=setTimeout(()=>{if(!call.attached)hangup(callId);},30000);call.attachTimer.unref?.();
         calls.set(callId,call);socketTickets.set(wsTicket,{callId,owner,config,expires:Date.now()+30000});
         if(res.destroyed||controller.signal.aborted){await hangup(callId);throw new Error('Voice request canceled');}
@@ -246,7 +249,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
         return res.json({provider:'alibaba',callId,wsTicket,maxCallSeconds:config.voice.maxCallSeconds});
       }
       const form = new FormData(); form.set('sdp', req.body.sdp);
-      form.set('session', JSON.stringify({ type: 'realtime', model: config.voice.model, instructions: instructions()+'\n'+bookingDataInstructions+'\n'+orderInstructions()+'\n'+voiceNavigationInstructions(), tools:[draftTool,voiceNavigationTool,bookingDataTool], tool_choice:'auto', max_output_tokens: config.voice.maxOutputTokens,
+      form.set('session', JSON.stringify({ type: 'realtime', model: config.voice.model, instructions: instructions()+'\n'+bookingDataInstructions+'\n'+orderInstructions()+'\n'+voiceNavigationInstructions()+voiceLanguageInstructions(language), tools:[draftTool,voiceNavigationTool,bookingDataTool], tool_choice:'auto', max_output_tokens: config.voice.maxOutputTokens,
         audio: { input: { transcription: { model: 'gpt-4o-mini-transcribe' }, turn_detection: { type: 'server_vad' } }, output: { voice: 'marin' } },
       }));
       const upstream = await fetchImpl('https://api.openai.com/v1/realtime/calls', { method: 'POST', headers: headers(req), body: form, signal: AbortSignal.any([controller.signal,AbortSignal.timeout(45000)]) });
@@ -282,7 +285,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
       const call=calls.get(value.callId);
       if(!call){client.close();return;}
       call.attached=true;clearTimeout(call.attachTimer);
-      call.close=bridgeAlibabaVoice({client,env,model:value.config.voice.model,instructions:instructions()+'\n'+bookingDataInstructions+'\n'+orderInstructions()+'\n'+voiceNavigationInstructions(),tools:[draftTool,voiceNavigationTool,bookingDataTool],maxOutputTokens:value.config.voice.maxOutputTokens,onReady:()=>{call.providerReady=true;},onClose:detail=>hangup(value.callId,{refund:detail?.side==='provider'&&detail.code!==1000})});
+      call.close=bridgeAlibabaVoice({client,env,model:value.config.voice.model,instructions:instructions()+'\n'+bookingDataInstructions+'\n'+orderInstructions()+'\n'+voiceNavigationInstructions()+voiceLanguageInstructions(call.language),tools:[draftTool,voiceNavigationTool,bookingDataTool],maxOutputTokens:value.config.voice.maxOutputTokens,onReady:()=>{call.providerReady=true;},onClose:detail=>hangup(value.callId,{refund:detail?.side==='provider'&&detail.code!==1000})});
     },
   };
   return {voiceSocketHooks};

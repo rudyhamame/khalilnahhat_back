@@ -87,8 +87,8 @@ test('modern chat requests one shared patch and records usage without content',a
   const metrics=[];
   const request=await fixture(t,{recordMetric:value=>metrics.push(value),fetchImpl:async(_url,options)=>{
     const body=JSON.parse(options.body);
-    assert.deepEqual(body.text.format.schema.required,['reply','orderPatch','section']);
-    assert.deepEqual(Object.keys(body.text.format.schema.properties),['reply','section','orderPatch']);
+    assert.deepEqual(body.text.format.schema.required,['reply','orderPatch','section','face']);
+    assert.deepEqual(Object.keys(body.text.format.schema.properties),['reply','section','face','orderPatch']);
     return Response.json({status:'completed',usage:{input_tokens:120,output_tokens:30,input_tokens_details:{cached_tokens:80}},output:[{content:[{type:'output_text',text:JSON.stringify({reply:'Which date?',orderPatch:[{path:'event.type',value:'wedding'},{path:'customer.email',value:'private@example.invalid'}]})}]}]});
   }});
   const response=await request('chat',{consent:true,responseFormat:'patch',messages:[{role:'user',content:'PRIVATE wedding information'}]});
@@ -214,4 +214,19 @@ test('text assistant can follow a question viewport without changing the draft',
  const request=await fixture(t,{fetchImpl:async()=>Response.json({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({reply:'What venue are you planning to use?',orderPatch:[],section:'simulation'})}]}]})});
  const response=await request('chat',{consent:true,responseFormat:'patch',messages:[{role:'user',content:'Help me with the venue'}]});
  assert.equal(response.status,200);assert.equal((await response.json()).section,'simulation');
+});
+
+
+test('text has voice-equivalent navigation instructions and returns venue faces with draft patches',async t=>{
+ let sent;
+ const request=await fixture(t,{fetchImpl:async(_url,options)=>{sent=JSON.parse(options.body);return Response.json({output:[{content:[{type:'output_text',text:JSON.stringify({reply:'Here is the venue view.',section:'availability',face:'venue',orderPatch:[{path:'event.type',value:'party'}]})}]}]});}});
+ const response=await request('chat',{consent:true,responseFormat:'patch',messages:[{role:'user',content:'Make it a party and show me the venue.'}]});
+ assert.equal(response.status,200);const result=await response.json();assert.equal(result.section,'availability');assert.equal(result.face,'venue');assert.equal(result.orderPatch[0].value,'party');
+ assert.match(sent.instructions,/same homepage and shared booking draft as voice/);assert.match(sent.instructions,/applies the patch before navigation/);assert.match(sent.instructions,/face=venue/);assert.deepEqual(sent.text.format.schema.properties.face.enum,['none','calendar','venue']);
+});
+
+test('text never forwards an arbitrary navigation face',async t=>{
+ const request=await fixture(t,{fetchImpl:async()=>Response.json({output:[{content:[{type:'output_text',text:JSON.stringify({reply:'Here is your calendar.',section:'availability',face:'javascript:invalid',orderPatch:[]})}]}]})});
+ const response=await request('chat',{consent:true,responseFormat:'patch',messages:[{role:'user',content:'Show calendar.'}]});
+ assert.equal(response.status,200);assert.equal((await response.json()).face,undefined);
 });

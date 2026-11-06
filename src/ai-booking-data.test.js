@@ -10,3 +10,12 @@ test('booking eye reads fresh sources and distinguishes failed availability from
  failed=true;const next=await load(year);assert.equal(calls,2);assert.equal(next.availability.status,'unavailable');assert.equal(next.availability.data,null);assert.equal(next.catalog.status,'ready');assert.doesNotMatch(JSON.stringify(next),/private DB/);
  await assert.rejects(()=>load(1900),{status:400});assert.equal(bookingDataTool.name,'read_booking_data');
 });
+
+
+test('live-data instructions agree with automatic task saving and distinguish business reservation',()=>{
+ const {bookingDataInstructions}=require('./ai-booking-data');
+ assert.match(bookingDataInstructions,/applied and saved automatically/);
+ assert.match(bookingDataInstructions,/saved=true/);
+ assert.match(bookingDataInstructions,/Never ask for task checkmarks/);
+ assert.match(bookingDataInstructions,/never a reservation/);
+});

@@ -2,12 +2,12 @@ const mongoose = require('mongoose');
 const { z } = require('zod');
 const deletedDrafts=require('./deleted-event-drafts');
 
-const messageSchema = z.object({ id: z.uuid(), role: z.enum(['user', 'assistant']), content: z.string().trim().min(1).max(4000), mode: z.enum(['chat', 'voice']), segmentId: z.uuid().optional() });
+const messageSchema = z.object({ id: z.uuid(), role: z.enum(['user', 'assistant']), content: z.string().trim().min(1).max(4000), mode: z.enum(['chat', 'voice']), segmentId: z.uuid().optional(), fieldPath:z.string().max(120).optional(), section:z.enum(['none','home','tree','work','availability','music','setup','simulation','booking','live','about']).optional(), face:z.enum(['none','calendar','venue']).optional() });
 const appendSchema = z.object({ consent: z.literal(true), id: z.uuid(), messages: z.array(messageSchema).min(1).max(8) });
 const schema = new mongoose.Schema({
   _id: String,
   owner: { type: String, required: true, index: true },
-  messages: [{ _id: false, id: String, role: String, content: String, mode: String, segmentId: String, createdAt: Date }],
+  messages: [{ _id: false, id: String, role: String, content: String, mode: String, segmentId: String, fieldPath:String, section:String, face:String, createdAt: Date }],
 }, { timestamps: true });
 schema.index({ owner: 1, updatedAt: -1 });
 const Conversation = mongoose.models.BookingConversation || mongoose.model('BookingConversation', schema);

@@ -245,6 +245,24 @@
    "ar": "الموسيقى والترفيه (اختياري)",
    "fields": [
     {
+     "key": "music.djRequested",
+     "label": "Add DJ Khalil service to your booking?",
+     "ar": "هل تريد إضافة خدمة دي جي خليل إلى حجزك؟",
+     "type": "boolean"
+    },
+    {
+     "key": "music.mcRequested",
+     "label": "Add MC hosting and announcements?",
+     "ar": "هل تريد إضافة خدمة تقديم الحفل والإعلانات؟",
+     "type": "boolean"
+    },
+    {
+     "key": "rental.requested",
+     "label": "Would you like rental services or equipment?",
+     "ar": "هل تريد خدمات تأجير أو معدات؟",
+     "type": "boolean"
+    },
+    {
      "key": "music.styles",
      "label": "Which language is your music in?",
      "ar": "بأي لغة تريد الموسيقى؟",
@@ -358,8 +376,8 @@
     },
     {
      "key": "music.djMc",
-     "label": "Should the DJ also host and make announcements (MC)? (optional)",
-     "ar": "هل تريد أن يقدّم الدي جي الحفل أيضاً (MC)؟ (اختياري)",
+     "label": "MC hosting and announcement notes (optional)",
+     "ar": "ملاحظات تقديم الحفل والإعلانات (اختياري)",
      "type": "textarea"
     },
     {

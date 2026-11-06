@@ -50,7 +50,15 @@ export function normalizeEventOrder(input) {
 export function updateOrderField(order,path,value,{ai=false}={}) {
   const field=(ai?aiFields:fields).find(item=>item.key===path);
   if(!field||!validValue(field,value))return order;
-  const next=structuredClone(order);put(next,path,value);if(ai)next.source='ai';return next;
+  const next=structuredClone(order);put(next,path,value);
+  // Explicit service decisions stay in sync with the canonical booking selections.
+  if(path==='music.djRequested'&&typeof value==='boolean')next.services=value?[...new Set([...(next.services||[]),'dj'])]:(next.services||[]).filter(id=>id!=='dj');
+  if(path==='services'&&Array.isArray(value)&&value.includes('dj'))next.music.djRequested=true;
+  if(path==='music.mcRequested'&&typeof value==='boolean'){
+    const notes=String(next.music.djMc||'').split('\n').filter(line=>line&&line!=='MC service requested');
+    if(value)notes.push('MC service requested');next.music.djMc=notes.join('\n');
+  }
+  if(ai)next.source='ai';return next;
 }
 export function applyOrderPatch(order,patch) {
   if(!Array.isArray(patch))return order;

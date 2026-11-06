@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { z } = require('zod');
+const deletedDrafts=require('./deleted-event-drafts');
 
 const messageSchema = z.object({ id: z.uuid(), role: z.enum(['user', 'assistant']), content: z.string().trim().min(1).max(4000), mode: z.enum(['chat', 'voice']) });
 const appendSchema = z.object({ consent: z.literal(true), id: z.uuid(), messages: z.array(messageSchema).min(1).max(8) });
@@ -14,6 +15,7 @@ const mongoStore = {
   list: owner => Conversation.find({ owner }).sort({ updatedAt: -1 }).limit(100).select({ messages: { $slice: 1 } }).lean(),
   get: (owner, id) => Conversation.findOne({ _id: id, owner }).lean(),
   async append(owner, id, messages) {
+    if(await deletedDrafts.isDeleted(owner,id))throw Object.assign(new Error('This draft was deleted.'),{status:409});
     try {
       await Conversation.updateOne({ _id: id, owner }, { $setOnInsert: { owner, messages: [] } }, { upsert: true });
     } catch (error) { if (error.code === 11000) return null; throw error; }
@@ -23,6 +25,10 @@ const mongoStore = {
         const existing = await Conversation.exists({ _id: id, owner, 'messages.id': message.id });
         if (!existing) throw Object.assign(new Error('Conversation is full. Start a new conversation.'), { status: 409 });
       }
+    }
+    if(await deletedDrafts.isDeleted(owner,id)){
+      await Conversation.deleteOne({_id:id,owner});
+      throw Object.assign(new Error('This draft was deleted.'),{status:409});
     }
     return { id };
   },

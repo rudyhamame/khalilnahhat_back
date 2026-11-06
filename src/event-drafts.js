@@ -2,6 +2,7 @@ const mongoose=require('mongoose');
 const {randomUUID}=require('node:crypto');
 const {z}=require('zod');
 const {normalizeEventOrder,validateEventOrder}=require('./event-order');
+const deletedDrafts=require('./deleted-event-drafts');
 const schema=new mongoose.Schema({_id:String,draftId:{type:String,default:randomUUID},order:mongoose.Schema.Types.Mixed,version:{type:Number,default:1}},{timestamps:true});
 const EventDraft=mongoose.models.EventDraft||mongoose.model('EventDraft',schema);
 const mongoStore={
@@ -11,14 +12,18 @@ const mongoStore={
     return item;
   },
   async put(owner,version,order,draftId){
-    if(version===0){try{return await EventDraft.create({_id:owner,draftId,version:1,order});}catch(error){if(error.code===11000)return null;throw error;}}
-    return EventDraft.findOneAndUpdate({_id:owner,version,draftId},{$set:{order},$inc:{version:1}},{new:true}).lean();
+    if(await deletedDrafts.isDeleted(owner,draftId))return null;
+    let item;
+    if(version===0){try{item=await EventDraft.create({_id:owner,draftId,version:1,order});}catch(error){if(error.code===11000)return null;throw error;}}
+    else item=await EventDraft.findOneAndUpdate({_id:owner,version,draftId},{$set:{order},$inc:{version:1}},{new:true}).lean();
+    if(item&&await deletedDrafts.isDeleted(owner,draftId)){await EventDraft.deleteOne({_id:owner,draftId});return null;}
+    return item;
   },
-  async remove(owner,version){return (await EventDraft.deleteOne({_id:owner,version})).deletedCount===1;},
+  async remove(owner,version,draftId){return (await EventDraft.deleteOne({_id:owner,version,...(draftId?{draftId}:{})})).deletedCount===1;},
 };
 const inputSchema=z.object({version:z.number().int().min(0),draftId:z.uuid().optional(),order:z.record(z.string(),z.unknown())}).strict();
 const serialize=item=>item?{draftId:item.draftId,order:item.order,version:item.version,updatedAt:item.updatedAt}:null;
-function registerEventDrafts(app,{requireAuth,store=mongoStore}){
+function registerEventDrafts(app,{requireAuth,store=mongoStore,retireDraft=store===mongoStore?deletedDrafts.retire:async()=>{},removeConversation=store===mongoStore?(owner,id)=>require('./booking-conversations').Conversation.deleteOne({_id:id,owner}):async()=>{},removeRetiredDraft=store===mongoStore?(owner,draftId)=>EventDraft.deleteOne({_id:owner,draftId}):async()=>{}}){
   const writes=new Map();
   const guarded=handler=>async(req,res)=>{
     const owner=String(req.authUser?._id||req.authUser?.id||'');
@@ -42,10 +47,19 @@ function registerEventDrafts(app,{requireAuth,store=mongoStore}){
     res.json({item:serialize(item)});
   }));
   app.delete('/api/ai-booking/event-draft',requireAuth,guarded(async(req,res,owner)=>{
-    const version=z.coerce.number().int().positive().safeParse(req.query.version);
+    const version=z.coerce.number().int().min(0).safeParse(req.query.version);
     if(!version.success)return res.status(400).json({message:'Invalid draft version.'});
-    if(!await store.remove(owner,version.data))return res.status(409).json({message:'This draft changed. Reload before removing it.'});
-    res.json({removed:true});
+    const requested=req.query.draftId;
+    if(requested&&!z.uuid().safeParse(requested).success)return res.status(400).json({message:'Invalid draft ID.'});
+    const current=await store.get(owner);
+    if(current&&(current.version!==version.data||(requested&&current.draftId&&requested!==current.draftId)))return res.status(409).json({message:'This draft changed. Reload before removing it.'});
+    const draftId=requested||current?.draftId;
+    if(current&&!await store.remove(owner,version.data,current.draftId))return res.status(409).json({message:'This draft changed. Reload before removing it.'});
+    // The conditional removal must win before retiring this exact draft ID.
+    // A later cleanup failure can be retried even when the draft is now absent.
+    if(draftId)await retireDraft(owner,draftId);
+    if(draftId){await removeRetiredDraft(owner,draftId);await removeConversation(owner,draftId);}
+    res.json({removed:true,conversationRemoved:true});
   }));
 }
 module.exports={registerEventDrafts,EventDraft,mongoStore};

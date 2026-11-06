@@ -5,6 +5,7 @@ const { evaluateSubmissionReplay, fingerprintSubmission, isSubmissionDuplicateKe
 
 const serviceRequestCreateSchema = z.object({
   clientSubmissionId: z.string().uuid().optional(),
+  draftId: z.string().uuid().optional(),
   items: z.array(z.object({
     serviceId: z.string().trim().min(1),
     name: z.string().trim().min(1),
@@ -16,7 +17,7 @@ const serviceRequestCreateSchema = z.object({
   voucherCode: z.string().trim().max(40).optional(),
 });
 
-function registerServiceRequestSubmission(app, { requireAuth, ServiceRequest, Equipment, vouchers, serializeServiceRequest, sendServiceRequestNotification }) {
+function registerServiceRequestSubmission(app, { requireAuth, ServiceRequest, Equipment, vouchers, serializeServiceRequest, sendServiceRequestNotification, loadConversation=(owner,id)=>require('./booking-conversations').mongoStore.get(owner,id) }) {
   app.post('/api/service-requests', requireAuth, async (request, response) => {
     const parsed = serviceRequestCreateSchema.safeParse(request.body);
 
@@ -31,7 +32,7 @@ function registerServiceRequestSubmission(app, { requireAuth, ServiceRequest, Eq
     const draftVoucher=parsed.data.order?.additional?.voucherCode?.trim().toUpperCase();
     if(draftVoucher&&parsed.data.voucherCode&&draftVoucher!==parsed.data.voucherCode.trim().toUpperCase())return response.status(400).json({message:'The voucher changed. Review the current draft code before submitting.'});
     if(draftVoucher&&!parsed.data.voucherCode)parsed.data.voucherCode=draftVoucher;
-    const submissionPayload = { items: parsed.data.items, event: parsed.data.event || null, order: parsed.data.order || null, voucherCode: parsed.data.voucherCode || '' };
+    const submissionPayload = { items: parsed.data.items, event: parsed.data.event || null, order: parsed.data.order || null, voucherCode: parsed.data.voucherCode || '', ...(parsed.data.draftId?{draftId:parsed.data.draftId}:{}) };
     const submissionHash = parsed.data.clientSubmissionId ? fingerprintSubmission(submissionPayload) : undefined;
     const findExistingSubmission = async () => ServiceRequest.findOne({ userId: user._id, clientSubmissionId: parsed.data.clientSubmissionId }).select('+submissionHash');
     const sendReplay = async (existing) => {
@@ -53,6 +54,16 @@ function registerServiceRequestSubmission(app, { requireAuth, ServiceRequest, Eq
       catch(error){return response.status(400).json({message:error.message});}
     }
 
+    // Snapshot only this authenticated owner's draft conversation. Never accept
+    // transcript text supplied in the submission body or load another owner.
+    let conversation=null;
+    if(parsed.data.draftId){
+      try{
+        const saved=await loadConversation(String(user._id||user.id),parsed.data.draftId);
+        conversation={draftId:parsed.data.draftId,messages:(saved?.messages||[]).map(({id,role,content,mode,createdAt})=>({id,role,content,mode,createdAt}))};
+      }catch{return response.status(503).json({message:'The draft conversation could not be attached. Please retry; nothing was submitted.'});}
+    }
+
     // A voucher is claimed before the booking is saved and released again if saving fails.
     let voucher = null;
     if (parsed.data.voucherCode) {
@@ -70,6 +81,7 @@ function registerServiceRequestSubmission(app, { requireAuth, ServiceRequest, Eq
       items: parsed.data.items,
       event: parsed.data.event || null,
       order: parsed.data.order || null,
+      conversation,
       requestNumber: `ECHO-${Date.now().toString(36).toUpperCase()}`,
       status: 'pending',
       voucher: voucher ? vouchers.snapshot(voucher) : null,

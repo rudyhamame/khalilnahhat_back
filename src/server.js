@@ -430,6 +430,7 @@ function serializeServiceRequest(serviceRequest, includeQuote = true) {
     voucher: serviceRequest.voucher || null,
     event: serviceRequest.event || null,
     order: serviceRequest.order || null,
+    conversation: serviceRequest.conversation || null,
     id: serviceRequest.externalId || serviceRequest.id,
     customerName: serviceRequest.customerName,
     customerUsername: serviceRequest.customerUsername,
@@ -975,7 +976,7 @@ app.post('/api/auth/logout', async (request, response) => {
   });
 });
 
-app.get('/api/service-requests/order-contract', (_request,response) => response.json({schemaVersion:eventOrder.contract.version,canonicalOrder:true,idempotentSubmission:true}));
+app.get('/api/service-requests/order-contract', (_request,response) => response.json({schemaVersion:eventOrder.contract.version,canonicalOrder:true,idempotentSubmission:true,draftConversation:true}));
 registerServiceRequestSubmission(app, { requireAuth, ServiceRequest, Equipment, vouchers, serializeServiceRequest, sendServiceRequestNotification });
 
 app.get('/api/service-requests/mine', requireAuth, async (request, response) => {

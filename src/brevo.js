@@ -64,6 +64,8 @@ async function sendBrevoEmail(payload, {notifications=notificationEmails,fetchIm
 }
 
 async function sendServiceRequestNotification(serviceRequest) {
+  const conversation=serviceRequest.conversation;
+  const transcript=conversation?.messages?.map(message=>`${message.createdAt?new Date(message.createdAt).toISOString()+' · ':''}${message.role==='assistant'?'Echo AI':'Client'} · ${message.mode==='voice'?'Voice call':'Text'}\n${message.content}`).join('\n\n');
   const recipientEmail = process.env.SERVICE_REQUEST_NOTIFICATION_EMAIL?.trim()
     || DEFAULT_NOTIFICATION_EMAIL;
   const adminServicesUrl = process.env.ADMIN_SERVICES_URL?.trim();
@@ -82,6 +84,7 @@ async function sendServiceRequestNotification(serviceRequest) {
     },
     subject: `New service request from ${serviceRequest.customerName}`,
     tags: ['service-request'],
+    ...(transcript?{attachment:[{name:'echo-booking-conversation.txt',content:Buffer.from(`Echo booking conversation\nDraft: ${conversation.draftId}\n\n${transcript}`,'utf8').toString('base64')}]}:{}),
     notificationContext: {customerName:serviceRequest.customerName,customerEmail:serviceRequest.customerEmail,requestId:serviceRequest.requestNumber||serviceRequest.externalId,details:serviceRequest.items.map(item=>`${item.name} (${item.category}) × ${item.quantity}`).join('\n'),actionUrl:adminServicesUrl||''},
     htmlContent: `<!doctype html>
       <html>

@@ -250,7 +250,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
       }
       const form = new FormData(); form.set('sdp', req.body.sdp);
       form.set('session', JSON.stringify({ type: 'realtime', model: config.voice.model, instructions: instructions()+'\n'+bookingDataInstructions+'\n'+orderInstructions()+'\n'+voiceNavigationInstructions()+voiceLanguageInstructions(language), tools:[draftTool,voiceNavigationTool,bookingDataTool], tool_choice:'auto', max_output_tokens: config.voice.maxOutputTokens,
-        audio: { input: { noise_reduction: { type: 'far_field' }, transcription: { model: 'gpt-4o-mini-transcribe', language: language==='ar-SA'?'ar':'en' }, turn_detection: { type: 'server_vad', prefix_padding_ms: 500, silence_duration_ms: 1800 } }, output: { voice: 'marin' } },
+        audio: { input: { noise_reduction: { type: 'far_field' }, transcription: { model: 'gpt-4o-mini-transcribe', language: language==='ar-SA'?'ar':'en' }, turn_detection: { type: 'server_vad', prefix_padding_ms: 500, silence_duration_ms: 1800, create_response: req.body.manualTurns!==true, interrupt_response: false } }, output: { voice: 'marin' } },
       }));
       const upstream = await fetchImpl('https://api.openai.com/v1/realtime/calls', { method: 'POST', headers: headers(req), body: form, signal: AbortSignal.any([controller.signal,AbortSignal.timeout(45000)]) });
       if (!upstream.ok) return res.status(502).json({ message: 'The AI voice service could not connect. Try chat or personal booking.' });
@@ -262,7 +262,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
       if(res.destroyed||controller.signal.aborted){await hangup(callId);throw new Error('Voice request canceled');}
       if(ticket){try{await configService.complete(ticket,{connectionMs:Math.round(performance.now()-started)});}catch(error){await hangup(callId);throw error;}}
       connected=true;
-      return res.json({ sdp, callId, maxCallSeconds: config.voice.maxCallSeconds });
+      return res.json({ sdp, callId, manualTurns:req.body.manualTurns===true, maxCallSeconds: config.voice.maxCallSeconds });
     } catch(error) { return res.status([400,402,409,503].includes(error.status)?error.status:502).json({ message: error.status?error.message:'AI voice connection failed. No booking was submitted.' }); }
     finally { if(!connected)refundQuota();pending.delete(lock);res.off('close',disconnected);if(ticket&&!connected)await configService.fail(ticket).catch(()=>{});recordMetric({mode:'voice',model:config.voice.model,status:connected?'connected':'failed',connectionMs:Math.round(performance.now()-started)}); }
   });

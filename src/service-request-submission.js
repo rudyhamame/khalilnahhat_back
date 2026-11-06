@@ -60,7 +60,7 @@ function registerServiceRequestSubmission(app, { requireAuth, ServiceRequest, Eq
     if(parsed.data.draftId){
       try{
         const saved=await loadConversation(String(user._id||user.id),parsed.data.draftId);
-        conversation={draftId:parsed.data.draftId,messages:(saved?.messages||[]).map(({id,role,content,mode,createdAt})=>({id,role,content,mode,createdAt}))};
+        conversation={draftId:parsed.data.draftId,messages:(saved?.messages||[]).map(({id,role,content,mode,segmentId,createdAt})=>({id,role,content,mode,segmentId,createdAt}))};
       }catch{return response.status(503).json({message:'The draft conversation could not be attached. Please retry; nothing was submitted.'});}
     }
 

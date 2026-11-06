@@ -65,7 +65,11 @@ async function sendBrevoEmail(payload, {notifications=notificationEmails,fetchIm
 
 async function sendServiceRequestNotification(serviceRequest) {
   const conversation=serviceRequest.conversation;
-  const transcript=conversation?.messages?.map(message=>`${message.createdAt?new Date(message.createdAt).toISOString()+' · ':''}${message.role==='assistant'?'Echo AI':'Client'} · ${message.mode==='voice'?'Voice call':'Text'}\n${message.content}`).join('\n\n');
+  const transcript=conversation?.messages?.map((message,index)=>{
+    const previous=conversation.messages[index-1];
+    const resumed=previous&&((message.segmentId&&message.segmentId!==previous.segmentId)||message.mode!==previous.mode||Date.parse(message.createdAt)-Date.parse(previous.createdAt)>15*60*1000);
+    return `${resumed?'──────── Conversation resumed · '+(message.mode==='voice'?'Voice call':'Text')+' ────────\n\n':''}${message.createdAt?new Date(message.createdAt).toISOString()+' · ':''}${message.role==='assistant'?'Echo AI':'Client'} · ${message.mode==='voice'?'Voice call':'Text'}\n${message.content}`;
+  }).join('\n\n');
   const recipientEmail = process.env.SERVICE_REQUEST_NOTIFICATION_EMAIL?.trim()
     || DEFAULT_NOTIFICATION_EMAIL;
   const adminServicesUrl = process.env.ADMIN_SERVICES_URL?.trim();

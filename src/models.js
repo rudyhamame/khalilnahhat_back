@@ -265,7 +265,7 @@ const serviceRequestSchema = new mongoose.Schema(
   {
     externalId: { type: String, required: true, unique: true, trim: true },
     clientSubmissionId: { type: String, default: undefined, trim: true },
-    conversation: { type: new mongoose.Schema({draftId:String,messages:[{_id:false,id:String,role:String,content:String,mode:String,createdAt:Date}]},{_id:false}),default:null },
+    conversation: { type: new mongoose.Schema({draftId:String,messages:[{_id:false,id:String,role:String,content:String,mode:String,segmentId:String,createdAt:Date}]},{_id:false}),default:null },
     submissionHash: { type: String, default: undefined, select: false },
     userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User', index: true },
     customerName: { type: String, required: true, trim: true },

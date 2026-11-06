@@ -11,6 +11,7 @@ const { validDate } = require('./quote-validation');
 const { orderPatchJsonSchema, sanitizeOrderPatch, draftTool, orderInstructions, createEventOrder, applyOrderPatch, aiOrderContext } = require('./event-order');
 
 const SERVICES = ['dj', 'sound', 'lighting', 'led', 'fx', 'rental', 'corporate'];
+const claimsDraftChange=reply=>typeof reply==='string'&&(/\bI(?:['’]ve| have)?\s+(?:added|queued|proposed|prepared|updated|set|selected|saved|changed|included)\b/iu.test(reply)||/^\s*(?:added|queued|proposed|updated|selected|saved)\b/iu.test(reply)||/(?:أضفت|اقترحت|جهزت|تمت إضافة|تم تحديث|تم حفظ)/u.test(reply));
 const DRAFT_PROPERTIES = {
   eventType: { type: 'string', enum: ['wedding', 'engagement', 'birthday', 'corporate', 'party', 'graduation', 'other', ''] },
   eventDate: { type: 'string', maxLength: 10, pattern: '^([0-9]{4}-[0-9]{2}-[0-9]{2})?$' },
@@ -166,8 +167,26 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
       }
       const text = content.filter(item => item.type === 'output_text').map(item => item.text).join('');
       stage = 'reply_json';
-      const parsed = parseModelReply(text);
+      let parsed = parseModelReply(text);
       if (!parsed) throw new Error('Unreadable AI reply');
+      // Every field uses the same receipt: a claim about a proposed change must
+      // contain valid structured values. Repair once instead of silently
+      // dropping malformed patches or showing a task that was never queued.
+      const unusableProposal=value=>Array.isArray(value?.orderPatch)&&(sanitizeOrderPatch(value.orderPatch).length!==value.orderPatch.length||(!value.orderPatch.length&&claimsDraftChange(value.reply)));
+      if(patchOnly&&(!Array.isArray(parsed.orderPatch)||unusableProposal(parsed))){
+        stage='proposal_repair';
+        const repair=JSON.parse(requestOptions.body);repair.stream=false;
+        repair.instructions+='\nYour previous structured reply did not contain usable proposals matching its acknowledgement. Return the actual requested changes in orderPatch using the exact field guide and active catalog IDs. This applies to ALL sections, including equipment, services, venue, contact, music, references and notes. Never claim a task was added with an empty patch. Preserve existing equipment when adding items and return its complete proposed list. If the client did not request a change or the item is ambiguous, ask one clarification and make no action claim. Do not invent values.';
+        repair.input.push({role:'assistant',content:JSON.stringify(parsed)},{role:'user',content:'Correct the structured proposals for my preceding message. Your reply must agree with the returned orderPatch.'});
+        const repaired=(config.chat.provider||'openai')!=='openai'?await openrouter.request({...repair,config:config.chat},{signal:requestOptions.signal}):await fetchImpl('https://api.openai.com/v1/responses',{...requestOptions,body:JSON.stringify(repair)});
+        if(!repaired.ok)throw new Error('Could not repair AI proposals');
+        const repairedData=await repaired.json();
+        if(repairedData.status==='incomplete')throw new Error('Incomplete proposal repair');
+        const extra=repairedData.usage||{};
+        usage={input_tokens:(usage?.input_tokens||0)+(extra.input_tokens||0),output_tokens:(usage?.output_tokens||0)+(extra.output_tokens||0),input_tokens_details:{cached_tokens:(usage?.input_tokens_details?.cached_tokens||0)+(extra.input_tokens_details?.cached_tokens||0)}};
+        parsed=parseModelReply((repairedData.output||[]).flatMap(item=>item.content||[]).filter(item=>item.type==='output_text').map(item=>item.text).join(''));
+        if(!parsed||!Array.isArray(parsed.orderPatch)||unusableProposal(parsed))throw new Error('AI did not provide reviewable proposals');
+      }
       stage = 'draft_validation';
       // A summary may contain a useful draft but no conversational text.
       // Preserve the review-only draft; the fallback makes no booking claims.

@@ -64,8 +64,12 @@ export function updateOrderField(order,path,value,{ai=false}={}) {
   if(path==='music.djRequested'&&typeof value==='boolean')next.services=value?[...new Set([...(next.services||[]),'dj'])]:(next.services||[]).filter(id=>id!=='dj');
   if(path==='services'&&Array.isArray(value)){
     if(value.includes('dj'))next.music.djRequested=true;
+    else if(order.services?.includes('dj'))next.music.djRequested=false;
     if(value.includes('mc'))next.music.mcRequested=true;
-    else if(order.services?.includes('mc'))next.music.mcRequested=false;
+    else if(order.services?.includes('mc')){
+      next.music.mcRequested=false;
+      next.music.djMc=String(next.music.djMc||'').split('\n').filter(line=>line&&line!=='MC service requested').join('\n');
+    }
   }
   if(path==='music.mcRequested'&&typeof value==='boolean'){
     next.services=value?[...new Set([...(next.services||[]),'mc'])]:(next.services||[]).filter(id=>id!=='mc');

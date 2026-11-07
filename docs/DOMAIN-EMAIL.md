@@ -63,3 +63,9 @@ The original Zoho API adapter remains available with `DOMAIN_MAIL_PROVIDER=zoho`
 Frontend `src/echo/mail/` separates HTTP requests, mailbox state, draft state, folders, list, reader and composer. The Email tab fills the dashboard content area; its list and reader scroll independently. Folder search is server-side and escapes regular-expression characters. A message move uses the current folder as a concurrency guard. Restore to Sent or Needs attention is only allowed from Trash to its recorded previous folder. Permanent removal is restricted to Trash.
 
 Cloudflare's Worker runtime does not accept `redirect: "error"`; the receiver uses `redirect: "manual"` and rejects every non-success response. Redirects are never followed with the signing headers or MIME body. Failure diagnostics contain only event names, status codes and exception names.
+
+## Public contact form
+
+The homepage Contact viewport precedes About. `POST /api/contact` validates the visitor's name, email, subject and message, then sends via Brevo from the configured automated sender to the fixed bookings address. The visitor's address is Reply-To, so the administrator can answer from the inbox. This does not send a separate acknowledgement to the visitor.
+
+The route uses a honeypot, persistent hourly IP limits (five submissions), a daily shared cap (60), and a seven-day submission ID record to avoid duplicate sending after uncertain delivery. Counters contain a SHA-256 IP hash and expire automatically. The submission record stores state, not visitor message text. A transport failure never reports successful sending or automatically retries. The UI preserves the filled form and offers the direct email link.

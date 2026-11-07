@@ -63,6 +63,8 @@ test('refresh token requests are shared and token is reused across mailbox calls
 });
 test('lossless JSON parsing keeps numeric provider IDs beyond safe integer precision',()=>{
  assert.equal(parseJson('{"id":9000000000000001234}').id,'9000000000000001234');assert.equal(textFromHtml('<p>A &amp; B</p>'),'A & B');
+  assert.match(textFromHtml('<a href="https://example.test/booking">Review booking</a>'),/https:\/\/example.test\/booking/);
+  assert.doesNotMatch(textFromHtml('<a href="javascript:alert(1)">Bad link</a>'),/javascript:/);
 });
 test('controlled activation replaces stale Gmail recipients and forces the noreply automated sender',async()=>{
  const {notificationAddress,senderAddress}=require('../src/business-mail-identity');

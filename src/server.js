@@ -803,6 +803,7 @@ app.use(
   }),
 );
 
+require('./cloudflare-mail').registerMailIngress(app);
 app.use(express.json({ limit: '8mb', type: ['application/json', 'application/webhook+json'], verify(request, _response, buffer) {
   if (request.path === '/api/live-stream/webrtc/webhook') request.rawBody = buffer.toString('utf8');
 } }));

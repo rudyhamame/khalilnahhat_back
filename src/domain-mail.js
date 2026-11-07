@@ -101,13 +101,13 @@ function createDomainMail({env=process.env,fetchImpl=fetch,store=sendStore,clock
     },
   };
 }
-function registerDomainMail(app,{requireAdmin,service=createDomainMail()}={}){
+function registerDomainMail(app,{requireAdmin,service=process.env.DOMAIN_MAIL_PROVIDER==='zoho'?createDomainMail():require('./cloudflare-mail').createCloudflareMail()}={}){
   app.use('/api/admin/mail',requireAdmin,(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
   app.get('/api/admin/mail/status',(_req,res)=>res.json(service.status()));
   app.get('/api/admin/mail/folders',async(_req,res)=>res.json({items:await service.folders()}));
   app.get('/api/admin/mail/messages',async(req,res)=>{const parsed=z.object({folderId:z.string().regex(/^\d{1,30}$/),start:z.coerce.number().int().min(1).max(100000).default(1)}).safeParse(req.query);if(!parsed.success)throw failure(400,'Choose a valid mail folder and page.');res.json({items:await service.messages(parsed.data.folderId,parsed.data.start)});});
-  app.get('/api/admin/mail/folders/:folderId/messages/:messageId',async(req,res)=>{if(!/^\d{1,30}$/.test(req.params.folderId)||!/^\d{1,30}$/.test(req.params.messageId))throw failure(400,'Invalid message.');res.json({item:await service.message(req.params.folderId,req.params.messageId)});});
-  app.get('/api/admin/mail/folders/:folderId/messages/:messageId/attachments/:attachmentId',async(req,res)=>{if(!Object.values(req.params).every(value=>/^\d{1,30}$/.test(value)))throw failure(400,'Invalid attachment.');const file=await service.attachment(req.params.folderId,req.params.messageId,req.params.attachmentId);res.set({'Content-Type':'application/octet-stream','X-Content-Type-Options':'nosniff','Content-Disposition':`attachment; filename="attachment"; filename*=UTF-8''${encodeURIComponent(file.name)}`}).send(file.data);});
+  app.get('/api/admin/mail/folders/:folderId/messages/:messageId',async(req,res)=>{if(!/^\d{1,30}$/.test(req.params.folderId)||! /^(?:\d{1,30}|[a-f0-9]{24})$/.test(req.params.messageId))throw failure(400,'Invalid message.');res.json({item:await service.message(req.params.folderId,req.params.messageId)});});
+  app.get('/api/admin/mail/folders/:folderId/messages/:messageId/attachments/:attachmentId',async(req,res)=>{if(!Object.values(req.params).every(value=>/^(?:\d{1,30}|[a-f0-9]{24})$/.test(value)))throw failure(400,'Invalid attachment.');const file=await service.attachment(req.params.folderId,req.params.messageId,req.params.attachmentId);res.set({'Content-Type':'application/octet-stream','X-Content-Type-Options':'nosniff','Content-Disposition':`attachment; filename="attachment"; filename*=UTF-8''${encodeURIComponent(file.name)}`}).send(file.data);});
   app.post('/api/admin/mail/send',async(req,res)=>res.json(await service.send(String(req.user._id),req.body)));
 }
 module.exports={BOOKINGS,NOREPLY,createDomainMail,registerDomainMail,textFromHtml,parseJson};

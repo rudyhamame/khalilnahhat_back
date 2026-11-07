@@ -1,42 +1,40 @@
 # Domain email activation
 
-## Intended addresses
+## Addresses and delivery
 
-- `bookings@djkhalilnahhat.ca`: real Zoho mailbox, read and send through Business → Email (`/admin/echo?tab=email`).
-- `noreply@djkhalilnahhat.ca`: Brevo sender for the application's automated notifications. Do not create an incoming noreply mailbox unless required by the provider. Customer quote Reply-To points to bookings after activation.
+- `bookings@djkhalilnahhat.ca`: send and receive in Business → Email (`/admin/echo?tab=email`).
+- `noreply@djkhalilnahhat.ca`: Brevo sender for automated notifications. Incoming mail to this address is rejected.
 
-The Email tab lists provider folders and paginated messages, reads messages as safe text without executing HTML or loading tracking images, downloads real attachments (up to 25 MB), and sends or replies from bookings. Compose currently supports text messages; outgoing attachments and saved drafts remain available through Zoho webmail. Incoming mail remains stored at Zoho. Passwords and OAuth credentials never enter the frontend. All mailbox endpoints require the existing administrator session.
+Cloudflare Email Routing delivers bookings mail to `deploy/email-worker/worker.mjs`. The worker signs the exact MIME body and sends it to the Render API over HTTPS. The API checks the HMAC, timestamp and recipient before parsing, and acknowledges only after MongoDB commits the message. Messages and incoming attachments are stored in the application's existing MongoDB database. This is a custom inbox, not Cloudflare webmail or an IMAP service.
 
-## Account and DNS
+The admin tab lists Inbox, Sent, Unconfirmed and Trash with 50 messages per page, reads safe plain text without tracking images, downloads incoming attachments and sends/replies through Brevo. Outgoing attachments and saved drafts are not implemented. All mailbox reading and sending endpoints require an administrator session. Provider credentials never enter the frontend.
 
-1. The owner completes the actual Zoho free account registration and accepts its terms. Free custom-domain hosting is only available in selected data centers; Canadian pricing may only display paid plans or trials. Confirm the resulting plan is permanently free before proceeding. Never enter false location details to obtain a plan.
-2. Add `djkhalilnahhat.ca` to Zoho and verify the ownership TXT record in Squarespace. Create the exact bookings mailbox. Use the provider's MX and DKIM records for its actual data center, not copied records for another region.
-3. Verify the domain and noreply sender in Brevo. Add the exact supplied DKIM and domain-verification TXT/CNAME records. Keep one combined SPF record covering the actual sending services, and check DMARC alignment. Squarespace's default `v=spf1 -all` blocks mail and must be replaced by the provider-authorized SPF value at activation; merge rather than adding a second SPF record. Preserve website A/CNAME records.
-4. Do not redirect notifications or replace public contact links until both external inbound delivery and an outbound reply have been confirmed. Sender verification and actual inbox delivery are separate checks.
+Incoming messages are limited to 5 MiB and inbound mailbox storage to 100 MiB. A failed or full receiver rejects delivery rather than claiming the message was saved. A sleeping Render instance or provider outage can therefore cause a delivery rejection; the sender must resend. This free setup has no managed mailbox availability guarantee. MongoDB storage and the providers' free quotas still apply. Do not activate a paid plan automatically.
 
-## Zoho API connection
+## Cloudflare DNS and receiver
 
-Create a confidential OAuth client in the correct regional Zoho API Console for this application. The owner must approve mailbox access. Request only `ZohoMail.accounts.READ,ZohoMail.folders.READ,ZohoMail.messages.READ,ZohoMail.messages.CREATE` and offline access. Exchange the owner's authorization grant server-side for a refresh token; never send a secret in chat, source control or a VITE variable.
+1. Keep the domain registered at Squarespace and the website hosted on Render. Import and preserve the existing website A/CNAME records with DNS-only proxy mode.
+2. Change Squarespace nameservers to the exact pair assigned by Cloudflare. If the registrar requires disabling its existing DNSSEC setting, obtain action-time approval. Enable Cloudflare DNSSEC after activation and publish its assigned DS record at the registrar.
+3. Deploy `deploy/email-worker/worker.mjs` as an Email Worker. Generate a random 32-byte hexadecimal `MAIL_INGRESS_SECRET`; store the same value as a Worker secret and a private Render API environment variable. Never commit or send it in chat.
+4. Enable Email Routing, use its exact MX/SPF records, and route only `bookings@djkhalilnahhat.ca` to this Worker. Reject other addresses, including noreply; no catch-all forwarding.
+5. Set `DOMAIN_MAIL_PROVIDER=cloudflare` and deploy the API. Set `DOMAIN_MAIL_RECEIVING_ACTIVE=true` after external delivery reaches the admin inbox. The flag is operator confirmation, not an automatic DNS check.
 
-Store `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`, and `ZOHO_REGION` in the API's Render environment. Region values supported: `us`, `eu`, `in`, `ca`. `/api/admin/mail/folders` verifies the connected account contains the confirmed bookings address, is enabled and has verified MX. It never selects another account as a fallback. Confirm that the actual free account permits these API scopes. If it does not, stop and choose another free receiving solution; do not silently upgrade.
+The public ingress is `POST /api/mail/inbound`, accepts only `message/rfc822` and requires a valid body-bound signature within five minutes. Duplicate deliveries are acknowledged without storing a second copy. MIME bodies do not get written to logs. The database requires transaction support, as provided by MongoDB Atlas.
 
-The provider token is refreshed on the server with bounded requests and a shared in-flight refresh. Access tokens stay in memory and expire early. Send requests use a MongoDB unique `(owner, requestId)` record; duplicate submissions cannot send a second message. Ambiguous sends must be checked in Sent before retrying with a new request ID.
+## Brevo sending
 
-Official API references:
+Authenticate `djkhalilnahhat.ca` in Brevo using the exact verification and DKIM records shown for this account. Keep one SPF TXT record; merge authorized mechanisms rather than adding conflicting SPF records. Preserve DMARC and verify aligned DKIM. Register bookings and noreply as senders.
 
-- https://www.zoho.com/mail/help/api/getting-started-with-api.html
-- https://www.zoho.com/mail/help/api/get-all-users-accounts.html
-- https://www.zoho.com/mail/help/api/get-all-folder-details.html
-- https://www.zoho.com/mail/help/api/get-emails-list.html
-- https://www.zoho.com/mail/help/api/get-email-content.html
-- https://www.zoho.com/mail/help/api/post-send-an-email.html
-- https://www.zoho.com/mail/help/api/post-reply-to-an-email.html
+Use the existing server-only `BREVO_API_KEY`, or have the owner provision a replacement if invalid. Set `DOMAIN_MAIL_SENDING_ACTIVE=true` only when the bookings sender is verified. Outgoing messages always use bookings; automatic mail uses noreply after cutover. Requests have unique owner/request IDs. An ambiguous submission stays in Unconfirmed and cannot automatically send a duplicate. Check provider delivery logs before manually composing another copy.
 
 ## Controlled cutover
 
-After delivery checks pass, set these API Render values and deploy:
+After an external message arrives in Inbox and its reply is actually delivered, set the API environment:
 
 ```dotenv
+DOMAIN_MAIL_PROVIDER=cloudflare
+DOMAIN_MAIL_RECEIVING_ACTIVE=true
+DOMAIN_MAIL_SENDING_ACTIVE=true
 DOMAIN_EMAIL_ACTIVE=true
 EMAIL_FROM_ADDRESS=noreply@djkhalilnahhat.ca
 SERVICE_REQUEST_NOTIFICATION_EMAIL=bookings@djkhalilnahhat.ca
@@ -44,12 +42,10 @@ ADMIN_SERVICES_URL=https://djkhalilnahhat.ca/admin/services
 CUSTOMER_SERVICES_URL=https://djkhalilnahhat.ca/dashboard/services
 ```
 
-`DOMAIN_EMAIL_ACTIVE=true` makes automated sender identity and booking/meeting admin recipients use the exact domain addresses, even if older sender/notification environment values were left over. Brevo must be verified before enabling it.
+Set frontend `VITE_PUBLIC_CONTACT_EMAIL=bookings@djkhalilnahhat.ca` and rebuild. This updates contact links and LocalBusiness metadata together. Keep the previous contact route until actual inbound and outbound delivery are confirmed. Flags and credentials alone do not prove delivery.
 
-Set frontend `VITE_PUBLIC_CONTACT_EMAIL=bookings@djkhalilnahhat.ca` and rebuild/deploy. It updates the artist contact badge, Contact page and LocalBusiness metadata together. Before cutover, the existing contact and notification routes remain usable. The Email tab shows connection status without inventing inbox messages or claiming that credential presence proves delivery.
+The existing administrator Google login remains unchanged. Do not delete the Google account. Old Gmail history is not imported automatically.
 
-Changing the existing administrator's Google/Gmail login identity is a separate account migration. Do not delete the Google account or invalidate its working sign-in during mailbox setup. The domain addresses do not import old Gmail history automatically.
+## Optional Zoho adapter
 
-## Verification
-
-`node --test test/domain-mail.test.js test/notification-emails.test.js` exercises real Express routes with substituted provider/database implementations; no external email is sent. It covers admin admission, mailbox identity/MX verification, long provider IDs, safe message rendering, attachment selection, sender enforcement, shared token refresh, concurrent duplicates and uncertain sends. The frontend production build must pass. Real provider authorization, DNS and actual external send/receive must still be verified separately.
+The original Zoho API adapter remains available with `DOMAIN_MAIL_PROVIDER=zoho`, `ZOHO_REGION`, `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET` and `ZOHO_REFRESH_TOKEN`. Canadian custom-domain hosting required payment when checked, so it is not the chosen free setup. Do not enable a paid trial.

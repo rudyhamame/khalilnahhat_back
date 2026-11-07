@@ -53,7 +53,7 @@ test('all destination endpoints enforce the existing admin guard including reads
  const app=express();app.use(express.json());const h=setup();let calls=0;
  registerLiveDestinations(app,{getLiveStreamConfig:async()=>h.live,requireAdmin:(req,res,next)=>req.headers.authorization==='Bearer admin'?next():res.status(403).json({message:'Admin only'}),service:{...h.service,list:async()=>{calls++;return {items:[]};}},startWorker:false});
  const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));t.after(()=>server.close());const url='http://127.0.0.1:'+server.address().port;
- for(const [method,path] of [['GET',''],['PUT','/youtube'],['POST','/youtube/start'],['POST','/instagram/stop'],['DELETE','/youtube'],['DELETE','/instagram']])assert.equal((await fetch(url+'/api/admin/live-destinations'+path,{method})).status,403);
+ for(const [method,path] of [['GET',''],['PUT','/youtube'],['POST','/youtube/start'],['POST','/instagram/stop'],['DELETE','/youtube'],['DELETE','/instagram'],['PUT','/tiktok'],['POST','/tiktok/start'],['POST','/tiktok/stop'],['DELETE','/tiktok']])assert.equal((await fetch(url+'/api/admin/live-destinations'+path,{method})).status,403);
  assert.equal(calls,0);assert.equal((await fetch(url+'/api/admin/live-destinations',{headers:{Authorization:'Bearer admin'}})).status,200);
 });
 test('social-only jobs do not suppress recording recovery or report capture failures',async()=>{
@@ -109,4 +109,38 @@ test('authenticated delete endpoints confirm key removal on both platforms witho
   const response=await fetch(url,{method:'DELETE',headers:{Authorization:'Bearer admin'}});assert.equal(response.status,200);
   const value=await response.json();assert.equal(value.deleted,true);assert.equal(value.item.platform,platform);assert.equal(value.item.configured,false);
  }
+});
+
+const tiktok={serverUrl:'rtmps://push-rtmp-l1-gcp01.tiktokcdn.com:443/game',streamKey:'tt-private?auth=fixture',accessConfirmed:true};
+test('TikTok accepts publisher ingest URLs and rejects arbitrary hosts, keyed URLs and ports',()=>{
+ for(const serverUrl of [tiktok.serverUrl,'rtmp://push-rtmp-l1-va01.tiktokcdn.com/live/','rtmp://push-rtmp.tiktok.com:1935/live','rtmps://live-api-s.tiktok.com/live'])assert.ok(validate('tiktok',{...tiktok,serverUrl}));
+ for(const serverUrl of ['rtmps://127.0.0.1/live','rtmps://push-rtmp.tiktokcdn.com.attacker.test/live','rtmps://attacker.tiktokcdn.com/live','rtmps://push-rtmp.tiktokcdn.com:444/live','https://push-rtmp.tiktokcdn.com/live','rtmps://user:pass@push-rtmp.tiktokcdn.com/live','rtmps://push-rtmp.tiktokcdn.com/live/key','rtmps://push-rtmp.tiktokcdn.com/live?key=secret','rtmps://push-rtmp.tiktokcdn.com/live#secret'])assert.throws(()=>validate('tiktok',{...tiktok,serverUrl}),undefined,serverUrl);
+ assert.throws(()=>validate('youtube',{...body,serverUrl:'rtmp://a.rtmps.youtube.com/live2'}));
+ assert.throws(()=>validate('instagram',{...instagram,serverUrl:'rtmp://live-upload.instagram.com/rtmp'}));
+});
+test('TikTok requires external streaming confirmation, sends portrait alongside both platforms, and stops independently',async()=>{
+ const h=setup();assert.deepEqual((await h.service.list()).items.map(row=>row.platform),['youtube','instagram','tiktok']);
+ const pending=await h.service.save('tiktok',{...tiktok,accessConfirmed:false});assert.equal(pending.accessConfirmed,false);
+ await assert.rejects(h.service.start('tiktok','owned'),/Confirm external streaming access/);assert.equal(h.started.length,0);
+ await h.service.save('youtube',body);await h.service.save('instagram',instagram);await h.service.save('tiktok',tiktok);
+ for(const platform of ['youtube','instagram','tiktok'])await h.service.start(platform,'owned');
+ assert.equal(h.started[2].options.encodingOptions.width,720);assert.equal(h.started[2].options.encodingOptions.height,1280);
+ assert.equal(h.started[2].output.stream.urls[0],tiktok.serverUrl+'/'+tiktok.streamKey);
+ const status=JSON.stringify(await h.service.list());assert.ok(!status.includes(tiktok.streamKey));assert.ok(!status.includes(h.rows.find(row=>row.platform==='tiktok').secret));
+ await assert.rejects(h.service.stop('tiktok','stale'),/session has changed/);
+ await assert.rejects(h.service.removeKey('tiktok'),/Stop this output/);
+ await h.service.stop('tiktok','owned');await h.service.list();assert.deepEqual(h.stopped,['job-3']);
+ assert.equal(h.rows.find(row=>row.platform==='youtube').state,'live');assert.equal(h.rows.find(row=>row.platform==='instagram').state,'live');assert.equal(h.live.isLive,true);
+ const removed=await h.service.removeKey('tiktok');assert.equal(removed.configured,false);assert.equal(h.rows.find(row=>row.platform==='tiktok').secret,undefined);
+ await assert.rejects(h.service.start('tiktok','owned'),/Save this destination/);
+});
+test('TikTok authenticated routes save, start, stop and delete through the shared service',async t=>{
+ const h=setup(),app=express();app.use(express.json());
+ registerLiveDestinations(app,{requireAdmin:(req,res,next)=>req.headers.authorization==='Bearer admin'?next():res.status(403).end(),service:h.service,startWorker:false});
+ const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
+ const call=async(method,path,body)=>{const response=await fetch(`http://127.0.0.1:${server.address().port}/api/admin/live-destinations/tiktok${path}`,{method,headers:{Authorization:'Bearer admin','Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});assert.equal(response.status,200);return response.json();};
+ assert.equal((await call('PUT','',tiktok)).item.configured,true);
+ assert.equal((await call('POST','/start',{roomName:'owned'})).item.state,'live');
+ await call('POST','/stop',{roomName:'owned'});await h.service.list();
+ assert.equal((await call('DELETE','')).item.configured,false);
 });

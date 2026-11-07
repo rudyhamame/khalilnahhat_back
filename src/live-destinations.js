@@ -2,7 +2,7 @@ const crypto=require('node:crypto');
 const mongoose=require('mongoose');
 const {EgressClient}=require('livekit-server-sdk');
 const {StreamOutput,StreamProtocol,EncodingOptions,VideoCodec,AudioCodec}=require('@livekit/protocol');
-const platforms=['youtube','instagram'];
+const platforms=['youtube','instagram','tiktok'];
 const active=['starting','live','stopping'];
 const schema=new mongoose.Schema({platform:{type:String,enum:platforms,unique:true,required:true},serverUrl:String,accessConfirmed:{type:Boolean,default:false},secret:{type:String,select:false},roomName:{type:String,default:''},jobId:{type:String,default:''},state:{type:String,default:'idle'},operation:String,error:{type:String,default:''}},{timestamps:true});
 const Destination=mongoose.models.LiveDestination||mongoose.model('LiveDestination',schema);
@@ -12,13 +12,19 @@ function seal(value,env){const iv=crypto.randomBytes(12),cipher=crypto.createCip
 function unseal(value,env){const [iv,tag,data]=value.split('.').map(x=>Buffer.from(x,'base64'));const cipher=crypto.createDecipheriv('aes-256-gcm',encryptionKey(env),iv);cipher.setAuthTag(tag);return Buffer.concat([cipher.update(data),cipher.final()]).toString('utf8');}
 function validate(platform,body){
  if(!platforms.includes(platform))throw failure(404,'Unknown streaming destination.');
- const hosts=platform==='youtube'?['a.rtmps.youtube.com','b.rtmps.youtube.com']:['live-upload.instagram.com'];
- let url;try{url=new URL(body.serverUrl);}catch{throw failure(400,'Enter the platform’s RTMPS server URL without its stream key.');}
- if(url.protocol!=='rtmps:'||!hosts.includes(url.hostname)||url.username||url.password||url.search||url.hash||(url.port&&url.port!=='443')||url.pathname.replace(/\/$/,'')!==(platform==='youtube'?'/live2':'/rtmp'))throw failure(400,'Use the supported secure platform server URL, with no key or query in the URL.');
+ let url;try{url=new URL(body.serverUrl);}catch{throw failure(400,'Enter the platform’s server URL without its stream key.');}
+ const path=url.pathname.replace(/\/$/,'');
+ // TikTok supplies regional ingest hosts and may supply plain RTMP. Accept only
+ // known publisher host families, never arbitrary URLs or complete keyed URLs.
+ const tiktokHost=/^push-rtmp(?:-[a-z0-9]+)*\.tiktokcdn\.com$/.test(url.hostname)||['push.tiktok.com','push-rtmp.tiktok.com','live-api.tiktok.com','live-api-s.tiktok.com'].includes(url.hostname);
+ const supported=platform==='tiktok'
+  ? tiktokHost&&['/live','/game','/push'].includes(path)&&['rtmp:','rtmps:'].includes(url.protocol)&&(!url.port||url.port===(url.protocol==='rtmps:'?'443':'1935'))
+  : url.protocol==='rtmps:'&&(!url.port||url.port==='443')&&(platform==='youtube'?['a.rtmps.youtube.com','b.rtmps.youtube.com'].includes(url.hostname)&&path==='/live2':url.hostname==='live-upload.instagram.com'&&path==='/rtmp');
+ if(!supported||url.username||url.password||url.search||url.hash)throw failure(400,'Use the supported platform server URL, with no key or query in the URL.');
  if(typeof body.streamKey!=='string'||!body.streamKey.trim()||body.streamKey.length>2048||/[\s#]/.test(body.streamKey)||body.streamKey.includes('://'))throw failure(400,'Enter a valid stream key separately.');
  return {serverUrl:url.href.replace(/\/$/,''),streamKey:body.streamKey};
 }
-function view(row){return {platform:row.platform,serverUrl:row.serverUrl||'',configured:Boolean(row.secret),accessConfirmed:row.platform==='youtube'||row.accessConfirmed===true,roomName:row.roomName||'',state:row.state||'idle',error:row.error||'',updatedAt:row.updatedAt||null,format:row.platform==='instagram'?'720 × 1280 portrait':'1280 × 720 landscape'};}
+function view(row){return {platform:row.platform,serverUrl:row.serverUrl||'',configured:Boolean(row.secret),accessConfirmed:row.platform==='youtube'||row.accessConfirmed===true,roomName:row.roomName||'',state:row.state||'idle',error:row.error||'',updatedAt:row.updatedAt||null,format:row.platform!=='youtube'?'720 × 1280 portrait':'1280 × 720 landscape'};}
 function createDestinationService({Model=Destination,getLiveStreamConfig,env=process.env,client=()=>new EgressClient(env.LIVEKIT_URL,env.LIVEKIT_API_KEY,env.LIVEKIT_API_SECRET)}={}){
  const read=platform=>Model.findOne({platform}).select('+secret');
  const change=(row,patch)=>Model.findOneAndUpdate({_id:row._id,operation:row.operation,state:row.state},{$set:patch},{new:true}).select('+secret');
@@ -60,11 +66,12 @@ function createDestinationService({Model=Destination,getLiveStreamConfig,env=pro
   const live=await getLiveStreamConfig();if(!live.isLive||live.broadcastMode!=='webrtc'||!roomName||live.webrtcRoomName!==roomName)throw failure(409,'Start the browser or Android live stream first. OBS relay output is not supported by these destinations.');
   if(!env.LIVEKIT_URL||!env.LIVEKIT_API_KEY||!env.LIVEKIT_API_SECRET)throw failure(503,'Configure LiveKit on the API server.');
   let row=await read(platform);if(!row?.secret)throw failure(409,'Save this destination’s server URL and stream key first.');
+  if(platform==='tiktok'&&!row.accessConfirmed)throw failure(409,'Confirm external streaming access and a current server URL and stream key in this TikTok account before sending output.');
   if(platform==='instagram'&&!row.accessConfirmed)throw failure(409,'Instagram is prepared for later. Confirm Live Producer access in the studio after the account becomes eligible.');
   const url=outputUrl(row),operation=crypto.randomUUID();
   row=await Model.findOneAndUpdate({_id:row._id,operation:row.operation,secret:row.secret,state:{$nin:active}},{$set:{state:'starting',operation,roomName,jobId:'',error:''}},{new:true}).select('+secret');if(!row)throw failure(409,'This destination changed, is already active or is awaiting reconciliation. Refresh before retrying.');
   try{
-   const portrait=platform==='instagram';
+   const portrait=platform!=='youtube';
    const job=await client().startRoomCompositeEgress(roomName,{stream:new StreamOutput({protocol:StreamProtocol.RTMP,urls:[url]})},{layout:'single-speaker',encodingOptions:new EncodingOptions({width:portrait?720:1280,height:portrait?1280:720,framerate:30,videoCodec:VideoCodec.H264_BASELINE,videoBitrate:2500,audioCodec:AudioCodec.AAC,audioBitrate:128,audioFrequency:48000,keyFrameInterval:2})});
    await change(row,{jobId:job.egressId});row={...row.toObject?.()||row,jobId:job.egressId};
    return view(await refresh(row)||row);

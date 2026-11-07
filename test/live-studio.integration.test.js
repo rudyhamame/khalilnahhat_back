@@ -67,6 +67,11 @@ test('Live studio: authenticated media, audience ownership, concurrent review an
   await run('live_youtube_start',{roomName:'qa-session'});assert.equal(outputJobs.length,1);assert.equal(outputJobs[0].status,1);
   const outputs=await registry.executeRead('live_destinations_read',{},admin);assert.equal(outputs.items[0].state,'live');assert.ok(!JSON.stringify(outputs).includes('qa-secret-platform-key'));
   await run('live_youtube_stop',{roomName:'qa-session'});assert.equal(outputJobs[0].status,3);
+  const tiktok=await call('/admin/live-destinations/tiktok',{token:'qa-admin',method:'PUT',body:{serverUrl:'rtmps://push-rtmp-l1-gcp01.tiktokcdn.com:443/game',streamKey:'qa-tiktok-private',accessConfirmed:true}});assert.equal(tiktok.code,200);
+  await run('live_tiktok_start',{roomName:'qa-session'});assert.equal(outputJobs[1].status,1);
+  const social=await registry.executeRead('live_destinations_read',{},admin);assert.equal(social.items.find(item=>item.platform==='tiktok').state,'live');assert.ok(!JSON.stringify(social).includes('qa-tiktok-private'));
+  await run('live_tiktok_stop',{roomName:'qa-session'});assert.equal(outputJobs[1].status,3);
+
   const state=await registry.executeRead('live_stream_read',{},admin);assert.equal(state.session,'qa-session');assert.equal('streamKey' in state,false);assert.equal('url' in state,false);
  });
  await t.test('ending a session closes requests/comments and stale client reads cannot leak into the next room',async()=>{

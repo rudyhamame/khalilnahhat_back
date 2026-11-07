@@ -3,7 +3,7 @@ const { z } = require('zod');
 const { sendSimpleEmail } = require('./brevo');
 const { notificationEmails } = require('./notification-emails');
 
-const DEFAULT_ADMIN_EMAIL = 'khalilnahhatdj@gmail.com';
+const {notificationAddress} = require('./business-mail-identity');
 const HOUR_MS = 60 * 60 * 1000;
 
 const meetingSchema = new mongoose.Schema(
@@ -26,7 +26,7 @@ const Meeting = mongoose.models.Meeting || mongoose.model('Meeting', meetingSche
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const when = (d) => new Intl.DateTimeFormat('en-CA', { dateStyle: 'full', timeStyle: 'short', timeZone: 'America/Toronto' }).format(d);
-const adminEmail = () => process.env.SERVICE_REQUEST_NOTIFICATION_EMAIL?.trim() || DEFAULT_ADMIN_EMAIL;
+const adminEmail = () => notificationAddress();
 
 const publicSlot = (m) => ({ id: m.id, start: m.start, durationMin: m.durationMin, mode: m.mode });
 const bookedView = (m) => ({ ...publicSlot(m), link: m.link, location: m.location, topic: m.topic, bookedByName: m.bookedByName, bookedByEmail: m.bookedByEmail });

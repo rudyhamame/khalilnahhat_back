@@ -1,5 +1,5 @@
 const BREVO_TRANSACTIONAL_EMAIL_URL = 'https://api.brevo.com/v3/smtp/email';
-const DEFAULT_NOTIFICATION_EMAIL = 'khalilnahhatdj@gmail.com';
+const {notificationAddress,senderAddress} = require('./business-mail-identity');
 const { notificationEmails } = require('./notification-emails');
 
 function escapeHtml(value) {
@@ -20,7 +20,7 @@ function formatCad(value) {
 
 async function sendBrevoEmail(payload, {notifications=notificationEmails,fetchImpl=fetch,env=process.env} = {}) {
   const apiKey = env.BREVO_API_KEY?.trim();
-  const senderEmail = env.EMAIL_FROM_ADDRESS?.trim();
+  const senderEmail = senderAddress(env);
 
   if (!apiKey || !senderEmail) {
     console.warn('Brevo notification skipped: BREVO_API_KEY or EMAIL_FROM_ADDRESS is missing.');
@@ -42,11 +42,11 @@ async function sendBrevoEmail(payload, {notifications=notificationEmails,fetchIm
         'content-type': 'application/json',
       },
       body: JSON.stringify({
+        ...payload,
         sender: {
           name: env.EMAIL_FROM_NAME?.trim() || 'Khalil Nahhat Website',
           email: senderEmail,
         },
-        ...payload,
       }),
       signal: controller.signal,
     });
@@ -70,8 +70,7 @@ async function sendServiceRequestNotification(serviceRequest) {
     const resumed=previous&&((message.segmentId&&message.segmentId!==previous.segmentId)||message.mode!==previous.mode||Date.parse(message.createdAt)-Date.parse(previous.createdAt)>15*60*1000);
     return `${resumed?'──────── Conversation resumed · '+(message.mode==='voice'?'Voice call':'Text')+' ────────\n\n':''}${message.createdAt?new Date(message.createdAt).toISOString()+' · ':''}${message.role==='assistant'?'Echo AI':'Client'} · ${message.mode==='voice'?'Voice call':'Text'}\n${message.content}`;
   }).join('\n\n');
-  const recipientEmail = process.env.SERVICE_REQUEST_NOTIFICATION_EMAIL?.trim()
-    || DEFAULT_NOTIFICATION_EMAIL;
+  const recipientEmail = notificationAddress();
   const adminServicesUrl = process.env.ADMIN_SERVICES_URL?.trim();
   const itemRows = serviceRequest.items.map((item) => `
     <tr>
@@ -120,8 +119,7 @@ async function sendServiceRequestNotification(serviceRequest) {
 }
 
 async function sendServiceQuoteNotification(serviceRequest) {
-  const khalilEmail = process.env.SERVICE_REQUEST_NOTIFICATION_EMAIL?.trim()
-    || DEFAULT_NOTIFICATION_EMAIL;
+  const khalilEmail = notificationAddress();
   const customerServicesUrl = process.env.CUSTOMER_SERVICES_URL?.trim();
   const totals=require('./quote-totals').quoteTotals(serviceRequest);
   const total=totals.total;
@@ -205,7 +203,7 @@ async function sendQuoteExpiryReminder(serviceRequest, expiresAt) {
 }
 
 async function sendBookingConfirmation(sr, paidCents) {
-  const khalilEmail = process.env.SERVICE_REQUEST_NOTIFICATION_EMAIL?.trim() || DEFAULT_NOTIFICATION_EMAIL;
+  const khalilEmail = notificationAddress();
   const ref = escapeHtml(sr.requestNumber || sr.externalId);
   const body = (who) => `<p>${who}</p>
     <p>Booking <strong>${ref}</strong> is <strong>confirmed</strong> for <strong>${escapeHtml(sr.event.eventDate)}</strong> at ${escapeHtml(sr.event.venueName || sr.event.city || 'your venue')}.</p>

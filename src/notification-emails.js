@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { z } = require('zod');
+const {senderAddress}=require('./business-mail-identity');
 
 const BRAND = 'Echo Event Entertainment';
 const sample = { recipientName:'Alex', customerName:'Alex Morgan', customerEmail:'alex@example.com', requestId:'ECHO-1042', eventDate:'November 21, 2026', venue:'Toronto', depositAmount:'$250.00', total:'$1,000.00', details:'DJ performance × 1 — $1,000.00', adminNote:'We look forward to your event.', expiresAt:'November 14, 2026 at 5:00 p.m. Eastern', meetingTime:'November 7, 2026 at 2:00 p.m. Eastern', duration:'30 minutes', meetingLocation:'Online meeting', topic:'Event planning', actionUrl:'https://example.com/your-link', brand:BRAND, liveTitle:'Live with DJ Khalil', liveGoal:'DJing in Home Studio' };
@@ -67,7 +68,7 @@ function createNotificationEmails({store=mongoStore}={}){
 }
 const notificationEmails=createNotificationEmails();
 function registerNotificationEmails(app,{requireAdmin,service=notificationEmails,env=process.env}){
- app.get('/api/admin/notifications/emails',requireAdmin,async(_req,res)=>res.set('Cache-Control','no-store').json({items:await service.list(),provider:{name:'Brevo',configured:Boolean(env.BREVO_API_KEY?.trim()&&env.EMAIL_FROM_ADDRESS?.trim()),senderEmail:env.EMAIL_FROM_ADDRESS||'',senderName:env.EMAIL_FROM_NAME||'Khalil Nahhat Website'}}));
+ app.get('/api/admin/notifications/emails',requireAdmin,async(_req,res)=>res.set('Cache-Control','no-store').json({items:await service.list(),provider:{name:'Brevo',configured:Boolean(env.BREVO_API_KEY?.trim()&&senderAddress(env)),senderEmail:senderAddress(env),senderName:env.EMAIL_FROM_NAME||'Khalil Nahhat Website'}}));
  app.put('/api/admin/notifications/emails/:id',requireAdmin,async(req,res)=>res.json({item:await service.save(req.params.id,req.body,String(req.user._id))}));
  app.post('/api/admin/notifications/emails/:id/preview',requireAdmin,(req,res)=>res.json(service.preview(req.params.id,req.body)));
 }

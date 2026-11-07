@@ -1624,6 +1624,7 @@ require('./live-recordings').registerLiveRecordings(app, requireAdmin);
 require('./live-suggestions').registerLiveSuggestions(app, { getLiveStreamConfig, requireAuth });
 require('./live-comments').registerLiveComments(app, { getLiveStreamConfig, requireAuth, requireAdmin });
 require('./notification-emails').registerNotificationEmails(app, { requireAdmin });
+require('./domain-mail').registerDomainMail(app, { requireAdmin });
 registerEquipmentRoutes(app, requireAdmin);
 require('./equipment-3d').registerEquipment3D(app,{requireAdmin});
 registerPlanning(app, { requireAuth, serialize: serializeServiceRequest });

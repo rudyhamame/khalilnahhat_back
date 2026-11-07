@@ -8,9 +8,9 @@ services:
       - key: NODE_VERSION
         value: "24"
       - key: FRONTEND_URL
-        value: "https://echo-khalil.onrender.com"
+        value: "https://djkhalilnahhat.ca"
       - key: CORS_ORIGIN
-        value: "https://echo-khalil.onrender.com"
+        value: "https://djkhalilnahhat.ca"
       - key: YOUTUBE_PROCESSING_MODE
         value: server
       - key: GOOGLE_CLIENT_ID

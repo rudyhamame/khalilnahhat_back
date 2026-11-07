@@ -45,7 +45,7 @@ async function notifyLiveTransition(previous,next){
  if(!id||sessionKey(previous)===id)return;
  try{
   if(!(await notificationEmails.get('live-started')).enabled)return;
-  const actionUrl=(process.env.FRONTEND_URL||process.env.PUBLIC_APP_URL||'https://echo-khalil.onrender.com').replace(/\/+$/,'')+'/';
+  const actionUrl=(process.env.FRONTEND_URL||process.env.PUBLIC_APP_URL||'https://djkhalilnahhat.ca').replace(/\/+$/,'')+'/';
   await Campaign.updateOne({_id:id},{$setOnInsert:{title:next.title||'Live with DJ Khalil',goal:goals[next.goal]||goals.broadcast,actionUrl,cutoff:new Date(),audienceReady:false}},{upsert:true});
   void tick();
  }catch(error){console.error('Could not queue live announcement:',error.name);}

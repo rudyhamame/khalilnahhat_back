@@ -86,7 +86,7 @@ const DEFAULT_SERVICE_PRICES = [
 ].map(([serviceId, name, category]) => ({ serviceId, name, category }));
 
 function getFrontendUrl() {
-  return (process.env.FRONTEND_URL || process.env.PUBLIC_APP_URL || 'http://localhost:5173').replace(/\/+$/, '');
+  return (process.env.FRONTEND_URL || process.env.PUBLIC_APP_URL || 'https://djkhalilnahhat.ca').replace(/\/+$/, '');
 }
 
 async function ensureServicePrices() {
@@ -670,12 +670,9 @@ function parseCorsOrigins(value) {
     .filter(Boolean);
 }
 
-const configuredCorsOrigins = new Set([
-  'http://localhost:5173',
-  'http://192.168.68.104:5173',
-  'https://echo-khalil.onrender.com',
-  ...parseCorsOrigins(process.env.CORS_ORIGIN),
-]);
+const configuredCorsOrigins = new Set(
+  parseCorsOrigins(process.env.CORS_ORIGIN || 'https://djkhalilnahhat.ca'),
+);
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,

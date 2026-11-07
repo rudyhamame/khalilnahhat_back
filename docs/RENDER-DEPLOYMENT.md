@@ -1,6 +1,6 @@
 # Render deployment
 
-Current website: https://echo-khalil.onrender.com
+Current website: https://djkhalilnahhat.ca
 Current API: https://echo-khalil-api.onrender.com/api
 
 Render builds the main branches of `khalilnahhat_front` and `khalilnahhat_back`. The frontend is a static Vite build (`npm run build`, publish `dist`, rewrite `/*` to `/index.html`). The backend uses the standard repository Dockerfile and `/api/health` health check. Neither project requires another application's container image, Compose stack, SSH tunnel or host-mounted secret file.

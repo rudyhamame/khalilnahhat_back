@@ -60,7 +60,7 @@ test('Cloudflare worker signs the actual MIME body and rejects an unconfirmed de
  const worker=(await import('../deploy/email-worker/worker.mjs')).default,originalFetch=global.fetch;let rejection='';const f=fixture();
  t.after(()=>{global.fetch=originalFetch;});
  const message=()=>({to:BOOKINGS,from:'customer@example.test',raw:new Blob([mime]).stream(),rawSize:mime.length,setReject:value=>{rejection=value;}});
- global.fetch=async(_url,options)=>new Response(JSON.stringify(await f.service.receive(Buffer.from(options.body),options.headers)));
+ global.fetch=async(_url,options)=>{assert.equal(options.redirect,'manual','Cloudflare rejects redirect:error before sending');return new Response(JSON.stringify(await f.service.receive(Buffer.from(options.body),options.headers)));};
  await worker.email(message(),{MAIL_INGRESS_SECRET:secret});assert.equal(rejection,'');assert.equal(f.rows.size,1);
  global.fetch=async()=>new Response('{}',{status:503});await worker.email(message(),{MAIL_INGRESS_SECRET:secret});assert.match(rejection,/could not accept/);
 });

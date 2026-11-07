@@ -7,9 +7,9 @@
 
 Cloudflare Email Routing delivers bookings mail to `deploy/email-worker/worker.mjs`. The worker signs the exact MIME body and sends it to the Render API over HTTPS. The API checks the HMAC, timestamp and recipient before parsing, and acknowledges only after MongoDB commits the message. Messages and incoming attachments are stored in the application's existing MongoDB database. This is a custom inbox, not Cloudflare webmail or an IMAP service.
 
-The admin tab lists Inbox, Sent, Unconfirmed and Trash with 50 messages per page, reads safe plain text without tracking images, downloads incoming attachments and sends/replies through Brevo. Outgoing attachments and saved drafts are not implemented. All mailbox reading and sending endpoints require an administrator session. Provider credentials never enter the frontend.
+The admin tab lists Inbox, Sent, Archive, Needs attention and Trash with 50 messages per page, reads safe plain text without tracking images, downloads incoming attachments and sends/replies through Brevo. Compose retains a private draft in this browser tab for the signed-in administrator. Outgoing attachments are not implemented. All mailbox reading and sending endpoints require an administrator session. Provider credentials never enter the frontend.
 
-Incoming messages are limited to 5 MiB and inbound mailbox storage to 100 MiB. A failed or full receiver rejects delivery rather than claiming the message was saved. A sleeping Render instance or provider outage can therefore cause a delivery rejection; the sender must resend. This free setup has no managed mailbox availability guarantee. MongoDB storage and the providers' free quotas still apply. Do not activate a paid plan automatically.
+Incoming messages are limited to 5 MiB and total new mailbox storage to 100 MiB. Sent drafts reserve quota before sending; permanently deleting a Trash message releases its reserved bytes. A failed or full receiver rejects delivery rather than claiming the message was saved. A sleeping Render instance or provider outage can therefore cause a delivery rejection; the sender must resend. This free setup has no managed mailbox availability guarantee. MongoDB storage and the providers' free quotas still apply. Do not activate a paid plan automatically.
 
 ## Cloudflare DNS and receiver
 
@@ -25,7 +25,7 @@ The public ingress is `POST /api/mail/inbound`, accepts only `message/rfc822` an
 
 Authenticate `djkhalilnahhat.ca` in Brevo using the exact verification and DKIM records shown for this account. Keep one SPF TXT record; merge authorized mechanisms rather than adding conflicting SPF records. Preserve DMARC and verify aligned DKIM. Register bookings and noreply as senders.
 
-Use the existing server-only `BREVO_API_KEY`, or have the owner provision a replacement if invalid. Set `DOMAIN_MAIL_SENDING_ACTIVE=true` only when the bookings sender is verified. Outgoing messages always use bookings; automatic mail uses noreply after cutover. Requests have unique owner/request IDs. An ambiguous submission stays in Unconfirmed and cannot automatically send a duplicate. Check provider delivery logs before manually composing another copy.
+Use the existing server-only `BREVO_API_KEY`, or have the owner provision a replacement if invalid. Set `DOMAIN_MAIL_SENDING_ACTIVE=true` only when the bookings sender is verified. Outgoing messages always use bookings; automatic mail uses noreply after cutover. Requests have unique owner/request IDs. An ambiguous submission stays in Needs attention and cannot automatically send a duplicate. Check provider delivery logs before manually composing another copy.
 
 ## Controlled cutover
 
@@ -49,3 +49,17 @@ The existing administrator Google login remains unchanged. Do not delete the Goo
 ## Optional Zoho adapter
 
 The original Zoho API adapter remains available with `DOMAIN_MAIL_PROVIDER=zoho`, `ZOHO_REGION`, `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET` and `ZOHO_REFRESH_TOKEN`. Canadian custom-domain hosting required payment when checked, so it is not the chosen free setup. Do not enable a paid trial.
+
+## Module boundaries
+
+- `src/mail/routes.js`: admin admission, request schemas, private errors and raw ingress.
+- `src/mail/service.js`: mailbox identity, capabilities and read/move/delete contracts.
+- `src/mail/store.js`: fixed-mailbox queries, indexes, transactional quota and delivery idempotency.
+- `src/mail/receive.js`: body-bound HMAC verification and safe MIME parsing.
+- `src/mail/send.js`: validated bookings sender, reply threading and uncertain-send preservation.
+- `src/mail/text.js`, `validation.js`, `constants.js`: shared rendering, limits and rules.
+- `src/mail/zoho.js`: optional legacy adapter; it is not used by the active Cloudflare setup.
+
+Frontend `src/echo/mail/` separates HTTP requests, mailbox state, draft state, folders, list, reader and composer. The Email tab fills the dashboard content area; its list and reader scroll independently. Folder search is server-side and escapes regular-expression characters. A message move uses the current folder as a concurrency guard. Restore to Sent or Needs attention is only allowed from Trash to its recorded previous folder. Permanent removal is restricted to Trash.
+
+Cloudflare's Worker runtime does not accept `redirect: "error"`; the receiver uses `redirect: "manual"` and rejects every non-success response. Redirects are never followed with the signing headers or MIME body. Failure diagnostics contain only event names, status codes and exception names.

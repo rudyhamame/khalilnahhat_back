@@ -9,6 +9,8 @@ const Entry=mongoose.models.SetupCatalogEntry||mongoose.model('SetupCatalogEntry
 const slug=z.string().trim().min(1).max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 const image=z.string().trim().max(2048).refine(value=>!value||value.startsWith('/echo/')||/^https:\/\//i.test(value),'Use an HTTPS image URL.');
 const fields={
+ icon:z.enum(['','microphone','audio','disc','monitor','sparkles','lighting','building','box']).default(''),
+ selectionField:z.enum(['','music.mcRequested','music.djRequested']).default(''),
  name:z.string().trim().min(1).max(160),nameAr:z.string().trim().max(160).default(''),
  description:z.string().trim().max(2000).default(''),descriptionAr:z.string().trim().max(2000).default(''),
  imageUrl:image.default(''),galleryImages:z.array(image.min(1)).max(12).default([]),category:z.string().trim().max(80).regex(/^$|^[a-z0-9]+(?:-[a-z0-9]+)*$/).default(''),

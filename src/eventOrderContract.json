@@ -184,7 +184,8 @@
       "led",
       "fx",
       "rental",
-      "corporate"
+      "corporate",
+      "mc"
      ],
      "required": true
     },

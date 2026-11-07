@@ -992,7 +992,7 @@ app.get('/api/service-requests/mine', requireAuth, async (request, response) => 
 app.get('/api/service-requests/admin', requireAdmin, async (_request, response) => {
   const [requests,equipment,prices]=await Promise.all([ServiceRequest.find().sort({createdAt:-1}),Equipment.find().select('slug priceCents'),ServicePrice.find({isActive:true}).select('serviceId amountCents')]);
   const defaults=new Map([...prices.map(item=>[item.serviceId,Number(item.amountCents)/100]),...equipment.map(item=>[item.slug,Number(item.priceCents)/100])]);
-  const serviceAliases={'svc-dj':'service-dj','svc-sound':'service-sound','svc-lighting':'service-lighting','svc-led':'service-video','svc-fx':'service-effects','svc-corporate':'service-corporate'};
+  const serviceAliases={'svc-mc':'service-mc','svc-dj':'service-dj','svc-sound':'service-sound','svc-lighting':'service-lighting','svc-led':'service-video','svc-fx':'service-effects','svc-corporate':'service-corporate'};
   for(const [bookingId,priceId] of Object.entries(serviceAliases)){if(defaults.has(priceId))defaults.set(bookingId,defaults.get(priceId));}
   return response.json({items:requests.map(item=>{const result=serializeServiceRequest(item,true);return {...result,items:result.items.map(line=>({...line,defaultUnitPrice:defaults.has(line.serviceId)?defaults.get(line.serviceId):null}))};})});
 });

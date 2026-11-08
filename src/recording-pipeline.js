@@ -12,7 +12,7 @@ function createRecordingPipeline({Model,providers,prepareFiles,upload,verify=asy
  async function run(id){
   return jobs.run(id,async lease=>{
    const {row,save}=lease;const previousAttempts=row.attempts||0;
-   const provider=providers[row.provider==='ovh'?'ovh':'livekit'];
+   const provider=providers[row.provider]||providers.livekit;
    let sources=Array.from(row.sources||[],source=>source.toObject?source.toObject():{...source});
    const keepLegacy=row.parts?.length?Array.from(row.parts,part=>part.toObject?part.toObject():{...part}):row.publicId?[{publicId:row.publicId,delivery:row.delivery||'authenticated',bytes:row.bytes||0,duration:row.duration||0}]:[];
    // Previously saved rows keep their original identities and part order.
@@ -70,7 +70,7 @@ function createRecordingPipeline({Model,providers,prepareFiles,upload,verify=asy
     if(error.code==='RECORDING_LEASE_LOST')return;
     const attempts=previousAttempts+1;
     await save({...(phase==='capture'?{captureState:row.captureState==='starting'?'failed':row.captureState==='ended'?'ended':'unknown'}:{}),status:attempts>=RETRIES&&row.captureState==='ended'&&parts().length?'partial':'upload_failed',attempts,error:phase==='capture'?'Recording capture could not be checked or started. Already saved parts are kept. Check the media service and retry recovery.':'Saving did not finish. Already saved parts are kept. Check source availability and retry recovery.',nextRetryAt:new Date(clock()+Math.min(attempts*60000,1800000))});
-   }finally{if(directory)await fs.rm(directory,{recursive:true,force:true}).catch(()=>{});}
+   }finally{provider.release?.(row);if(directory)await fs.rm(directory,{recursive:true,force:true}).catch(()=>{});}
   });
  }
  let running=false;

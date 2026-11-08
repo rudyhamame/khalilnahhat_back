@@ -18,4 +18,12 @@ function recordingStorageConfig(env=process.env){
     accessKey:env.ECHO_RECORDING_ACCESS_KEY,secretKey:env.ECHO_RECORDING_SECRET,
   };
 }
-module.exports={recordingStorageConfig};
+// Opt-in free-space reservation for a staging store sharing the API's disk.
+function recordingDiskReserve(env=process.env){
+ const value=env.ECHO_RECORDING_MIN_FREE_BYTES;
+ if(value===undefined||value==='')return 0;
+ const bytes=Number(value);
+ if(!Number.isSafeInteger(bytes)||bytes<0)throw Object.assign(new Error('Invalid recording disk reserve configuration.'),{status:503});
+ return bytes;
+}
+module.exports={recordingStorageConfig,recordingDiskReserve};

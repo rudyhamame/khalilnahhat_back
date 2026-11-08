@@ -1635,6 +1635,7 @@ require('./echo-project-chat-calls').registerEchoProjectChatCalls(app, { require
 require('./availability').registerAvailability(app, { requireAdmin });
 vouchers.registerVouchers(app, { requireAdmin, requireAuth });
 require('./live-recordings').registerLiveRecordings(app, requireAdmin);
+require('./direct-recording').registerDirectRecordingRoutes(app,requireAdmin);
 require('./live-suggestions').registerLiveSuggestions(app, { getLiveStreamConfig, requireAuth });
 require('./live-comments').registerLiveComments(app, { getLiveStreamConfig, requireAuth, requireAdmin });
 require('./notification-emails').registerNotificationEmails(app, { requireAdmin });

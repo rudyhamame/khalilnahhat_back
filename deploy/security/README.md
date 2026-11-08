@@ -52,3 +52,7 @@ The cleaner removes unused Docker images older than 30 days, retaining images us
 It does not remove project files, backups, recordings, databases, Docker volumes, stopped containers or application runtime directories. These need separate retention and recovery decisions. For a preview run `sudo python3 /srv/rh/khalil-security/bin/cleanup.py`; review service results with `journalctl -u khalil-cleanup.service`. Disable scheduling with `systemctl disable --now khalil-cleanup.timer`.
 
 On 2026-11-08, old deployment/backup files were copied to the operator workstation under `/home/rudy/Documents/khalil/ovh-cleanup-20261108/` for verification before server removal. This is separate from the encrypted daily production backup process.
+
+## Recording storage
+
+LiveKit staging now uses OVH Garage. Preserve the storage volume, HTTPS bucket route and API hostname override. See [recording storage operations](../recording-storage/README.md) for capacity, cleanup, recovery and the remaining LiveKit egress quota blocker.

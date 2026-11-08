@@ -1,4 +1,6 @@
 const mongoose=require('mongoose');
+const {statfs}=require('node:fs/promises');
+const {recordingDiskReserve}=require('./recording-storage');
 const cloudinary=require('cloudinary').v2;
 const {createRecordingObjectStore}=require('./recording-object-store');
 const {RoomServiceClient,EgressClient}=require('livekit-server-sdk');
@@ -21,6 +23,7 @@ const schema=new mongoose.Schema({
  attempts:{type:Number,default:0},nextRetryAt:{type:Date,default:()=>new Date()},leaseUntil:{type:Date,default:()=>new Date(0)},
  deletedAt:{type:Date,default:null},
  provider:{type:String,default:'livekit'},relaySegments:[String],
+ direct:{ownerId:String,mime:String,count:{type:Number,default:0},bytes:{type:Number,default:0},state:String,complete:Boolean,lastChunkAt:Date},
  error:{type:String,default:''},published:{type:Boolean,default:false},test:{type:Boolean,default:false},
 },{timestamps:true});
 schema.index({deletedAt:1,nextRetryAt:1,leaseUntil:1});
@@ -49,13 +52,24 @@ async function uploadRecordingPart(filename,publicId,expected={}){
  return new Promise((resolve,reject)=>{const stream=cloudinary.uploader.upload_large(filename,{resource_type:'video',type:'authenticated',public_id:publicId,overwrite:false,chunk_size:20*1024*1024,timeout:600000},(error,result)=>error?reject(error):resolve(result));stream.on('error',reject);});
 }
 function objectBelongsToRoom(key,roomName){return typeof key==='string'&&key.startsWith(roomName+'/')&&!key.includes('..')&&key.endsWith('.mp4');}
-// The file LiveKit writes to the B2 staging bucket for one room (the server later moves it to Cloudinary's "Live" folder).
+// LiveKit writes to the configured private S3 staging bucket; verified files move to Cloudinary.
 function recordingFile(roomName,config){
  return new EncodedFileOutput({fileType:EncodedFileType.MP4,filepath:`${roomName}/{publisher_identity}-{time}.mp4`,disableManifest:true,
   output:{case:'s3',value:new S3Upload({accessKey:process.env.ECHO_RECORDING_ACCESS_KEY,secret:process.env.ECHO_RECORDING_SECRET,endpoint:config.publicEndpoint,bucket:config.bucket,region:config.region,forcePathStyle:true})}});
 }
-async function prepareRecordingRoom(roomName,title,test=false){
+async function prepareRecordingRoom(roomName,title,test=false,options={}){
+ if(options.mode==='direct'){
+  const recording=await require('./direct-recording').createDirectRecording(roomName,title,options.ownerId);
+  try{await sdk(RoomServiceClient).createRoom({name:roomName,emptyTimeout:180,departureTimeout:15});}
+  catch(error){await LiveRecording.updateOne({_id:recording._id},{$set:{captureState:'ended',status:'failed',error:'The live room could not start.'}});throw error;}
+  return recording;
+ }
  if(!configured())throw Object.assign(new Error('Automatic recording storage is not configured.'),{status:503});
+ const reserve=recordingDiskReserve();
+ if(reserve){
+  const disk=await statfs('/var/tmp');
+  if(disk.bavail*disk.bsize<reserve)throw Object.assign(new Error('Recording storage is low on disk space. Wait for pending recordings to finish saving before starting another live stream.'),{status:503});
+ }
  const config=recordingStorageConfig(),BUCKET=config.bucket;
  const client=store();
  if(!await client.bucketExists(BUCKET))throw Object.assign(new Error('Create the private recording staging bucket before starting a live stream.'),{status:503});
@@ -76,9 +90,9 @@ async function verifyArchivedPart(part){
  if(stored.public_id!==part.publicId||!(stored.bytes>0)||(part.bytes&&stored.bytes!==part.bytes))throw new Error('Saved archive part could not be confirmed');
 }
 const pipeline=createRecordingPipeline({Model:LiveRecording,
- providers:createRecordingProviders({store,bucket:()=>recordingStorageConfig()?.bucket,
+ providers:{direct:require('./direct-recording').directProvider(),...createRecordingProviders({store,bucket:()=>recordingStorageConfig()?.bucket,
   egress:()=>sdk(EgressClient),rooms:()=>sdk(RoomServiceClient),
-  startCapture:(roomName,identity)=>sdk(EgressClient).startParticipantEgress(roomName,identity,{file:recordingFile(roomName,recordingStorageConfig())},{encodingOptions:EncodingOptionsPreset.H264_720P_30})}),
+  startCapture:(roomName,identity)=>sdk(EgressClient).startParticipantEgress(roomName,identity,{file:recordingFile(roomName,recordingStorageConfig())},{encodingOptions:EncodingOptionsPreset.H264_720P_30})})},
  prepareFiles:prepareRecordingFiles,upload:uploadRecordingPart,verify:verifyArchivedPart});
 async function statusForRoom(roomName){
  if(!roomName)return null;

@@ -40,8 +40,9 @@ function registerLiveBroadcastRoutes(app, deps) {
         { new: true },
       );
       if (!updated) return response.status(409).json({ message: 'Another source started first. Refresh your live status.' });
+      let recording;
       if (prepareRecording) {
-        try { await prepareRecording(roomName, title || current.title || defaults.title); }
+        try { recording=await prepareRecording(roomName, title || current.title || defaults.title,false,{mode:request.body?.recordingMode==='direct'?'direct':'livekit',ownerId:request.user?._id}); }
         catch (error) {
           await LiveStreamConfig.findOneAndUpdate({ key: defaults.key, webrtcRoomName: roomName }, { isLive: false, webrtcRoomName: '', statusLabel: defaults.statusLabel }, { new: true });
           throw error;
@@ -53,7 +54,7 @@ function registerLiveBroadcastRoutes(app, deps) {
           if(expired) await new RoomServiceClient(config.wsUrl,config.apiKey,config.apiSecret).deleteRoom(roomName);
         } catch { /* The exact-room webhook can still reconcile a disconnected publisher. */ }
       },60000); expiry.unref?.();
-      return response.status(201).json({ item: serialize(updated), token, url: config.wsUrl, roomName });
+      return response.status(201).json({ item: serialize(updated), token, url: config.wsUrl, roomName,...(recording?.provider==='direct'?{recording:{id:String(recording._id),mode:'direct'}}:{}) });
     } catch (error) {
       console.error('WebRTC go-live failed:', error.message);
       return response.status(error.status || 500).json({ message: error.status === 503 ? error.message : 'Could not start the live stream.' });

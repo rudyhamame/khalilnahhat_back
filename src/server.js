@@ -1629,7 +1629,7 @@ require('./stem-separation').registerStemSeparation(app, { requireAdmin });
 require('./music-archive').registerMusicArchive(app, { requireAdmin });
 require('./dj-service-builder').registerDjServiceBuilder(app, { requireAdmin });
 require('./setup-catalog').registerSetupCatalog(app, { requireAdmin });
-require('./echo-project-chat').registerEchoProjectChat(app, { requireAdmin });
+const projectChatRealtime=require('./echo-project-chat').registerEchoProjectChat(app, { requireAdmin,authenticate:authFromRequest,allowedOrigins:[...configuredCorsOrigins,getFrontendUrl()] });
 require('./echo-project-chat-audio').registerEchoProjectChatAudio(app, { requireAdmin });
 require('./echo-project-chat-calls').registerEchoProjectChatCalls(app, { requireAdmin, getConfig: getLiveKitConfig });
 require('./availability').registerAvailability(app, { requireAdmin });
@@ -1683,6 +1683,7 @@ async function startServer(port = PORT) {
   server.maxRequestsPerSocket = 1000;
   server.once('close',stopAssetCleanup);
   aiBooking.attachAlibabaVoiceSocket(server,aiBookingRoutes.voiceSocketHooks);
+  projectChatRealtime.attach(server);
   return server;
 }
 

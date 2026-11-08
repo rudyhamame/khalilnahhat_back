@@ -7,7 +7,7 @@
     "dev": "nodemon",
     "start": "node src/server.js",
     "check": "node --check src/server.js",
-    "test:project-chat": "node --test test/echo-project-chat.test.js test/echo-project-chat-features.test.js",
+    "test:project-chat": "node --test test/echo-project-chat.test.js test/echo-project-chat-features.test.js test/project-chat-socket.test.js",
     "test:music-ontology": "node --test test/music-ontology.test.js test/music-ontology.integration.test.js test/music-archive.test.js test/music-archive-files.test.js",
     "music-ontology:audit": "node scripts/music-ontology-migrate.js audit",
     "test:ai-administrator": "node --test test/ai-administrator.integration.test.js",

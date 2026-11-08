@@ -127,3 +127,15 @@ test('Sent, Delivered and Seen times require real acknowledgements from another 
  assert.equal((await f.request('/receipts','POST',{messageIds:[id(900)],seen:true},b)).status,200);assert.equal(f.receipts.size,1,'nonexistent messages receive no receipt');
  await f.request('/'+message._id,'DELETE');assert.equal(f.receipts.size,0);
 });
+
+test('compact history omits media bytes; private attachments load only for authenticated admins',async t=>{
+ const f=await fixture(t);const attachment={type:'audio',mimeType:'audio/webm',name:'Voice',data:'data:audio/webm;base64,'+'YQ=='.repeat(200000)};
+ const message=f.add(1,a,attachment);f.add(2,b);
+ const result=await f.request('?compact=1');assert.equal(result.status,200);
+ assert.equal(result.data.items[0].attachment.type,'audio');assert.equal(result.data.items[0].attachment.data,undefined);assert.ok(JSON.stringify(result.data).length<2000);
+ const path='/'+message._id+'/attachment';
+ assert.equal((await f.request(path,'GET',undefined,null)).status,401);assert.equal((await f.request(path,'GET',undefined,c)).status,403);
+ assert.equal((await f.request(path)).data.attachment.data,attachment.data);
+ assert.equal((await f.request('/bad/attachment')).status,400);assert.equal((await f.request('/'+id(999)+'/attachment')).status,404);
+ assert.equal((await f.request()).data.items[0].attachment.data,attachment.data,'legacy clients still receive their original response');
+});

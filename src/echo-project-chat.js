@@ -39,7 +39,11 @@ function deliveryTimes(item,receipts=[]){
   return {sentAt:item.createdAt,deliveredAt:first('deliveredAt'),seenAt:first('seenAt')};
 }
 
-function registerEchoProjectChat(app, { requireAdmin }) {
+function registerEchoProjectChat(app, { requireAdmin,authenticate,allowedOrigins }) {
+  const realtime=require('./project-chat-socket').createProjectChatSocket({authenticate,allowedOrigins,
+    onHeartbeat:(user,connectionId)=>Presence.updateOne({_id:'socket:'+connectionId},{$set:{userId:String(user._id||user.id),lastSeenAt:new Date()}},{upsert:true}),
+    onOffline:(_user,connectionId)=>Presence.deleteOne({_id:'socket:'+connectionId}),
+  });
   const actor = req => req.user || req.authUser;
   const userId = req => String(actor(req)?._id || actor(req)?.id || '');
   const validTopic=async topicId=>topicId==='general'||Boolean(await Topic.exists({_id:topicId}));
@@ -66,7 +70,7 @@ function registerEchoProjectChat(app, { requireAdmin }) {
     if(!parsed.success)return res.status(400).json({message:'Enter a discussion topic of 1–80 characters.'});
     const title=parsed.data.title.replace(/\s+/g,' '),titleKey=title.normalize('NFKC').toLowerCase();
     if(titleKey==='general')return res.status(409).json({message:'A topic with this name already exists.'});
-    try{const item=await Topic.create({title,titleKey,createdBy:userId(req)});res.status(201).json({item:serializeTopic(item)});}catch(error){res.status(error.code===11000?409:503).json({message:error.code===11000?'A topic with this name already exists.':'Discussion topic could not be created.'});}
+    try{const item=await Topic.create({title,titleKey,createdBy:userId(req)});realtime.publish('topics');res.status(201).json({item:serializeTopic(item)});}catch(error){res.status(error.code===11000?409:503).json({message:error.code===11000?'A topic with this name already exists.':'Discussion topic could not be created.'});}
   });
   app.get('/api/echo-project-chat/status',requireAdmin,async(req,res)=>{
     if(!userId(req))return res.status(401).json({message:'Sign in to use project chat.'});
@@ -94,7 +98,7 @@ function registerEchoProjectChat(app, { requireAdmin }) {
       await ReadState.updateOne({_id:id},{$setOnInsert:{readAt:new Date(0),readId:new mongoose.Types.ObjectId('000000000000000000000000')}},{upsert:true});
       // A slow receipt from another tab must never move the read position back.
       await ReadState.updateOne({_id:id,$or:[{readAt:{$lt:message.createdAt}},{readAt:message.createdAt,readId:{$lt:message._id}}]},{$set:{readAt:message.createdAt,readId:message._id}});
-      res.set('Cache-Control','no-store').json(await status(req));
+      realtime.publish('read');res.set('Cache-Control','no-store').json(await status(req));
     }catch{res.status(503).json({message:'Messages could not be marked as read.'});}
   });
   app.post('/api/echo-project-chat/receipts',requireAdmin,async(req,res)=>{
@@ -105,21 +109,33 @@ function registerEchoProjectChat(app, { requireAdmin }) {
       const id=userId(req),now=new Date();
       const messages=await Message.find({_id:{$in:[...new Set(parsed.data.messageIds)]},senderId:{$ne:id}}).select('_id').lean();
       if(messages.length)await Receipt.bulkWrite(messages.map(message=>({updateOne:{filter:{_id:String(message._id)+':'+id},update:{$setOnInsert:{messageId:String(message._id),userId:id,deliveredAt:now},...(parsed.data.seen?{$min:{seenAt:now}}:{})},upsert:true}})));
-      res.json({acknowledged:true});
+      realtime.publish('receipts');res.json({acknowledged:true});
     }catch{res.status(503).json({message:'Message receipt could not be saved.'});}
   });
-  const serialize = (item,receipts=[]) => ({ id: String(item._id),topicId:topicOf(item), senderId: item.senderId, senderName: item.senderName, content: item.content, attachment: item.attachment?.data ? item.attachment : undefined, createdAt: item.createdAt,editedAt:item.editedAt||null,...deliveryTimes(item,receipts) });
+  const serialize = (item,receipts=[],compact=false) => ({ id: String(item._id),topicId:topicOf(item), senderId: item.senderId, senderName: item.senderName, content: item.content, attachment: item.attachment?.type && (compact || item.attachment.data) ? (compact?{type:item.attachment.type,name:item.attachment.name,mimeType:item.attachment.mimeType}:item.attachment) : undefined, createdAt: item.createdAt,editedAt:item.editedAt||null,...deliveryTimes(item,receipts) });
   app.get('/api/echo-project-chat', requireAdmin, async (req, res) => {
     if (!userId(req)) return res.status(401).json({ message: 'Sign in to use project chat.' });
     const selected=topicIdSchema.safeParse(req.query.topicId);
     if(!selected.success)return res.status(400).json({message:'Choose a valid discussion topic.'});
     try {
       if(!await validTopic(selected.data))return res.status(404).json({message:'Discussion topic not found.'});
-      const items = await Message.find(topicFilter(selected.data)).sort({ createdAt: -1, _id: -1 }).limit(200).lean();
+      const compact=req.query.compact==='1';
+      const query=Message.find(topicFilter(selected.data)).sort({ createdAt: -1, _id: -1 }).limit(200);
+      if(compact)query.select('-attachment.data');
+      const items = await query.lean();
       const receipts=items.length?await Receipt.find({messageId:{$in:items.map(item=>String(item._id))}}).lean():[];
       const byMessage=new Map();for(const receipt of receipts){const rows=byMessage.get(receipt.messageId)||[];rows.push(receipt);byMessage.set(receipt.messageId,rows);}
-      res.set('Cache-Control', 'no-store').json({ items: items.reverse().map(item=>serialize(item,byMessage.get(String(item._id)))) });
+      res.set('Cache-Control', 'no-store').json({ items: items.reverse().map(item=>serialize(item,byMessage.get(String(item._id)),compact)) });
     } catch { res.status(503).json({ message: 'Project chat is temporarily unavailable.' }); }
+  });
+  app.get('/api/echo-project-chat/:id/attachment',requireAdmin,async(req,res)=>{
+    if(!userId(req))return res.status(401).json({message:'Sign in to use project chat.'});
+    if(!/^[a-f\d]{24}$/i.test(req.params.id))return res.status(400).json({message:'Invalid message.'});
+    try{
+      const message=await Message.findById(req.params.id).select('attachment').lean();
+      if(!message?.attachment?.data)return res.status(404).json({message:'Attachment is no longer available.'});
+      res.set('Cache-Control','no-store').json({attachment:message.attachment});
+    }catch{res.status(503).json({message:'Attachment could not be loaded. Please retry.'});}
   });
   app.post('/api/echo-project-chat', requireAdmin, async (req, res) => {
     if (!userId(req)) return res.status(401).json({ message: 'Sign in to use project chat.' });
@@ -135,7 +151,7 @@ function registerEchoProjectChat(app, { requireAdmin }) {
       if(!await validTopic(parsed.data.topicId))return res.status(404).json({message:'Discussion topic not found.'});
       const user = actor(req);
       const item = await Message.create({topicId:parsed.data.topicId, senderId: userId(req), senderName: String(user.name || user.firstName || user.email || 'Echo user').slice(0, 120), content: parsed.data.content, attachment: parsed.data.attachment });
-      res.status(201).json({ item: serialize(item.toObject()) });
+      realtime.publish('messages');res.status(201).json({ item: serialize(item.toObject()) });
     } catch { res.status(503).json({ message: 'Message could not be sent. Please try again.' }); }
   });
   app.delete('/api/echo-project-chat/:id',requireAdmin,async(req,res)=>{
@@ -145,7 +161,7 @@ function registerEchoProjectChat(app, { requireAdmin }) {
       const removed=await Message.findOneAndDelete({_id:req.params.id,senderId:userId(req)});
       if(!removed)return res.status(404).json({message:'Your message was not found.'});
       await Receipt.deleteMany({messageId:String(removed._id)}).catch(()=>{});
-      res.json({deleted:true,id:String(removed._id)});
+      realtime.publish('messages');res.json({deleted:true,id:String(removed._id)});
     }catch{res.status(503).json({message:'Message could not be deleted. Please try again.'});}
   });
   app.patch('/api/echo-project-chat/:id',requireAdmin,async(req,res)=>{
@@ -156,9 +172,10 @@ function registerEchoProjectChat(app, { requireAdmin }) {
       const item=await Message.findOneAndUpdate({_id:req.params.id,senderId:userId(req),content:parsed.data.expectedContent,'attachment.data':{$exists:false}},{$set:{content:parsed.data.content,editedAt:new Date()}},{new:true,runValidators:true});
       if(!item)return res.status(409).json({message:'Your text message changed or is no longer available. Reload it before editing.'});
       const receipts=await Receipt.find({messageId:String(item._id)}).lean();
-      res.json({item:serialize(item.toObject(),receipts)});
+      realtime.publish('messages');res.json({item:serialize(item.toObject(),receipts)});
     }catch{res.status(503).json({message:'Message could not be edited. Please try again.'});}
   });
+  return realtime;
 }
 
 module.exports = { registerEchoProjectChat, Topic, Message, ReadState, Presence, Receipt, ONLINE_WINDOW_MS, afterCursor, deliveryTimes };

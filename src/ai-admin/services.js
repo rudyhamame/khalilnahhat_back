@@ -3,33 +3,29 @@ const multer=require('multer');
 const {z}=require('zod');
 const {providerKey}=require('../openrouter');
 const {failure}=require('./route-adapter');
-const {catalog:bookingCatalog}=require('../ai-configuration');
-const Settings=mongoose.models.EchoAdminServices||mongoose.model('EchoAdminServices',new mongoose.Schema({_id:String,revision:Number,text:mongoose.Schema.Types.Mixed,stt:mongoose.Schema.Types.Mixed,voice:mongoose.Schema.Types.Mixed,updatedBy:String},{timestamps:true}));
+const Settings=mongoose.models.EchoAdminServices||mongoose.model('EchoAdminServices',new mongoose.Schema({_id:String,revision:Number,text:mongoose.Schema.Types.Mixed,stt:mongoose.Schema.Types.Mixed,updatedBy:String},{timestamps:true}));
 const serviceSchema=z.object({enabled:z.boolean(),provider:z.string(),model:z.string().trim().min(1).max(200)}).strict();
-const schema=z.object({revision:z.number().int().min(0),text:serviceSchema.extend({provider:z.enum(['openai','openrouter','poe','alibaba','ollama']),freeOnly:z.boolean(),maxOutputTokens:z.number().int().min(1500).max(8000)}),stt:serviceSchema.extend({provider:z.enum(['browser','openai','alibaba'])}),voice:serviceSchema.extend({provider:z.enum(['openai','alibaba']),maxOutputTokens:z.number().int().min(256).max(4096).default(1200),maxCallSeconds:z.number().int().min(30).max(900)})}).strict();
+const schema=z.object({revision:z.number().int().min(0),text:serviceSchema.extend({provider:z.enum(['openai','openrouter','poe','alibaba','ollama']),freeOnly:z.boolean(),maxOutputTokens:z.number().int().min(1500).max(8000)}),stt:serviceSchema.extend({provider:z.enum(['browser','openai','alibaba'])})}).strict();
 const audioCatalog=[
  {mode:'stt',provider:'browser',id:'browser-recognition',label:'Browser speech recognition'},
  {mode:'stt',provider:'openai',id:'whisper-1',label:'Whisper'},
  {mode:'stt',provider:'openai',id:'gpt-4o-mini-transcribe',label:'GPT-4o Mini Transcribe'},
  {mode:'stt',provider:'alibaba',id:'qwen3-asr-flash',label:'Qwen3 ASR Flash'},
- ...bookingCatalog.filter(row=>row.mode==='voice'),
 ];
 function createAdminServices({configService,env=process.env,fetchImpl=fetch}){
  const load=async()=>{
   const saved=await Settings.findById('administrator').lean();
-  const legacy=!saved||!audioCatalog.some(row=>row.mode==='voice'&&row.provider===saved.voice?.provider&&row.id===saved.voice?.model);
-  const booking=legacy?await configService.load():null;
-  const voice=legacy?{enabled:saved?.voice?.enabled??booking.voice.enabled,provider:booking.voice.provider||'openai',model:booking.voice.model,maxCallSeconds:saved?.voice?.maxCallSeconds||booking.voice.maxCallSeconds,maxOutputTokens:booking.voice.maxOutputTokens}:saved.voice;
-  if(saved)return schema.parse({revision:saved.revision,text:saved.text,stt:saved.stt,voice});
-  return {revision:0,text:{enabled:true,provider:'openai',model:env.OPENAI_ADMIN_MODEL||(booking.chat?.provider==='openai'?booking.chat.model:env.OPENAI_BOOKING_CHAT_MODEL||'gpt-4o-mini'),freeOnly:false,maxOutputTokens:3000},stt:{enabled:true,provider:'browser',model:'browser-recognition'},voice};
+  if(saved)return schema.parse({revision:saved.revision,text:saved.text,stt:saved.stt});
+  const booking=await configService.load();
+  return {revision:0,text:{enabled:true,provider:'openai',model:env.OPENAI_ADMIN_MODEL||(booking.chat?.provider==='openai'?booking.chat.model:env.OPENAI_BOOKING_CHAT_MODEL||'gpt-4o-mini'),freeOnly:false,maxOutputTokens:3000},stt:{enabled:true,provider:'browser',model:'browser-recognition'}};
  };
  const configured=provider=>provider==='browser'||Boolean(providerKey(env,provider));
- const describe=async()=>{const config=await configService.describe();const saved=await Settings.findById('administrator').select('voice').lean();const migrationPending=Boolean(saved&&!audioCatalog.some(row=>row.mode==='voice'&&row.provider===saved.voice?.provider&&row.id===saved.voice?.model));return {item:await load(),migrationPending,catalog:[...config.catalog.filter(row=>row.mode==='chat').map(row=>({...row,mode:'text'})),...audioCatalog],providers:{...config.providers,browser:{configured:true}},catalogError:config.catalogError};};
+ const describe=async()=>{const config=await configService.describe();return {item:await load(),catalog:[...config.catalog.filter(row=>row.mode==='chat').map(row=>({...row,mode:'text'})),...audioCatalog],providers:{...config.providers,browser:{configured:true}},catalogError:config.catalogError};};
  const save=async(body,actor)=>{
   const data=schema.parse(body),old=await load();if(data.revision!==old.revision)throw failure(409,'Administrator settings changed. Reload before saving.');
-  for(const mode of ['stt','voice'])if(!audioCatalog.some(row=>row.mode===mode&&row.provider===data[mode].provider&&row.id===data[mode].model))throw failure(400,`Choose a supported Administrator ${mode} model.`);
+  for(const mode of ['stt'])if(!audioCatalog.some(row=>row.mode===mode&&row.provider===data[mode].provider&&row.id===data[mode].model))throw failure(400,`Choose a supported Administrator ${mode} model.`);
   const catalog=await describe();
-  for(const mode of ['text','stt','voice']){
+  for(const mode of ['text','stt']){
    const current=data[mode],previous=old[mode];
    if(current.provider!==previous.provider||current.model!==previous.model){const model=catalog.catalog.find(row=>row.mode===mode&&row.provider===current.provider&&row.id===current.model);if(!model)throw failure(400,`Select an available ${mode} model for this provider.`);}
    if(current.enabled&&!configured(current.provider))throw failure(503,`Configure the server API key for ${current.provider} before enabling Administrator ${mode}.`);

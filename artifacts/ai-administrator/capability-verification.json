@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-11-04T04:24:42.306Z",
+  "generatedAt": "2026-11-07T23:58:03.506Z",
   "database": "isolated ephemeral MongoDB replica set",
-  "registered": 89,
+  "registered": 91,
   "verifiedCapabilities": [
     "administrator_open_section",
     "ai_billing_accounts_read",
@@ -91,6 +91,8 @@
     "live_youtube_stop",
     "live_instagram_start",
     "live_instagram_stop",
+    "live_tiktok_start",
+    "live_tiktok_stop",
     "live_request_recover",
     "live_request_review",
     "live_comment_moderate"

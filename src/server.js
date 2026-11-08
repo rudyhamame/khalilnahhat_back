@@ -1661,7 +1661,6 @@ async function startServer(port = PORT) {
   });
   server.once('close',stopAssetCleanup);
   aiBooking.attachAlibabaVoiceSocket(server,aiBookingRoutes.voiceSocketHooks);
-  aiAdministrator.attachVoice(server);
   return server;
 }
 

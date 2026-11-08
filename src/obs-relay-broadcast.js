@@ -1,8 +1,6 @@
-const {randomBytes}=require('node:crypto');
 const relay=require('./obs-relay-client');
 function createRelayBroadcast(deps) {
- const {LiveStreamConfig,getLiveStreamConfig,defaults,randomUUID,serialize}=deps;
- const {LiveRecording}=require('./live-recordings');
+ const {LiveStreamConfig,getLiveStreamConfig,defaults}=deps;
  const owned=row=>({key:defaults.key,obsRoomName:row.obsRoomName,broadcastMode:'whep'});
  async function stop(row) {
   const ending=await LiveStreamConfig.findOneAndUpdate(owned(row),{isLive:false,obsState:'ending',streamUrl:'',statusLabel:defaults.statusLabel},{new:true});
@@ -24,30 +22,7 @@ function createRelayBroadcast(deps) {
   if(updated)await deps.notifyLiveTransition?.(row,updated);
   return updated || getLiveStreamConfig();
  }
- async function prepare(req,res) {
-  let claimed;
-  try {
-   const current=await getLiveStreamConfig();
-   if(current.isLive || current.webrtcRoomName || current.obsRoomName)return res.status(409).json({message:'End the existing broadcast or OBS session first.'});
-   await relay.request('health');
-   const roomName=`khalil-obs-${randomUUID()}`;
-   const title=(typeof req.body?.title==='string' && req.body.title.trim().slice(0,180)) || current.title || defaults.title;
-   claimed=await LiveStreamConfig.findOneAndUpdate({key:defaults.key,isLive:{$ne:true},webrtcRoomName:{$in:['',null]},obsRoomName:{$in:['',null]}},
-    {isLive:false,title,streamUrl:'',broadcastMode:'whep',broadcastSource:'obs',webrtcRoomName:'',obsRoomName:roomName,obsState:'preparing',obsExpiresAt:new Date(Date.now()+120000)},{new:true});
-   if(!claimed)return res.status(409).json({message:'Another broadcaster started first.'});
-   const saveRecording=claimed.obsSaveRecording!==false;
-   if(saveRecording)await LiveRecording.create({roomName,title,provider:'ovh',status:'waiting'});
-   const connection=await relay.request('sessions',{method:'POST',body:{id:roomName,publishToken:randomBytes(32).toString('hex'),saveRecording}});
-   const updated=await LiveStreamConfig.findOneAndUpdate({...owned(claimed),obsState:'preparing'},
-    {obsUrl:connection.server,obsStreamKey:connection.streamKey,obsState:'waiting',obsExpiresAt:new Date(connection.expiresAt)},{new:true});
-   if(!updated)throw new Error('OBS setup was cancelled');
-   return res.status(201).json({item:serialize(updated)});
-  } catch(error) {
-   if(claimed)await stop(claimed).catch(()=>{});
-   console.error('OVH OBS prepare failed:',error.status || error.name);
-   return res.status(error.status===409?409:503).json({message:error.status?error.message:'OVH OBS setup did not finish. Try again shortly.'});
-  }
- }
- return {stop,synchronize,prepare};
+ // New relay connections are retired; retain legacy reconciliation and cleanup.
+ return {stop,synchronize};
 }
 module.exports={createRelayBroadcast};

@@ -1,0 +1,6 @@
+FROM caddy:2-alpine
+USER root
+# The upstream binary has a privileged-port file capability. Copying its bytes
+# removes that capability so a process with an empty capability set can execute it.
+RUN cp /usr/bin/caddy /usr/bin/caddy.unprivileged && mv /usr/bin/caddy.unprivileged /usr/bin/caddy
+USER 1000:1000

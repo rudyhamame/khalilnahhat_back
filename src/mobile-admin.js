@@ -69,7 +69,7 @@ function registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest 
     const client=await User.findOne({_id:req.params.id,isAdmin:{$ne:true},username:{$nin:[...ADMIN_USERNAMES]}});
     if(!client) return fail(res,404,'Client not found.');
     client.isBlocked=parsed.data.blocked;
-    if(client.isBlocked) {client.sessionToken='';client.androidSessionToken='';}
+    if(client.isBlocked) Object.assign(client, require('./account-sessions').clearFields());
     await client.save();
     res.json({item:clientView(client)});
   });
@@ -81,7 +81,7 @@ function registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest 
     if(!client)return fail(res,404,'Client not found.');
     if(client.isBlocked)return fail(res,409,'Unblock this client before granting administrator access.');
     if(isAdminUser(client))return res.json({granted:true,item:clientView(client)});
-    const updated=await User.findOneAndUpdate({_id:client._id,isBlocked:{$ne:true},adminGrantedAt:null},{$set:{isAdmin:true,adminGrantedAt:new Date(),adminGrantedBy:actor}},{new:true,runValidators:true});
+    const updated=await User.findOneAndUpdate({_id:client._id,isBlocked:{$ne:true},adminGrantedAt:null},{$set:{isAdmin:true,adminGrantedAt:new Date(),adminGrantedBy:actor,...require('./account-sessions').clearFields()}},{new:true,runValidators:true});
     if(!updated)return fail(res,409,'This account changed. Refresh the client list and try again.');
     return res.json({granted:true,item:clientView(updated)});
   });
@@ -134,7 +134,7 @@ function registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest 
     if(!parsed.success) return fail(res,400,'Enter a name, valid email and a username with at least three characters.');
     if(ADMIN_USERNAMES.has(parsed.data.username)) return fail(res,409,'That administrator username is reserved.');
     try {
-      const u=await User.create({...parsed.data,phoneNumber:parsed.data.phoneNumber || 'Not provided',passwordHash:hashPassword(crypto.randomBytes(40).toString('hex')),isAdmin:false,emailVerified:false});
+      const u=await User.create({...parsed.data,phoneNumber:parsed.data.phoneNumber || 'Not provided',passwordHash:await hashPassword(crypto.randomBytes(40).toString('hex')),isAdmin:false,emailVerified:false});
       res.status(201).json({item:clientView(u),message:'Client created. They can set their own password through Forgot password.'});
     } catch(e) { if(e.code===11000) return fail(res,409,'That username is already in use.'); throw e; }
   });

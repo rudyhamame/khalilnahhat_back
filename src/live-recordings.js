@@ -1,6 +1,6 @@
 const mongoose=require('mongoose');
 const cloudinary=require('cloudinary').v2;
-const {Client}=require('minio');
+const {createRecordingObjectStore}=require('./recording-object-store');
 const {RoomServiceClient,EgressClient}=require('livekit-server-sdk');
 const {RoomEgress,AutoParticipantEgress,EncodedFileOutput,S3Upload,EncodedFileType,EncodingOptionsPreset}=require('@livekit/protocol');
 const {ArchiveItem}=require('./models');
@@ -26,10 +26,13 @@ const schema=new mongoose.Schema({
 schema.index({deletedAt:1,nextRetryAt:1,leaseUntil:1});
 const LiveRecording=mongoose.models.LiveRecording||mongoose.model('LiveRecording',schema);
 function configured(){return Boolean(recordingStorageConfig()&&process.env.CLOUDINARY_API_SECRET);}
+let storageClient, storageIdentity;
 function store(){
  const config=recordingStorageConfig();
  if(!config)throw Object.assign(new Error('Configure private S3 recording storage before starting a live stream.'),{status:503});
- return new Client({endPoint:config.host,port:config.port,useSSL:config.useSSL,accessKey:config.accessKey,secretKey:config.secretKey,region:config.region});
+ const identity=JSON.stringify(config);
+ if(!storageClient||identity!==storageIdentity){storageClient=createRecordingObjectStore(config);storageIdentity=identity;}
+ return storageClient;
 }
 function sdk(Class){return new Class(process.env.LIVEKIT_URL,process.env.LIVEKIT_API_KEY,process.env.LIVEKIT_API_SECRET);}
 function recordingParts(row){return row.parts?.length?Array.from(row.parts):row.publicId?[{publicId:row.publicId,delivery:row.delivery||'authenticated',bytes:row.bytes,duration:row.duration}]:[];}

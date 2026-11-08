@@ -1,0 +1,7 @@
+ARG STEM_BASE=khalil-api-stems:20261028
+FROM ${STEM_BASE}
+USER root
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+USER node

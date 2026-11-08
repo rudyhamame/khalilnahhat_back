@@ -51,10 +51,10 @@ const {
 } = require('./brevo');
 
 const app = express();
-// Render terminates public requests at one reverse proxy; retain per-client login limits.
-if (process.env.RENDER === 'true') app.set('trust proxy', 1);
+// Trust only the configured origin proxy; never trust arbitrary forwarding headers.
+require('./security-controls').configureSecurity(app);
 const PORT = process.env.PORT || 4000;
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024, files: 1, fields: 12, fieldSize: 64 * 1024 } });
 const liveRequestPriceCents = 0;
 const liveRequestCurrency = 'cad';
 
@@ -146,7 +146,7 @@ const signupSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required.'),
   lastName: z.string().trim().min(1, 'Last name is required.'),
   username: z.string().trim().min(1).optional(),
-  password: z.string().trim().min(1, 'Password is required.'),
+  password: z.string().min(12, 'Choose a password of at least 12 characters.').max(128),
   email: z.string().trim().email('A valid email is required.'),
   phoneNumber: z.string().trim().min(1, 'Phone number is required.'),
 });
@@ -154,7 +154,7 @@ const signupSchema = z.object({
 const loginSchema = z.object({
   email: z.string().trim().email('A valid email address is required.').optional(),
   username: z.string().trim().min(1).optional(),
-  password: z.string().trim().min(1, 'Password is required.'),
+  password: z.string().min(1, 'Password is required.').max(200),
 }).refine(value=>value.email||value.username,{message:'Email address is required.'});
 
 const youtubeSearchSchema = z.object({
@@ -673,6 +673,9 @@ function parseCorsOrigins(value) {
 const configuredCorsOrigins = new Set(
   parseCorsOrigins(process.env.CORS_ORIGIN || 'https://djkhalilnahhat.ca'),
 );
+if (process.env.NODE_ENV === 'production' && [...configuredCorsOrigins].some(origin => origin === '*' || !origin.startsWith('https://'))) {
+  throw new Error('Production requires explicit HTTPS frontend origins.');
+}
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -749,7 +752,7 @@ async function authFromRequest(request) {
     return null;
   }
 
-  return User.findOne(accountSessions.sessionQuery(token));
+  return accountSessions.authenticate(User, token);
 }
 
 async function requireAdmin(request, response, next) {
@@ -804,6 +807,8 @@ app.use(
 );
 
 require('./cloudflare-mail').registerMailIngress(app);
+app.use(require('./security-controls').resourceAdmission);
+app.use('/api/auth', express.json({ limit: '16kb' }), require('./security-controls').authRateLimit);
 app.use(express.json({ limit: '8mb', type: ['application/json', 'application/webhook+json'], verify(request, _response, buffer) {
   if (request.path === '/api/live-stream/webrtc/webhook') request.rawBody = buffer.toString('utf8');
 } }));
@@ -815,6 +820,19 @@ app.get('/api/health', async (_request, response) => {
     databaseName: MONGODB_DB_NAME,
     time: new Date().toISOString(),
   });
+});
+
+app.get('/api/ready', async (_request, response) => {
+  let timer;
+  response.set('Cache-Control', 'no-store');
+  try {
+    const db = require('mongoose').connection;
+    if (db.readyState !== 1 || !db.db) throw new Error('Database unavailable');
+    await Promise.race([db.db.command({ ping: 1 }, { maxTimeMS: 1500 }),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Readiness timeout')), 2000); })]);
+    response.json({ ready: true });
+  } catch { response.status(503).json({ ready: false }); }
+  finally { clearTimeout(timer); }
 });
 
 app.get('/api/bootstrap', async (_request, response) => {
@@ -831,7 +849,7 @@ app.get('/api/bootstrap', async (_request, response) => {
   });
 });
 
-app.post('/api/session-token', async (_request, response) => {
+app.post('/api/session-token', requireAuth, require('./security-controls').providerSessionLimit, async (_request, response) => {
   if (!process.env.ANAM_API_KEY) {
     return response.status(503).json({
       error: 'ANAM_API_KEY is not configured on the server.',
@@ -904,7 +922,7 @@ app.post('/api/auth/login', async (request, response) => {
 
   const user = await findPasswordAccount(User, parsed.data);
 
-  if (!user || !verifyPassword(parsed.data.password, user.passwordHash)) {
+  if (!await verifyPassword(parsed.data.password, user?.passwordHash) || !user) {
     return response.status(401).json({
       message: 'Incorrect email address or password.',
     });
@@ -951,15 +969,15 @@ app.post('/api/auth/signup', async (request, response) => {
     ...parsed.data,
     username: normalizedUsername,
     email: parsed.data.email.toLowerCase(),
-    passwordHash: hashPassword(parsed.data.password),
+    passwordHash: await hashPassword(parsed.data.password),
     isAdmin: normalizedUsername === ADMIN_USERNAME,
-    sessionToken: createSessionToken(),
   });
 
+  const token = await accountSessions.issueSession(user, request, isAdminUser);
   sendVerification(user, getFrontendUrl()).catch((error) => console.error('Verification email failed:', error));
 
   return response.status(201).json({
-    token: user.sessionToken,
+    token,
     user: serializeUser(user),
   });
 });
@@ -1560,12 +1578,6 @@ app.post('/api/bookings', async (request, response) => {
   });
 });
 
-app.use((error, _request, response, _next) => {
-  console.error(error);
-  response.status(error.status || 500).json({
-    message: error.status === 403 ? error.message : 'Unexpected server error.',
-  });
-});
 
 require('./mobile-admin').registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest: serializeServiceRequest });
 const {createAiConfiguration,registerAiConfiguration}=require('./ai-configuration');
@@ -1612,6 +1624,7 @@ require('./event-drafts').registerEventDrafts(app, {
   requireAuth: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest }),
 });
 require('./archive-player').registerArchivePlayer(app, { requireAdmin });
+app.use('/api/player/stems', require('./security-controls').stemStartLimit);
 require('./stem-separation').registerStemSeparation(app, { requireAdmin });
 require('./music-archive').registerMusicArchive(app, { requireAdmin });
 require('./dj-service-builder').registerDjServiceBuilder(app, { requireAdmin });
@@ -1641,8 +1654,10 @@ registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize: serializeSer
 
 const aiAdministrator=require('./ai-admin/routes').registerAiAdministrator(app,{
  requireAdmin,configService:aiConfiguration,
- authorize:async (owner,token,binding)=>{if(!require('mongoose').isValidObjectId(owner))return null;const user=await User.findById(owner);const active=accountSessions.selectSession(user,token,binding);return isAdminUser(user)&&active?accountSessions.sessionActor(user,active):null;},
+ authorize:async (owner,token,binding)=>{if(!require('mongoose').isValidObjectId(owner))return null;const user=await User.findById(owner).select('+sessionTokenEncrypted +androidSessionTokenEncrypted');const active=accountSessions.selectSession(user,token,binding);return isAdminUser(user)&&active?accountSessions.sessionActor(user,active):null;},
 });
+
+app.use(require('./security-controls').securityError);
 
 app.use((_request, response) => {
   response.status(404).json({
@@ -1652,6 +1667,8 @@ app.use((_request, response) => {
 
 async function startServer(port = PORT) {
   await connectToDatabase();
+  await require('./security-controls').initializeSecurity();
+  await accountSessions.migrateLegacySessions(User);
   await require('./cloudinary-assets').Asset.init();
   const stopAssetCleanup=require('./cloudinary-assets').startCleanup();
   if(process.env.ECHO_ADMIN_WORKER_MODE!=='external')await aiAdministrator.start();
@@ -1659,6 +1676,10 @@ async function startServer(port = PORT) {
   const server=app.listen(port, '0.0.0.0', () => {
     console.log(`Khalil app API listening on http://localhost:${port}`);
   });
+  server.requestTimeout = 300000;
+  server.headersTimeout = 30000;
+  server.keepAliveTimeout = 5000;
+  server.maxRequestsPerSocket = 1000;
   server.once('close',stopAssetCleanup);
   aiBooking.attachAlibabaVoiceSocket(server,aiBookingRoutes.voiceSocketHooks);
   return server;

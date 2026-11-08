@@ -8,6 +8,9 @@ const { ArchiveItem, LiveSession, LiveStreamConfig } = require('./models');
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017';
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'khalil';
+if (process.env.NODE_ENV === 'production' && (!MONGODB_URI.startsWith('mongodb+srv://') || MONGODB_DB_NAME !== 'khalil')) {
+  throw new Error('Production requires the configured Khalil MongoDB Atlas database.');
+}
 
 async function seedDefaults() {
   if (defaultLiveSessions.length && (await LiveSession.countDocuments()) === 0) {

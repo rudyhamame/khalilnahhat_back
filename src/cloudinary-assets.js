@@ -81,7 +81,7 @@ async function hasReferences(asset,{db=mongoose.connection.db}={}){
  const collections=await db.listCollections({},{nameOnly:true}).toArray();
  for(const {name,type} of collections){
   // These are upload receipts, not owners. Actual recording/version rows own audio.
-  if(type==='view'||name.startsWith('system.')||['cloudinaryassets','musicaudioassets','equipment3djobs'].includes(name))continue;
+  if(type==='view'||name.startsWith('system.')||['cloudinaryassets','musicaudioassets','equipment3djobs','securityratelimits'].includes(name))continue;
   const cursor=db.collection(name).find({}).batchSize(100);
   try{for await(const row of cursor){if(referenced(row,asset))return true;}}finally{await cursor.close();}
  }
@@ -134,7 +134,7 @@ async function discoverReferenced({db=mongoose.connection.db,Model=Asset,cloud=c
  if(!db||!cloud)throw Error('Database and Cloudinary configuration required');
  let found=0;
  for(const {name,type} of await db.listCollections({},{nameOnly:true}).toArray()){
-  if(type==='view'||name.startsWith('system.')||['cloudinaryassets','musicaudioassets','equipment3djobs'].includes(name))continue;
+  if(type==='view'||name.startsWith('system.')||['cloudinaryassets','musicaudioassets','equipment3djobs','securityratelimits'].includes(name))continue;
   const cursor=db.collection(name).find({}).batchSize(100);
   try{for await(const row of cursor){
    const identities=collectIdentities(row,cloud);

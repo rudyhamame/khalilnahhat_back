@@ -1,0 +1,92 @@
+{
+  "name": "khalil-api",
+  "services": {
+    "rh-khalil-api": {
+      "image": "${KHALIL_API_IMAGE:?Set the reviewed immutable API image}",
+      "pull_policy": "never",
+      "restart": "unless-stopped",
+      "ports": [
+        "127.0.0.1:14310:4310"
+      ],
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "/srv/rh/echo-dj/youtube-worker",
+          "target": "/run/youtube-worker",
+          "read_only": true
+        },
+        {
+          "type": "bind",
+          "source": "/srv/rh/echo-dj/music-archive-data",
+          "target": "/app/data/music-archive",
+          "read_only": false
+        },
+        {
+          "type": "bind",
+          "source": "/srv/rh/echo-dj/youtube-auth",
+          "target": "/run/youtube-auth",
+          "read_only": false
+        },
+        {
+          "type": "bind",
+          "source": "/srv/rh/khalil-security/tmp",
+          "target": "/tmp"
+        },
+        {
+          "type": "bind",
+          "source": "/srv/rh/khalil-security/runtime",
+          "target": "/app/.runtime"
+        },
+        {
+          "type": "bind",
+          "source": "/srv/rh/khalil-security/recording-tmp",
+          "target": "/var/tmp"
+        }
+      ],
+      "env_file": [
+        "${KHALIL_ENV_FILE:?Set the private production environment file}"
+      ],
+      "command": [
+        "node",
+        "src/server.js"
+      ],
+      "mem_limit": "1g",
+      "memswap_limit": "1536m",
+      "cpus": 1.0,
+      "pids_limit": 128,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "read_only": true,
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4310/api/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ],
+        "interval": "30s",
+        "timeout": "5s",
+        "retries": 3,
+        "start_period": "60s"
+      },
+      "container_name": "deploy-rh-khalil-api-1"
+    }
+  },
+  "networks": {
+    "default": {
+      "name": "khalil_api",
+      "external": true
+    }
+  }
+}

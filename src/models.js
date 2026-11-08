@@ -14,15 +14,28 @@ const userSchema = new mongoose.Schema(
     isBlocked: { type: Boolean, default: false, index: true },
     sessionToken: { type: String, default: '' },
     androidSessionToken: { type: String, default: '' },
+    sessionTokenHash: { type: String, default: '', index: true },
+    sessionTokenEncrypted: { type: String, default: '', select: false },
+    sessionTokenExpiresAt: { type: Date, default: null },
+    sessionTokenLastSeenAt: { type: Date, default: null },
+    androidSessionTokenHash: { type: String, default: '', index: true },
+    androidSessionTokenEncrypted: { type: String, default: '', select: false },
+    androidSessionTokenExpiresAt: { type: Date, default: null },
+    androidSessionTokenLastSeenAt: { type: Date, default: null },
     lastLoginAt: { type: Date, default: null },
     googleSubject: { type: String, unique: true, sparse: true },
     emailVerified: { type: Boolean, default: false },
     verifyTokenHash: { type: String, default: '' },
+    verifyExpires: { type: Date, default: null },
     resetTokenHash: { type: String, default: '' },
     resetExpires: { type: Date, default: null },
   },
   { timestamps: true },
 );
+
+// Email identity cannot be claimed twice by racing signup / Google requests.
+userSchema.index({ email: 1 }, { unique: true, collation: { locale: 'en', strength: 2 },
+  partialFilterExpression: { email: { $type: 'string' } } });
 
 const liveSessionSchema = new mongoose.Schema(
   {

@@ -57,7 +57,7 @@ function registerGoogleAuth(app, { User, serializeUser, isAdminUser, clientId = 
             lastName: String(profile.family_name || '').slice(0, 120),
             email, emailVerified: true, phoneNumber: '', isAdmin: false,
             // Google accounts have no usable local password. Password reset can add one.
-            passwordHash: hashPassword(crypto.randomBytes(48).toString('hex')),
+            passwordHash: await hashPassword(crypto.randomBytes(48).toString('hex')),
           });
         }
       }

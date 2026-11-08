@@ -66,8 +66,8 @@ async function materialize(row,lease){
  async function* chunks(){for(let i=0;i<row.direct.count;i++){await lease.assert();yield* createReadStream(chunkPath(row,i));}}
  await pipeline(Readable.from(chunks()),createWriteStream(raw,{mode:0o600}));
  const {stdout}=await exec('ffprobe',['-v','error','-show_entries','stream=codec_type,codec_name','-of','json',raw],{timeout:60000});
- const streams=JSON.parse(stdout).streams||[],copyVideo=streams.find(s=>s.codec_type==='video')?.codec_name==='h264';
- await exec('ffmpeg',['-hide_banner','-loglevel','error','-y','-i',raw,'-map','0:v?','-map','0:a?',...(copyVideo?['-c:v','copy']:['-c:v','libx264','-preset','ultrafast','-crf','23','-maxrate','3M','-bufsize','6M','-pix_fmt','yuv420p']),'-c:a','aac','-b:a','128k','-movflags','+faststart',output],{timeout:1800000,maxBuffer:1024*1024});
+ const streams=JSON.parse(stdout).streams||[],copyVideo=streams.find(s=>s.codec_type==='video')?.codec_name==='h264',copyAudio=streams.find(s=>s.codec_type==='audio')?.codec_name==='aac';
+ await exec('ffmpeg',['-hide_banner','-loglevel','error','-y','-i',raw,'-map','0:v?','-map','0:a?',...(copyVideo?['-c:v','copy']:['-c:v','libx264','-preset','ultrafast','-crf','23','-maxrate','3M','-bufsize','6M','-pix_fmt','yuv420p']),...(copyAudio?['-c:a','copy']:['-c:a','aac','-b:a','320k']),'-movflags','+faststart',output],{timeout:1800000,maxBuffer:1024*1024});
  await require('./recording-files').durationOf(output);
  await lease.assert();await fs.rename(output,target);
  await lease.save({direct:{...row.direct.toObject?.()||row.direct,state:'prepared'}});

@@ -24,6 +24,18 @@ test('direct recording durable chunks and archive lifecycle',{timeout:90000},asy
   await pipeline.run(row._id);let saved=await LiveRecording.findById(row._id);assert.equal(saved.status,'upload_failed');await fs.access(path.join(direct.directory(saved),'capture.mp4'));
   fail=false;await pipeline.run(row._id);saved=await LiveRecording.findById(row._id);assert.equal(saved.status,'ready');assert.equal(saved.parts.length,1);assert.equal(saved.cleanupPending,false);assert.ok(saved.duration>0);await assert.rejects(fs.access(direct.directory(saved)),{code:'ENOENT'});assert.equal(uploads,2);
  });
+ await t.test('AAC stereo source is archived without changing a single encoded audio packet',async()=>{
+  const source=path.join(dir,'stereo.mp4');
+  execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','testsrc2=size=160x90:rate=10','-f','lavfi','-i','aevalsrc=sin(2*PI*440*t)|sin(2*PI*880*t):s=48000','-t','1','-c:v','libx264','-c:a','aac','-b:a','256k',source]);
+  const original=await fs.readFile(source),r=await direct.createDirectRecording('test-audio-passthrough','Stereo passthrough','owner');
+  await jobs.run(r._id,l=>direct.acceptChunk(l,0,original,'video/mp4'));await jobs.run(r._id,l=>direct.seal(l,1,true));
+  const provider=direct.directProvider();try{await jobs.run(r._id,l=>provider.inspect(l.row,l));}finally{provider.release(r);}
+  const output=path.join(direct.directory(r),'capture.mp4');
+  const audio=file=>execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-i',file,'-map','0:a:0','-c:a','copy','-f','adts','pipe:1']);
+  assert.deepEqual(audio(output),audio(source));
+  const probe=JSON.parse(execFileSync('ffprobe',['-v','error','-select_streams','a:0','-show_entries','stream=channels,sample_rate','-of','json',output]));
+  assert.equal(probe.streams[0].channels,2);assert.equal(probe.streams[0].sample_rate,'48000');
+ });
  await t.test('authenticated upload routes fence owners and reject anonymous writes',async()=>{
   const express=require('express'),app=express();app.use(express.json());direct.registerDirectRecordingRoutes(app,(req,res,next)=>{if(!req.headers.authorization)return res.status(401).end();req.user={_id:req.headers.authorization};next();});const http=app.listen(0,'127.0.0.1');await new Promise(r=>http.once('listening',r));t.after(()=>http.close());const url=`http://127.0.0.1:${http.address().port}/api/live-stream/recordings/${row._id}`;
   assert.equal((await fetch(url+'/status')).status,401);assert.equal((await fetch(url+'/status',{headers:{Authorization:'other'}})).status,404);

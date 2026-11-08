@@ -1,0 +1,13 @@
+[Unit]
+Description=Conservative OVH disk cleanup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /srv/rh/khalil-security/bin/cleanup.py --apply
+Nice=19
+IOSchedulingClass=idle
+TimeoutStartSec=30min
+NoNewPrivileges=true
+PrivateTmp=true

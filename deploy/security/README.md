@@ -42,3 +42,13 @@ At completion the 38 GB root disk had about 3.9 GB free (90% used). Do not accum
 Four app containers have read-only roots, unprivileged users, no capabilities, no-new-privileges, bounded memory/CPU/PIDs and rotated logs. Network listeners are loopback-only; Cloudflare connector uses host networking and a loopback-only metrics listener. OBS services and the shared VPS remain separate residual exposure and capacity concerns.
 
 Before a later release, review the diff and explicitly authorize functional/regression testing, especially authentication/password reset, bookings, recording storage, uploads, email and stem processing. This hardening used builds, syntax/dependency/configuration inspection and read-only health checks; no test suite or real customer transaction was run. Frontend CSP retains `unsafe-eval` for existing ONNX functionality. Node production dependency audit reports zero known advisories at the recorded time; this is not an OS/Python/Torch or penetration-test result.
+
+## Automatic disk cleanup
+
+Root `khalil-cleanup.timer` runs daily around 04:30 America/New_York, with up to ten minutes of jitter and catch-up after downtime. Its service runs `/srv/rh/khalil-security/bin/cleanup.py --apply`.
+
+The cleaner removes unused Docker images older than 30 days, retaining images used by any running or stopped container, images named in available container Compose configurations, and the two newest images in each service family. Docker removal is never forced and container references are checked again before removal. It also removes unused build cache older than 14 days while retaining a 256 MB cache budget, and rotates/vacuums system journals to 14 days / 200 MB. Cleanup skips if a running container reports unhealthy. An exclusive lock prevents overlapping cleaner runs.
+
+It does not remove project files, backups, recordings, databases, Docker volumes, stopped containers or application runtime directories. These need separate retention and recovery decisions. For a preview run `sudo python3 /srv/rh/khalil-security/bin/cleanup.py`; review service results with `journalctl -u khalil-cleanup.service`. Disable scheduling with `systemctl disable --now khalil-cleanup.timer`.
+
+On 2026-11-08, old deployment/backup files were copied to the operator workstation under `/home/rudy/Documents/khalil/ovh-cleanup-20261108/` for verification before server removal. This is separate from the encrypted daily production backup process.

@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily OVH disk housekeeping
+
+[Timer]
+OnCalendar=*-*-* 04:30:00 America/New_York
+RandomizedDelaySec=10min
+Persistent=true
+Unit=khalil-cleanup.service
+
+[Install]
+WantedBy=timers.target

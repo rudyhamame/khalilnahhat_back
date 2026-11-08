@@ -1,5 +1,5 @@
 const BOOKINGS = "bookings@djkhalilnahhat.ca";
-const INGRESS = "https://echo-khalil-api.onrender.com/api/mail/inbound";
+const INGRESS = "https://api.djkhalilnahhat.ca/api/mail/inbound";
 const hex = (bytes) =>
   Array.from(new Uint8Array(bytes), (value) =>
     value.toString(16).padStart(2, "0"),

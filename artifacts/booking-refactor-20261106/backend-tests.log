@@ -78,8 +78,8 @@ AI booking reply failed {"stage":"provider_request","error":"Error"}
 ✔ simultaneous matching submissions create and notify only once (23.186158ms)
 ✔ failed persistence releases its voucher and leaves a retry possible (10.036836ms)
 Failed to send Brevo service request notification: Error: Mail unavailable
-    at sendServiceRequestNotification (/home/rudy/projects/khalil-back/test/service-request-submission.test.js:25:89)
-    at /home/rudy/projects/khalil-back/src/service-request-submission.js:102:34
+    at sendServiceRequestNotification (/home/rudy/Documents/khalil/khalil-back/test/service-request-submission.test.js:25:89)
+    at /home/rudy/Documents/khalil/khalil-back/src/service-request-submission.js:102:34
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
 ✔ mail failure preserves a successfully saved request (7.647271ms)
 ✔ canonical submissions retain the brief but enforce account identity and reject mismatched services (42.456731ms)

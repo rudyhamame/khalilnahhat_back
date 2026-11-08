@@ -16,7 +16,7 @@ test at test/venue-map.integration.test.js:68:1
   
   503 !== 200
   
-      at TestContext.<anonymous> (/home/rudy/projects/khalil-back/test/venue-map.integration.test.js:81:45)
+      at TestContext.<anonymous> (/home/rudy/Documents/khalil/khalil-back/test/venue-map.integration.test.js:81:45)
       at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
       at async Test.run (node:internal/test_runner/test:1313:7)
       at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {

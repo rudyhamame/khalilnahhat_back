@@ -59,10 +59,10 @@ AI booking reply failed {"stage":"provider_request","error":"Error"}
 ✔ public equipment data contains quantity/status but never internal price or inventory controls (2.121081ms)
 ✔ price items link explicitly to the same equipment and non-equipment services have no fabricated stock (1.674739ms)
 TypeError: Cannot read properties of undefined (reading '$ne')
-    at /home/rudy/projects/khalil-back/src/equipment-stock.test.js:29:148
+    at /home/rudy/Documents/khalil/khalil-back/src/equipment-stock.test.js:29:148
     at Array.filter (<anonymous>)
-    at Object.sort (/home/rudy/projects/khalil-back/src/equipment-stock.test.js:29:46)
-    at /home/rudy/projects/khalil-back/src/equipment.js:82:60
+    at Object.sort (/home/rudy/Documents/khalil/khalil-back/src/equipment-stock.test.js:29:46)
+    at /home/rudy/Documents/khalil/khalil-back/src/equipment.js:82:60
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
 ✖ quantity editing requires admin, rejects invalid counts and updates the public equipment result (349.312377ms)
 ✔ incomplete drafts are private, persist and resume without submitting (309.135041ms)
@@ -184,10 +184,10 @@ TypeError: Cannot read properties of undefined (reading '$ne')
   ✔ HTTP task ownership, auth, runtime inventory and denied credentials (21.305955ms)
 ✔ AI Administrator: real editor adapters, durable approvals, verification, authentication and recovery (13487.744204ms)
 Archive creation failed: Error: unavailable
-    at convert (/home/rudy/projects/khalil-back/test/archive-create.test.js:62:80)
-    at /home/rudy/projects/khalil-back/src/archive-create.js:29:29
-    at invoke (/home/rudy/projects/khalil-back/test/archive-create.test.js:22:11)
-    at TestContext.<anonymous> (/home/rudy/projects/khalil-back/test/archive-create.test.js:63:23)
+    at convert (/home/rudy/Documents/khalil/khalil-back/test/archive-create.test.js:62:80)
+    at /home/rudy/Documents/khalil/khalil-back/src/archive-create.js:29:29
+    at invoke (/home/rudy/Documents/khalil/khalil-back/test/archive-create.test.js:22:11)
+    at TestContext.<anonymous> (/home/rudy/Documents/khalil/khalil-back/test/archive-create.test.js:63:23)
     at Test.runInAsyncScope (node:async_hooks:227:14)
     at Test.run (node:internal/test_runner/test:1306:25)
     at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
@@ -195,17 +195,17 @@ Archive creation failed: Error: unavailable
     at Test.run (node:internal/test_runner/test:1372:12)
     at async Test.processPendingSubtests (node:internal/test_runner/test:897:7)
 Archive creation failed: Error: unavailable
-    at convert (/home/rudy/projects/khalil-back/test/archive-create.test.js:62:80)
-    at /home/rudy/projects/khalil-back/src/archive-create.js:29:29
-    at invoke (/home/rudy/projects/khalil-back/test/archive-create.test.js:22:11)
-    at TestContext.<anonymous> (/home/rudy/projects/khalil-back/test/archive-create.test.js:64:23)
+    at convert (/home/rudy/Documents/khalil/khalil-back/test/archive-create.test.js:62:80)
+    at /home/rudy/Documents/khalil/khalil-back/src/archive-create.js:29:29
+    at invoke (/home/rudy/Documents/khalil/khalil-back/test/archive-create.test.js:22:11)
+    at TestContext.<anonymous> (/home/rudy/Documents/khalil/khalil-back/test/archive-create.test.js:64:23)
     at async Test.run (node:internal/test_runner/test:1313:7)
     at async Test.processPendingSubtests (node:internal/test_runner/test:897:7)
 Archive creation failed: Error: database unavailable
-    at create (/home/rudy/projects/khalil-back/test/archive-create.test.js:69:67)
-    at /home/rudy/projects/khalil-back/src/archive-create.js:38:26
-    at async invoke (/home/rudy/projects/khalil-back/test/archive-create.test.js:22:5)
-    at async TestContext.<anonymous> (/home/rudy/projects/khalil-back/test/archive-create.test.js:70:17)
+    at create (/home/rudy/Documents/khalil/khalil-back/test/archive-create.test.js:69:67)
+    at /home/rudy/Documents/khalil/khalil-back/src/archive-create.js:38:26
+    at async invoke (/home/rudy/Documents/khalil/khalil-back/test/archive-create.test.js:22:5)
+    at async TestContext.<anonymous> (/home/rudy/Documents/khalil/khalil-back/test/archive-create.test.js:70:17)
     at async Test.run (node:internal/test_runner/test:1313:7)
     at async Test.processPendingSubtests (node:internal/test_runner/test:897:7)
 ✔ YouTube URLs are restricted to individual HTTP(S) videos and normalized (1.712311ms)
@@ -216,10 +216,10 @@ Archive creation failed: Error: database unavailable
 ✔ failed database save removes the new upload (0.917248ms)
 ✔ concurrent conversions are bounded and become available after completion (0.660962ms)
 Archive creation failed: Error: Sign in to confirm
-    at convert (/home/rudy/projects/khalil-back/test/archive-create.test.js:117:82)
-    at /home/rudy/projects/khalil-back/src/archive-create.js:29:29
-    at invoke (/home/rudy/projects/khalil-back/test/archive-create.test.js:22:11)
-    at TestContext.<anonymous> (/home/rudy/projects/khalil-back/test/archive-create.test.js:118:26)
+    at convert (/home/rudy/Documents/khalil/khalil-back/test/archive-create.test.js:117:82)
+    at /home/rudy/Documents/khalil/khalil-back/src/archive-create.js:29:29
+    at invoke (/home/rudy/Documents/khalil/khalil-back/test/archive-create.test.js:22:11)
+    at TestContext.<anonymous> (/home/rudy/Documents/khalil/khalil-back/test/archive-create.test.js:118:26)
     at Test.runInAsyncScope (node:async_hooks:227:14)
     at Test.run (node:internal/test_runner/test:1306:25)
     at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
@@ -229,10 +229,10 @@ Archive creation failed: Error: Sign in to confirm
   code: 'YOUTUBE_AUTH_REQUIRED'
 }
 Archive creation failed: Error: Sign in to confirm you are not a bot
-    at convert (/home/rudy/projects/khalil-back/test/archive-create.test.js:132:82)
-    at /home/rudy/projects/khalil-back/src/archive-create.js:29:29
-    at invoke (/home/rudy/projects/khalil-back/test/archive-create.test.js:22:11)
-    at TestContext.<anonymous> (/home/rudy/projects/khalil-back/test/archive-create.test.js:133:26)
+    at convert (/home/rudy/Documents/khalil/khalil-back/test/archive-create.test.js:132:82)
+    at /home/rudy/Documents/khalil/khalil-back/src/archive-create.js:29:29
+    at invoke (/home/rudy/Documents/khalil/khalil-back/test/archive-create.test.js:22:11)
+    at TestContext.<anonymous> (/home/rudy/Documents/khalil/khalil-back/test/archive-create.test.js:133:26)
     at Test.runInAsyncScope (node:async_hooks:227:14)
     at Test.run (node:internal/test_runner/test:1306:25)
     at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
@@ -242,10 +242,10 @@ Archive creation failed: Error: Sign in to confirm you are not a bot
   code: 'YOUTUBE_PUBLIC_ACCESS_BLOCKED'
 }
 Archive creation failed: Error: offline
-    at convert (/home/rudy/projects/khalil-back/test/archive-create.test.js:142:82)
-    at /home/rudy/projects/khalil-back/src/archive-create.js:29:29
-    at invoke (/home/rudy/projects/khalil-back/test/archive-create.test.js:22:11)
-    at TestContext.<anonymous> (/home/rudy/projects/khalil-back/test/archive-create.test.js:143:26)
+    at convert (/home/rudy/Documents/khalil/khalil-back/test/archive-create.test.js:142:82)
+    at /home/rudy/Documents/khalil/khalil-back/src/archive-create.js:29:29
+    at invoke (/home/rudy/Documents/khalil/khalil-back/test/archive-create.test.js:22:11)
+    at TestContext.<anonymous> (/home/rudy/Documents/khalil/khalil-back/test/archive-create.test.js:143:26)
     at Test.runInAsyncScope (node:async_hooks:227:14)
     at Test.run (node:internal/test_runner/test:1306:25)
     at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
@@ -361,7 +361,7 @@ test at src/ai-configuration.test.js:27:1
   
   3 !== 2
   
-      at TestContext.<anonymous> (/home/rudy/projects/khalil-back/src/ai-configuration.test.js:29:149)
+      at TestContext.<anonymous> (/home/rudy/Documents/khalil/khalil-back/src/ai-configuration.test.js:29:149)
       at async Test.run (node:internal/test_runner/test:1313:7)
       at async Test.processPendingSubtests (node:internal/test_runner/test:897:7) {
     generatedMessage: true,
@@ -384,7 +384,7 @@ test at src/equipment-stock.test.js:25:1
 test at test/music-archive.test.js:16:1
 ✖ collections: admin CRUD, draft isolation, manual membership/order and reorder work through real HTTP handlers (161.387951ms)
   TypeError: Cannot read properties of undefined (reading 'recordingIds')
-      at TestContext.<anonymous> (/home/rudy/projects/khalil-back/test/music-archive.test.js:31:22)
+      at TestContext.<anonymous> (/home/rudy/Documents/khalil/khalil-back/test/music-archive.test.js:31:22)
       at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
       at async Test.run (node:internal/test_runner/test:1313:7)
       at async Test.processPendingSubtests (node:internal/test_runner/test:897:7)
@@ -395,7 +395,7 @@ test at test/music-ontology-delete.test.js:7:1
   
   400 !== 409
   
-      at TestContext.<anonymous> (/home/rudy/projects/khalil-back/test/music-ontology-delete.test.js:21:9)
+      at TestContext.<anonymous> (/home/rudy/Documents/khalil/khalil-back/test/music-ontology-delete.test.js:21:9)
       at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
       at async Test.run (node:internal/test_runner/test:1313:7)
       at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
@@ -413,9 +413,9 @@ test at test/music-ontology.integration.test.js:3:1
   
   400 !== 201
   
-      at write (/home/rudy/projects/khalil-back/test/music-ontology.integration.test.js:23:130)
+      at write (/home/rudy/Documents/khalil/khalil-back/test/music-ontology.integration.test.js:23:130)
       at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-      at async TestContext.<anonymous> (/home/rudy/projects/khalil-back/test/music-ontology.integration.test.js:36:19)
+      at async TestContext.<anonymous> (/home/rudy/Documents/khalil/khalil-back/test/music-ontology.integration.test.js:36:19)
       at async Test.run (node:internal/test_runner/test:1313:7)
       at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
     generatedMessage: false,
@@ -445,7 +445,7 @@ test at test/music-ontology.test.js:5:1
       "message": "Invalid option: expected one of \"COVER\"|\"REMIX\"|\"MASHUP\"|\"MEDLEY\"|\"MIX\"|\"LIVE\""
     }
   ]
-      at TestContext.<anonymous> (/home/rudy/projects/khalil-back/test/music-ontology.test.js:7:82)
+      at TestContext.<anonymous> (/home/rudy/Documents/khalil/khalil-back/test/music-ontology.test.js:7:82)
       at Test.runInAsyncScope (node:async_hooks:227:14)
       at Test.run (node:internal/test_runner/test:1306:25)
       at Test.start (node:internal/test_runner/test:1177:17)

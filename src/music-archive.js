@@ -1,3 +1,4 @@
+const permanentDeletion=require('./permanent-deletion');
 const mongoose = require('mongoose');
 const { randomUUID } = require('crypto');
 const { z } = require('zod');
@@ -100,10 +101,10 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, C
     });
     app.delete(`/api/admin/music-archive/${kind}/:id`, requireAdmin, async (req, res) => {
       if (kind === 'songs' && await model.exists({externalId:req.params.id,$or:[{workId:{$exists:true,$ne:''}},{'items.0':{$exists:true}}]})) return res.status(409).json({message:'Archive this recording through the ontology editor; its references and files are preserved.'});
-      const row = kind === 'songs' && ontology ? await ontology.deleteLegacy(req.params.id) : await model.findOneAndDelete({ externalId: req.params.id });
+      const row = kind === 'songs' && ontology ? await ontology.deleteLegacy(req.params.id) : await permanentDeletion.remove(model,{externalId:req.params.id});
       if (!row) return res.status(404).json({ message: 'This item no longer exists.' });
-      // Unreferenced managed files are removed by the shared cleanup worker.
-      res.json({ ok: true });
+      // The final owner deletion also requests permanent Cloudinary cleanup.
+      res.json({ok:true,cloudinaryCleanupPending:Boolean(row.cloudinaryCleanupPending)});
     });
     app.put(`/api/admin/music-archive/${kind}/order`, requireAdmin, async (req, res) => {
       const parsed = z.object({ ids: z.array(z.string().min(1).max(120)).max(5000) }).strict().safeParse(req.body);

@@ -1,3 +1,4 @@
+const permanentDeletion=require('./permanent-deletion');
 const mongoose=require('mongoose');
 const {statfs}=require('node:fs/promises');
 const {recordingDiskReserve}=require('./recording-storage');
@@ -124,15 +125,33 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
  });
  app.delete('/api/admin/live-recordings/:id',requireAdmin,async(req,res)=>{
   if(!mongoose.isValidObjectId(req.params.id))return res.status(400).json({message:'Invalid recording.'});
-  const row=await LiveRecording.findOneAndUpdate({_id:req.params.id,deletedAt:null,status:{$in:['ready','partial','failed','upload_failed','not_recorded']},$or:[{status:{$in:['ready','partial','not_recorded']}},{captureState:'ended'}],leaseUntil:{$lt:new Date()},cleanupPending:{$ne:true}},{$set:{deletedAt:new Date()}},{new:true});
-  if(!row)return res.status(409).json({message:'This recording is active, saving, or already removed. Refresh and try again.'});
-  res.json({deleted:true,id:String(row._id),recoverable:true});
- });
- app.post('/api/admin/live-recordings/:id/restore',requireAdmin,async(req,res)=>{
-  if(!mongoose.isValidObjectId(req.params.id))return res.status(400).json({message:'Invalid recording.'});
-  const row=await LiveRecording.findOneAndUpdate({_id:req.params.id,deletedAt:{$ne:null}},{$set:{deletedAt:null}},{new:true});
-  if(!row)return res.status(404).json({message:'No removed recording was found.'});
-  res.json({item:view(row)});
+  let keys=[];
+  const removed=await mongoose.connection.transaction(async session=>{
+   const filter={_id:req.params.id,deletedAt:null,status:{$in:['ready','partial','failed','upload_failed','not_recorded']},$or:[{status:{$in:['ready','partial','not_recorded']}},{captureState:'ended'}],leaseUntil:{$lt:new Date()},cleanupPending:{$ne:true}};
+   const row=await LiveRecording.findOne(filter).session(session);
+   if(!row)return false;
+   const prefix=`live-${row._id}`,ownedIds=new RegExp('^'+prefix+'(?:-part-[0-9]+)?$');
+   const published=await ArchiveItem.find({externalId:ownedIds}).session(session);
+   const ids=published.map(item=>item.externalId);
+   if(ids.length&&await ArchiveItem.exists({externalId:{$nin:ids},sourceRecordingIds:{$in:ids}}).session(session))throw Object.assign(new Error('This live recording is used as a source. Remove its source links before deleting it.'),{status:409});
+   const versions=ids.length?await require('./music-ontology/models').Version.find({recordingId:{$in:ids}}).session(session):[];
+   keys=await permanentDeletion.prepare([row.toObject(),...published.map(item=>item.toObject()),...versions.map(item=>item.toObject())],{session});
+   if(ids.length){
+    await require('./music-archive').Collection.updateMany({recordingIds:{$in:ids}},{$pull:{recordingIds:{$in:ids}}},{session});
+    await require('./music-ontology/models').Version.deleteMany({recordingId:{$in:ids}},{session});
+    await ArchiveItem.deleteMany({externalId:{$in:ids}},{session});
+   }
+   const urls=recordingParts(row).map(part=>cloudinary.url(part.publicId,{secure:true,resource_type:'video',type:part.delivery||'authenticated',format:'mp4'}));
+   const media=await MediaItem.find({mediaUrl:{$in:urls}}).select('_id').session(session);
+   await require('./gallery-albums').GalleryAlbum.updateMany({itemIds:{$in:media.map(item=>String(item._id))}},{$pull:{itemIds:{$in:media.map(item=>String(item._id))}}},{session});
+   await MediaItem.deleteMany({_id:{$in:media.map(item=>item._id)}},{session});
+   const result=await LiveRecording.deleteOne(filter,{session});
+   if(result.deletedCount!==1)throw Object.assign(new Error('Recording changed. Refresh before deleting.'),{status:409});
+   return true;
+  });
+  if(!removed)return res.status(409).json({message:'This recording is active, saving, or already deleted. Refresh and try again.'});
+  const cleanup=await permanentDeletion.finish(keys);
+  res.json({deleted:true,id:req.params.id,recoverable:false,cloudinaryCleanupPending:cleanup.pending});
  });
  app.post('/api/admin/live-recordings/:id/publish',requireAdmin,async(req,res)=>{
   if(!mongoose.isValidObjectId(req.params.id))return res.status(400).json({message:'Invalid recording.'});

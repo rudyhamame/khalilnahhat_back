@@ -1,3 +1,4 @@
+const permanentDeletion=require('./permanent-deletion');
 const {uploadAsset}=require('./cloudinary-assets');
 const mongoose = require('mongoose');
 const crypto = require('crypto');
@@ -88,7 +89,9 @@ function registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest 
   app.delete('/api/admin/clients/:id', requireAdmin, async (req,res) => {
     if(!validId(req.params.id)) return fail(res,400,'Invalid client.');
     try {
+      let deletionKeys=[];
       const removed=await mongoose.connection.transaction(async session=>{
+        deletionKeys=[];
         const client=await User.findOne({_id:req.params.id,isAdmin:{$ne:true},username:{$nin:[...ADMIN_USERNAMES]}}).session(session).lean();
         if(!client) throw Object.assign(new Error('Client not found.'),{status:404});
         const objectId=client._id, owner=String(client._id), email=String(client.email||'').toLowerCase();
@@ -96,7 +99,7 @@ function registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest 
         const requests=await ServiceRequest.find(serviceRequestFilter).select('externalId').session(session).lean();
         const requestIds=requests.map(row=>row.externalId);
         const counts={};
-        const remove=async(name,query)=>{const result=await mongoose.connection.collection(name).deleteMany(query,{session});counts[name]=(counts[name]||0)+result.deletedCount;};
+        const remove=async(name,query)=>{const collection=mongoose.connection.collection(name);const rows=await collection.find(query,{session}).toArray();deletionKeys.push(...await permanentDeletion.prepare(rows,{session}));const result=await collection.deleteMany(query,{session});counts[name]=(counts[name]||0)+result.deletedCount;};
         await remove(ServiceRequest.collection.collectionName,serviceRequestFilter);
         await remove(EventBooking.collection.collectionName,{$or:[{userId:objectId},...(requestIds.length?[{requestId:{$in:requestIds}}]:[])]});
         await remove(StoredFile.collection.collectionName,{$or:[{clientId:objectId},...(requestIds.length?[{requestId:{$in:requestIds}}]:[])]});
@@ -116,13 +119,16 @@ function registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest 
         const ownerFilter={$or:[{owner},{owner:objectId},{userId:objectId},{clientId:objectId}]};
         for(const [name,collection] of Object.entries(mongoose.connection.collections)){
           if(skip.has(collection.collectionName)) continue;
+          const rows=await collection.find(ownerFilter,{session}).toArray();deletionKeys.push(...await permanentDeletion.prepare(rows,{session}));
           const result=await collection.deleteMany(ownerFilter,{session});
           if(result.deletedCount) counts[collection.collectionName]=(counts[collection.collectionName]||0)+result.deletedCount;
         }
+        deletionKeys.push(...await permanentDeletion.prepare(client,{session}));
         await User.collection.deleteOne({_id:objectId},{session});
         return {counts};
       });
-      res.json({deleted:true,removed:removed.counts});
+      const cleanup=await permanentDeletion.finish(deletionKeys);
+      res.json({deleted:true,removed:removed.counts,cloudinaryCleanupPending:cleanup.pending});
     } catch(error) {
       if(error.status) return fail(res,error.status,error.message);
       console.error('Client deletion failed:',error.name);

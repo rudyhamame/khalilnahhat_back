@@ -307,7 +307,20 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
   assertAcyclic(id||'__new_recording__',v.sourceRecordingIds,await ArchiveModel.find({}).lean());
   return v;
  }
- async function deleteLegacy(id){return transaction(async session=>{await mongoose.connection.collection('musicontologylocks').updateOne({_id:'source-graph'},{$inc:{revision:1}},{upsert:true,session});const row=await ArchiveModel.findOne({externalId:id}).session(session);if(!row)return null;if(row.workId||row.items?.length)fail('Archive this recording through the ontology editor.',409);if(await ArchiveModel.exists({sourceRecordingIds:id}).session(session))fail('This recording is used as a source; retain its identity and media.',409);return ArchiveModel.findOneAndDelete({externalId:id}).session(session);});}
+ async function deleteLegacy(id){
+  const deletion=require('../permanent-deletion');let keys=[];
+  const removed=await transaction(async session=>{
+   await mongoose.connection.collection('musicontologylocks').updateOne({_id:'source-graph'},{$inc:{revision:1}},{upsert:true,session});
+   const row=await ArchiveModel.findOne({externalId:id}).session(session);if(!row)return null;
+   if(row.workId||row.items?.length)fail('Delete this recording through the ontology editor.',409);
+   if(await ArchiveModel.exists({sourceRecordingIds:id}).session(session))fail('This recording is used as a source. Remove its source links before deleting.',409);
+   keys=await deletion.prepare(row,{session});
+   await require('../music-archive').Collection.updateMany({recordingIds:id},{$pull:{recordingIds:id}},{session});
+   return ArchiveModel.findOneAndDelete({externalId:id}).session(session);
+  });
+  if(removed)await deletion.finish(keys);return removed;
+ }
+
  return {transaction,saveVocabulary,saveWork,saveWorkType,deleteWorkType,listWorkTypes,withSamples,setWorkTypeSample,clearWorkTypeSample,saveRecording,hydrate,list,workMap,models,contract,deleteLegacy,preflightRecording};
 }
 module.exports={sampleFor,sampleProblem,SAMPLE_SECONDS,createService,assertAcyclic,matches,norm,fail};

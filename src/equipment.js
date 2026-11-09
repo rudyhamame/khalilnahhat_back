@@ -1,3 +1,4 @@
+const permanentDeletion=require('./permanent-deletion');
 const {uploadAsset}=require('./cloudinary-assets');
 const {validateSetMembers}=require('./equipment-demand');
 const mongoose = require('mongoose');
@@ -152,8 +153,8 @@ function registerEquipmentRoutes(app, requireAdmin) {
   });
 
   app.delete('/api/equipment/:id', requireAdmin, async (req, res) => {
-    const item = await Equipment.findOneAndDelete({ slug: req.params.id });
-    return item ? res.json({ ok: true }) : res.status(404).json({ message: 'Equipment not found.' });
+    const item = await permanentDeletion.remove(Equipment,{slug:req.params.id});
+    return item ? res.json({ok:true,cloudinaryCleanupPending:Boolean(item.cloudinaryCleanupPending)}) : res.status(404).json({ message: 'Equipment not found.' });
   });
 
   app.post('/api/equipment/:id/photo', requireAdmin, upload.single('photo'), async (req, res) => {

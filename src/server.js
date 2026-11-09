@@ -1,3 +1,4 @@
+const permanentDeletion=require('./permanent-deletion');
 const accountSessions = require('./account-sessions');
 const {uploadAsset}=require('./cloudinary-assets');
 const {findPasswordAccount}=require('./password-account');
@@ -1251,7 +1252,7 @@ app.patch('/api/live-sessions/:id', requireAdmin, async (request, response) => {
 });
 
 app.delete('/api/live-sessions/:id', requireAdmin, async (request, response) => {
-  const deleted = await LiveSession.findOneAndDelete({ externalId: request.params.id });
+  const deleted = await permanentDeletion.remove(LiveSession,{externalId:request.params.id});
 
   if (!deleted) {
     return response.status(404).json({

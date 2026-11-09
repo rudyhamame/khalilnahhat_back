@@ -1,3 +1,4 @@
+const permanentDeletion=require('./permanent-deletion');
 const mongoose = require('mongoose');
 const {randomUUID} = require('node:crypto');
 const {z} = require('zod');
@@ -73,7 +74,7 @@ function registerGalleryAlbums(app, requireAdmin, {MediaItem, ContentSeed}) {
     return album ? res.json({item: view(album)}) : res.status(404).json({message: 'Album not found.'});
   });
   app.delete(base + '/:id', requireAdmin, async (req,res) => {
-    const album = await GalleryAlbum.findOneAndUpdate({_id: req.params.id, deletedAt: null}, {$set: {deletedAt: new Date(), itemIds: []}});
+    const album = await permanentDeletion.remove(GalleryAlbum,{_id:req.params.id,deletedAt:null});
     return album ? res.json({ok: true, assetsPreserved: true}) : res.status(404).json({message: 'Album not found.'});
   });
   app.post(base + '/:id/items', requireAdmin, async (req,res) => {

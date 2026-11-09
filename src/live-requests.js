@@ -1,3 +1,4 @@
+const permanentDeletion=require('./permanent-deletion');
 const {sessionKey:liveBroadcastSession,requestScope,memberName}=require('./live-interactions');
 // Manual dashboard and Echo AI Administrator dispatch through these same handlers.
 function registerLiveRequestRoutes(app,{
@@ -88,7 +89,7 @@ app.get('/api/live-requests/admin', requireAdmin, async (request, response) => {
 });
 
 app.delete('/api/live-requests/:id', requireAdmin, async (request, response) => {
-  const deleted = await LiveRequest.findOneAndDelete({ externalId: request.params.id });
+  const deleted = await permanentDeletion.remove(LiveRequest,{externalId:request.params.id});
 
   if (!deleted) {
     return response.status(404).json({

@@ -1,3 +1,4 @@
+const permanentDeletion=require('./permanent-deletion');
 const {uploadAsset}=require('./cloudinary-assets');
 const mongoose = require('mongoose');
 const multer = require('multer');
@@ -65,8 +66,9 @@ function crud(app, requireAdmin, base, Model, fields, required, publicFilter, on
     return d ? res.json({ item: view(d) }) : res.status(404).json({ message: 'Not found.' });
   });
   app.delete(`${base}/:id`, requireAdmin, async (req, res) => {
-    const d = await Model.findByIdAndDelete(req.params.id).catch(() => null);
-    return d ? res.json({ ok: true }) : res.status(404).json({ message: 'Not found.' });
+    const d = await permanentDeletion.remove(Model,{_id:req.params.id});
+    if(d&&Model===MediaItem)await require('./gallery-albums').GalleryAlbum.updateMany({itemIds:String(d._id)},{$pull:{itemIds:String(d._id)}});
+    return d ? res.json({ok:true,cloudinaryCleanupPending:Boolean(d.cloudinaryCleanupPending)}) : res.status(404).json({ message: 'Not found.' });
   });
   app.get(base, async (req, res) => res.json({ items: (await Model.find({ isPublished: true, ...publicFilter(req) }).sort({ sortOrder: 1, createdAt: -1 })).map(view) }));
 }

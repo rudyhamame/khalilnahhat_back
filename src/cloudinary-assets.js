@@ -6,7 +6,7 @@ const cloudinary=require('cloudinary').v2;
 const Asset=mongoose.models.CloudinaryAsset||mongoose.model('CloudinaryAsset',new mongoose.Schema({
  key:{type:String,unique:true,required:true},sha256:String,cloud:String,publicId:String,resourceType:String,delivery:String,
  result:mongoose.Schema.Types.Mixed,state:{type:String,default:'ready'},holdUntil:Date,missingSince:Date,
- checkedAt:Date,leaseUntil:Date,attempts:{type:Number,default:0},lastError:String,
+ checkedAt:Date,leaseUntil:Date,attempts:{type:Number,default:0},lastError:String,deleteRequested:{type:Boolean,default:false},
 },{timestamps:true}));
 const HOLD_MS=10*60*1000,GRACE_MS=5*60*1000;
 const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
@@ -87,15 +87,15 @@ async function hasReferences(asset,{db=mongoose.connection.db}={}){
  }
  return false;
 }
-async function sweep({Model=Asset,client=cloudinary,check=hasReferences,now=new Date(),limit=20}={}){
- const rows=await Model.find({state:{$ne:'deleted'},holdUntil:{$lte:now},$or:[{leaseUntil:{$lte:now}},{leaseUntil:null}]}).sort({checkedAt:1}).limit(limit).lean();
+async function sweep({Model=Asset,client=cloudinary,check=hasReferences,now=new Date(),limit=20,keys}={}){
+ const rows=await Model.find({...(keys?{key:{$in:keys}}:{}),state:{$ne:'deleted'},holdUntil:{$lte:now},$or:[{leaseUntil:{$lte:now}},{leaseUntil:null}]}).sort({deleteRequested:-1,checkedAt:1}).limit(limit).lean();
  for(const row of rows){
   const claim=await Model.findOneAndUpdate({_id:row._id,$or:[{leaseUntil:{$lte:now}},{leaseUntil:null}]},{$set:{leaseUntil:new Date(+now+10*60*1000),checkedAt:now}},{returnDocument:'after'});
   if(!claim)continue;
   try{
-   if(await check(row)){await Model.updateOne({_id:row._id},{$set:{state:'ready',missingSince:null,lastError:''}});continue;}
-   if(!row.missingSince){await Model.updateOne({_id:row._id},{$set:{missingSince:now}});continue;}
-   if(+now-new Date(row.missingSince)<GRACE_MS)continue;
+   if(await check(row)){await Model.updateOne({_id:row._id},{$set:{state:'ready',missingSince:null,lastError:'',deleteRequested:false}});continue;}
+   if(!row.deleteRequested&&!row.missingSince){await Model.updateOne({_id:row._id},{$set:{missingSince:now}});continue;}
+   if(!row.deleteRequested&&+now-new Date(row.missingSince)<GRACE_MS)continue;
    const locked=await Model.findOneAndUpdate({_id:row._id,state:{$ne:'deleted'},holdUntil:{$lte:now}},{$set:{state:'deleting'}},{returnDocument:'after'});
    if(!locked)continue;
    // Recheck after locking; uploads cannot reuse an asset marked deleting.

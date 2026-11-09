@@ -1,3 +1,4 @@
+const permanentDeletion=require('../permanent-deletion');
 const {z}=require('zod');
 const {createService}=require('./service');
 const {ArchiveItem}=require('../models');
@@ -43,6 +44,7 @@ function registerMusicOntology(app,{requireAdmin,service=createService()}={}){
  app.delete(`${admin}/recordings/:id`,requireAdmin,wrap(async(req,res)=>{
   const schema=z.object({revision:z.number().int().nonnegative(),permanent:z.literal(true)}).strict();
   const {revision}=schema.parse(req.body);
+  let deletionKeys=[];
   await service.transaction(async session=>{
    await require('mongoose').connection.collection('musicontologylocks').updateOne({_id:'source-graph'},{$inc:{revision:1}},{upsert:true,session});
    const row=await ArchiveItem.findOne({externalId:req.params.id}).session(session);
@@ -50,11 +52,14 @@ function registerMusicOntology(app,{requireAdmin,service=createService()}={}){
    if((row.ontologyRevision??0)!==revision)throw Object.assign(new Error('Recording changed. Reload before deleting.'),{status:409});
    if(await ArchiveItem.exists({externalId:{$ne:row.externalId},sourceRecordingIds:row.externalId}).session(session))throw Object.assign(new Error('This recording is used as a source. Remove its source reference from other recordings before deleting it.'),{status:409});
    await require('../music-archive').Collection.updateMany({recordingIds:row.externalId},{$pull:{recordingIds:row.externalId}},{session});
+   const versions=await service.models.Version.find({recordingId:row.externalId}).session(session);
+   deletionKeys=await permanentDeletion.prepare([row.toObject(),...versions.map(item=>item.toObject())],{session});
    await service.models.Version.deleteMany({recordingId:row.externalId}).session(session);
    const deleted=await ArchiveItem.deleteOne({_id:row._id,externalId:row.externalId,ontologyRevision:row.ontologyRevision}).session(session);
    if(deleted.deletedCount!==1||await ArchiveItem.exists({externalId:row.externalId}).session(session))throw Object.assign(new Error('Permanent deletion could not be confirmed.'),{status:409});
   });
-  res.json({ok:true,deleted:true,id:req.params.id});
+  const cleanup=await permanentDeletion.finish(deletionKeys);
+  res.json({ok:true,deleted:true,id:req.params.id,cloudinaryCleanupPending:cleanup.pending});
  }));
 
  return service;

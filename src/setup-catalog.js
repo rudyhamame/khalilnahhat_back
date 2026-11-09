@@ -1,3 +1,4 @@
+const permanentDeletion=require('./permanent-deletion');
 const mongoose=require('mongoose');
 const {z}=require('zod');
 const defaults=require('../contracts/setup-catalog.json');
@@ -47,7 +48,10 @@ function registerSetupCatalog(app,{requireAdmin}){
   const id=slug.safeParse(req.params.id);if(!id.success)return res.status(400).json({message:'Invalid service ID.'});
   const key=`service:${id.data}`,current=(await list(true)).find(row=>row.kind==='service'&&row.id===id.data);
   if(!current)return res.status(404).json({message:'Service not found.'});
-  await Entry.updateOne({key},{$set:{value:{...current,deleted:true}}},{upsert:true});
+  const cleanup=await permanentDeletion.prepare(current);
+  // Keep only a seed-suppression marker; no deleted content or media survives.
+  await Entry.updateOne({key},{$set:{value:{id:id.data,kind:'service',deleted:true}}},{upsert:true});
+  await permanentDeletion.finish(cleanup);
   res.json({removed:true,id:id.data});
  }));
 }

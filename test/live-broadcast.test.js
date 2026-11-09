@@ -105,3 +105,17 @@ test('ready requires current publisher media and exact browser ownership',async(
 test('Android preparation preserves its source and waits for media confirmation',async()=>{const ctx=setup();const response=await ctx.call('go-live',{source:'android',title:'Phone set'});assert.equal(response.body.item.broadcastSource,'android');assert.equal(response.body.item.isLive,false);});
 
 test('failed media revocation keeps the exact reservation for a safe retry',async()=>{const ctx=setup({RoomServiceClient:class{async deleteRoom(){throw new Error('offline');}}});Object.assign(ctx.current,{isLive:true,webrtcRoomName:'owned-room'});const result=await ctx.call('end',{roomName:'owned-room'});assert.equal(result.statusCode,503);assert.equal(ctx.writes.length,0);});
+test('live-only mode skips recording preparation and explicitly confirms no recording',async()=>{
+ let prepared=0;
+ const ctx=setup({prepareRecording:async()=>{prepared++;throw new Error('Recording must remain off');}});
+ const result=await ctx.call('go-live',{title:'Live only',recordingMode:'direct',saveRecording:false});
+ assert.equal(result.statusCode,201);assert.equal(prepared,0);assert.equal(result.body.recording.mode,'none');assert.equal(result.body.roomName,'khalil-live-new');assert.equal(result.body.token,'temporary-token');
+});
+test('saving remains enabled by default and only an explicit false disables it',async()=>{
+ for(const value of [undefined,true,'false',null,0]){
+  let prepared=0;
+  const ctx=setup({prepareRecording:async(_room,_title,_test,options)=>{prepared++;assert.equal(options.mode,'direct');return {_id:'recording-1',provider:'direct'};}});
+  const result=await ctx.call('go-live',{recordingMode:'direct',...(value===undefined?{}:{saveRecording:value})});
+  assert.equal(result.statusCode,201);assert.equal(prepared,1);assert.deepEqual(result.body.recording,{id:'recording-1',mode:'direct'});
+ }
+});

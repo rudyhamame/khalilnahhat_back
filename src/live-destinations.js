@@ -25,6 +25,11 @@ function validate(platform,body){
  return {serverUrl:url.href.replace(/\/$/,''),streamKey:body.streamKey};
 }
 function view(row){return {platform:row.platform,serverUrl:row.serverUrl||'',configured:Boolean(row.secret),accessConfirmed:row.platform==='youtube'||row.accessConfirmed===true,roomName:row.roomName||'',state:row.state||'idle',error:row.error||'',updatedAt:row.updatedAt||null,format:row.platform!=='youtube'?'720 × 1280 portrait':'1280 × 720 landscape'};}
+function portraitTemplateUrl(env){
+ const url=new URL('/live-portrait.html',env.FRONTEND_URL||env.PUBLIC_APP_URL||'https://djkhalilnahhat.ca');
+ if(url.protocol!=='https:'&&!(env.NODE_ENV!=='production'&&url.protocol==='http:'&&['localhost','127.0.0.1'].includes(url.hostname)))throw failure(503,'Configure an HTTPS frontend URL for portrait live output.');
+ return url.href;
+}
 function createDestinationService({Model=Destination,getLiveStreamConfig,env=process.env,client=()=>new EgressClient(env.LIVEKIT_URL,env.LIVEKIT_API_KEY,env.LIVEKIT_API_SECRET)}={}){
  const read=platform=>Model.findOne({platform}).select('+secret');
  const change=(row,patch)=>Model.findOneAndUpdate({_id:row._id,operation:row.operation,state:row.state},{$set:patch},{new:true}).select('+secret');
@@ -68,11 +73,12 @@ function createDestinationService({Model=Destination,getLiveStreamConfig,env=pro
   let row=await read(platform);if(!row?.secret)throw failure(409,'Save this destination’s server URL and stream key first.');
   if(platform==='tiktok'&&!row.accessConfirmed)throw failure(409,'Confirm external streaming access and a current server URL and stream key in this TikTok account before sending output.');
   if(platform==='instagram'&&!row.accessConfirmed)throw failure(409,'Instagram is prepared for later. Confirm Live Producer access in the studio after the account becomes eligible.');
+  const templateUrl=platform!=='youtube'?portraitTemplateUrl(env):null;
   const url=outputUrl(row),operation=crypto.randomUUID();
   row=await Model.findOneAndUpdate({_id:row._id,operation:row.operation,secret:row.secret,state:{$nin:active}},{$set:{state:'starting',operation,roomName,jobId:'',error:''}},{new:true}).select('+secret');if(!row)throw failure(409,'This destination changed, is already active or is awaiting reconciliation. Refresh before retrying.');
   try{
    const portrait=platform!=='youtube';
-   const job=await client().startRoomCompositeEgress(roomName,{stream:new StreamOutput({protocol:StreamProtocol.RTMP,urls:[url]})},{layout:'single-speaker',encodingOptions:new EncodingOptions({width:portrait?720:1280,height:portrait?1280:720,framerate:30,videoCodec:VideoCodec.H264_BASELINE,videoBitrate:2500,audioCodec:AudioCodec.AAC,audioBitrate:128,audioFrequency:48000,keyFrameInterval:2})});
+   const job=await client().startRoomCompositeEgress(roomName,{stream:new StreamOutput({protocol:StreamProtocol.RTMP,urls:[url]})},{layout:'single-speaker',...(portrait?{customBaseUrl:templateUrl}:{}),encodingOptions:new EncodingOptions({width:portrait?720:1280,height:portrait?1280:720,framerate:30,videoCodec:VideoCodec.H264_BASELINE,videoBitrate:2500,audioCodec:AudioCodec.AAC,audioBitrate:128,audioFrequency:48000,keyFrameInterval:2})});
    await change(row,{jobId:job.egressId});row={...row.toObject?.()||row,jobId:job.egressId};
    return view(await refresh(row)||row);
   }catch(error){

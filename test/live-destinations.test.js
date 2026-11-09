@@ -34,6 +34,8 @@ test('duplicate starts are fenced and a stale room cannot start or stop another 
 test('Instagram uses portrait; ending one destination does not end the other or Echo',async()=>{
  const h=setup();await h.service.save('youtube',body);await h.service.save('instagram',{serverUrl:'rtmps://live-upload.instagram.com/rtmp',streamKey:'ig-private',accessConfirmed:true});
  await h.service.start('youtube','owned');await h.service.start('instagram','owned');assert.equal(h.started[1].options.encodingOptions.height,1280);assert.equal(h.started[1].options.encodingOptions.width,720);
+ assert.equal(h.started[0].options.customBaseUrl,undefined);
+ assert.equal(h.started[1].options.customBaseUrl,'https://djkhalilnahhat.ca/live-portrait.html');
  await h.service.stop('instagram','owned');await h.service.list();assert.deepEqual(h.stopped,['job-2']);assert.equal(h.rows[0].state,'live');assert.equal(h.live.isLive,true);
 });
 test('source session replacement stops only its old destination job',async()=>{

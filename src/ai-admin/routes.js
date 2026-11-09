@@ -30,8 +30,8 @@ function registerAiAdministrator(app,{requireAdmin,authorize,configService,env=p
  }));
  app.delete(`${base}/conversations/:sessionId`,requireAdmin,guard(async(req,res)=>{
   const sessionId=z.string().min(1).max(160).parse(req.params.sessionId);
-  const result=await store.hideConversation(owner(req),sessionId);if(result.busy)throw failure(409,'This chat still has a running or waiting request. Cancel it first.');
-  res.json({deleted:true,count:result.hidden});
+  const result=await store.deleteConversation(owner(req),sessionId);if(result.busy)throw failure(409,'This chat still has a running or waiting request. Cancel it first.');
+  res.json({deleted:true,count:result.deleted,cloudinaryCleanupPending:result.cloudinaryCleanupPending});
  }));
  app.post(`${base}/tasks`,requireAdmin,guard(async(req,res)=>{if(!(await adminServices.load()).text.enabled)throw failure(503,'Administrator Text is disabled in ECHO AI Configuration.');await admitted(owner(req));res.status(202).json({item:publicTask(await engine.submit(owner(req),req.body,req.get('x-echo-client')==='android'?'android':'dashboard'))});}));
  app.get(`${base}/tasks/:id`,requireAdmin,guard(async(req,res)=>res.json({item:publicTask(await owned(req))})));

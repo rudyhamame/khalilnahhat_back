@@ -44,19 +44,12 @@ test('missing Cloudinary asset in nested SDK 404 proceeds to private upload; oth
   c.api.resource=async()=>({public_id:'owned/part',bytes:10});await uploadRecordingPart('fixture','owned/part');assert.equal(uploads,1);
  }finally{c.api.resource=read;c.uploader.upload_large=upload;}
 });
-test('delete is admin-only, atomic, recoverable and cannot remove active/saving media',async()=>{
- const {registerLiveRecordings,LiveRecording}=require('../src/live-recordings');const routes={};const admin=()=>{};
- const register=(p,a,h)=>{assert.equal(a,admin);routes[p]=h;};registerLiveRecordings({get:register,post:register,delete:register},admin);
- const old=LiveRecording.findOneAndUpdate;let filter,change;
- LiveRecording.findOneAndUpdate=async(f,c)=>{filter=f;change=c;return {_id:'012345678901234567890123',status:'ready'};};
- const res=()=>({code:200,status(n){this.code=n;return this;},json(body){this.body=body;return this;}});
- try{
-  let r=res();await routes['/api/admin/live-recordings/:id']({params:{id:'012345678901234567890123'}},r);
-  assert.equal(r.body.recoverable,true);assert.equal(filter.deletedAt,null);assert.ok(!filter.status.$in.includes('processing'));assert.ok(!filter.status.$in.includes('recording'));assert.ok(change.$set.deletedAt instanceof Date);
-  LiveRecording.findOneAndUpdate=async()=>null;r=res();await routes['/api/admin/live-recordings/:id']({params:{id:'012345678901234567890123'}},r);assert.equal(r.code,409);
-  LiveRecording.findOneAndUpdate=async(f,c)=>{filter=f;change=c;return {_id:'012345678901234567890123',status:'ready'};};
-  r=res();await routes['/api/admin/live-recordings/:id/restore']({params:{id:'012345678901234567890123'}},r);assert.equal(change.$set.deletedAt,null);assert.deepEqual(filter.deletedAt,{$ne:null});
- }finally{LiveRecording.findOneAndUpdate=old;}
+test('delete stays admin-only and the restore route no longer exists',()=>{
+ const {registerLiveRecordings}=require('../src/live-recordings');const routes={};const admin=()=>{};
+ const register=(p,a,h)=>{assert.equal(a,admin);routes[p]=h;};
+ registerLiveRecordings({get:register,post:register,delete:register},admin,{startWorker:false});
+ assert.equal(typeof routes['/api/admin/live-recordings/:id'],'function');
+ assert.equal(routes['/api/admin/live-recordings/:id/restore'],undefined);
 });
 test('capture recovery starts only the intended publisher and rechecks active jobs first',async()=>{
  const {createRecordingProviders}=require('../src/recording-providers');let jobs=[],participants=[],started=0;

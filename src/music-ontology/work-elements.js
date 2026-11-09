@@ -72,7 +72,7 @@ function createWorkElements(service){
   if(def.source==='vocabulary'&&await Vocabulary.exists({parentId:id,archived:{$ne:true}}))fail('Remove this option’s child entries first.',409);
   if(def.source!=='vocabulary'&&!mongoose.isValidObjectId(id))fail('Option not found.',404);
   const Model=def.source==='vocabulary'?Vocabulary:Option,query=def.source==='vocabulary'?{externalId:id,kind:def.kind}:{_id:id,key};
-  const result=await Model.updateOne({...query,revision,archived:{$ne:true}},{$set:{archived:true},$inc:{revision:1}});if(result.modifiedCount!==1)fail('This option changed. Reload before deleting.',409);
+  const removed=await require('../permanent-deletion').remove(Model,{...query,revision,archived:{$ne:true}});if(!removed)fail('This option changed. Reload before deleting.',409);
  }
  return {list,initialize,save,remove};
 }

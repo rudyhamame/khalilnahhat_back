@@ -135,7 +135,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
  async function deleteWorkType(id){
   const type=await DjWorkType.findOne({externalId:id});if(!type)fail('DJ work type not found.',404);
   if(await Work.exists({workKind:id})||await ArchiveItem.exists({recordingType:id}))fail('This DJ work type is assigned to catalog content and cannot be deleted yet.',409);
-  const deleted=await DjWorkType.deleteOne({_id:type._id,revision:type.revision});if(deleted.deletedCount!==1)fail('This DJ work type changed. Reload before deleting.',409);
+  const deleted=await require('../permanent-deletion').remove(DjWorkType,{_id:type._id,revision:type.revision});if(!deleted)fail('This DJ work type changed. Reload before deleting.',409);
   return true;
  }
  async function saveVocabulary(input,id,actor){
@@ -318,7 +318,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    await require('../music-archive').Collection.updateMany({recordingIds:id},{$pull:{recordingIds:id}},{session});
    return ArchiveModel.findOneAndDelete({externalId:id}).session(session);
   });
-  if(removed)await deletion.finish(keys);return removed;
+  if(removed)removed.cloudinaryCleanupPending=(await deletion.finish(keys)).pending;return removed;
  }
 
  return {transaction,saveVocabulary,saveWork,saveWorkType,deleteWorkType,listWorkTypes,withSamples,setWorkTypeSample,clearWorkTypeSample,saveRecording,hydrate,list,workMap,models,contract,deleteLegacy,preflightRecording};

@@ -118,7 +118,10 @@ function registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest 
         const skip=new Set([User.collection.collectionName,ServiceRequest.collection.collectionName,EventBooking.collection.collectionName,StoredFile.collection.collectionName,Redemption.collection.collectionName,EventDraft.collection.collectionName,SimulationDraft.collection.collectionName,Meeting.collection.collectionName,Booking.collection.collectionName,LiveRequest.collection.collectionName]);
         const ownerFilter={$or:[{owner},{owner:objectId},{userId:objectId},{clientId:objectId}]};
         for(const [name,collection] of Object.entries(mongoose.connection.collections)){
-          if(skip.has(collection.collectionName)) continue;
+          // Upload receipts are global identities, not account-owned content.
+          // Shared recordings still need their audio-asset aliases after this
+          // account is gone; the asset worker ignores receipts as owners.
+          if(skip.has(collection.collectionName)||['musicaudioassets','cloudinaryassets'].includes(collection.collectionName)) continue;
           const rows=await collection.find(ownerFilter,{session}).toArray();deletionKeys.push(...await permanentDeletion.prepare(rows,{session}));
           const result=await collection.deleteMany(ownerFilter,{session});
           if(result.deletedCount) counts[collection.collectionName]=(counts[collection.collectionName]||0)+result.deletedCount;

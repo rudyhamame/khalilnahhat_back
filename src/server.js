@@ -1264,6 +1264,7 @@ app.delete('/api/live-sessions/:id', requireAdmin, async (request, response) => 
 
   return response.json({
     ok: true,
+    cloudinaryCleanupPending:Boolean(deleted.cloudinaryCleanupPending),
   });
 });
 
@@ -1542,6 +1543,7 @@ app.delete('/api/archive-items/:id', requireAdmin, async (request, response) => 
 
   return response.json({
     ok: true,
+    cloudinaryCleanupPending:Boolean(deleted.cloudinaryCleanupPending),
   });
 });
 

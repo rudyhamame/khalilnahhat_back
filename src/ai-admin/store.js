@@ -1,4 +1,5 @@
 const mongoose=require('mongoose');
+const permanentDeletion=require('../permanent-deletion');
 const {randomUUID}=require('node:crypto');
 const {tokenPolicy}=require('./token-policy');
 const taskSchema=new mongoose.Schema({_id:String,owner:{type:String,required:true,index:true},sessionId:String,requestId:String,command:String,source:String,contextInitialized:Boolean,state:{type:String,index:true},input:[mongoose.Schema.Types.Mixed],actions:[mongoose.Schema.Types.Mixed],audit:[mongoose.Schema.Types.Mixed],result:mongoose.Schema.Types.Mixed,error:String,pending:mongoose.Schema.Types.Mixed,cancelRequested:{type:Boolean,default:false},leaseToken:String,leaseUntil:Date,notification:mongoose.Schema.Types.Mixed,pushPublishedVersion:String,hidden:{type:Boolean,default:false}},{timestamps:true,versionKey:false});
@@ -11,11 +12,16 @@ function createStore(){const auditCounts=new WeakMap();return {
  get:id=>Task.findById(id).lean(),
  conversation:(owner,sessionId,task)=>Task.find({owner,sessionId,hidden:{$ne:true},_id:{$ne:task._id},createdAt:{$lte:task.createdAt}}).sort({createdAt:-1,_id:-1}).limit(tokenPolicy().historyRequests).select('_id command state result error actions').lean(),
  async conversations(owner){return Task.aggregate([{$match:{owner,hidden:{$ne:true}}},{$sort:{createdAt:1,_id:1}},{$group:{_id:{$cond:[{$in:['$sessionId',[null,'']]},'dashboard',{$ifNull:['$sessionId','dashboard']}]},title:{$first:'$command'},createdAt:{$first:'$createdAt'},updatedAt:{$max:'$updatedAt'},lastCommand:{$last:'$command'},state:{$last:'$state'},messageCount:{$sum:1}}},{$sort:{updatedAt:-1}},{$limit:100},{$project:{title:{$substrCP:[{$ifNull:['$title','Untitled chat']},0,100]},createdAt:1,updatedAt:1,state:1,messageCount:1}}]);},
- // A deleted chat is hidden, not erased: its tasks keep their audit trail. Refused while the chat still has work in flight.
- async hideConversation(owner,sessionId){
-  const match={owner,hidden:{$ne:true},sessionId:sessionId==='dashboard'?{$in:[sessionId,null,'']}:sessionId};
-  if(await Task.exists({...match,state:{$in:['QUEUED','RUNNING','AWAITING_APPROVAL']}}))return {busy:true};
-  return {hidden:(await Task.updateMany(match,{$set:{hidden:true}})).modifiedCount};
+ // Completed conversations are permanently removed; work in flight is protected.
+ async deleteConversation(owner,sessionId){
+  const match={owner,sessionId:sessionId==='dashboard'?{$in:[sessionId,null,'']}:sessionId};
+  const active=['QUEUED','RUNNING','AWAITING_APPROVAL'];
+  const rows=await Task.find(match).lean();
+  if(rows.some(row=>active.includes(row.state)))return {busy:true};
+  const keys=await permanentDeletion.prepare(rows);
+  const result=await Task.deleteMany({...match,_id:{$in:rows.map(row=>row._id)},state:{$nin:active}});
+  const cleanup=await permanentDeletion.finish(keys);
+  return {deleted:result.deletedCount,cloudinaryCleanupPending:cleanup.pending};
  },
  async messages(owner,sessionId,before){
   const query={owner,hidden:{$ne:true},sessionId:sessionId==='dashboard'?{$in:[sessionId,null,'']}:sessionId};

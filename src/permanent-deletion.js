@@ -1,6 +1,6 @@
 const mongoose=require('mongoose');
 const cloudinary=require('cloudinary').v2;
-const {Asset,collectIdentities,sweep}=require('./cloudinary-assets');
+const {Asset,collectIdentities,ownedIdentity,sweep}=require('./cloudinary-assets');
 
 const managed=/^(?:Gallery\/|Live\/|khalil\/(?:assets|content|music-archive|equipment|equipment-models|live-sessions|live-posters|song-covers|private)\/)/;
 function deletionIdentities(value,cloud,resourceType='video'){
@@ -24,6 +24,11 @@ function createPermanentDeletion({Model=Asset,client=cloudinary,db=()=>mongoose.
  async function prepare(value,{session,resourceType='video'}={}){
   const plain=value?.toObject?value.toObject():value;
   const cloud=client.config().cloud_name||process.env.CLOUDINARY_CLOUD_NAME;
+  const needsCloud=item=>{
+   if(typeof item==='string'){try{const url=new URL(item);return Boolean(ownedIdentity(item,url.pathname.split('/')[1]));}catch{return false;}}
+   return !!item&&typeof item==='object'&&Object.values(item).some(needsCloud);
+  };
+  if(!cloud&&needsCloud(plain))throw Object.assign(new Error('Cloudinary must be configured before deleting uploaded files.'),{status:503});
   const identities=deletionIdentities(plain,cloud,resourceType);
   // Music records can own audio through an asset receipt rather than a URL.
   const aliases=new Set();
@@ -53,7 +58,7 @@ function createPermanentDeletion({Model=Asset,client=cloudinary,db=()=>mongoose.
   const item=await Model.findOne(filter);
   if(!item)return null;
   const keys=await prepare(item);
-  const removed=await Model.findOneAndDelete({...filter,_id:item._id});
+  const removed=await Model.findOneAndDelete({...filter,_id:item._id,...(item.updatedAt?{updatedAt:item.updatedAt}:{})});
   if(removed)removed.cloudinaryCleanupPending=(await finish(keys)).pending;
   return removed;
  }

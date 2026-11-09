@@ -127,6 +127,7 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
   if(!mongoose.isValidObjectId(req.params.id))return res.status(400).json({message:'Invalid recording.'});
   let keys=[];
   const removed=await mongoose.connection.transaction(async session=>{
+   await mongoose.connection.collection('musicontologylocks').updateOne({_id:'source-graph'},{$inc:{revision:1}},{upsert:true,session});
    const filter={_id:req.params.id,deletedAt:null,status:{$in:['ready','partial','failed','upload_failed','not_recorded']},$or:[{status:{$in:['ready','partial','not_recorded']}},{captureState:'ended'}],leaseUntil:{$lt:new Date()},cleanupPending:{$ne:true}};
    const row=await LiveRecording.findOne(filter).session(session);
    if(!row)return false;

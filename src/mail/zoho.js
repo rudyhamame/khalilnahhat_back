@@ -11,7 +11,7 @@ const REGIONS = {
   ca: ["https://accounts.zohocloud.ca", "https://mail.zohocloud.ca"],
 };
 const failure = (status, message) =>
-  Object.assign(new Error(message), { status });
+  Object.assign(new Error(message), { status,mailSafe:true });
 const id = (value) =>
   z
     .string()
@@ -61,6 +61,7 @@ const Send =
     ).index({ owner: 1, requestId: 1 }, { unique: true }),
   );
 const sendStore = {
+  sendStatus:(owner,requestId)=>Send.findOne({owner,requestId}).select('_id state messageId').lean(),
   async claim(owner, requestId, hash) {
     try {
       return {
@@ -172,13 +173,10 @@ function createDomainMail({
       token = null;
       account = null;
     }
-    if (!response.ok)
-      throw failure(
-        response.status === 429 ? 429 : 502,
-        response.status === 429
-          ? "Mailbox provider limit reached. Wait before trying again."
-          : "The mail provider rejected the request. Check the mailbox connection and permissions.",
-      );
+    if(!response.ok)throw Object.assign(failure(
+      response.status===429?429:502,
+      response.status===429?'Mailbox provider limit reached. Wait before trying again.':'The mail provider rejected the request. Check the mailbox connection and permissions.',
+    ),response.status>=400&&response.status<500?{sendState:'not_sent'}:{});
     if (binary) {
       const limit = 25 * 1024 * 1024;
       if (Number(response.headers.get("content-length")) > limit)
@@ -241,6 +239,7 @@ function createDomainMail({
   const folderPath = async (folderId) =>
     `/accounts/${(await mailbox()).id}/folders/${id(folderId)}`;
   return {
+    sendStatus:(owner,requestId)=>require('./send-status').sendStatus(store,owner,requestId),
     status() {
       return {
         mailbox: BOOKINGS,
@@ -341,6 +340,7 @@ function createDomainMail({
             409,
             "This send request already belongs to a different message.",
           );
+        if(claim.item.state==='failed')throw Object.assign(failure(409,'The previous send was rejected. Retry with a new send request.'),{sendState:'not_sent'});
         if (claim.item.state === "sent")
           return { sent: true, messageId: claim.item.messageId };
         throw failure(
@@ -374,9 +374,9 @@ function createDomainMail({
         await store.finish(owner, requestId, { state: "sent", messageId });
         return { sent: true, messageId };
       } catch (error) {
-        await store
-          .finish(owner, requestId, { state: "uncertain" })
-          .catch(() => {});
+        const notSent=error.sendState==='not_sent';
+        await store.finish(owner,requestId,{state:notSent?'failed':'uncertain'}).catch(()=>{});
+        error.sendState=notSent?'not_sent':'uncertain';
         throw error;
       }
     },

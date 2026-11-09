@@ -122,6 +122,11 @@ function registerDomainMail(
       throw fail(405, "This provider does not support deletion here.");
     res.json(await service.remove(messageId));
   });
+  router.get('/send/:requestId',async(req,res)=>{
+    const requestId=checked(z.string().uuid(),req.params.requestId);
+    if(!service.sendStatus)throw fail(503,'Send status is unavailable.');
+    res.json(await service.sendStatus(String(req.user._id),requestId));
+  });
   router.post("/send", async (req, res) =>
     res.json(await service.send(String(req.user._id), req.body)),
   );

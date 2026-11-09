@@ -43,12 +43,14 @@ function createSender({ env, store, fetchImpl = fetch, clock = Date.now }) {
         throw fail(409, "This request already belongs to a different message.");
       if (claim.item.state === "sent")
         return { sent: true, messageId: String(claim.item._id) };
+      if(claim.item.state==='failed')throw fail(409,'The previous send was rejected. Retry with a new send request.',{sendState:'not_sent'});
       throw fail(
         409,
         "This message was already submitted. Check Sent and Needs attention before sending another copy.",
         { sendState: "uncertain" },
       );
     }
+    let providerAccepted=false;
     try {
       const headers = {
         idempotencyKey: requestId,
@@ -85,11 +87,15 @@ function createSender({ env, store, fetchImpl = fetch, clock = Date.now }) {
         redirect: "error",
       });
       const payload = await response.json().catch(() => ({}));
+      if(!response.ok&&response.status>=400&&response.status<500){
+        throw fail(response.status,'The email provider rejected this message. Check the recipients and sender configuration, then retry.',{sendState:'not_sent'});
+      }
       if (!response.ok || !payload.messageId)
         throw fail(
           response.status === 429 ? 429 : 502,
           "The provider did not confirm sending. Check Sent and Needs attention before trying again.",
         );
+      providerAccepted=true;
       await store.finish(owner, requestId, {
         state: "sent",
         folder: "2",
@@ -98,15 +104,16 @@ function createSender({ env, store, fetchImpl = fetch, clock = Date.now }) {
       });
       return { sent: true, messageId: String(claim.item._id) };
     } catch (error) {
+      const notSent=!providerAccepted&&error.sendState==='not_sent';
       await store
-        .finish(owner, requestId, { state: "uncertain", folder: "4" })
+        .finish(owner, requestId, { state: notSent?'failed':'uncertain', folder: "4" })
         .catch(() => {});
       throw fail(
         error.status || 502,
         error.status
           ? error.message
           : "Sending was not confirmed. Check Sent and Needs attention before trying again.",
-        { sendState: "uncertain" },
+        { sendState: notSent?'not_sent':'uncertain' },
       );
     }
   };

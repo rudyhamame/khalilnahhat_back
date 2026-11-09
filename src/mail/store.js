@@ -98,6 +98,7 @@ const scope = (folder, extra = {}) => ({
 });
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const mongoStore = {
+  sendStatus:(owner,requestId)=>Message.findOne({mailbox:BOOKINGS,owner,requestId}).select('_id state providerMessageId').lean(),
   async receive(row) {
     try {
       return await transaction(async (session) => {

@@ -44,6 +44,7 @@ function createCloudflareMail({
     env.DOMAIN_MAIL_SENDING_ACTIVE === "true" &&
     Boolean(env.BREVO_API_KEY?.trim());
   return {
+    sendStatus:(owner,requestId)=>require('./send-status').sendStatus(store,owner,requestId),
     status() {
       return {
         provider: "Cloudflare + Brevo",

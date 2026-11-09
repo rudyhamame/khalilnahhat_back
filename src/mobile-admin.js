@@ -48,6 +48,13 @@ function signedFileUrl(file) {
   });
 }
 function registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest }) {
+  app.get('/api/admin/admins',requireAdmin,async(req,res)=>{
+    const q=String(req.query.q||'').trim().slice(0,100);
+    const role={$or:[{username:{$in:[...ADMIN_USERNAMES]}},{isAdmin:true,adminGrantedAt:{$ne:null},adminGrantedBy:{$ne:null}}]};
+    const filter={$and:[role,...(q?[{$or:['firstName','lastName','email','username'].map(key=>({[key]:{$regex:q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),$options:'i'}}))}]:[])]};
+    const rows=await User.find(filter).select('_id firstName lastName username email isAdmin isBlocked adminGrantedAt adminGrantedBy createdAt lastLoginAt').sort({username:1}).limit(500).lean();
+    res.json({items:rows.filter(isAdminUser).map(user=>({id:String(user._id),name:[user.firstName,user.lastName].filter(Boolean).join(' '),username:user.username,email:user.email||'',role:ADMIN_USERNAMES.has(String(user.username).toLowerCase())?'Owner':'Administrator',isBlocked:Boolean(user.isBlocked),grantedAt:user.adminGrantedAt||null,createdAt:user.createdAt,lastLoginAt:user.lastLoginAt||null}))});
+  });
   app.get('/api/admin/overview', requireAdmin, async (_req,res) => {
     const [clients,requests,pending,confirmed,media,archive,vault,queue,meetings,equipment] = await Promise.all([
       User.countDocuments({isAdmin:{$ne:true},username:{$nin:[...ADMIN_USERNAMES]}}),ServiceRequest.countDocuments(),

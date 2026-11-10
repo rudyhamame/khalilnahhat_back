@@ -1,4 +1,5 @@
 const crypto = require("node:crypto");
+const { isIP } = require("node:net");
 const { BOOKINGS, FOLDERS } = require("./constants");
 const { fail, draftSchema } = require("./validation");
 const { cleanHeader, escapeHtml } = require("./text");
@@ -88,6 +89,13 @@ function createSender({ env, store, fetchImpl = fetch, clock = Date.now }) {
       });
       const payload = await response.json().catch(() => ({}));
       if(!response.ok&&response.status>=400&&response.status<500){
+        const address=typeof payload.message==='string'?payload.message.match(/unrecogni[sz]ed IP address\s+([\da-fA-F:.]+)/i)?.[1]?.replace(/\.$/,''):null;
+        if((response.status===401||response.status===403)&&address&&isIP(address)){
+          throw fail(503,`Brevo blocked this server's IP address (${address}). Add it in Brevo under Security → Authorized IPs, then retry. No email was sent.`,{sendState:'not_sent'});
+        }
+        if(response.status===401||response.status===403){
+          throw fail(503,'Brevo has not authorized this server to send email. Check the API key permissions and authorized IPs in Brevo, then retry. No email was sent.',{sendState:'not_sent'});
+        }
         throw fail(response.status,'The email provider rejected this message. Check the recipients and sender configuration, then retry.',{sendState:'not_sent'});
       }
       if (!response.ok || !payload.messageId)

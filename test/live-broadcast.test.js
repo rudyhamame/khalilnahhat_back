@@ -88,6 +88,20 @@ test('recording setup failure releases only its own live claim and returns no to
  assert.equal(ctx.writes.length,2);assert.deepEqual(ctx.writes[1].filter,{key:'live',webrtcRoomName:'khalil-live-new'});assert.equal(ctx.writes[1].change.isLive,false);
 });
 
+test('recording disk admission failure explains the blocker and releases its reservation',async()=>{
+ const message='Recording disk is full. Pending data is kept for recovery.';
+ const ctx=setup({prepareRecording:async()=>{throw Object.assign(new Error(message),{status:507});}});
+ const result=await ctx.call('go-live',{recordingMode:'direct'});
+ assert.equal(result.statusCode,507);assert.equal(result.body.message,message);assert.equal(result.body.token,undefined);
+ assert.equal(ctx.writes.length,2);assert.deepEqual(ctx.writes[1].filter,{key:'live',webrtcRoomName:'khalil-live-new'});assert.equal(ctx.writes[1].change.webrtcRoomName,'');
+});
+
+test('unexpected startup errors keep internal details out of the response',async()=>{
+ const ctx=setup({prepareRecording:async()=>{throw new Error('private implementation detail');}});
+ const result=await ctx.call('go-live');
+ assert.equal(result.statusCode,500);assert.equal(result.body.message,'Could not start the live stream.');assert.equal(result.body.token,undefined);
+});
+
 test('browser and phone cannot claim or end a waiting OBS session', async()=>{
  const ctx=setup();ctx.current.obsRoomName='khalil-obs-reserved';
  assert.equal((await ctx.call('go-live')).statusCode,409);

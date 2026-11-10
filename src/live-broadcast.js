@@ -58,7 +58,9 @@ function registerLiveBroadcastRoutes(app, deps) {
       return response.status(201).json({ item: serialize(updated), token, url: config.wsUrl, roomName,...(!saveRecording?{recording:{mode:'none'}}:recording?.provider==='direct'?{recording:{id:String(recording._id),mode:'direct'}}:{}) });
     } catch (error) {
       console.error('WebRTC go-live failed:', error.message);
-      return response.status(error.status || 500).json({ message: error.status === 503 ? error.message : 'Could not start the live stream.' });
+      const status = error.status || 500;
+      const actionable = status === 503 || status === 507;
+      return response.status(status).json({ message: actionable ? error.message : 'Could not start the live stream.' });
     }
   });
   app.post('/api/live-stream/webrtc/ready', requireAdmin, async (request,response) => {

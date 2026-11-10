@@ -71,6 +71,7 @@ function createRecordingPipeline({Model,providers,prepareFiles,upload,verify=asy
     await commit({status,error:status==='not_recorded'?'This live stream ended without a saved recording.':status==='partial'?warning:'',attempts:0,nextRetryAt:new Date(clock()+15000),cleanupPending:sources.some(item=>item.saved&&!item.cleaned)});
    }catch(error){
     if(error.code==='RECORDING_LEASE_LOST')return;
+    console.error('Recording save failed:',phase,error.code||'',String(error.message||error).slice(0,300));
     const attempts=previousAttempts+1;
     await save({...(phase==='capture'?{captureState:row.captureState==='starting'?'failed':row.captureState==='ended'?'ended':'unknown'}:{}),status:attempts>=RETRIES&&row.captureState==='ended'&&parts().length?'partial':'upload_failed',attempts,error:phase==='capture'?'Recording capture could not be checked or started. Already saved parts are kept. Check the media service and retry recovery.':'Saving did not finish. Already saved parts are kept. Check source availability and retry recovery.',nextRetryAt:new Date(clock()+Math.min(attempts*60000,1800000))});
    }finally{provider.release?.(row);if(directory)await fs.rm(directory,{recursive:true,force:true}).catch(()=>{});}

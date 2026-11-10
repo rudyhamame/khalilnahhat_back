@@ -29,11 +29,13 @@ async function withRecording(id,owner,work){
  const jobs=require('./recording-jobs').recordingJobs(LiveRecording);
  const result=await jobs.run(id,async lease=>work(lease));if(result?.busy)throw fail(409,'Recording is busy. Retry this same chunk.');return result;
 }
-async function acceptChunk(lease,index,body,mime){
+async function acceptChunk(lease,index,body,mime,claimedHash){
  const {row,save}=lease,d=row.direct;
  if(!Number.isSafeInteger(index)||index<0||index>100000)throw fail(400,'Invalid chunk sequence.');
  if(!Buffer.isBuffer(body)||!body.length||body.length>CHUNK_LIMIT)throw fail(413,'Recording chunk is too large or empty.');
  const hash=digest(body),filename=chunkPath(row,index);
+ // Transit integrity: the Studio hashes the part it holds on disk; a mismatch means the bytes were damaged in flight.
+ if(claimedHash&&claimedHash.toLowerCase()!==hash)throw fail(422,'Chunk checksum mismatch. Retry this chunk.');
  // An acknowledgement lost in transit must never append the same bytes twice.
  if(index<d.count){const existing=await fs.readFile(filename).catch(()=>null);if(existing&&digest(existing)===hash)return {nextSequence:d.count};throw fail(409,'This chunk sequence already contains different data.');}
  if(d.state!=='open')throw fail(409,'This recording has finished receiving data.');
@@ -51,9 +53,10 @@ async function acceptChunk(lease,index,body,mime){
  await save({direct:{...d.toObject?.()||d,count:d.count+1,bytes:d.bytes+body.length,mime,lastChunkAt:new Date()},captureState:'recording',status:'recording'});
  return {nextSequence:index+1};
 }
-async function seal(lease,count,complete){
+async function seal(lease,count,complete,bytes){
  const {row,save}=lease,d=row.direct;
  if(!Number.isSafeInteger(count)||count!==d.count||count<0)throw fail(409,'Some recording chunks have not arrived. Retry uploads before finishing.');
+ if(bytes!==undefined&&bytes!==d.bytes)throw fail(409,'Received recording size does not match the Studio copy. Retry uploads before finishing.');
  if(d.state==='open')await save({direct:{...d.toObject?.()||d,state:count?'sealed':'empty',complete:count?Boolean(complete):false},captureState:'ended',status:'processing',error:'',attempts:0,nextRetryAt:new Date()});
  return {accepted:true,chunks:count};
 }
@@ -99,8 +102,8 @@ function directProvider(){return {
 function registerDirectRecordingRoutes(app,requireAdmin){
  const express=require('express');
  const handle=fn=>async(req,res)=>{try{res.set('Cache-Control','no-store');res.json(await withRecording(req.params.id,req.user._id,lease=>fn(req,lease)));}catch(e){res.status(e.status||503).json({message:e.status?e.message:'Recording data is retained. Please retry.'});}};
- app.post('/api/live-stream/recordings/:id/chunks/:sequence',requireAdmin,express.raw({type:'application/octet-stream',limit:CHUNK_LIMIT}),handle((req,lease)=>acceptChunk(lease,Number(req.params.sequence),req.body,req.headers['x-recording-mime'])));
- app.post('/api/live-stream/recordings/:id/finish',requireAdmin,handle((req,lease)=>seal(lease,req.body?.chunks,req.body?.complete===true)));
+ app.post('/api/live-stream/recordings/:id/chunks/:sequence',requireAdmin,express.raw({type:'application/octet-stream',limit:CHUNK_LIMIT}),handle((req,lease)=>acceptChunk(lease,Number(req.params.sequence),req.body,req.headers['x-recording-mime'],req.headers['x-chunk-sha256'])));
+ app.post('/api/live-stream/recordings/:id/finish',requireAdmin,handle((req,lease)=>seal(lease,req.body?.chunks,req.body?.complete===true,req.body?.bytes)));
  app.get('/api/live-stream/recordings/:id/status',requireAdmin,handle((_req,{row})=>({nextSequence:row.direct.count,state:row.direct.state,status:row.status})));
 }
 module.exports={createDirectRecording,acceptChunk,seal,directProvider,registerDirectRecordingRoutes,directory,CHUNK_LIMIT};

@@ -16,6 +16,8 @@ test('direct recording durable chunks and archive lifecycle',{timeout:90000},asy
   await assert.rejects(jobs.run(row._id,l=>direct.acceptChunk(l,2,first,'video/webm')),/missing recording chunk/);
   await jobs.run(row._id,l=>direct.acceptChunk(l,1,bytes.subarray(half),'video/webm'));
   await assert.rejects(jobs.run(row._id,l=>direct.seal(l,3,true)),/not arrived/);
+  await assert.rejects(jobs.run(row._id,l=>direct.acceptChunk(l,2,Buffer.from('x'),'video/webm','0'.repeat(64))),/checksum mismatch/);
+  await assert.rejects(jobs.run(row._id,l=>direct.seal(l,2,true,1)),/size does not match/);
   assert.equal((await LiveRecording.findById(row._id)).direct.count,2);
  });
  await t.test('real WebM chunks become an MP4 and originals survive archive failure',async()=>{

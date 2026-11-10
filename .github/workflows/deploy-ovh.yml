@@ -1,0 +1,35 @@
+name: Deploy API to OVH
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+concurrency:
+  group: deploy-ovh-api
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare SSH
+        env:
+          OVH_DEPLOY_KEY: ${{ secrets.OVH_DEPLOY_KEY }}
+          OVH_KNOWN_HOSTS: ${{ secrets.OVH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$OVH_DEPLOY_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$OVH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Upload source, build image, switch with health check
+        env:
+          HOST: ubuntu@${{ secrets.OVH_HOST }}
+        run: |
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=30"
+          CTX=/srv/rh/khalil-security/ci/api/$GITHUB_SHA
+          $SSH "$HOST" "mkdir -p $CTX"
+          rsync -a --delete --exclude .git --exclude node_modules --exclude '.env*' --exclude test --exclude artifacts --exclude data --exclude uploads -e "$SSH" ./ "$HOST:$CTX/"
+          $SSH "$HOST" "bash -s -- $GITHUB_SHA" < deploy/ovh/deploy-api.sh
+      - name: Public health check
+        run: curl -fsS --retry 5 --retry-delay 5 https://api.djkhalilnahhat.ca/api/health

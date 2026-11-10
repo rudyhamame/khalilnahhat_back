@@ -15,7 +15,7 @@ const directory=row=>{const id=String(row._id);if(!/^[a-f\d]{24}$/.test(id))thro
 const chunkPath=(row,n)=>path.join(directory(row),String(n).padStart(8,'0')+'.chunk');
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 function models(){return require('./live-recordings');}
-async function diskCheck(reserve=2*1024**3){await fs.mkdir(ROOT,{recursive:true,mode:0o700});const disk=await fs.statfs(ROOT);if(disk.bavail*disk.bsize-reservedBytes()<reserve)throw fail(507,'Recording disk is full. Pending data is kept for recovery.');}
+async function diskCheck(reserve=2*1024**3){await fs.mkdir(ROOT,{recursive:true,mode:0o700});const disk=await fs.statfs(ROOT),free=disk.bavail*disk.bsize-reservedBytes();if(free<reserve){const gb=n=>(Math.max(0,n)/1024**3).toFixed(1)+' GB';throw fail(507,`The OVH server's recording disk is full (${gb(free)} free, ${gb(reserve)} needed). This is the server, not your computer: your recording is safe in your chosen folder and will upload automatically once space is freed on the server.`);}}
 async function createDirectRecording(roomName,title,ownerId){
  if(!ownerId)throw fail(401,'Recording owner is required.');
  await diskCheck(require('./recording-storage').recordingDiskReserve()||2*1024**3);

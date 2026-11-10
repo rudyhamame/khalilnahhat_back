@@ -597,6 +597,7 @@ function serializeArchiveItem(item) {
 function serializeLiveStreamConfig(config) {
   return {
     broadcastSessionId: liveBroadcastSession(config),
+    liveStartedAt: config?.liveStartedAt || null,
     isLive: Boolean(config?.isLive),
     title: config?.title || '',
     streamUrl: '',
@@ -695,6 +696,13 @@ async function getLiveStreamConfig() {
     config = await LiveStreamConfig.findOneAndUpdate(
       { _id: config._id, isLive: true, updatedAt: config.updatedAt, broadcastSessionId: { $in: ['', null] } },
       { $set: { broadcastSessionId: crypto.randomUUID() } }, { new: true },
+    ) || await LiveStreamConfig.findOne({ key: defaultLiveStreamConfig.key });
+  }
+  const session = liveBroadcastSession(config);
+  if (session && config.liveStartedSession !== session) {
+    config = await LiveStreamConfig.findOneAndUpdate(
+      { _id: config._id, liveStartedSession: { $ne: session } },
+      { $set: { liveStartedSession: session, liveStartedAt: new Date() } }, { new: true },
     ) || await LiveStreamConfig.findOne({ key: defaultLiveStreamConfig.key });
   }
   return config;

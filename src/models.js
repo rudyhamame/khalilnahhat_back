@@ -236,6 +236,8 @@ const bookingSchema = new mongoose.Schema(
 const liveStreamConfigSchema = new mongoose.Schema(
   {
     broadcastSessionId: { type: String, default: '' },
+    liveStartedSession: { type: String, default: '' },
+    liveStartedAt: { type: Date, default: null },
     key: { type: String, required: true, unique: true, trim: true },
     isLive: { type: Boolean, default: false },
     title: { type: String, default: '', trim: true },

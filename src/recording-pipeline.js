@@ -32,11 +32,14 @@ function createRecordingPipeline({Model,providers,prepareFiles,upload,verify=asy
      if(row.objectKey&&!sources.length){sources=[{key:'legacy-cleanup',remote:row.objectKey,saved:true,cleaned:false,parts:[]}];await commit({cleanupPending:true});}
      await clean();await save({nextRetryAt:new Date(clock()+60000)});return;
     }
+    // Direct capture is already finished before inspect assembles/remuxes it.
+    // A conversion failure here is a saving failure, not a media-service start failure.
+    if(row.provider==='direct'&&['sealed','prepared','empty'].includes(row.direct?.state))phase='saving';
     const snapshot=await provider.inspect(row,lease);
     phase='saving';
     const known=new Set(sources.map(source=>source.key)),remotes=new Set(sources.map(source=>source.remote));
     for(const source of snapshot.sources){if(!known.has(source.key)&&!remotes.has(source.remote)){sources.push({...source,saved:Boolean(source.alreadySaved),cleaned:false,parts:[]});known.add(source.key);remotes.add(source.remote);}}
-    await commit({captureState:snapshot.captureState,captureCheckedAt:new Date(clock()),captureWarning:snapshot.warning||row.captureWarning||'',status:snapshot.active?'recording':'processing',nextRetryAt:new Date(clock()+15000)});
+    await commit({captureState:snapshot.captureState,captureCheckedAt:new Date(clock()),captureWarning:snapshot.warning||row.captureWarning||'',error:'',status:snapshot.active?'recording':'processing',nextRetryAt:new Date(clock()+15000)});
     let sourceFailed=false;
     for(const source of sources.filter(item=>!item.saved)){
      try{

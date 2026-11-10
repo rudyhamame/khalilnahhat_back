@@ -28,6 +28,14 @@ test('durable live recording pipeline',{timeout:90000},async t=>{
   await p.run(f.row._id);let row=await Model.findById(f.row._id);assert.equal(row.status,'upload_failed');assert.equal(row.parts.length,1);assert.deepEqual(f.removed,['one']);
   await p.run(f.row._id);row=await Model.findById(f.row._id);assert.equal(row.status,'ready');assert.equal(row.parts.length,2);assert.equal(f.uploads.length,2);assert.equal(new Set(row.parts.map(p=>p.publicId)).size,2);assert.deepEqual(f.removed,['one','two']);assert.equal(row.attempts,0);assert.ok(row.parts.every(part=>part.sha256?.length===64));
  });
+ await t.test('finished direct conversion failures report saving and clear stale errors on retry',async()=>{
+  const f=await fixture({provider:'direct',captureState:'ended',direct:{state:'sealed',complete:true,count:1}});let fail=true;
+  const inspect=f.provider.inspect;f.provider.inspect=async(...args)=>{if(fail)throw new Error('remux temporarily unavailable');return inspect(...args);};
+  const pipeline=createRecordingPipeline({Model,providers:{direct:f.provider},prepareFiles:f.prepareFiles,upload:f.upload});
+  await pipeline.run(f.row._id);let row=await Model.findById(f.row._id);
+  assert.equal(row.status,'upload_failed');assert.equal(row.captureState,'ended');assert.match(row.error,/Saving did not finish/);assert.doesNotMatch(row.error,/capture could not/);
+  fail=false;await pipeline.run(f.row._id);row=await Model.findById(f.row._id);assert.equal(row.status,'ready');assert.equal(row.error,'');assert.equal(row.direct.complete,true);
+ });
  await t.test('two workers cannot process the same recording concurrently',async()=>{
   const f=await fixture();let release,entered;const gate=new Promise(r=>{release=r;}),started=new Promise(r=>{entered=r;});const download=f.provider.download;
   f.provider.download=async(...args)=>{entered();await gate;return download(...args);};

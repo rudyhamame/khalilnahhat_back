@@ -19,7 +19,8 @@ test('direct recording durable chunks and archive lifecycle',{timeout:90000},asy
   assert.equal((await LiveRecording.findById(row._id)).direct.count,2);
  });
  await t.test('real WebM chunks become an MP4 and originals survive archive failure',async()=>{
-  await jobs.run(row._id,l=>direct.seal(l,2,true));const provider=direct.directProvider();let fail=true,uploads=0;
+  await LiveRecording.updateOne({_id:row._id},{$set:{error:'Old capture error',attempts:2}});
+  await jobs.run(row._id,l=>direct.seal(l,2,true));const sealed=await LiveRecording.findById(row._id);assert.equal(sealed.status,'processing');assert.equal(sealed.error,'');assert.equal(sealed.attempts,0);const provider=direct.directProvider();let fail=true,uploads=0;
   const pipeline=require('../src/recording-pipeline').createRecordingPipeline({Model:LiveRecording,providers:{direct:provider},prepareFiles:require('../src/recording-files').prepareRecordingFiles,upload:async(file,id)=>{uploads++;if(fail)throw new Error('archive unavailable');const stat=await fs.stat(file);return {public_id:id,bytes:stat.size};}});
   await pipeline.run(row._id);let saved=await LiveRecording.findById(row._id);assert.equal(saved.status,'upload_failed');await fs.access(path.join(direct.directory(saved),'capture.mp4'));
   fail=false;await pipeline.run(row._id);saved=await LiveRecording.findById(row._id);assert.equal(saved.status,'ready');assert.equal(saved.parts.length,1);assert.equal(saved.cleanupPending,false);assert.ok(saved.duration>0);await assert.rejects(fs.access(direct.directory(saved)),{code:'ENOENT'});assert.equal(uploads,2);

@@ -54,7 +54,7 @@ async function acceptChunk(lease,index,body,mime){
 async function seal(lease,count,complete){
  const {row,save}=lease,d=row.direct;
  if(!Number.isSafeInteger(count)||count!==d.count||count<0)throw fail(409,'Some recording chunks have not arrived. Retry uploads before finishing.');
- if(d.state==='open')await save({direct:{...d.toObject?.()||d,state:count?'sealed':'empty',complete:count?Boolean(complete):false},captureState:'ended',nextRetryAt:new Date()});
+ if(d.state==='open')await save({direct:{...d.toObject?.()||d,state:count?'sealed':'empty',complete:count?Boolean(complete):false},captureState:'ended',status:'processing',error:'',attempts:0,nextRetryAt:new Date()});
  return {accepted:true,chunks:count};
 }
 async function materialize(row,lease){

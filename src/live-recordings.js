@@ -13,14 +13,14 @@ const {createRecordingPipeline}=require('./recording-pipeline');
 const {createRecordingProviders}=require('./recording-providers');
 const {prepareRecordingFiles}=require('./recording-files');
 
-const partSchema={_id:false,publicId:String,delivery:String,bytes:Number,duration:Number,sha256:String};
+const partSchema={_id:false,publicId:String,delivery:String,bytes:Number,duration:Number,sha256:String,trimStart:Number,trimEnd:Number};
 const sourceSchema={_id:false,key:String,remote:String,saved:Boolean,cleaned:Boolean,error:String,parts:[partSchema]};
 const schema=new mongoose.Schema({
  roomName:{type:String,unique:true,required:true},title:String,status:{type:String,default:'waiting'},egressId:String,objectKey:String,
  parts:[partSchema],sources:[sourceSchema],legacyParts:[partSchema],
  leaseToken:{type:String,default:''},cleanupPending:{type:Boolean,default:false},
  captureState:{type:String,default:'waiting'},captureWarning:{type:String,default:''},captureAttempts:{type:Number,default:0},endObservedAt:Date,captureCheckedAt:Date,captureRequestedAt:Date,
- publicId:String,delivery:{type:String,default:'authenticated'},bytes:{type:Number,default:0},duration:{type:Number,default:0},
+ publicId:String,delivery:{type:String,default:'authenticated'},bytes:{type:Number,default:0},duration:{type:Number,default:0},trimStart:Number,trimEnd:Number,
  attempts:{type:Number,default:0},nextRetryAt:{type:Date,default:()=>new Date()},leaseUntil:{type:Date,default:()=>new Date(0)},
  deletedAt:{type:Date,default:null},
  provider:{type:String,default:'livekit'},relaySegments:[String],
@@ -39,12 +39,20 @@ function store(){
  return storageClient;
 }
 function sdk(Class){return new Class(process.env.LIVEKIT_URL,process.env.LIVEKIT_API_KEY,process.env.LIVEKIT_API_SECRET);}
-function recordingParts(row){return row.parts?.length?Array.from(row.parts):row.publicId?[{publicId:row.publicId,delivery:row.delivery||'authenticated',bytes:row.bytes,duration:row.duration}]:[];}
-function view(row){const parts=recordingParts(row);return {id:String(row._id),title:row.title,status:row.status,bytes:row.bytes,durationSec:row.duration,published:row.published,createdAt:row.createdAt,error:row.error||'',captureState:row.captureState||'unknown',captureCheckedAt:row.captureCheckedAt||null,warning:row.captureWarning||'',cleanupPending:Boolean(row.cleanupPending),savedPartCount:parts.length,canRetry:['failed','upload_failed'].includes(row.status)||row.captureState==='failed'||(row.status==='partial'&&row.sources?.some(source=>!source.saved)),canRemove:!row.cleanupPending&&(['ready','partial','not_recorded'].includes(row.status)||(['failed','upload_failed'].includes(row.status)&&row.captureState==='ended')),canPreview:['ready','partial'].includes(row.status)&&parts.length>0,partCount:parts.length,parts:parts.map((part,index)=>({index,bytes:part.bytes,durationSec:part.duration}))};}
+function recordingParts(row){return row.parts?.length?Array.from(row.parts):row.publicId?[{publicId:row.publicId,delivery:row.delivery||'authenticated',bytes:row.bytes,duration:row.duration,trimStart:row.trimStart,trimEnd:row.trimEnd}]:[];}
+function partTrim(part){
+ const duration=Number(part?.duration)||0,start=Number(part?.trimStart),end=Number(part?.trimEnd);
+ if(!duration||!Number.isFinite(start)||!Number.isFinite(end)||start<0||end<=start||end>duration+.05)return null;
+ if(start<.005&&end>=duration-.005)return null;
+ return {start:Math.max(0,start),end:Math.min(duration,end)};
+}
+function view(row){const parts=recordingParts(row);return {id:String(row._id),title:row.title,status:row.status,bytes:row.bytes,durationSec:row.duration,published:row.published,createdAt:row.createdAt,error:row.error||'',captureState:row.captureState||'unknown',captureCheckedAt:row.captureCheckedAt||null,warning:row.captureWarning||'',cleanupPending:Boolean(row.cleanupPending),savedPartCount:parts.length,canRetry:['failed','upload_failed'].includes(row.status)||row.captureState==='failed'||(row.status==='partial'&&row.sources?.some(source=>!source.saved)),canRemove:!row.cleanupPending&&(['ready','partial','not_recorded'].includes(row.status)||(['failed','upload_failed'].includes(row.status)&&row.captureState==='ended')),canPreview:['ready','partial'].includes(row.status)&&parts.length>0,partCount:parts.length,parts:parts.map((part,index)=>{const trim=partTrim(part);return {index,bytes:part.bytes,durationSec:part.duration,trimStartSec:trim?.start||0,trimEndSec:trim?.end||part.duration||0,selectedDurationSec:trim?trim.end-trim.start:part.duration};})};}
 function recordingLink(row,partIndex,attachment){
  const parts=recordingParts(row);const index=partIndex===undefined?0:Number(partIndex);
  if(!Number.isInteger(index)||index<0||index>=parts.length)return null;
  const part=parts[index];
+ const trim=attachment&&partTrim(part);
+ if(trim)return cloudinary.url(part.publicId,{secure:true,resource_type:'video',type:part.delivery||'authenticated',format:'mp4',sign_url:true,start_offset:trim.start,end_offset:trim.end,flags:'attachment'});
  return cloudinary.utils.private_download_url(part.publicId,'mp4',{resource_type:'video',type:part.delivery||'authenticated',expires_at:Math.floor(Date.now()/1000)+180,attachment});
 }
 async function uploadRecordingPart(filename,publicId,expected={}){
@@ -123,6 +131,22 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
   if(!row)return res.status(409).json({message:'This recording cannot be retried now.'});
   res.json({item:view(row)});sweep().catch(()=>{});
  });
+ app.post('/api/admin/live-recordings/:id/trim',requireAdmin,async(req,res)=>{
+  if(!mongoose.isValidObjectId(req.params.id))return res.status(400).json({message:'Invalid recording.'});
+  const row=await LiveRecording.findOne({_id:req.params.id,deletedAt:null,status:{$in:['ready','partial']}});
+  if(!row)return res.status(409).json({message:'Wait for the recording to finish saving.'});
+  if(row.published)return res.status(409).json({message:'This recording is already published and its trim can no longer be changed.'});
+  const index=Number(req.body?.part),start=Number(req.body?.start),end=Number(req.body?.end),parts=recordingParts(row),part=parts[index];
+  if(!Number.isInteger(index)||index<0||!part)return res.status(400).json({message:'Select a valid recording part.'});
+  const duration=Number(part.duration)||0;
+  if(!duration||!Number.isFinite(start)||!Number.isFinite(end)||start<0||end<=start||end>duration+.05||end-start<.1)return res.status(400).json({message:'Choose a valid trim range of at least 0.1 seconds.'});
+  const trimStart=Math.round(Math.max(0,start)*1000)/1000,trimEnd=Math.round(Math.min(duration,end)*1000)/1000;
+  const full=trimStart<.005&&trimEnd>=duration-.005;
+  if(row.parts?.length){row.parts[index].trimStart=full?undefined:trimStart;row.parts[index].trimEnd=full?undefined:trimEnd;}
+  else{row.trimStart=full?undefined:trimStart;row.trimEnd=full?undefined:trimEnd;}
+  await row.save();
+  res.json({item:view(row)});
+ });
  app.delete('/api/admin/live-recordings/:id',requireAdmin,async(req,res)=>{
   if(!mongoose.isValidObjectId(req.params.id))return res.status(400).json({message:'Invalid recording.'});
   let keys=[];
@@ -174,11 +198,12 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
     const updateDelivery=items=>(items||[]).map(item=>({...item.toObject?.()||item,delivery:parts.find(p=>p.publicId===item.publicId)?.delivery||item.delivery}));
     await lease.save({parts,legacyParts:updateDelivery(row.legacyParts),sources:(row.sources||[]).map(source=>({...source.toObject?.()||source,parts:updateDelivery(source.parts)})),delivery:parts.every(p=>p.delivery==='upload')?'upload':'authenticated'});
    }
-   const videoUrl=cloudinary.url(part.publicId,{secure:true,resource_type:'video',type:'upload',format:'mp4'});
-   const audioUrl=cloudinary.url(part.publicId,{secure:true,resource_type:'video',type:'upload',format:'mp3'});
+   const trim=partTrim(part),transform=trim?{start_offset:trim.start,end_offset:trim.end}:{};
+   const videoUrl=cloudinary.url(part.publicId,{secure:true,resource_type:'video',type:'upload',format:'mp4',...transform});
+   const audioUrl=cloudinary.url(part.publicId,{secure:true,resource_type:'video',type:'upload',format:'mp3',...transform});
    const externalId=`live-${row._id}${parts.length>1?`-part-${index+1}`:''}`;
    const title=`${row.title}${parts.length>1?` · Part ${index+1} of ${parts.length}`:''}`;
-   const duration=part.duration||0;
+   const duration=trim?trim.end-trim.start:part.duration||0;
    await ArchiveItem.findOneAndUpdate({externalId},{$setOnInsert:{title,artist:'DJ Khalil',category:'Live Archive',mediaType:'audio',audioUrl,description:'Audio from a recorded Echo live stream.',duration:`${Math.floor(duration/60)}:${String(Math.floor(duration%60)).padStart(2,'0')}`}},{upsert:true});
    await MediaItem.findOneAndUpdate({mediaUrl:videoUrl},{$setOnInsert:{kind:'video',title,category:'Live Archive',isPublished:true,durationSec:Math.round(duration)}},{upsert:true});
   }

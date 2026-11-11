@@ -73,6 +73,14 @@
      "required": true
     },
     {
+     "key": "event.title",
+     "label": "Event title",
+     "ar": "عنوان الفعالية",
+     "maxLength": 120,
+     "required": false,
+     "hidden": true
+    },
+    {
      "key": "event.date",
      "label": "Event date",
      "ar": "تاريخ الفعالية",

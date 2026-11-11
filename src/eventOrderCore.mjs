@@ -5,7 +5,7 @@ const planningFields=['brideName','groomName','timeline','partyEntrances','entra
 planningFields.push({key:'planning.musicUploads',label:'Planning music references',type:'links'});
 export const aiFields = [...fields,...planningFields,{key:'equipment',label:'Equipment and complete sets',type:'equipment'}];
 export function decodePatchValue(field,value){
- if(typeof value==='string'&&(value==='null'||['number','coordinate','boolean','multi','links','songs','equipment'].includes(field.type))){try{return JSON.parse(value);}catch{return undefined;}}
+ if(typeof value==='string'&&(value==='null'||['number','coordinate','boolean','multi','links','songs','tags','pairs','equipment'].includes(field.type))){try{return JSON.parse(value);}catch{return undefined;}}
  return value;
 }
 export const getPath = (object, path) => path.split('.').reduce((value, key) => value?.[key], object);
@@ -26,7 +26,7 @@ export function hasEventDraftContent(order) {
 }
 export function createEventOrder() {
   const order={schemaVersion:contract.version,source:'manual'};
-  for(const field of fields)put(order,field.key,['multi','links','songs'].includes(field.type)?[]:null);
+  for(const field of fields)put(order,field.key,['multi','links','songs','tags','pairs'].includes(field.type)?[]:null);
   order.event.timezone=contract.timezone;
   order.equipment=[];
   // This belongs to the confirmed-booking workflow, not the quote questionnaire.
@@ -37,7 +37,10 @@ export function validValue(field, value) {
   if(field.type==='equipment')return Array.isArray(value)&&value.length<=100&&new Set(value.map(item=>item?.id)).size===value.length&&value.every(item=>item&&typeof item.id==='string'&&/^[a-z0-9-]+$/.test(item.id)&&item.id.length<=160&&Number.isSafeInteger(item.quantity)&&item.quantity>0&&item.quantity<=10000);
   // Ordered suggested songs: [{phase,song}], e.g. an intro song, then an outro song.
   if(field.type==='songs')return Array.isArray(value)&&value.length<=30&&value.every(item=>item&&typeof item==='object'&&typeof item.song==='string'&&item.song.trim().length>0&&item.song.length<=200&&typeof item.phase==='string'&&item.phase.length<=40&&(!field.phases||item.phase===''||field.phases.includes(item.phase)));
-  if(value===null)return !['multi','links','songs'].includes(field.type);
+  // Lists chosen from the Work Elements (genres, influences) are free text names; language pairs are {language, dialect}.
+  if(field.type==='tags')return Array.isArray(value)&&value.length<=40&&value.every(item=>typeof item==='string'&&item.trim().length>0&&item.length<=80);
+  if(field.type==='pairs')return Array.isArray(value)&&value.length<=40&&value.every(item=>item&&typeof item==='object'&&typeof item.language==='string'&&item.language.trim().length>0&&item.language.length<=80&&typeof item.dialect==='string'&&item.dialect.length<=80);
+  if(value===null)return !['multi','links','songs','tags','pairs'].includes(field.type);
   if(field.type==='coordinate')return typeof value==='number'&&Number.isFinite(value)&&Math.abs(value)<=field.max;
   if(field.type==='number')return typeof value==='number'&&Number.isInteger(value)&&value>=0&&value<=(field.max||100000);
   if(field.type==='boolean')return typeof value==='boolean';

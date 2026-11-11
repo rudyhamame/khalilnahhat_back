@@ -289,8 +289,21 @@
      "key": "music.genres",
      "label": "Which music genres do you like?",
      "ar": "ما الأنواع الموسيقية التي تفضلها؟",
-     "type": "multi",
-     "options": ["arabic-pop", "dabke", "khaleeji", "pop", "hip-hop", "rnb", "house", "electronic", "latin", "afrobeats", "oldies", "rock"],
+     "type": "tags",
+     "hidden": true
+    },
+    {
+     "key": "music.influences",
+     "label": "Musical influences",
+     "ar": "التأثيرات الموسيقية",
+     "type": "tags",
+     "hidden": true
+    },
+    {
+     "key": "music.languagePairs",
+     "label": "Languages, each with its dialect (the first is the main language)",
+     "ar": "اللغات، لكل لغة لهجتها (الأولى هي الرئيسية)",
+     "type": "pairs",
      "hidden": true
     },
     {
@@ -298,7 +311,16 @@
      "label": "Suggested songs, in order, each with its moment (intro, outro ...)",
      "ar": "الأغاني المقترحة بالترتيب، لكل أغنية لحظتها (مقدمة، ختام ...)",
      "type": "songs",
-     "phases": ["intro", "entrance", "first-dance", "dinner", "cake-cutting", "party", "slow-dance", "outro"],
+     "phases": [
+      "intro",
+      "entrance",
+      "first-dance",
+      "dinner",
+      "cake-cutting",
+      "party",
+      "slow-dance",
+      "outro"
+     ],
      "hidden": true
     },
     {

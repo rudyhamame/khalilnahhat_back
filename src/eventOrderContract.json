@@ -286,6 +286,22 @@
      ]
     },
     {
+     "key": "music.genres",
+     "label": "Which music genres do you like?",
+     "ar": "ما الأنواع الموسيقية التي تفضلها؟",
+     "type": "multi",
+     "options": ["arabic-pop", "dabke", "khaleeji", "pop", "hip-hop", "rnb", "house", "electronic", "latin", "afrobeats", "oldies", "rock"],
+     "hidden": true
+    },
+    {
+     "key": "music.suggestedSongs",
+     "label": "Suggested songs, in order, each with its moment (intro, outro ...)",
+     "ar": "الأغاني المقترحة بالترتيب، لكل أغنية لحظتها (مقدمة، ختام ...)",
+     "type": "songs",
+     "phases": ["intro", "entrance", "first-dance", "dinner", "cake-cutting", "party", "slow-dance", "outro"],
+     "hidden": true
+    },
+    {
      "key": "music.otherLanguage",
      "label": "If you chose \"Other\" (language or dialect), tell us which (optional)",
      "ar": "إذا اخترت \"أخرى\" (لغة أو لهجة)، فأخبرنا بها (اختياري)",
@@ -376,6 +392,22 @@
       "other",
       "unknown"
      ]
+    },
+    {
+     "key": "music.favouriteSongs",
+     "label": "Favourite songs (optional)",
+     "ar": "الأغاني المفضلة (اختياري)",
+     "type": "textarea",
+     "maxLength": 1500,
+     "hidden": true
+    },
+    {
+     "key": "music.favouriteArtists",
+     "label": "Favourite artists (optional)",
+     "ar": "الفنانون المفضلون (اختياري)",
+     "type": "textarea",
+     "maxLength": 1500,
+     "hidden": true
     },
     {
      "key": "music.otherPreferences",

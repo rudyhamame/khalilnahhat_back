@@ -84,7 +84,8 @@ function directProvider(){return {
   if(row.direct.state==='open'){
    const active=await require('./models').LiveStreamConfig.exists({webrtcRoomName:row.roomName});
    const idle=Date.now()-new Date(row.direct.lastChunkAt).getTime();
-   if(!active&&idle>120000){
+   // Parts are uploaded after the live ends, so an ended live waits for them (hours, not minutes) before sealing what arrived.
+   if(!active&&idle>(Number(process.env.ECHO_RECORDING_IDLE_MS)||6*3600*1000)){
     if(!row.direct.count)return {sources:[],active:false,ended:true,captureState:'ended',warning:'No recording chunks were received.'};
     await seal(lease,row.direct.count,false);
    }else return {sources:[],active:true,ended:false,captureState:row.direct.count?'recording':'waiting',warning:''};

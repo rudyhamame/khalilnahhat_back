@@ -12,8 +12,9 @@ function registerMusicOntology(app,{requireAdmin,service=createService()}={}){
  const filterSchema=z.object(Object.fromEntries(contract.filters.map(key=>[key,['bpmMin','bpmMax'].includes(key)?z.coerce.number().positive().max(1000).optional():z.string().max(240).optional()]))).strict().refine(f=>f.bpmMin==null||f.bpmMax==null||f.bpmMin<=f.bpmMax,'Minimum BPM cannot exceed maximum BPM.');
  const readFilters=req=>{const f=filterSchema.parse(req.query);if(f.bpmScope&&!['work','recording'].includes(f.bpmScope))throw Object.assign(new Error('Choose work or recording BPM scope.'),{status:400});return f;};
  app.get(`${pub}/contract`,(_req,res)=>res.json(contract));
- // The Work Elements list of musical influences (an admin-managed preset) for the client's DJ service form.
- app.get(`${pub}/influences`,wrap(async(_req,res)=>{const row=(await elements.list()).find(item=>item.id==='influences');res.set('Cache-Control','no-store').json({items:(row?.options||[]).map(option=>({id:option.id,value:option.value}))});}));
+ // Admin-managed preset lists (musical influences, event moments) for the client's DJ service form.
+ app.get(`${pub}/preset/:key`,wrap(async(req,res)=>res.set('Cache-Control','no-store').json({items:await elements.presetOptions(req.params.key)})));
+ app.get(`${pub}/influences`,wrap(async(_req,res)=>res.set('Cache-Control','no-store').json({items:await elements.presetOptions('influences')})));
  for(const [prefix,guards,isAdmin] of [[pub,[],false],[admin,[requireAdmin],true]]){
   app.get(`${prefix}/recordings`,...guards,wrap(async(req,res)=>{const filters=readFilters(req);if(!isAdmin&&(filters.publicationStatus&&filters.publicationStatus!=='PUBLISHED'||filters.archivalStatus&&filters.archivalStatus!=='ACTIVE'))return res.json({items:[]});res.set('Cache-Control','no-store').json({items:await service.list(isAdmin,filters)});}));
   app.get(`${prefix}/recordings/:id`,...guards,wrap(async(req,res)=>{const item=(await service.list(isAdmin)).find(r=>r.id===req.params.id);if(!item)return res.status(404).json({message:'Recording not found.'});res.set('Cache-Control','no-store').json({item});}));

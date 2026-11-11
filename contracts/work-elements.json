@@ -50,5 +50,10 @@
     "id": "influences",
     "label": "Musical influences",
     "source": "preset"
+  },
+  {
+    "id": "moments",
+    "label": "Event moment",
+    "source": "preset"
   }
 ]

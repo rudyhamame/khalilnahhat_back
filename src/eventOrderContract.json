@@ -311,16 +311,6 @@
      "label": "Suggested songs, in order, each with its moment (intro, outro ...)",
      "ar": "الأغاني المقترحة بالترتيب، لكل أغنية لحظتها (مقدمة، ختام ...)",
      "type": "songs",
-     "phases": [
-      "intro",
-      "entrance",
-      "first-dance",
-      "dinner",
-      "cake-cutting",
-      "party",
-      "slow-dance",
-      "outro"
-     ],
      "hidden": true
     },
     {
@@ -419,16 +409,14 @@
      "key": "music.favouriteSongs",
      "label": "Favourite songs (optional)",
      "ar": "الأغاني المفضلة (اختياري)",
-     "type": "textarea",
-     "maxLength": 1500,
+     "type": "tags",
      "hidden": true
     },
     {
      "key": "music.favouriteArtists",
      "label": "Favourite artists (optional)",
      "ar": "الفنانون المفضلون (اختياري)",
-     "type": "textarea",
-     "maxLength": 1500,
+     "type": "tags",
      "hidden": true
     },
     {

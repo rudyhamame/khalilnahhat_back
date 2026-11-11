@@ -47,12 +47,13 @@ function partTrim(part){
  return {start:Math.max(0,start),end:Math.min(duration,end)};
 }
 function view(row){const parts=recordingParts(row);return {id:String(row._id),title:row.title,status:row.status,bytes:row.status==='recording'?row.direct?.bytes||0:row.bytes,durationSec:row.status==='recording'&&row.direct?.lastChunkAt?Math.max(0,Math.round((new Date(row.direct.lastChunkAt)-new Date(row.createdAt))/1000)):row.duration,published:row.published,createdAt:row.createdAt,error:row.error||'',captureState:row.captureState||'unknown',captureCheckedAt:row.captureCheckedAt||null,warning:row.captureWarning||'',cleanupPending:Boolean(row.cleanupPending),savedPartCount:parts.length,retrying:row.status==='upload_failed'&&(row.attempts||0)<3,canRetry:['failed','upload_failed'].includes(row.status)||row.captureState==='failed'||(row.status==='partial'&&row.sources?.some(source=>!source.saved)),canRemove:!row.cleanupPending&&(['ready','partial','not_recorded'].includes(row.status)||(['failed','upload_failed'].includes(row.status)&&row.captureState==='ended')),canPreview:['ready','partial'].includes(row.status)&&parts.length>0,partCount:parts.length,parts:parts.map((part,index)=>{const trim=partTrim(part);return {index,bytes:part.bytes,durationSec:part.duration,trimStartSec:trim?.start||0,trimEndSec:trim?.end||part.duration||0,selectedDurationSec:trim?trim.end-trim.start:part.duration};})};}
-function recordingLink(row,partIndex,attachment){
+function recordingLink(row,partIndex,attachment,full=false){
  const parts=recordingParts(row);const index=partIndex===undefined?0:Number(partIndex);
  if(!Number.isInteger(index)||index<0||index>=parts.length)return null;
  const part=parts[index];
- const trim=attachment&&partTrim(part);
- if(trim)return cloudinary.url(part.publicId,{secure:true,resource_type:'video',type:part.delivery||'authenticated',format:'mp4',sign_url:true,start_offset:trim.start,end_offset:trim.end,flags:'attachment'});
+ // The saved trim applies to the preview as well as to downloads and publishing; only the trimmer asks for the full source (full=1).
+ const trim=!full&&partTrim(part);
+ if(trim)return cloudinary.url(part.publicId,{secure:true,resource_type:'video',type:part.delivery||'authenticated',format:'mp4',sign_url:true,start_offset:trim.start,end_offset:trim.end,...(attachment?{flags:'attachment'}:{})});
  return cloudinary.utils.private_download_url(part.publicId,'mp4',{resource_type:'video',type:part.delivery||'authenticated',expires_at:Math.floor(Date.now()/1000)+180,attachment});
 }
 async function uploadRecordingPart(filename,publicId,expected={}){
@@ -122,7 +123,7 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
   res.set('Cache-Control','no-store');
   const row=mongoose.isValidObjectId(req.params.id)?await LiveRecording.findOne({_id:req.params.id,deletedAt:null}):null;
   if(!row||!['ready','partial'].includes(row.status))return res.status(404).json({message:'The recording is not ready.'});
-  const url=recordingLink(row,req.query.part,route==='download');
+  const url=recordingLink(row,req.query.part,route==='download',route==='preview'&&req.query.full==='1');
   if(!url)return res.status(400).json({message:'Select a valid recording part.'});
   res.json({url,expiresIn:180});
  });

@@ -10,7 +10,7 @@ function migrationInput(row,mapping){
 }
 async function audit(){
  const rows=await ArchiveItem.find().lean();
- return {total:rows.length,mapped:rows.filter(r=>r.workId).length,unmapped:rows.filter(r=>!r.workId).length,withAudio:rows.filter(r=>r.audioUrl).length,withLegacyLyricsMetadata:rows.filter(r=>r.lyricsLanguage||r.lyricsSummary).length,recordings:rows.map(r=>({id:r.externalId,title:r.title,legacyTrackClass:r.trackClass||null,legacyLanguage:r.lyricsLanguage||r.language||null,legacyBpm:r.bpm||null,hasAudio:Boolean(r.audioUrl),mapped:Boolean(r.workId)}))};
+ return {total:rows.length,mapped:rows.filter(r=>r.workId).length,unmapped:rows.filter(r=>!r.workId).length,withAudio:rows.filter(r=>r.audioUrl).length,recordings:rows.map(r=>({id:r.externalId,title:r.title,legacyTrackClass:r.trackClass||null,legacyLanguage:r.language||null,legacyBpm:r.bpm||null,hasAudio:Boolean(r.audioUrl),mapped:Boolean(r.workId)}))};
 }
 async function migrate(mapping,{apply=false,runId=randomUUID(),service}={}){
  if(!Array.isArray(mapping)||new Set(mapping.map(m=>m.recordingId)).size!==mapping.length)fail('Provide an array with distinct recordingId mappings.');

@@ -29,12 +29,6 @@
     "kind": "rhythm"
   },
   {
-    "id": "concept",
-    "label": "Concept",
-    "source": "vocabulary",
-    "kind": "concept"
-  },
-  {
     "id": "instrument",
     "label": "Instrument",
     "source": "vocabulary",
@@ -51,12 +45,6 @@
     "label": "Musician",
     "source": "vocabulary",
     "kind": "musician"
-  },
-  {
-    "id": "lyricist",
-    "label": "Lyricist",
-    "source": "vocabulary",
-    "kind": "lyricist"
   },
   {
     "id": "influences",

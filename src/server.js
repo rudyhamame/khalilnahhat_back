@@ -178,11 +178,7 @@ const liveSessionSchema = z.object({
   vocals: z.string().trim().optional().default(''),
   energy: z.string().trim().optional().default(''),
   beat: z.string().trim().optional().default(''),
-  lyricsSummary: z.string().trim().optional().default(''),
-  lyricsMoods: z.string().trim().optional().default(''),
-  lyricsEnergy: z.string().trim().optional().default(''),
   themes: z.string().trim().optional().default(''),
-  lyricsLanguage: z.string().trim().optional().default(''),
   explicit: z.string().trim().optional().default(''),
   playState: z.enum(LIVE_PLAY_STATES).default('queued'),
   sortOrder: z.coerce.number().optional(),
@@ -223,11 +219,7 @@ const liveRequestCreateSchema = z.object({
     vocals: z.string().trim().optional().default(''),
     energy: z.string().trim().optional().default(''),
     beat: z.string().trim().optional().default(''),
-    lyricsSummary: z.string().trim().optional().default(''),
-    lyricsMoods: z.string().trim().optional().default(''),
-    lyricsEnergy: z.string().trim().optional().default(''),
     themes: z.string().trim().optional().default(''),
-    lyricsLanguage: z.string().trim().optional().default(''),
     explicit: z.string().trim().optional().default(''),
     sourcePlatform: z.string().trim().optional().default('manual'),
     sourceUrl: z.string().trim().optional().default(''),
@@ -293,11 +285,7 @@ function buildDirectRequestMetadata(message) {
     vocals: '',
     energy: '',
     beat: '',
-    lyricsSummary: '',
-    lyricsMoods: '',
-    lyricsEnergy: '',
     themes: '',
-    lyricsLanguage: '',
     explicit: '',
     sourcePlatform,
     sourceUrl,
@@ -332,11 +320,7 @@ const archiveItemSchema = z.object({
   vocals: z.string().trim().optional().default(''),
   energy: z.string().trim().optional().default(''),
   beat: z.string().trim().optional().default(''),
-  lyricsSummary: z.string().trim().optional().default(''),
-  lyricsMoods: z.string().trim().optional().default(''),
-  lyricsEnergy: z.string().trim().optional().default(''),
   themes: z.string().trim().optional().default(''),
-  lyricsLanguage: z.string().trim().optional().default(''),
   explicit: z.string().trim().optional().default(''),
   coverImage: z.string().trim().optional().default(''),
   coverPublicId: z.string().trim().optional().default(''),
@@ -476,11 +460,7 @@ function serializeLiveSession(session) {
     vocals: session.vocals || '',
     energy: session.energy || '',
     beat: session.beat || '',
-    lyricsSummary: session.lyricsSummary || '',
-    lyricsMoods: session.lyricsMoods || '',
-    lyricsEnergy: session.lyricsEnergy || '',
     themes: session.themes || '',
-    lyricsLanguage: session.lyricsLanguage || '',
     explicit: session.explicit || '',
     playState: session.playState || 'queued',
     sortOrder: Number(session.sortOrder || 0),
@@ -524,11 +504,7 @@ function serializeLiveRequest(request) {
     vocals: request.vocals || '',
     energy: request.energy || '',
     beat: request.beat || '',
-    lyricsSummary: request.lyricsSummary || '',
-    lyricsMoods: request.lyricsMoods || '',
-    lyricsEnergy: request.lyricsEnergy || '',
     themes: request.themes || '',
-    lyricsLanguage: request.lyricsLanguage || '',
     explicit: request.explicit || '',
     sourcePlatform: request.sourcePlatform || 'manual',
     sourceUrl: request.sourceUrl || '',
@@ -585,11 +561,7 @@ function serializeArchiveItem(item) {
     vocals: item.vocals || '',
     energy: item.energy || '',
     beat: item.beat || '',
-    lyricsSummary: item.lyricsSummary || '',
-    lyricsMoods: item.lyricsMoods || '',
-    lyricsEnergy: item.lyricsEnergy || '',
     themes: item.themes || '',
-    lyricsLanguage: item.lyricsLanguage || '',
     explicit: item.explicit || '',
   };
 }
@@ -1596,22 +1568,6 @@ const aiConfiguration=createAiConfiguration();
 registerAiConfiguration(app,{
   requireAdmin: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, adminCheck: isAdminUser }),
   service:aiConfiguration,
-});
-require('./recording-atom-detection').registerRecordingAtomDetection(app,{
-  requireAdmin: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, adminCheck: isAdminUser }),
-  configService:aiConfiguration,
-});
-require('./recording-ai-completion').registerRecordingAiCompletion(app,{
-  requireAdmin: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, adminCheck: isAdminUser }),
-  configService:aiConfiguration,
-});
-require('./lyrics-concept').registerLyricsConcept(app,{
-  requireAdmin: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, adminCheck: isAdminUser }),
-  configService:aiConfiguration,
-});
-require('./lyrics-transcription').registerLyricsTranscription(app,{
-  requireAdmin: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, adminCheck: isAdminUser }),
-  configService:aiConfiguration,
 });
 const {mongoBillingStore,createAiBilling,registerAiBilling}=require('./ai-billing');
 registerAiBilling(app, {

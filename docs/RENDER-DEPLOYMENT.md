@@ -57,10 +57,10 @@ Create an API key at [poe.com/api/keys](https://poe.com/api/keys), then add it t
 
 The first ontology deployment (`9b2d885`) failed at startup because the Docker image copied `src` but omitted `contracts/music-ontology.json`. Render retained the preceding API, which returned 404 for the new editor. The Dockerfile now includes the canonical contracts and migration CLI and loads the ontology models/validation during the image build to catch a missing dependency before deployment. This code deployment does not apply a legacy-data migration.
 
-## Groq timed lyrics
+## Groq speech-to-text
 
 The ECHO AI Configuration → Speech-to-text provider selector supports Groq with `whisper-large-v3-turbo`. Add `GROQ_API_KEY` to the API service's Render environment, deploy the backend, then select Groq, enable STT, and save configuration. Existing saved providers are preserved until explicitly changed. Keys remain on the server.
 
-Both plain transcripts and timed recording lyrics use Groq when selected. Timed requests return segment timestamps, and recording snapshots accept the Groq model identifier. The displayed transcription model comes from the configured timestamp provider. Cost estimates use USD $0.04 per audio hour, with Groq's 10-second minimum per request (checked November 4, 2026: https://console.groq.com/docs/speech-to-text). The current application upload limit remains 25 MB. No automatic fallback sends a failed Groq request to another provider.
+Plain transcripts use Groq when selected. Cost estimates use USD $0.04 per audio hour, with Groq's 10-second minimum per request (checked November 4, 2026: https://console.groq.com/docs/speech-to-text). The current application upload limit remains 25 MB. No automatic fallback sends a failed Groq request to another provider.
 
 Source integration and backend syntax checks are complete; hosted deployment, API key setup, and a real Groq transcription have not been performed by this change.

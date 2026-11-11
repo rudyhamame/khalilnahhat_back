@@ -22,8 +22,8 @@ test('source derivations reject self reference and indirect cycles',()=>{
  assert.doesNotThrow(()=>assertAcyclic('a',['b','c'],[{externalId:'b',sourceRecordingIds:['c']}]));
 });
 test('canonical filters preserve scope, Song-only lyrics and combined unique results',()=>{
- const row={title:'Song remix',recordingType:'REMIX',recordingMetadata:{bpm:130,key:'D minor'},work:{type:'SONG',title:'Shared work',lyrics:{language:{id:'ar'},dialect:{id:'levant'},artistCredits:[{artistId:'lyricist'}],regions:[{id:'region'}],concepts:[{id:'love'}]},melody:{bpm:90,key:'C minor',rhythm:{id:'rhythm'},genres:[{id:'pop'}]}}};
- assert.equal(matches(row,{recordingType:'REMIX',language:'ar',dialect:'levant',region:'region',concept:'love',genre:'pop',bpmMin:'85',bpmMax:'100',lyricArtist:'lyricist'}),true);
+ const row={title:'Song remix',recordingType:'REMIX',recordingMetadata:{bpm:130,key:'D minor'},work:{type:'SONG',title:'Shared work',lyrics:{language:{id:'ar'},dialect:{id:'levant'},artistCredits:[{artistId:'singer'}],regions:[{id:'region'}]},melody:{bpm:90,key:'C minor',rhythm:{id:'rhythm'},genres:[{id:'pop'}]}}};
+ assert.equal(matches(row,{recordingType:'REMIX',language:'ar',dialect:'levant',region:'region',genre:'pop',bpmMin:'85',bpmMax:'100'}),true);
  assert.equal(matches(row,{bpmMin:'120'}),false);
  assert.equal(matches(row,{bpmMin:'120',bpmScope:'recording',key:'D minor'}),true);
  assert.equal(matches({...row,work:{...row.work,type:'MUSIC',lyrics:null}},{language:'ar'}),false);

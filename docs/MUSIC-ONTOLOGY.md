@@ -30,7 +30,7 @@ erDiagram
   RECORDING ||--o{ RECORDING_VERSION : snapshots
   RECORDING }o--o{ VOCABULARY_ENTITY : credited_artist
   MUSICAL_WORK }o--o{ VOCABULARY_ENTITY : credited_artist
-  LYRICS }o--o{ VOCABULARY_ENTITY : language_dialect_region_concept_artist
+  LYRICS }o--o{ VOCABULARY_ENTITY : language_dialect_region_artist
   MELODY }o--o{ VOCABULARY_ENTITY : rhythm_genre
 ```
 
@@ -43,7 +43,7 @@ Recording is the produced audio artifact. `MIX | REMIX | COVER | MASHUP | MEDLEY
 | `ArchiveItem` | Existing `externalId`; additive `recordingType`, `workId`, `audioAssetId`, `recordingMetadata`, explicit credits, `sourceRecordingIds`, `sourceWorkIds`, `publicationStatus`, `archivalStatus`, `ontologyRevision`, provenance and version label. Old fields remain. |
 | `MusicalWork` | Persistent `externalId`, `title`, `type`, required `melodyId`, Song-only `lyricsId`, explicit credits, description, revision and provenance. |
 | `MusicMelody` | Persistent identity, canonical work BPM/key, rhythm and genre IDs, time signature, mode, melodic description, influences, field states and provenance. |
-| `MusicLyrics` | Persistent identity, language/dialect IDs, region/concept IDs, role-qualified artist credits, text, script, translation references, notes, completeness, field states and provenance. |
+| `MusicLyrics` | Persistent identity, language/dialect IDs, region IDs, role-qualified vocalist credits, script, translation references, field states and provenance. Lyric text, timed lyrics, lyricist credits and concepts are no longer read, written or returned; any previously stored values remain in the database untouched. |
 | `MusicVocabulary` | Persistent identity, controlled kind, display name, normalized identity key, parent identity, ISO language code and description/provenance. |
 | `MusicAudioAsset` | Persistent identity, uploaded URL, optional MIME/original filename and duration; media bytes remain in existing storage. |
 | `MusicRecordingVersion` | Immutable recording snapshots, sequential revision, actor and timestamp. |
@@ -54,7 +54,7 @@ Identity indexes are unique. Vocabulary uniqueness covers kind + NFKC/case/space
 
 Work edits create new Lyrics/Melody component identities by default, leaving prior components intact. API consumers can explicitly reuse `lyricsId`/`melodyId`. Editing one work therefore cannot accidentally mutate another work that reused a component. All recordings referencing an edited work see the updated work revision. Recording BPM/key never updates work BPM/key. Separate arrangement identities are not introduced in version 1; arrangement descriptions/credits and recording technical values remain explicitly scoped.
 
-`MISSING`, `UNKNOWN`, `NOT_APPLICABLE`, and `SPECIFIED` are stored per metadata field. Empty arrays/nulls do not fabricate values. A Song without lyrics details remains a Song with incomplete Lyrics. Complete lyrics require text and a language. Music never carries Lyrics.
+`MISSING`, `UNKNOWN`, `NOT_APPLICABLE`, and `SPECIFIED` are stored per metadata field. Empty arrays/nulls do not fabricate values. Music never carries vocal metadata.
 
 ## Transaction and deployment requirements
 
@@ -81,7 +81,7 @@ Public prefix: `/api/music-ontology`; admin prefix: `/api/admin/music-ontology`.
 | `POST /vocabulary`, `PUT /vocabulary/:id` (admin) | Controlled metadata creation/editing; updates require revision |
 | Existing `/api/admin/music-archive/upload` | Authenticated audio/artwork uploads; no provider replacement |
 
-Filters are canonical server fields: `q`, `recordingType`, `workType`, `language`, `dialect`, `region`, `concept`, `artist`, `lyricArtist`, `rhythm`, `genre`, `bpmMin`, `bpmMax`, `key`, `bpmScope`, and administrative statuses. Lyrics filters apply only to Song. `bpmScope=work` is the default; `recording` selects technical metadata. Genre/rhythm always refer to work Melody. Multiple matching relationships never duplicate a recording. No category-folder label is interpreted as a musical ontology value.
+Filters are canonical server fields: `q`, `recordingType`, `workType`, `language`, `dialect`, `region`, `artist`, `rhythm`, `genre`, `bpmMin`, `bpmMax`, `key`, `bpmScope`, and administrative statuses. Language filters apply only to Song. `bpmScope=work` is the default; `recording` selects technical metadata. Genre/rhythm always refer to work Melody. Multiple matching relationships never duplicate a recording. No category-folder label is interpreted as a musical ontology value.
 
 Publication requires a valid work, production classification, active archival status and uploaded audio. Optional musical metadata remains optional and explicitly incomplete. Credits require existing artist IDs and explicit roles. Self/cyclic source graphs, invalid references, stale revisions, nonpositive BPM, invalid key notation and dialect/language mismatches are rejected. All media references must pass existing owned-upload restrictions.
 
@@ -160,8 +160,8 @@ Music exposes **Instruments, Key and Musicians** through the shared Melody entit
 ## Recording classification and components (2026-10-28)
 
 Contract version 2 uses these displayed names, keeping existing stored work identities:
-- `SONG`: **Lyrical Music** — Melody + Lyrics.
-- `MUSIC`: **Instrumental Music** — Melody only; lyrics remain forbidden.
+- `SONG`: **Vocal Music** — Melody + vocal metadata.
+- `MUSIC`: **Instrumental Music** — Melody only; vocal metadata remains forbidden.
 
 Recording amount and production type are separate classifications:
 - `INDIVIDUAL`: Cover, Remix, Production, Mashup.

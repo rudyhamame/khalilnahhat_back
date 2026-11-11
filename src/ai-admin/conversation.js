@@ -7,7 +7,7 @@ function compact(value,depth=0){
  if(depth>4)return '[read current details when needed]';
  if(typeof value==='string')return value.slice(0,300);
  if(Array.isArray(value))return value.slice(0,8).map(item=>compact(item,depth+1));
- if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([key])=>!['audit','input','pending','lyrics','description','lyricsText','notes'].includes(key)).sort(([a],[b])=>priority(a)-priority(b)).slice(0,30).map(([key,item])=>[key,compact(item,depth+1)]));
+ if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([key])=>!['audit','input','pending','description','notes'].includes(key)).sort(([a],[b])=>priority(a)-priority(b)).slice(0,30).map(([key,item])=>[key,compact(item,depth+1)]));
  return value;
 }
 // Rows are newest first. Only this owner's selected conversation is queried by the store.

@@ -188,8 +188,7 @@ function mergeAnalysisMetadata({
     cleanOptionalText(overrideMetadata.genre) ||
     cleanOptionalText(overrideMetadata.genres);
   const mergedLanguage =
-    cleanOptionalText(overrideMetadata.language) ||
-    cleanOptionalText(overrideMetadata.lyricsLanguage);
+    cleanOptionalText(overrideMetadata.language);
   const mergedDuration =
     cleanOptionalText(overrideMetadata.duration);
 
@@ -230,13 +229,7 @@ function mergeAnalysisMetadata({
     beat:
       cleanOptionalText(overrideMetadata.beat) ||
       cleanOptionalText(overrideMetadata.bpm),
-    lyricsSummary: cleanOptionalText(overrideMetadata.lyricsSummary) || '',
-    lyricsMoods: cleanOptionalText(overrideMetadata.lyricsMoods) || '',
-    lyricsEnergy: cleanOptionalText(overrideMetadata.lyricsEnergy) || '',
     themes: '',
-    lyricsLanguage:
-      cleanOptionalText(overrideMetadata.lyricsLanguage) ||
-      mergedLanguage,
     explicit: cleanOptionalText(overrideMetadata.explicit) || '',
     sourcePlatform:
       overrideMetadata.sourcePlatform ||
@@ -344,7 +337,7 @@ async function analyzeLiveRequest(message, sessions, overrideMetadata = {}) {
   const duplicateSession = findDuplicateSession(sessions, metadata.track);
   const insertion = suggestInsertionPoint(sessions, metadata);
   const analysisSourcesLabel = metadata.analysisSources.join(' + ');
-  const fitDescriptors = [metadata.genres || metadata.genre, metadata.lyricsLanguage || metadata.language, metadata.musicMoods || metadata.mood, metadata.energy]
+  const fitDescriptors = [metadata.genres || metadata.genre, metadata.language, metadata.musicMoods || metadata.mood, metadata.energy]
     .filter(Boolean)
     .join(' / ');
 

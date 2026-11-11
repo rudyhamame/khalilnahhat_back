@@ -25,7 +25,7 @@ test('ontology HTTP, transactions, references, legacy compatibility and reversib
  const dialect=await write('vocabulary',{kind:'dialect',name:'Levantine',parentId:language.id});
  const genre=await write('vocabulary',{kind:'genre',name:'Pop'});
  const artist=await write('vocabulary',{kind:'artist',name:'Khalil'});
- const work=await write('works',{title:'A song',type:'SONG',melody:{bpm:95,key:'C minor',genreIds:[genre.id]},lyrics:{languageId:language.id,dialectId:dialect.id,artistCredits:[{artistId:artist.id,role:'LYRICIST'}]}});
+ const work=await write('works',{title:'A song',type:'SONG',melody:{bpm:95,key:'C minor',genreIds:[genre.id]},lyrics:{languageId:language.id,dialectId:dialect.id,artistCredits:[{artistId:artist.id,role:'VOCALIST'}]}});
  const instrument=await write('vocabulary',{kind:'instrument',name:'Piano'});
  const music=await write('works',{title:'Instrumental',type:'MUSIC',melody:{bpm:120,key:'A minor',instrumentIds:[instrument.id],musicianCredits:[{artistId:artist.id,role:'PERFORMER',detail:'Piano part'}]}});
  const reused=await write('works',{title:'Alternate work attribution',type:'SONG',melodyId:work.melody.id,lyricsId:work.lyrics.id});assert.equal(reused.melody.id,work.melody.id);assert.equal(reused.lyrics.id,work.lyrics.id);

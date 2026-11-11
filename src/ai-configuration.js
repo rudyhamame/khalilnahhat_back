@@ -5,7 +5,7 @@ const crypto=require('node:crypto');
 const {GROQ_MODEL,GROQ_RATE_PER_MINUTE}=require('./speech-to-text-models');
 const CHECKED='2026-10-29';
 const catalog=[
- {id:'whisper-1',mode:'stt',label:'Whisper · timed lyrics',deprecated:true,timestamps:true,rates:{audioMinute:0.006}},
+ {id:'whisper-1',mode:'stt',label:'Whisper',deprecated:true,timestamps:true,rates:{audioMinute:0.006}},
  {id:'gpt-4o-mini',mode:'chat',label:'GPT-4o Mini',deprecated:true,rates:{textInput:0.15,textCached:0.075,textOutput:0.6}},
  {id:'gpt-4.1-mini',mode:'chat',label:'GPT-4.1 Mini',deprecated:true,rates:{textInput:0.4,textCached:0.1,textOutput:1.6}},
  {id:'gpt-5.6-luna',mode:'chat',label:'GPT-5.6 Luna',rates:{textInput:0.2,textCached:0.02,textOutput:1.2}},

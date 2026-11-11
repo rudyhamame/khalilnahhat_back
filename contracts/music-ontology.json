@@ -33,14 +33,11 @@
     "region",
     "artist",
     "musician",
-    "lyricist",
-    "concept",
     "rhythm",
     "genre",
     "instrument"
   ],
   "creditRoles": [
-    "LYRICIST",
     "VOCALIST",
     "PERFORMER",
     "COMPOSER",
@@ -59,7 +56,6 @@
     "dialect",
     "region",
     "artist",
-    "concept",
     "bpmMin",
     "bpmMax",
     "key",
@@ -68,7 +64,6 @@
     "bpmScope",
     "publicationStatus",
     "archivalStatus",
-    "lyricArtist",
     "instrument",
     "musician",
     "recordingAmount"
@@ -96,7 +91,7 @@
     ]
   },
   "workTypeLabels": {
-    "SONG": "Lyrical Music",
+    "SONG": "Vocal Music",
     "MUSIC": "Instrumental Music"
   },
   "recordingTypeLabels": {

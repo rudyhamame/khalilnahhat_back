@@ -97,6 +97,16 @@ async function startJob(track, key) {
     Object.assign(job,{status:'error',stage:'Channel preparation failed. Original audio remains available.'});
   } finally { activeJob=null; }
 }
+// Forward a request to the stem worker and stream its answer back.
+async function relay(req,res,target){
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);
+  let response;
+  try {response=await fetch(target,{method:req.method,headers:{'User-Agent':'khalil-api-worker/1.0',Authorization:`Bearer ${process.env.STEM_WORKER_TOKEN||''}`,...(req.headers.range?{Range:req.headers.range}:{})},signal:controller.signal,redirect:'error'});} finally {clearTimeout(timer);}
+  res.status(response.status);
+  for(const name of ['content-type','content-length','content-range','accept-ranges','cache-control'])if(response.headers.has(name))res.set(name,response.headers.get(name));
+  if(!response.body||req.method==='HEAD')return res.end();
+  const stream=require('node:stream').Readable.fromWeb(response.body);res.on('close',()=>{controller.abort();stream.destroy();});stream.on('error',()=>res.destroy());stream.pipe(res);
+}
 function registerStemSeparation(app,{requireAdmin}) {
   if(process.env.STEM_WORKER_URL){
     const base=new URL(process.env.STEM_WORKER_URL);
@@ -108,13 +118,17 @@ function registerStemSeparation(app,{requireAdmin}) {
         if(!match||req.method==='POST'&&match[2])return res.sendStatus(404);
         const track=await resolveTrack(decodeURIComponent(match[1]),false);
         if(!track||!validateSource(track.audioUrl))return res.status(404).json({message:'This published recording is unavailable.'});
-        const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);
-        let response;
-        try {response=await fetch(new URL(`/api/player/stems/${encodeURIComponent(match[1])}${match[2]?`/audio/${match[2]}`:''}`,base),{method:req.method,headers:{'User-Agent':'khalil-api-worker/1.0',Authorization:`Bearer ${process.env.STEM_WORKER_TOKEN||''}`,...(req.headers.range?{Range:req.headers.range}:{})},signal:controller.signal,redirect:'error'});} finally {clearTimeout(timer);}
-        res.status(response.status);
-        for(const name of ['content-type','content-length','content-range','accept-ranges','cache-control'])if(response.headers.has(name))res.set(name,response.headers.get(name));
-        if(!response.body||req.method==='HEAD')return res.end();
-        const stream=require('node:stream').Readable.fromWeb(response.body);res.on('close',()=>{controller.abort();stream.destroy();});stream.on('error',()=>res.destroy());stream.pipe(res);
+        await relay(req,res,new URL(`/api/player/stems/${encodeURIComponent(match[1])}${match[2]?`/audio/${match[2]}`:''}`,base));
+      } catch(error){console.error('Stem worker:',error.name);if(!res.headersSent)res.status(503).json({message:'Channel processing is temporarily unavailable. Original audio remains available.'});}
+    });
+    // Admin: split an uploaded recording (by its Cloudinary URL), before it is saved or published.
+    app.use('/api/admin/stems',requireAdmin,async(req,res)=>{
+      try {
+        if(!['GET','POST','HEAD'].includes(req.method))return res.sendStatus(405);
+        const match=req.path.match(/^\/?(?:audio\/(vocals|drums|bass|other))?$/),url=String(req.query.url||'');
+        if(!match||req.method==='POST'&&match[1]||!validateSource(url))return res.status(400).json({message:'Choose a supported audio recording.'});
+        const target=new URL(`/api/admin/stems${match[1]?`/audio/${match[1]}`:''}`,base);target.searchParams.set('url',url);
+        await relay(req,res,target);
       } catch(error){console.error('Stem worker:',error.name);if(!res.headersSent)res.status(503).json({message:'Channel processing is temporarily unavailable. Original audio remains available.'});}
     });
     return;
@@ -152,6 +166,35 @@ function registerStemSeparation(app,{requireAdmin}) {
     if(!await readManifest(key)) return res.status(404).end();
     res.set('Cache-Control','private, max-age=300').sendFile(path.join(ROOT,key,`${req.params.channel}.flac`),{dotfiles:'allow'});
   });
+  // Admin: split any uploaded recording by URL (no publication needed). The worker trusts its bearer token instead of an admin session.
+  const adminOnly=(req,res,next)=>process.env.STEM_WORKER_MODE==='1'?next():requireAdmin(req,res,next);
+  const adminSource=(req,res)=>{const url=String(req.query.url||'');if(validateSource(url))return url;res.status(400).json({message:'Choose a supported audio recording.'});return null;};
+  app.get('/api/admin/stems',adminOnly,async(req,res)=>{
+    const url=adminSource(req,res);if(!url)return;
+    const key=keyFor(url),manifest=await readManifest(key),job=jobs.get(key),ready=Boolean(manifest),available=await separatorAvailable();
+    res.set('Cache-Control','no-store').json({status:ready?'ready':job?.status||(available?'idle':'unavailable'),stage:ready?'Separated channels ready':job?.stage||(available?'':'The server audio separator is not installed.'),
+      duration:manifest?.duration,canSeparate:available,separatorAvailable:available,
+      channels:ready?CHANNELS.map(name=>({name,url:`/api/admin/stems/audio/${name}?url=${encodeURIComponent(url)}`})):[]});
+  });
+  app.post('/api/admin/stems',adminOnly,async(req,res)=>{
+    const url=adminSource(req,res);if(!url)return;
+    const key=keyFor(url);
+    if(await readManifest(key))return res.json({status:'ready'});
+    if(jobs.get(key)?.status==='processing')return res.status(202).json({status:'processing'});
+    if(!await separatorAvailable())return res.status(503).json({message:'The server audio separator is not installed.'});
+    if(activeJob)return res.status(409).json({message:'Another recording is separating. Try again in a few minutes.'});
+    activeJob=key;
+    void startJob({audioUrl:url},key);
+    res.status(202).json({status:'processing'});
+  });
+  app.get('/api/admin/stems/audio/:channel',adminOnly,async(req,res)=>{
+    if(!CHANNELS.includes(req.params.channel))return res.status(404).end();
+    const url=adminSource(req,res);if(!url)return;
+    const key=keyFor(url);
+    if(!await readManifest(key))return res.status(404).end();
+    res.set('Cache-Control','private, max-age=300').sendFile(path.join(ROOT,key,`${req.params.channel}.flac`),{dotfiles:'allow'});
+  });
+  app.use('/api/admin/stems',(error,_req,res,_next)=>{console.error('Admin stem endpoint failed:',error.message);res.set('Cache-Control','no-store').status(503).json({message:'The audio separator is temporarily unavailable. Please try again.'});});
   app.use('/api/player/stems',(error,_req,res,_next)=>{
     console.error('Stem endpoint failed:',error.message);
     res.set('Cache-Control','no-store').status(503).json({message:'The audio separator is temporarily unavailable. Please try again.'});

@@ -10,3 +10,20 @@ test('cache identity changes with the audio source; stem paths use only fixed ch
   assert.notEqual(keyFor('a.wav'),keyFor('b.wav'));
   assert.deepEqual(CHANNELS,['vocals','drums','bass','other']);
 });
+test('admin stem endpoints require admin auth and only accept supported audio URLs',async()=>{
+  const express=require('express');
+  const {registerStemSeparation}=require('../src/stem-separation');
+  const app=express();
+  registerStemSeparation(app,{requireAdmin:(req,res,next)=>req.headers.authorization==='Bearer admin'?next():res.sendStatus(401)});
+  const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
+  try{
+    const base=`http://127.0.0.1:${server.address().port}/api/admin/stems`,url=encodeURIComponent('https://res.cloudinary.com/demo/video/upload/v1/song.wav');
+    assert.equal((await fetch(`${base}?url=${url}`)).status,401);
+    assert.equal((await fetch(`${base}?url=${encodeURIComponent('https://evil.example/a.wav')}`,{headers:{authorization:'Bearer admin'}})).status,400);
+    const ok=await fetch(`${base}?url=${url}`,{headers:{authorization:'Bearer admin'}});
+    assert.equal(ok.status,200);
+    const body=await ok.json();
+    assert.ok(['idle','unavailable','ready','processing'].includes(body.status));
+    assert.equal((await fetch(`${base}/audio/notachannel?url=${url}`,{headers:{authorization:'Bearer admin'}})).status,404);
+  }finally{server.close();}
+});

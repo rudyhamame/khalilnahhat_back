@@ -546,7 +546,7 @@ function serializeAdminLiveStreamConfig(config) {
       saveRecording: config?.obsSaveRecording !== false,
       url: config?.obsUrl || '', streamKey: config?.obsStreamKey || '', expiresAt: config?.obsExpiresAt || null,
       transport: config?.broadcastMode === 'whep' || (!config?.obsRoomName && require('./obs-relay-client').configured()) ? 'ovh' : 'livekit', error: config?._obsRelayError || '' },
-    pausePhoto: config?.pausePhoto?.url ? { id: config.pausePhoto.id || '', title: config.pausePhoto.title || '', url: config.pausePhoto.url, crop: { zoom: config.pausePhoto.crop?.zoom ?? 0, cx: config.pausePhoto.crop?.cx ?? 0.5, cy: config.pausePhoto.crop?.cy ?? 0.5 } } : null,
+    pausePhoto: config?.pausePhoto?.url ? { id: config.pausePhoto.id || '', title: config.pausePhoto.title || '', url: config.pausePhoto.url, crop: { zoom: config.pausePhoto.crop?.zoom ?? 0, cx: config.pausePhoto.crop?.cx ?? 0.5, cy: config.pausePhoto.crop?.cy ?? 0.5 }, message: { text: config.pausePhoto.message?.text || '', x: config.pausePhoto.message?.x ?? 0.5, y: config.pausePhoto.message?.y ?? 0.82, size: config.pausePhoto.message?.size ?? 7, color: config.pausePhoto.message?.color || '#ffffff' } } : null,
     muxLiveStreamId: config?.muxLiveStreamId || '',
     muxPlaybackId: config?.muxPlaybackId || '',
     muxStreamKey: config?.muxStreamKey || '',
@@ -1237,7 +1237,7 @@ app.put('/api/live-stream/goal', requireAdmin, async (request, response) => {
 
 // The pause photo is kept with the live so a reload, another browser or a halted recording shows the same photo.
 app.put('/api/live-stream/pause-photo', requireAdmin, async (request, response) => {
-  const parsed = z.object({ id: z.string().trim().max(120).default(''), title: z.string().trim().max(240).default(''), url: z.string().trim().max(2048).refine(value => /^https:\/\//.test(value), 'Choose a photo from the gallery.'), crop: z.object({ zoom: z.number().finite().min(0).max(4), cx: z.number().finite().min(0).max(1), cy: z.number().finite().min(0).max(1) }).strict().default({ zoom: 0, cx: 0.5, cy: 0.5 }) }).strict().safeParse(request.body);
+  const parsed = z.object({ id: z.string().trim().max(120).default(''), title: z.string().trim().max(240).default(''), url: z.string().trim().max(2048).refine(value => /^https:\/\//.test(value), 'Choose a photo from the gallery.'), crop: z.object({ zoom: z.number().finite().min(0).max(4), cx: z.number().finite().min(0).max(1), cy: z.number().finite().min(0).max(1) }).strict().default({ zoom: 0, cx: 0.5, cy: 0.5 }), message: z.object({ text: z.string().max(300).default(''), x: z.number().finite().min(0).max(1).default(0.5), y: z.number().finite().min(0).max(1).default(0.82), size: z.number().finite().min(2).max(20).default(7), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#ffffff') }).strict().default({ text: '', x: 0.5, y: 0.82, size: 7, color: '#ffffff' }) }).strict().safeParse(request.body);
   if (!parsed.success) return response.status(400).json({ message: parsed.error.issues[0].message });
   await getLiveStreamConfig();
   const config = await LiveStreamConfig.findOneAndUpdate({ key: defaultLiveStreamConfig.key }, { $set: { pausePhoto: parsed.data } }, { new: true });

@@ -17,6 +17,11 @@ let activeJob = null;
 let remoteCatalog;
 let remoteCatalogTime = 0;
 const keyFor = url => createHash('sha256').update(`htdemucs-v1:${url}`).digest('hex');
+// Uploaded admin assets are content-addressed (…/khalil/assets/<profile>/<sha256>.<ext>): the same audio keeps one cache entry even if its delivery URL differs.
+const assetKey = url => {
+  const hash = /\/khalil\/assets\/[^/]+\/([0-9a-f]{64})\.[a-z0-9]+$/i.exec((() => { try { return new URL(url).pathname; } catch { return ''; } })())?.[1];
+  return hash ? createHash('sha256').update(`htdemucs-v1:asset:${hash.toLowerCase()}`).digest('hex') : keyFor(url);
+};
 const localRequest = req => process.env.NODE_ENV !== 'production' && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
 function validateSource(url) {
   try { const parsed = new URL(url); return parsed.protocol === 'https:' && parsed.hostname === 'res.cloudinary.com' && /\/video\/(upload|authenticated)\//.test(parsed.pathname); }
@@ -171,14 +176,14 @@ function registerStemSeparation(app,{requireAdmin}) {
   const adminSource=(req,res)=>{const url=String(req.query.url||'');if(validateSource(url))return url;res.status(400).json({message:'Choose a supported audio recording.'});return null;};
   app.get('/api/admin/stems',adminOnly,async(req,res)=>{
     const url=adminSource(req,res);if(!url)return;
-    const key=keyFor(url),manifest=await readManifest(key),job=jobs.get(key),ready=Boolean(manifest),available=await separatorAvailable();
+    const key=assetKey(url),manifest=await readManifest(key),job=jobs.get(key),ready=Boolean(manifest),available=await separatorAvailable();
     res.set('Cache-Control','no-store').json({status:ready?'ready':job?.status||(available?'idle':'unavailable'),stage:ready?'Separated channels ready':job?.stage||(available?'':'The server audio separator is not installed.'),
       duration:manifest?.duration,canSeparate:available,separatorAvailable:available,
       channels:ready?CHANNELS.map(name=>({name,url:`/api/admin/stems/audio/${name}?url=${encodeURIComponent(url)}`})):[]});
   });
   app.post('/api/admin/stems',adminOnly,async(req,res)=>{
     const url=adminSource(req,res);if(!url)return;
-    const key=keyFor(url);
+    const key=assetKey(url);
     if(await readManifest(key))return res.json({status:'ready'});
     if(jobs.get(key)?.status==='processing')return res.status(202).json({status:'processing'});
     if(!await separatorAvailable())return res.status(503).json({message:'The server audio separator is not installed.'});
@@ -190,7 +195,7 @@ function registerStemSeparation(app,{requireAdmin}) {
   app.get('/api/admin/stems/audio/:channel',adminOnly,async(req,res)=>{
     if(!CHANNELS.includes(req.params.channel))return res.status(404).end();
     const url=adminSource(req,res);if(!url)return;
-    const key=keyFor(url);
+    const key=assetKey(url);
     if(!await readManifest(key))return res.status(404).end();
     res.set('Cache-Control','private, max-age=300').sendFile(path.join(ROOT,key,`${req.params.channel}.flac`),{dotfiles:'allow'});
   });
@@ -200,4 +205,4 @@ function registerStemSeparation(app,{requireAdmin}) {
     res.set('Cache-Control','no-store').status(503).json({message:'The audio separator is temporarily unavailable. Please try again.'});
   });
 }
-module.exports={registerStemSeparation,validateSource,keyFor,CHANNELS};
+module.exports={registerStemSeparation,validateSource,keyFor,assetKey,CHANNELS};

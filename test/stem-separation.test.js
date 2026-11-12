@@ -36,3 +36,14 @@ test('the same uploaded asset shares one stem cache entry regardless of its deli
   const other='https://res.cloudinary.com/demo/video/upload/v1/song.wav';
   assert.equal(assetKey(other),keyFor(other));
 });
+test('the player can no longer start a separation',async()=>{
+  const express=require('express');
+  const {registerStemSeparation}=require('../src/stem-separation');
+  const app=express();
+  registerStemSeparation(app,{requireAdmin:(_req,res)=>res.sendStatus(401)});
+  const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
+  try{
+    const response=await fetch(`http://127.0.0.1:${server.address().port}/api/player/stems/any-id`,{method:'POST'});
+    assert.equal(response.status,410);
+  }finally{server.close();}
+});

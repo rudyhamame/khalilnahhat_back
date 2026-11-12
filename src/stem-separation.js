@@ -8,7 +8,6 @@ const CHANNELS = ['vocals', 'drums', 'bass', 'other'];
 const ROOT = process.env.STEM_CACHE_DIR ? path.resolve(process.env.STEM_CACHE_DIR) : path.resolve(__dirname, '..', '.runtime', 'stems');
 const PYTHON = process.env.STEM_PYTHON || (process.env.NODE_ENV === 'production' ? '/opt/stems/bin/python' : path.resolve(__dirname, '..', '.runtime', 'stem-cpu', 'bin', 'python'));
 const SCRIPT = path.resolve(__dirname, '../scripts/separate-stems.py');
-const automaticEnabled = () => process.env.STEM_AUTOMATIC_ENABLED === '1';
 async function separatorAvailable() {
   try { await Promise.all([fs.access(PYTHON),fs.access(SCRIPT)]); return true; } catch { return false; }
 }
@@ -77,6 +76,11 @@ function separate(input, directory, job) {
     child.on('close', (code,signal) => { clearTimeout(timer); code===0 ? resolve() : reject(new Error(`Separator exited (${signal||code}): ${errors || 'No process diagnostics.'}`)); });
   });
 }
+// Saved channels live under the recording's content key (admin editor) or the older URL key; the player only ever reads them.
+async function savedKey(url) {
+  for (const key of [assetKey(url), keyFor(url)]) if (await readManifest(key)) return key;
+  return keyFor(url);
+}
 async function readManifest(key) {
   try {
     const saved=JSON.parse(await fs.readFile(path.join(ROOT,key,'ready.json'),'utf8'));
@@ -118,9 +122,10 @@ function registerStemSeparation(app,{requireAdmin}) {
     if(base.protocol!=='https:')throw new Error('STEM_WORKER_URL must use HTTPS.');
     app.use('/api/player/stems',async(req,res)=>{
       try {
-        if(!['GET','POST','HEAD'].includes(req.method))return res.sendStatus(405);
+        if(req.method==='POST')return res.status(410).json({message:'Channels are prepared when the recording is saved in the admin editor.'});
+        if(!['GET','HEAD'].includes(req.method))return res.sendStatus(405);
         const match=req.path.match(/^\/([^/]+)(?:\/audio\/(vocals|drums|bass|other))?$/);
-        if(!match||req.method==='POST'&&match[2])return res.sendStatus(404);
+        if(!match)return res.sendStatus(404);
         const track=await resolveTrack(decodeURIComponent(match[1]),false);
         if(!track||!validateSource(track.audioUrl))return res.status(404).json({message:'This published recording is unavailable.'});
         await relay(req,res,new URL(`/api/player/stems/${encodeURIComponent(match[1])}${match[2]?`/audio/${match[2]}`:''}`,base));
@@ -138,36 +143,23 @@ function registerStemSeparation(app,{requireAdmin}) {
     });
     return;
   }
-  const authorize = (req,res,next) => localRequest(req)||automaticEnabled() ? next() : requireAdmin(req,res,next);
+  // The player never splits audio. Channels are produced once, in the admin editor, and saved with the recording.
+  const PLAYER_NOTE='Channels are prepared when the recording is saved in the admin editor.';
   app.get('/api/player/stems/:id',async(req,res)=>{
     const track=await resolveTrack(req.params.id,localRequest(req));
     if(!track || !validateSource(track.audioUrl)) return res.status(404).json({message:'This published recording is unavailable.'});
-    const key=keyFor(track.audioUrl), manifest=await readManifest(key), job=jobs.get(key);
-    const ready=Boolean(manifest),available=await separatorAvailable();
-    const canSeparate=available&&(localRequest(req)||automaticEnabled());
-    const unavailableStage=!available?'The server audio separator is not installed.':!canSeparate?'Automatic channel preparation is not enabled on the server.':'';
-    res.set('Cache-Control','no-store').json({status:ready?'ready':job?.status||(canSeparate?'idle':'unavailable'),stage:ready?'Separated channels ready':job?.stage||unavailableStage,
-      duration:manifest?.duration,canSeparate,separatorAvailable:available,
+    const key=await savedKey(track.audioUrl), manifest=await readManifest(key);
+    const ready=Boolean(manifest);
+    res.set('Cache-Control','no-store').json({status:ready?'ready':'unavailable',stage:ready?'Separated channels ready':PLAYER_NOTE,
+      duration:manifest?.duration,canSeparate:false,separatorAvailable:false,
       channels:ready?CHANNELS.map(name=>({name,url:`/api/player/stems/${encodeURIComponent(track.id||track.externalId||req.params.id)}/audio/${name}`})):[]});
   });
-  app.post('/api/player/stems/:id',authorize,async(req,res)=>{
-    const track=await resolveTrack(req.params.id,localRequest(req));
-    if(!track || !validateSource(track.audioUrl)) return res.status(404).json({message:'Choose a published recording.'});
-    const key=keyFor(track.audioUrl);
-    if(await readManifest(key)) return res.json({status:'ready'});
-    if(jobs.get(key)?.status==='processing') return res.status(202).json({status:'processing'});
-    if(!await separatorAvailable()) return res.status(503).json({message:'The server audio separator is not installed.'});
-    if(activeJob) return res.status(409).json({message:'Another recording is separating. This recording will retry automatically.'});
-    // Reserve synchronously before starting asynchronous download/inference.
-    activeJob=key;
-    void startJob(track,key);
-    res.status(202).json({status:'processing'});
-  });
+  app.post('/api/player/stems/:id',(_req,res)=>res.status(410).json({message:PLAYER_NOTE}));
   app.get('/api/player/stems/:id/audio/:channel',async(req,res)=>{
     if(!CHANNELS.includes(req.params.channel)) return res.status(404).end();
     const track=await resolveTrack(req.params.id,localRequest(req));
     if(!track) return res.status(404).end();
-    const key=keyFor(track.audioUrl);
+    const key=await savedKey(track.audioUrl);
     if(!await readManifest(key)) return res.status(404).end();
     res.set('Cache-Control','private, max-age=300').sendFile(path.join(ROOT,key,`${req.params.channel}.flac`),{dotfiles:'allow'});
   });

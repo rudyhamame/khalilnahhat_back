@@ -38,3 +38,11 @@ test('legacy mapping never invents work identity or canonical work BPM',()=>{
 test('authoritative contract matches its synchronized checksum',()=>{const fs=require('fs'),crypto=require('crypto'),path=require('path');const file=path.join(__dirname,'../contracts/music-ontology.json');assert.equal(crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'),fs.readFileSync(file.replace('.json','.sha256'),'utf8').trim());});
 
 test('Music instruments and musicians use identities and performance roles',()=>{const m=V.melody.parse({key:'A minor',instrumentIds:['piano'],musicianCredits:[{artistId:'person',role:'PERFORMER'}]});assert.equal(m.key,'A minor');assert.deepEqual(m.instrumentIds,['piano']);assert.equal(m.musicianCredits[0].role,'PERFORMER');assert.equal(V.melody.safeParse({musicianCredits:[{artistId:'person',role:'LYRICIST'}]}).success,false);assert.equal(V.melody.safeParse({instrumentIds:['piano','piano']}).success,false);const r={work:{type:'MUSIC',melody:{instruments:[{id:'piano'}],musicianCredits:[{artistId:'person'}],key:'A minor'}}};assert.equal(matches(r,{instrument:'piano',musician:'person',key:'A minor'}),true);assert.equal(matches(r,{instrument:'violin'}),false);});
+test('recordings accept recording-level musical details as lists',()=>{
+  const {recording}=require('../src/music-ontology/validation');
+  const base={title:'Mix',recordingType:'mix',items:[{id:'a1',name:'Atom',hasLyrics:false,musicianCredits:[],releaseYear:null}]};
+  const ok=recording.safeParse({...base,musical:{keys:['C major','A minor'],rhythmIds:['r1','r2'],genreIds:['g1','g2','g3'],influences:['Oum Kalthoum','Fairuz'],musicianCredits:[{artistId:'p1',instrumentId:'i1',detail:''}]}});
+  assert.equal(ok.success,true,JSON.stringify(ok.error?.issues?.slice(0,2)));
+  assert.equal(ok.data.musical.genreIds.length,3);
+  assert.equal(recording.safeParse({...base,musical:{keys:['C major','C major']}}).success,false);
+});

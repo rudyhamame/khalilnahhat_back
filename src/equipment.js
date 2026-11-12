@@ -34,34 +34,11 @@ const equipmentSchema = new mongoose.Schema(
 );
 const Equipment = mongoose.models.Equipment || mongoose.model('Equipment', equipmentSchema);
 
-// Source: "Rental Price .pdf". quantityOwned is a placeholder until the owner enters real stock.
-const SEED = [
-  ['movingheads', 'lighting', 'Intelligent Moving Heads', '', 25000],
-  ['trussing', 'lighting', 'Base Plates / Trussing', '', 7500],
-  ['uplights', 'lighting', 'Uplights', '', 3500, 10],
-  ['qsc-k122', 'sound', 'QSC K12.2', 'QSC K12.2', 10000],
-  ['elite-15', 'sound', 'Elite 15" Speakers', '', 10000],
-  ['es18p', 'sound', 'ES18P 18" Subwoofer', 'ES18P', 15000],
-  ['shure-mics', 'sound', 'Shure Microphones', 'Shure', 7500],
-  ['soundcraft', 'sound', 'Soundcraft Soundboard', 'Soundcraft', 7500],
-  ['jbl-system', 'sound', 'JBL Concert Sound System', 'JBL SRX 725 tops + STX 828 bins', 80000],
-  ['smoke', 'effects', 'Smoke Machine', '', 10000],
-  ['sparklers', 'effects', 'Sparklers / Cold Spark Effects', '', 25000],
-  ['dry-ice', 'effects', 'Dry Ice Machine', '', 40000],
-  ['co2-gun', 'effects', 'CO₂ Gun With Tank', '', 60000],
-  ['led-screen', 'video', 'LED Screen', 'Six-panel configuration', 80000],
-  ['projector', 'video', 'Projector', '', 5000],
-  ['dj-service', 'dj', 'DJ Service', 'DJ Khalil Nahhat', 100000],
-].map(([slug, category, name, brandModel, priceCents, minQuantity = 1], sortOrder) => ({
-  slug, category, name, brandModel, priceCents, minQuantity, sortOrder,
-}));
-
+// Equipment lives only in the database. Nothing is ever created from a list in the code, so an item the admin deletes stays deleted
+// (a restart or a deploy cannot bring it back). Items that already exist may be given their default 3D model once.
 let seeded = false;
 async function ensureSeed() {
   if (seeded) return;
-  await Equipment.bulkWrite(
-    SEED.map((item) => ({ updateOne: { filter: { slug: item.slug }, update: { $setOnInsert: item }, upsert: true } })),
-  );
   await attachDefaultModels();
   seeded = true;
 }

@@ -59,58 +59,8 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100
 const liveRequestPriceCents = 0;
 const liveRequestCurrency = 'cad';
 
-const DEFAULT_SERVICE_PRICES = [
-  // Service-level prices: the base price of each service. Its equipment is priced separately on the Equipment records.
-  ['service-dj', 'DJ Services', 'Service'],
-  ['service-sound', 'Sound Systems', 'Service'],
-  ['service-lighting', 'Lighting', 'Service'],
-  ['service-video', 'LED Walls & Video', 'Service'],
-  ['service-effects', 'Special Effects', 'Service'],
-  ['service-corporate', 'Corporate Events', 'Service'],
-  ['professional-dj-service', 'Professional DJ Service', 'DJ'],
-  ['qsc-k12-2-speaker', 'QSC K12.2 Speaker', 'Sound'],
-  ['elite-15-speaker', 'Elite 15-inch Speaker', 'Sound'],
-  ['es18p-subwoofer', 'ES18P 18-inch Subwoofer', 'Sound'],
-  ['shure-microphone', 'Shure Microphone', 'Sound'],
-  ['soundcraft-soundboard', 'Soundcraft Soundboard', 'Sound'],
-  ['jbl-concert-system', 'JBL Concert-Level System', 'Sound'],
-  ['intelligent-moving-head', 'Intelligent Moving Head', 'Lighting'],
-  ['baseplate-trussing', 'Baseplate / Trussing', 'Lighting'],
-  ['uplight', 'Uplight', 'Lighting'],
-  ['smoke-machine', 'Smoke Machine', 'Special Effects'],
-  ['sparkler-machine', 'Sparkler Machine', 'Special Effects'],
-  ['dry-ice-machine', 'Dry Ice Machine', 'Special Effects'],
-  ['co2-gun', 'CO2 Gun with Tank', 'Special Effects'],
-  ['six-panel-led-screen', 'Six-Panel LED Screen', 'Video'],
-  ['projector', 'Projector', 'Video'],
-  ['song-request-live', 'Song Request During Live Events', 'Live Events'],
-].map(([serviceId, name, category]) => ({ serviceId, name, category }));
-
 function getFrontendUrl() {
   return (process.env.FRONTEND_URL || process.env.PUBLIC_APP_URL || 'https://djkhalilnahhat.ca').replace(/\/+$/, '');
-}
-
-async function ensureServicePrices() {
-  const fallbackAmount = Number.isInteger(liveRequestPriceCents) && liveRequestPriceCents >= 0
-    ? liveRequestPriceCents
-    : 500;
-
-  await Promise.all(
-    DEFAULT_SERVICE_PRICES.map((price) =>
-      ServicePrice.updateOne(
-        { serviceId: price.serviceId },
-        {
-          $setOnInsert: {
-            ...price,
-            amountCents: price.serviceId === 'song-request-live' ? fallbackAmount : 0,
-            currency: price.serviceId === 'song-request-live' ? liveRequestCurrency.toUpperCase() : 'CAD',
-            isActive: true,
-          },
-        },
-        { upsert: true },
-      ),
-    ),
-  );
 }
 
 function serializeServicePrice(price, equipment = []) {
@@ -1066,7 +1016,6 @@ const servicePriceUpdateSchema = z.object({
 });
 
 app.get('/api/prices', requireAdmin, async (_request, response) => {
-  await ensureServicePrices();
   await require('./equipment').ensureSeed();
   const [prices, equipment] = await Promise.all([ServicePrice.find().sort({ category: 1, name: 1 }), Equipment.find()]);
   return response.json({ items: prices.map(price => serializeServicePrice(price, equipment)) });

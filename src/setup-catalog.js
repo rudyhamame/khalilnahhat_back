@@ -20,10 +20,21 @@ const fields={
  isActive:z.boolean().default(true),sortOrder:z.number().int().min(0).max(10000).default(0),
 };
 const input=z.object({id:slug,kind:z.enum(['event','service']),...fields}).strict();
+// The catalog lives only in the database. The built-in services and event types are copied in once (an entry that already exists,
+// edited or deleted, is never touched), then every read comes from the database, so nothing the admin deletes can come back.
+let migrated=null;
+function migrateDefaults(){
+ if(!migrated)migrated=(async()=>{
+  if(await Entry.exists({key:'_meta:defaults-v1'}))return;
+  await Entry.bulkWrite(defaults.map(row=>({updateOne:{filter:{key:row.kind+':'+row.id},update:{$setOnInsert:{key:row.kind+':'+row.id,value:row}},upsert:true}})));
+  await Entry.updateOne({key:'_meta:defaults-v1'},{$setOnInsert:{key:'_meta:defaults-v1',value:{migrated:true}}},{upsert:true});
+ })().catch(error=>{migrated=null;throw error;});
+ return migrated;
+}
 async function list(admin=false){
- const rows=await Entry.find().lean(),merged=new Map(defaults.map(row=>[row.kind+':'+row.id,row]));
- for(const row of rows)merged.set(row.key,row.value);
- return [...merged.values()].filter(row=>!row.deleted&&(admin||row.isActive)).sort((a,b)=>a.sortOrder-b.sortOrder||a.name.localeCompare(b.name));
+ await migrateDefaults();
+ const rows=await Entry.find({key:{$not:/^_meta:/}}).lean();
+ return rows.map(row=>row.value).filter(row=>row&&!row.deleted&&(admin||row.isActive)).sort((a,b)=>a.sortOrder-b.sortOrder||a.name.localeCompare(b.name));
 }
 function registerSetupCatalog(app,{requireAdmin}){
  const wrap=fn=>async(req,res)=>{try{await fn(req,res);}catch(error){const status=error instanceof z.ZodError?400:error.code===11000?409:500;res.status(status).json({message:error instanceof z.ZodError?error.issues[0].message:status===409?'This item ID already exists.':'Could not save or load the setup catalog.'});if(status===500)console.error('Setup catalog failed',error.name,error.code||'');}};

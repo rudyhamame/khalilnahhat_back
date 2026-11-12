@@ -151,8 +151,9 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    if(old&&value.kind!=='genre'&&value.parentId!==old.parentId)fail('Parent identity cannot be changed for this entity; create a separate entity.');
    if(old&&value.revision!==old.revision)fail('This entity changed. Reload before editing.',409);
    if(value.languageIds?.length)await references(value.languageIds,'language',session);
+   if(value.instrumentIds?.length){if(value.kind!=='musician')fail('Only musicians have instruments.');if(await Vocabulary.countDocuments({externalId:{$in:value.instrumentIds},kind:'instrument',archived:{$ne:true}}).session(session)!==new Set(value.instrumentIds).size)fail('Choose existing instruments for this musician.');}
    if(value.instrumentId){if(value.kind!=='musician')fail('Only musicians have an instrument dependency.');const instrument=await Vocabulary.findOne({externalId:value.instrumentId,kind:'instrument',archived:{$ne:true}}).session(session);if(!instrument)fail('Choose an existing instrument for this musician.');}
-   const data={...value,...(value.kind==='musician'?{instrumentId:value.instrumentId!==undefined?value.instrumentId:old?.instrumentId}:{}),languageIds:value.languageIds??old?.languageIds??[],externalId:id||makeId(value.kind),normalizedName:norm(value.name),provenance:provenance(value.provenance,actor),revision:(old?.revision||0)+1};
+   const data={...value,...(value.kind==='musician'?{instrumentIds:value.instrumentIds!==undefined?[...new Set(value.instrumentIds)]:old?.instrumentIds||[],instrumentId:value.instrumentIds!==undefined?(value.instrumentIds[0]||null):value.instrumentId!==undefined?value.instrumentId:old?.instrumentId}:{}),languageIds:value.languageIds??old?.languageIds??[],externalId:id||makeId(value.kind),normalizedName:norm(value.name),provenance:provenance(value.provenance,actor),revision:(old?.revision||0)+1};
    if(old){old.set(data);await old.save({session});return plain(old);}
    return plain((await Vocabulary.create([data],{session}))[0]);
   });

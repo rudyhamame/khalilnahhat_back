@@ -143,7 +143,7 @@ async function savedPlayerStatus(id) {
   const song = (await publicSongs()).find(row => row.externalId === id && row.audioUrl);
   if (!song) return null;
   const channels = (song.stems?.channels || []).filter(channel => channel?.url && ADMIN_CHANNELS.includes(channel.name));
-  const ready = CHANNELS.every(name => channels.some(channel => channel.name === name) || name === 'other' && channels.length);
+  const ready = CHANNELS.every(name => channels.some(channel => channel.name === name));
   return {status:ready?'ready':'unavailable',stage:ready?'Separated channels ready':'Channels are prepared when the recording is saved in the admin editor.',duration:song.stems?.duration??undefined,canSeparate:false,separatorAvailable:false,
     channels:ready?channels.map(channel=>({name:channel.name,url:deliveryUrl(channel.url)})):[]};
 }

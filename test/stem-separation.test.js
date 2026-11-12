@@ -34,5 +34,7 @@ test('the same uploaded asset shares one stem cache entry regardless of its deli
   assert.equal(assetKey(a),assetKey(b));
   assert.notEqual(assetKey(a),keyFor(a));
   const other='https://res.cloudinary.com/demo/video/upload/v1/song.wav';
-  assert.equal(assetKey(other),keyFor(other));
+  assert.equal(assetKey(other),assetKey(other));
+  assert.notEqual(assetKey(other),keyFor(other));
+  assert.deepEqual(require('../src/stem-separation').ADMIN_CHANNELS,['vocals','drums','bass','guitar','piano','other']);
 });

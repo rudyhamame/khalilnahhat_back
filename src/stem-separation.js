@@ -5,6 +5,9 @@ const { spawn } = require('node:child_process');
 const { publicSongs, deliveryUrl } = require('./music-archive');
 
 const CHANNELS = ['vocals', 'drums', 'bass', 'other'];
+// Admin editor splits with the six-source model (adds guitar and piano); the public player keeps the four-source model.
+const ADMIN_CHANNELS = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'];
+const adminChannelPattern = ADMIN_CHANNELS.join('|');
 const ROOT = process.env.STEM_CACHE_DIR ? path.resolve(process.env.STEM_CACHE_DIR) : path.resolve(__dirname, '..', '.runtime', 'stems');
 const PYTHON = process.env.STEM_PYTHON || (process.env.NODE_ENV === 'production' ? '/opt/stems/bin/python' : path.resolve(__dirname, '..', '.runtime', 'stem-cpu', 'bin', 'python'));
 const SCRIPT = path.resolve(__dirname, '../scripts/separate-stems.py');
@@ -20,7 +23,7 @@ const keyFor = url => createHash('sha256').update(`htdemucs-v1:${url}`).digest('
 // Uploaded admin assets are content-addressed (…/khalil/assets/<profile>/<sha256>.<ext>): the same audio keeps one cache entry even if its delivery URL differs.
 const assetKey = url => {
   const hash = /\/khalil\/assets\/[^/]+\/([0-9a-f]{64})\.[a-z0-9]+$/i.exec((() => { try { return new URL(url).pathname; } catch { return ''; } })())?.[1];
-  return hash ? createHash('sha256').update(`htdemucs-v1:asset:${hash.toLowerCase()}`).digest('hex') : keyFor(url);
+  return hash ? createHash('sha256').update(`htdemucs_6s-v1:asset:${hash.toLowerCase()}`).digest('hex') : createHash('sha256').update(`htdemucs_6s-v1:${url}`).digest('hex');
 };
 const localRequest = req => process.env.NODE_ENV !== 'production' && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
 function validateSource(url) {
@@ -57,16 +60,16 @@ async function download(url, destination) {
     }
   } finally { await file.close(); }
 }
-function separate(input, directory, job) {
+function separate(input, directory, job, model = 'htdemucs') {
   return new Promise((resolve, reject) => {
-    const child = spawn(PYTHON, [SCRIPT, input, directory],
+    const child = spawn(PYTHON, [SCRIPT, input, directory, '--model', model],
       {env:{...process.env, PYTHONUNBUFFERED:'1'}, stdio:['ignore','pipe','pipe']});
     const timer = setTimeout(() => { child.kill('SIGTERM'); }, 30*60*1000);
     let output = '', errors = '';
     child.stdout.on('data', chunk => {
       output += chunk;
       const lines = output.split('\n'); output = lines.pop();
-      for (const line of lines) { try { const value=JSON.parse(line); job.stage=value.stage; if(value.duration) job.duration=value.duration; } catch { /* Python diagnostics. */ } }
+      for (const line of lines) { try { const value=JSON.parse(line); job.stage=value.stage; if(value.duration) job.duration=value.duration; if(Array.isArray(value.channels)) job.channels=value.channels; } catch { /* Python diagnostics. */ } }
     });
     child.stderr.on('data', chunk => {
       errors=(errors+chunk).slice(-4000);
@@ -77,14 +80,16 @@ function separate(input, directory, job) {
     child.on('close', (code,signal) => { clearTimeout(timer); code===0 ? resolve() : reject(new Error(`Separator exited (${signal||code}): ${errors || 'No process diagnostics.'}`)); });
   });
 }
-async function readManifest(key) {
+async function readManifest(key, channels = CHANNELS) {
   try {
     const saved=JSON.parse(await fs.readFile(path.join(ROOT,key,'ready.json'),'utf8'));
-    for (const name of CHANNELS) await fs.access(path.join(ROOT,key,`${name}.flac`));
-    return saved;
+    // Admin results list the channels the model actually produced (4 when the six-source weights were unavailable).
+    const list = channels === ADMIN_CHANNELS ? ADMIN_CHANNELS.filter(name => (saved.channels || CHANNELS).includes(name)) : channels;
+    for (const name of list) await fs.access(path.join(ROOT,key,`${name}.flac`));
+    return {...saved, channels:list};
   } catch { return null; }
 }
-async function startJob(track, key) {
+async function startJob(track, key, model = 'htdemucs') {
   const directory=path.join(ROOT,key), input=path.join(directory,'input.audio');
   const job={status:'processing',stage:'Downloading recording'};
   jobs.set(key,job); activeJob=key;
@@ -92,8 +97,8 @@ async function startJob(track, key) {
     await fs.access(PYTHON);
     await fs.mkdir(directory,{recursive:true});
     await download(track.audioUrl,input);
-    await separate(input,directory,job);
-    const manifest={duration:job.duration,sourceUrl:track.audioUrl};
+    await separate(input,directory,job,model);
+    const manifest={duration:job.duration,sourceUrl:track.audioUrl,...(job.channels?{channels:job.channels}:{})};
     await fs.writeFile(path.join(directory,'ready.json'),JSON.stringify(manifest));
     Object.assign(job,{status:'ready',stage:'Ready'});
     await fs.unlink(input).catch(()=>{});
@@ -130,7 +135,7 @@ function registerStemSeparation(app,{requireAdmin}) {
     app.use('/api/admin/stems',requireAdmin,async(req,res)=>{
       try {
         if(!['GET','POST','HEAD'].includes(req.method))return res.sendStatus(405);
-        const match=req.path.match(/^\/?(?:audio\/(vocals|drums|bass|other))?$/),url=String(req.query.url||'');
+        const match=req.path.match(new RegExp(`^/?(?:audio/(${adminChannelPattern}))?$`)),url=String(req.query.url||'');
         if(!match||req.method==='POST'&&match[1]||!validateSource(url))return res.status(400).json({message:'Choose a supported audio recording.'});
         const target=new URL(`/api/admin/stems${match[1]?`/audio/${match[1]}`:''}`,base);target.searchParams.set('url',url);
         await relay(req,res,target);
@@ -176,27 +181,31 @@ function registerStemSeparation(app,{requireAdmin}) {
   const adminSource=(req,res)=>{const url=String(req.query.url||'');if(validateSource(url))return url;res.status(400).json({message:'Choose a supported audio recording.'});return null;};
   app.get('/api/admin/stems',adminOnly,async(req,res)=>{
     const url=adminSource(req,res);if(!url)return;
-    const key=assetKey(url),manifest=await readManifest(key),job=jobs.get(key),ready=Boolean(manifest),available=await separatorAvailable();
+    const key=assetKey(url),manifest=await readManifest(key,ADMIN_CHANNELS),job=jobs.get(key),ready=Boolean(manifest),available=await separatorAvailable();
     res.set('Cache-Control','no-store').json({status:ready?'ready':job?.status||(available?'idle':'unavailable'),stage:ready?'Separated channels ready':job?.stage||(available?'':'The server audio separator is not installed.'),
       duration:manifest?.duration,canSeparate:available,separatorAvailable:available,
-      channels:ready?CHANNELS.map(name=>({name,url:`/api/admin/stems/audio/${name}?url=${encodeURIComponent(url)}`})):[]});
+      partial:ready&&manifest.channels.length<ADMIN_CHANNELS.length,channels:ready?manifest.channels.map(name=>({name,url:`/api/admin/stems/audio/${name}?url=${encodeURIComponent(url)}`})):[]});
   });
   app.post('/api/admin/stems',adminOnly,async(req,res)=>{
     const url=adminSource(req,res);if(!url)return;
     const key=assetKey(url);
-    if(await readManifest(key))return res.json({status:'ready'});
+    const done=await readManifest(key,ADMIN_CHANNELS);
+    // A four-channel fallback result may be re-run once the six-source model is available (?upgrade=1).
+    if(done&&!(req.query.upgrade==='1'&&done.channels.length<ADMIN_CHANNELS.length))return res.json({status:'ready'});
+    if(done)await fs.rm(path.join(ROOT,key,'ready.json'),{force:true});
     if(jobs.get(key)?.status==='processing')return res.status(202).json({status:'processing'});
     if(!await separatorAvailable())return res.status(503).json({message:'The server audio separator is not installed.'});
     if(activeJob)return res.status(409).json({message:'Another recording is separating. Try again in a few minutes.'});
     activeJob=key;
-    void startJob({audioUrl:url},key);
+    void startJob({audioUrl:url},key,'htdemucs_6s');
     res.status(202).json({status:'processing'});
   });
   app.get('/api/admin/stems/audio/:channel',adminOnly,async(req,res)=>{
-    if(!CHANNELS.includes(req.params.channel))return res.status(404).end();
+    if(!ADMIN_CHANNELS.includes(req.params.channel))return res.status(404).end();
     const url=adminSource(req,res);if(!url)return;
     const key=assetKey(url);
-    if(!await readManifest(key))return res.status(404).end();
+    const ready=await readManifest(key,ADMIN_CHANNELS);
+    if(!ready||!ready.channels.includes(req.params.channel))return res.status(404).end();
     res.set('Cache-Control','private, max-age=300').sendFile(path.join(ROOT,key,`${req.params.channel}.flac`),{dotfiles:'allow'});
   });
   app.use('/api/admin/stems',(error,_req,res,_next)=>{console.error('Admin stem endpoint failed:',error.message);res.set('Cache-Control','no-store').status(503).json({message:'The audio separator is temporarily unavailable. Please try again.'});});
@@ -205,4 +214,4 @@ function registerStemSeparation(app,{requireAdmin}) {
     res.set('Cache-Control','no-store').status(503).json({message:'The audio separator is temporarily unavailable. Please try again.'});
   });
 }
-module.exports={registerStemSeparation,validateSource,keyFor,assetKey,CHANNELS};
+module.exports={registerStemSeparation,validateSource,keyFor,assetKey,CHANNELS,ADMIN_CHANNELS};

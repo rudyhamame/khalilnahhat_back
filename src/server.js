@@ -1545,7 +1545,6 @@ require('./stem-separation').registerStemSeparation(app, { requireAdmin });
 require('./speech-relay').registerSpeechRelay(app, { requireAdmin });
 require('./speech-relay').registerWorkerLoad(app, { requireAdmin });
 require('./music-archive').registerMusicArchive(app, { requireAdmin });
-require('./recording-ai-info').registerRecordingAiInfo(app,{requireAdmin,configService:aiConfiguration});
 require('./dj-service-builder').registerDjServiceBuilder(app, { requireAdmin });
 require('./setup-catalog').registerSetupCatalog(app, { requireAdmin });
 const projectChatRealtime=require('./echo-project-chat').registerEchoProjectChat(app, { requireAdmin,authenticate:authFromRequest,allowedOrigins:[...configuredCorsOrigins,getFrontendUrl()] });

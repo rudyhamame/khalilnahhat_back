@@ -7,6 +7,7 @@ from pathlib import Path
 
 import numpy as np
 import soundfile as sf
+import sys
 import torch
 from demucs.pretrained import get_model
 from demucs.apply import apply_model
@@ -20,10 +21,23 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('input')
     parser.add_argument('output')
+    parser.add_argument('--model', default='htdemucs', choices=['htdemucs', 'htdemucs_6s'])
     args = parser.parse_args()
+    # The image's model folder is read-only: extra weights (e.g. the six-source model) live beside the cache.
+    extra = Path(args.output).resolve().parent / '_torch' / 'hub'
+    if (extra / 'checkpoints').is_dir():
+        torch.hub.set_dir(str(extra))
     torch.set_num_threads(max(1, int(os.environ.get('STEM_THREADS', '1'))))
     report('Loading separation model')
-    model = get_model('htdemucs').cpu().eval()
+    try:
+        model = get_model(args.model).cpu().eval()
+    except Exception as error:
+        # The six-source weights could not be loaded; keep working with the four-source model.
+        if args.model == 'htdemucs':
+            raise
+        report('Six-channel model unavailable; using four channels')
+        print(f'six-source model unavailable: {error}', file=sys.stderr, flush=True)
+        model = get_model('htdemucs').cpu().eval()
     # HTDemucs otherwise pads even short windows to its training length,
     # defeating the segment memory bound. Use its supported variable-length mode.
     for network in getattr(model, 'models', [model]):

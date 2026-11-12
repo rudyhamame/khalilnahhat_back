@@ -34,7 +34,8 @@ test('the same uploaded asset shares one stem cache entry regardless of its deli
   assert.equal(assetKey(a),assetKey(b));
   assert.notEqual(assetKey(a),keyFor(a));
   const other='https://res.cloudinary.com/demo/video/upload/v1/song.wav';
-  assert.equal(assetKey(other),keyFor(other));
+  assert.equal(require('../src/stem-separation').legacyAssetKey(other),keyFor(other));
+  assert.notEqual(assetKey(other),keyFor(other));
 });
 test('the player can no longer start a separation',async()=>{
   const express=require('express');
@@ -46,4 +47,13 @@ test('the player can no longer start a separation',async()=>{
     const response=await fetch(`http://127.0.0.1:${server.address().port}/api/player/stems/any-id`,{method:'POST'});
     assert.equal(response.status,410);
   }finally{server.close();}
+});
+test('six-source admin keys differ from the four-source keys, but share one entry per audio file',()=>{
+  const {assetKey,legacyAssetKey,ADMIN_CHANNELS}=require('../src/stem-separation');
+  const hash='2e3a3b487d2b8e375cee33a9d3141952406164cf757d60a33baee83a72e3e8cd';
+  const a=`https://res.cloudinary.com/demo/video/authenticated/s--AAA--/v1/khalil/assets/p/${hash}.wav`,b=`https://res.cloudinary.com/demo/video/authenticated/s--BBB--/v2/khalil/assets/p/${hash}.wav`;
+  assert.equal(assetKey(a),assetKey(b));
+  assert.notEqual(assetKey(a),legacyAssetKey(a));
+  assert.equal(legacyAssetKey(a),legacyAssetKey(b));
+  assert.deepEqual(ADMIN_CHANNELS,['vocals','drums','bass','guitar','piano','other']);
 });

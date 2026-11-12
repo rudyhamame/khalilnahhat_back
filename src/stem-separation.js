@@ -168,7 +168,7 @@ function registerStemSeparation(app,{requireAdmin}) {
     app.use('/api/admin/stems',requireAdmin,async(req,res)=>{
       try {
         if(!['GET','POST','HEAD','DELETE'].includes(req.method))return res.sendStatus(405);
-        const match=req.path.match(new RegExp(`^/?(?:audio/(${adminChannelPattern}))?$`)),url=String(req.query.url||'');
+        const match=req.path.match(new RegExp(`^/?(?:audio/(${adminChannelPattern}))?$`)),url=deliveryUrl(String(req.query.url||'')); // uploads are private (authenticated) Cloudinary assets: the worker needs the signed link
         if(!match||(req.method==='POST'||req.method==='DELETE')&&match[1]||!validateSource(url))return res.status(400).json({message:'Choose a supported audio recording.'});
         const target=new URL(`/api/admin/stems${match[1]?`/audio/${match[1]}`:''}`,base);target.searchParams.set('url',url);
         await relay(req,res,target);

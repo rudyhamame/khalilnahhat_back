@@ -10,7 +10,7 @@ const archiveFiles = require('./music-archive-files');
 const common = { externalId: { type: String, unique: true, required: true }, title: String, description: String,
   published: { type: Boolean, default: false }, sortOrder: { type: Number, default: 0 } };
 const Collection = mongoose.models.MusicCollection || mongoose.model('MusicCollection', new mongoose.Schema({ ...common,
-  coverImage: String, recordingIds: { type: [String], default: [] } }, { timestamps: true }));
+  coverImage: String, workTypeId: { type: String, default: '' }, recordingIds: { type: [String], default: [] } }, { timestamps: true }));
 const text = z.string().trim().max(4000);
 const base = { title: z.string().trim().min(1).max(240), description: text.default(''), published: z.boolean().default(false), sortOrder: z.number().int().min(0).max(1000000).default(0) };
 function ownedAsset(value) {
@@ -20,7 +20,7 @@ function ownedAsset(value) {
 }
 const asset = z.string().max(2048).refine(ownedAsset, 'Choose a file uploaded to this website.');
 const inputs = {
-  collections: z.object({ ...base, coverImage: asset.default(''), recordingIds: z.array(z.string().min(1).max(120)).max(5000).default([]) }).strict(),
+  collections: z.object({ ...base, coverImage: asset.default(''), workTypeId: z.string().trim().max(120).default(''), recordingIds: z.array(z.string().min(1).max(120)).max(5000).default([]) }).strict(),
   songs: z.object({ ...base, artist: z.string().trim().max(240).default('DJ Khalil'),
     date: z.string().regex(/^$|^\d{4}-\d{2}-\d{2}$/).refine(value => !value || (!Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value), 'Choose a valid date.').default(''), audioUrl: asset.refine(value => Boolean(value) && (archiveFiles.localAssetPattern.test(value) || /\/video\/(upload|authenticated)\//.test(value)), 'Upload an audio file.'),
     coverImage: asset.default(''), duration: z.string().max(30).default('') }).strict(),
@@ -37,7 +37,7 @@ function deliveryUrl(value) {
 function serialize(row) {
   const r = row.toObject ? row.toObject() : row;
   return { id: r.externalId, title: r.title, description: r.description || '', published: r.published !== false,
-    sortOrder: r.sortOrder || 0, recordingIds: r.recordingIds || [],
+    sortOrder: r.sortOrder || 0, recordingIds: r.recordingIds || [], workTypeId: r.workTypeId || '',
     artist: r.artist || 'DJ Khalil', date: r.date || (r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 10) : ''),
     audioUrl: deliveryUrl(r.audioUrl), coverImage: deliveryUrl(r.coverImage || r.image), duration: r.duration || '', createdAt: r.createdAt };
 }
@@ -72,10 +72,15 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, C
   app.get('/api/music-archive', readCatalog(async (_req, res) => res.set('Cache-Control', 'no-store').json(await catalog(false))));
   app.get('/api/admin/music-archive', requireAdmin, readCatalog(async (_req, res) => res.set('Cache-Control', 'no-store').json(await catalog(true))));
   for (const [kind, model] of Object.entries(models)) {
-    const validateParent = async (data) => {
-      if (kind !== 'collections' || !data.recordingIds) return '';
-      data.recordingIds = [...new Set(data.recordingIds)];
-      return await ArchiveModel.countDocuments({ externalId: { $in: data.recordingIds }, archivalStatus: { $ne: 'ARCHIVED' } }) === data.recordingIds.length ? '' : 'Choose existing active recordings. Deleted recordings cannot be added to a collection.';
+    // A collection holds recordings of one work type: the type it is created with (or already has) limits what it accepts.
+    const validateParent = async (data, existing = {}) => {
+      if (kind !== 'collections') return '';
+      const workTypeId = data.workTypeId ?? existing.workTypeId ?? '';
+      if (data.recordingIds) data.recordingIds = [...new Set(data.recordingIds)];
+      const ids = data.recordingIds ?? existing.recordingIds ?? [];
+      if (data.recordingIds && await ArchiveModel.countDocuments({ externalId: { $in: ids }, archivalStatus: { $ne: 'ARCHIVED' } }) !== ids.length) return 'Choose existing active recordings. Deleted recordings cannot be added to a collection.';
+      if (workTypeId && ids.length && (data.recordingIds || data.workTypeId !== undefined) && await ArchiveModel.countDocuments({ externalId: { $in: ids }, recordingType: workTypeId }) !== ids.length) return 'A collection only holds recordings of its work type. Move or remove the recordings of other work types first.';
+      return '';
     };
     app.post(`/api/admin/music-archive/${kind}`, requireAdmin, async (req, res) => {
       if(kind === 'songs' && ontology) return res.status(409).json({message:'Create recordings through the Music Archive ontology editor.',code:'MUSIC_ONTOLOGY_REQUIRED'});
@@ -93,7 +98,8 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, C
       const patchInput = z.object(Object.fromEntries(Object.entries(inputs[kind].shape).map(([key, field]) => [key, (field instanceof z.ZodDefault ? field.removeDefault() : field).optional()]))).strict();
       const parsed = patchInput.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0].message });
-      const error = await validateParent(parsed.data);
+      const found = kind === 'collections' ? await model.findOne({ externalId: req.params.id }) : null;
+      const error = await validateParent(parsed.data, found?.toObject ? found.toObject() : found || {});
       if (error) return res.status(400).json({ message: error });
       const row = await model.findOneAndUpdate({ externalId: req.params.id }, { $set: parsed.data }, { new: true, runValidators: true });
       if (!row) return res.status(404).json({ message: 'This item no longer exists.' });

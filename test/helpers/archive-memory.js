@@ -1,6 +1,6 @@
 function memoryModel(seed = []) {
   const rows = seed.map(row => ({ ...row }));
-  const match = (row, query) => Object.entries(query).every(([key, value]) => value?.$in ? value.$in.includes(row[key]) : row[key] === value);
+  const match = (row, query) => Object.entries(query).every(([key, value]) => value?.$in ? value.$in.includes(row[key]) : value && typeof value === 'object' && '$ne' in value ? row[key] !== value.$ne : row[key] === value);
   return { rows,
     find(query = {}) { const result = rows.filter(row => match(row, query)).map(row => ({ ...row })); return { then: (resolve, reject) => Promise.resolve(result).then(resolve, reject), sort: async () => result.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)) }; },
     countDocuments: async query => rows.filter(row => match(row, query)).length,

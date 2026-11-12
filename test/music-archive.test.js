@@ -78,3 +78,30 @@ test('uploads require admin, reject executable/image impostor types and store al
   assert.equal((await upload('image/png')).status,201);
   assert.equal(options[1].resource_type,'image'); assert.equal(options[1].transformation[0].width,1600);
 });
+
+test('a collection holds recordings of one work type only', async t => {
+  const app = express(); app.use(express.json());
+  const collections = memoryModel();
+  const songs = memoryModel([
+    { externalId: 'mix1', title: 'Mix 1', recordingType: 'MIX', audioUrl: 'https://example.com/1.mp3' },
+    { externalId: 'mix2', title: 'Mix 2', recordingType: 'MIX', audioUrl: 'https://example.com/2.mp3' },
+    { externalId: 'rmx1', title: 'Remix 1', recordingType: 'REMIX', audioUrl: 'https://example.com/3.mp3' },
+  ]);
+  registerMusicArchive(app, { requireAdmin: (req, res, next) => next(), CollectionModel: collections, ArchiveModel: songs });
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve)); t.after(() => new Promise(resolve => server.close(resolve)));
+  const base = `http://127.0.0.1:${server.address().port}/api/admin/music-archive/collections`;
+  const send = async (path, method, body) => { const r = await fetch(base + path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return { status: r.status, body: await r.json().catch(() => ({})) }; };
+  const made = await send('', 'POST', { title: 'Summer mixes', workTypeId: 'MIX', recordingIds: ['mix1', 'mix2'] });
+  assert.equal(made.status, 201);
+  assert.equal(made.body.item.workTypeId, 'MIX');
+  // a recording of another work type is refused, on create and on update
+  assert.equal((await send('', 'POST', { title: 'Mixed bag', workTypeId: 'MIX', recordingIds: ['mix1', 'rmx1'] })).status, 400);
+  assert.equal((await send(`/${made.body.item.id}`, 'PATCH', { recordingIds: ['mix1', 'rmx1'] })).status, 400);
+  // an update that does not touch the type or the recordings still works, and so does adding another recording of the same type
+  assert.equal((await send(`/${made.body.item.id}`, 'PATCH', { title: 'Summer mixes 2026' })).status, 200);
+  // changing the type while it holds recordings of the old type is refused
+  assert.equal((await send(`/${made.body.item.id}`, 'PATCH', { workTypeId: 'REMIX' })).status, 400);
+  // older collections without a work type keep working
+  assert.equal((await send('', 'POST', { title: 'Legacy', recordingIds: ['mix1', 'rmx1'] })).status, 201);
+});

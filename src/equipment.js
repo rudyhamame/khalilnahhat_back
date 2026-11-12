@@ -28,7 +28,7 @@ const equipmentSchema = new mongoose.Schema(
     isActive: { type: Boolean, default: true },
     sortOrder: { type: Number, default: 0 },
     // Where this item stands in the clients' 3D room: metres from the room's centre line, metres out from the back wall, degrees turned, metres off the floor. null = automatic stage plan.
-    roomPlacement:{type:new mongoose.Schema({x:Number,fromBack:Number,rotation:Number,height:Number},{_id:false}),default:null},
+    roomPlacement:{type:new mongoose.Schema({x:Number,fromBack:Number,rotation:Number,height:Number,scale:Number},{_id:false}),default:null},
   },
   { timestamps: true },
 );
@@ -55,7 +55,7 @@ const publicView = (e) => ({
   isSet:Boolean(e.isSet||(e.setItems||[]).length||(e.modelParts||[]).length),setItems:(e.setItems||[]).map(member=>({equipmentId:member.equipmentId,quantity:member.quantity,x:member.x||0,y:member.y||0,z:member.z||0,rotation:member.rotation||0})),
   id: e.slug, category: e.category, name: e.name, brandModel: e.brandModel,
   description: e.description, functionSummary: e.functionSummary || '', eventFit: e.eventFit && typeof e.eventFit === 'object' ? e.eventFit : {}, imageUrl: e.imageUrl, modelUrl:e.modelUrl||'', modelParts:(e.modelParts||[]).map(part=>({name:part.name,nameAr:part.nameAr||'',src:part.src,x:part.x||0,y:part.y||0,z:part.z||0,rotation:part.rotation||0})), minQuantity: e.minQuantity, ...stockView(e),
-  roomPlacement:e.roomPlacement&&Number.isFinite(e.roomPlacement.x)?{x:e.roomPlacement.x,fromBack:e.roomPlacement.fromBack||0,rotation:e.roomPlacement.rotation||0,height:e.roomPlacement.height||0}:null,
+  roomPlacement:e.roomPlacement&&Number.isFinite(e.roomPlacement.x)?{x:e.roomPlacement.x,fromBack:e.roomPlacement.fromBack||0,rotation:e.roomPlacement.rotation||0,height:e.roomPlacement.height||0,scale:e.roomPlacement.scale>0?e.roomPlacement.scale:1}:null,
 });
 const adminView = (e) => ({
   ...publicView(e),modelJobId:e.modelJobId||'', priceCents: e.priceCents, quantityOwned: e.quantityOwned, stockTracked: e.stockTracked, isActive: e.isActive, sortOrder: e.sortOrder,
@@ -75,7 +75,7 @@ const fields = {
   isSet:z.boolean(),
   setItems:z.array(setItemSchema).max(32).refine(items=>items.reduce((total,item)=>total+item.quantity,0)<=32,'A set can contain up to 32 pieces.').refine(items=>new Set(items.map(item=>item.equipmentId)).size===items.length,'Each equipment type must appear once.'),
   modelParts:z.array(modelPartSchema).max(32),
-  roomPlacement:z.object({x:z.number().finite().min(-50).max(50),fromBack:z.number().finite().min(0).max(100),rotation:z.number().finite().min(-360).max(360).default(0),height:z.number().finite().min(0).max(10).default(0)}).strict().nullable(),
+  roomPlacement:z.object({x:z.number().finite().min(-50).max(50),fromBack:z.number().finite().min(0).max(100),rotation:z.number().finite().min(-360).max(360).default(0),height:z.number().finite().min(0).max(10).default(0),scale:z.number().finite().min(.2).max(5).default(1)}).strict().nullable(),
   modelJobId:z.string().max(80).nullable(),
   category: z.string().trim().min(1), name: z.string().trim().min(1),
   brandModel: z.string().trim(), description: z.string().trim(), imageUrl: z.string().trim(),

@@ -17,3 +17,11 @@ test('admin set validation rejects self references, missing members and nested s
  await assert.rejects(validateSetMembers({slug:'new',isSet:true,setItems:[{equipmentId:'set',quantity:2}]},null,{find:async()=>[catalog[1]]}),/individual/);
  await validateSetMembers({slug:'new',isSet:true,setItems:[{equipmentId:'speaker',quantity:2}]},null,{find:async()=>[catalog[0]]});
 });
+
+test('a room placement keeps a size between 0.2 and 5 (default 1, so older placements still save)', () => {
+  const { updateSchema } = require('../src/equipment');
+  const place = (roomPlacement) => updateSchema.safeParse({ roomPlacement });
+  assert.equal(place({ x: 1, fromBack: 2, rotation: 0, height: 0, scale: 1.5 }).success, true);
+  assert.equal(place({ x: 1, fromBack: 2, scale: 9 }).success, false);
+  assert.equal(place({ x: 1, fromBack: 2, rotation: 10, height: 0 }).data.roomPlacement.scale, 1);
+});

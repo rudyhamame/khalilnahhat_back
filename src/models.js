@@ -235,6 +235,8 @@ const liveStreamConfigSchema = new mongoose.Schema(
     muxRtmpUrl: { type: String, default: '', trim: true },
     // What ECHO is on air for: broadcast | event | home-studio | chill-mix | radio
     goal: { type: String, enum: ['broadcast', 'event', 'home-studio', 'chill-mix', 'radio'], default: 'broadcast', trim: true },
+    // The photo viewers see while the live is paused or halted (a reference to a gallery image and how it is framed).
+    pausePhoto: { type: new mongoose.Schema({ id: String, title: String, url: String, crop: { zoom: Number, cx: Number, cy: Number } }, { _id: false }), default: null },
     broadcastMode: { type: String, enum: ['youtube', 'mux', 'webrtc', 'whep'], default: 'youtube', trim: true },
     webrtcRoomName: { type: String, default: '', trim: true },
     broadcastSource: { type: String, enum: ['', 'browser', 'android', 'obs'], default: '' },

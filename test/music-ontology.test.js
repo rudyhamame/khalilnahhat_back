@@ -46,3 +46,18 @@ test('recordings accept recording-level musical details as lists',()=>{
   assert.equal(ok.data.musical.genreIds.length,3);
   assert.equal(recording.safeParse({...base,musical:{keys:['C major','C major']}}).success,false);
 });
+test('recordings accept general languages and dialects as lists',()=>{
+  const {recording}=require('../src/music-ontology/validation');
+  const base={title:'Mix',recordingType:'mix',items:[{id:'a1',name:'Atom',hasLyrics:false,musicianCredits:[],releaseYear:null}]};
+  const ok=recording.safeParse({...base,languages:{languageIds:['ar','fr'],dialectIds:['lb','ma']}});
+  assert.equal(ok.success,true,JSON.stringify(ok.error?.issues?.slice(0,2)));
+  assert.deepEqual(ok.data.languages.languageIds,['ar','fr']);
+});
+test('recordings accept recording-level credits as lists',()=>{
+  const {recording}=require('../src/music-ontology/validation');
+  const base={title:'Mix',recordingType:'mix',items:[{id:'a1',name:'Atom',hasLyrics:false,musicianCredits:[],releaseYear:null}]};
+  const ok=recording.safeParse({...base,recordingCredits:{vocalists:[{artistId:'v1',detail:'lead'},{artistId:'v2'}],musicians:[{artistId:'m1',instrumentId:'oud',detail:''},{artistId:'m2'}]}});
+  assert.equal(ok.success,true,JSON.stringify(ok.error?.issues?.slice(0,2)));
+  assert.equal(ok.data.recordingCredits.vocalists.length,2);
+  assert.equal(ok.data.recordingCredits.musicians[0].instrumentId,'oud');
+});

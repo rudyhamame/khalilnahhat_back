@@ -7,4 +7,6 @@ const app=express();app.disable('x-powered-by');
 app.get('/health',(_req,res)=>res.json({ok:true,service:'khalil-stem-worker'}));
 app.use((req,res,next)=>{const got=Buffer.from(req.headers.authorization||''),wanted=Buffer.from(`Bearer ${process.env.STEM_WORKER_TOKEN}`);if(got.length!==wanted.length||!timingSafeEqual(got,wanted))return res.sendStatus(401);next();});
 require('../src/stem-separation').registerStemSeparation(app,{requireAdmin:(_req,res)=>res.sendStatus(403)});
+require('../src/speech-worker').registerSpeech(app);
+app.get('/api/admin/worker-load',(_req,res)=>res.set('Cache-Control','no-store').json(require('../src/worker-load').snapshot({separating:require('../src/worker-load').separationRunning()})));
 app.listen(Number(process.env.PORT||4310),'0.0.0.0');

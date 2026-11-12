@@ -48,3 +48,17 @@ The current Last Christmas source returned `status:error` and no channels. The O
 The separator now decodes to a temporary disk file and processes 12-second windows with two seconds of context on each side. Only central samples are written, preserving duration and a shared clock. Normalization and final peak attenuation remain common across all channels. Temporary float audio is converted to FLAC in bounded blocks and cleaned up. HTDemucs variable-length inference is enabled explicitly; otherwise its default pads short segments back to the training duration. CPU threading defaults to one on this CPU-limited worker. The worker script was replaced with a retained backup; existing caches and resource limits were preserved. Completion evidence for the current source must come from the public status and channel delivery, not from syntax checks.
 
 The real Last Christmas retry completed on 2026-10-30. Public status returned `ready`, duration 189.4661224489796 seconds and all four channel URLs. Each channel returned HTTP 206 for bytes 0–127 with a valid FLAC header. During the retry, worker cgroup OOM and OOM-kill counters remained zero; observed memory stayed below the unchanged 2 GiB limit. Listening quality and exhaustive playback/seek behavior were not evaluated in this repair.
+
+## Speech (Whisper) on the OVH worker
+
+The admin editor's language / dialect detection runs on the stem worker, not in the browser (`src/speech-worker.js`; the API relays
+`/api/admin/music-archive/speech/{language,transcribe}` in `src/speech-relay.js`). Before such a process starts the editor asks
+`GET /api/admin/music-archive/worker-load` (`src/worker-load.js`): when the server is busy it asks the admin to retry later
+(thresholds `WORKER_MAX_LOAD_PER_CPU`, default 1.2, and `WORKER_MIN_FREE_MB`, default 600).
+
+Server layout (outside the image, bind-mounted by `/srv/rh/khalil-security/stem-compose.private.json`):
+- `/srv/rh/khalil-stems/speech` -> `/app/speech`: `npm install @huggingface/transformers@4.3.2` (same version as the site), then delete the unused
+  `onnxruntime-node/bin/napi-v6/{darwin,win32,linux/arm64}` and the CUDA/TensorRT `.so` files (about 230 MB left).
+- `/srv/rh/khalil-stems/speech-models` -> `/models`: model cache (whisper-tiny and whisper-base, q8).
+- env `SPEECH_RUNTIME_DIR=/app/speech`, `SPEECH_MODEL_DIR=/models`.
+- Worker code is bind-mounted from `/srv/rh/khalil-stems/code/{src,scripts}`: copy changed files there and `docker restart khalil-stem-worker`.

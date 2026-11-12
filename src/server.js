@@ -1542,6 +1542,8 @@ require('./event-drafts').registerEventDrafts(app, {
 require('./archive-player').registerArchivePlayer(app, { requireAdmin });
 app.use('/api/player/stems', require('./security-controls').stemStartLimit);
 require('./stem-separation').registerStemSeparation(app, { requireAdmin });
+require('./speech-relay').registerSpeechRelay(app, { requireAdmin });
+require('./speech-relay').registerWorkerLoad(app, { requireAdmin });
 require('./music-archive').registerMusicArchive(app, { requireAdmin });
 require('./recording-ai-info').registerRecordingAiInfo(app,{requireAdmin,configService:aiConfiguration});
 require('./dj-service-builder').registerDjServiceBuilder(app, { requireAdmin });

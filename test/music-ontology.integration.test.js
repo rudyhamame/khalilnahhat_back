@@ -29,7 +29,8 @@ test('ontology HTTP, transactions, references, legacy compatibility and reversib
  const instrument=await write('vocabulary',{kind:'instrument',name:'Piano'});
  const music=await write('works',{title:'Instrumental',type:'MUSIC',melody:{bpm:120,key:'A minor',instrumentIds:[instrument.id],musicianCredits:[{artistId:artist.id,role:'PERFORMER',detail:'Piano part'}]}});
  const reused=await write('works',{title:'Alternate work attribution',type:'SONG',melodyId:work.melody.id,lyricsId:work.lyrics.id});assert.equal(reused.melody.id,work.melody.id);assert.equal(reused.lyrics.id,work.lyrics.id);
- const make=(type,workId=work.id)=>({title:type,recordingType:type,workId,audioUrl:'https://res.cloudinary.com/qa/video/upload/recording.wav',durationSeconds:60,publicationStatus:'PUBLISHED',credits:[{artistId:artist.id,role:'PRODUCER'}]});
+ const productionType=await write('work-types',{name:'Production',amount:'INDIVIDUAL'});
+ const make=(type,workId=work.id)=>({title:type,recordingType:type==='PRODUCTION'?productionType.id:type,workId,audioUrl:'https://res.cloudinary.com/qa/video/upload/recording.wav',durationSeconds:60,publicationStatus:'PUBLISHED',credits:[{artistId:artist.id,role:'PRODUCER'}]});
  let mix=await write('recordings',make('MIX',music.id));
  const remix=await write('recordings',{...make('REMIX'),sourceRecordingIds:[mix.id],sourceWorkIds:[music.id],recordingMetadata:{bpm:130,key:'D minor'}});
  const cover=await write('recordings',make('COVER'));
@@ -66,4 +67,32 @@ test('ontology HTTP, transactions, references, legacy compatibility and reversib
   assert.equal(await M.Version.countDocuments({recordingId:row.externalId}),1);
  });
  await t.test('revision conflicts prevent stale overwrite; archive retains identity and sources',async()=>{assert.equal((await req('/admin/music-ontology/recordings/'+mix.id,'PUT',{...make('MIX',music.id),revision:0})).status,409);assert.equal((await req('/admin/music-ontology/recordings/'+mix.id,'DELETE',{revision:mix.revision})).status,200);assert.equal((await req('/music-ontology/recordings/'+mix.id)).status,404);assert.ok(await ArchiveItem.exists({externalId:mix.id}));assert.deepEqual((await ArchiveItem.findOne({externalId:remix.id})).sourceRecordingIds,[mix.id]);assert.equal((await req('/admin/music-ontology/recordings/'+mix.id+'/versions')).body.items.length,2);assert.equal((await req('/music-archive')).body.songs.some(r=>r.id===mix.id),false);});
+ await t.test('archive privately with a prepared sample, then publish and activate it atomically',async()=>{
+  const type=await write('work-types',{name:'Workflow sample',amount:'INDIVIDUAL'});
+  const original=await write('recordings',{...make(type.id,music.id),title:'Original public sample'});
+  assert.equal((await req(`/admin/music-ontology/work-types/${type.id}/sample`,'PUT',{recordingId:original.id,startSec:0})).status,200);
+  const fields={...make(type.id,music.id),title:'Prepared privately',publicationStatus:'DRAFT',archivalStatus:'ARCHIVED',sampleStartSec:10};
+  const saved=await write('recordings',fields);
+  assert.equal(saved.sampleStartSec,10);assert.equal(saved.archivalStatus,'ARCHIVED');assert.equal(saved.published,false);
+  assert.equal((await req('/music-ontology/recordings/'+saved.id)).status,404);
+  let types=(await req('/music-ontology/work-types')).body.items;
+  assert.equal(types.find(row=>row.id===type.id).sample.recordingId,original.id,'saving does not replace the public sample');
+  const collection=(await req('/admin/music-archive/collections','POST',{title:'Workflow collection',workTypeId:type.id,recordingIds:[saved.id],published:true})).body.item;
+  assert.ok(collection?.id);
+  let publicCollection=(await req('/music-archive')).body.collections.find(row=>row.id===collection.id);
+  assert.deepEqual(publicCollection.recordingIds,[],'archived recordings stay private inside a public collection');
+  assert.equal((await req('/admin/music-ontology/recordings/'+saved.id,'PUT',{...fields,publicationStatus:'PUBLISHED',archivalStatus:'ACTIVE',revision:saved.revision,sampleStartSec:61})).status,400);
+  types=(await req('/music-ontology/work-types')).body.items;
+  assert.equal(types.find(row=>row.id===type.id).sample.recordingId,original.id,'invalid publication cannot replace a sample');
+  const published=await write('recordings',{...fields,publicationStatus:'PUBLISHED',archivalStatus:'ACTIVE',revision:saved.revision},saved.id);
+  assert.equal(published.published,true);assert.equal(published.sampleStartSec,10);
+  assert.equal((await req('/music-ontology/recordings/'+saved.id)).status,200);
+  types=(await req('/music-ontology/work-types')).body.items;
+  assert.equal(types.find(row=>row.id===type.id).sample.recordingId,saved.id);assert.equal(types.find(row=>row.id===type.id).sample.startSec,10);
+  publicCollection=(await req('/music-archive')).body.collections.find(row=>row.id===collection.id);
+  assert.deepEqual(publicCollection.recordingIds,[saved.id]);
+  const archivedAgain=await write('recordings',{...fields,revision:published.revision},saved.id);
+  assert.equal(archivedAgain.published,false);assert.equal((await req('/music-ontology/recordings/'+saved.id)).status,404);
+ });
+
 });

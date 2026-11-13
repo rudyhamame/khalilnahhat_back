@@ -14,7 +14,7 @@ async function fixture(){
  await Promise.all([...Object.values(M).filter(m=>m?.init),ArchiveItem].map(m=>m.init()));
  const service=archive.ontologyService();
  await service.listWorkTypes();
- await service.saveWorkType({name:'Production',amount:'INDIVIDUAL'});
+ const production=await service.saveWorkType({name:'Production',amount:'INDIVIDUAL'});
  const language=await service.saveVocabulary({kind:'language',name:'Arabic',isoCode:'ar'},null,'qa');
  const genre=await service.saveVocabulary({kind:'genre',name:'Arabic Pop'},null,'qa');
  const artist=await service.saveVocabulary({kind:'artist',name:'Khalil'},null,'qa');
@@ -23,7 +23,7 @@ async function fixture(){
  const music=await service.saveWork({title:'Night Instrumental',type:'MUSIC',melody:{bpm:120,key:'A minor',instrumentIds:[instrument.externalId],musicianCredits:[{artistId:artist.externalId,role:'PERFORMER'}]}},null,'qa');
  const samples=22050*20,buffer=Buffer.alloc(44+samples*2);buffer.write('RIFF',0);buffer.writeUInt32LE(buffer.length-8,4);buffer.write('WAVEfmt ',8);buffer.writeUInt32LE(16,16);buffer.writeUInt16LE(1,20);buffer.writeUInt16LE(1,22);buffer.writeUInt32LE(22050,24);buffer.writeUInt32LE(44100,28);buffer.writeUInt16LE(2,32);buffer.writeUInt16LE(16,34);buffer.write('data',36);buffer.writeUInt32LE(samples*2,40);for(let i=0;i<samples;i++)buffer.writeInt16LE(Math.round(Math.sin(i/22050*440*Math.PI*2)*1000),44+i*2);
  const asset=await require('../../src/music-archive-files').saveLocalFile({buffer,mimetype:'audio/wav',originalname:'qa-tone.wav'});
- const ids=[];for(const type of ['MIX','REMIX','COVER','PRODUCTION'])ids.push(await service.saveRecording({title:`${type} · Evening collection`,recordingType:type,workId:type==='MIX'?music:song,audioUrl:asset.url,durationSeconds:20,publicationStatus:'PUBLISHED',recordingMetadata:{bpm:type==='REMIX'?128:null},credits:[{artistId:artist.externalId,role:'PRODUCER'}],...(type==='REMIX'?{sourceRecordingIds:[ids[0]]}:{})},null,'qa'));
+ const ids=[];for(const type of ['MIX','REMIX','COVER','PRODUCTION'])ids.push(await service.saveRecording({title:`${type} · Evening collection`,recordingType:type==='PRODUCTION'?production.externalId:type,workId:type==='MIX'?music:song,audioUrl:asset.url,durationSeconds:20,publicationStatus:'PUBLISHED',recordingMetadata:{bpm:type==='REMIX'?128:null},credits:[{artistId:artist.externalId,role:'PRODUCER'}],...(type==='REMIX'?{sourceRecordingIds:[ids[0]]}:{})},null,'qa'));
  const app=express();app.use(express.json());const auth=(req,res,next)=>req.headers.authorization==='Bearer qa-admin'?next():res.status(401).json({message:'Unauthorized'});
  archive.registerMusicArchive(app,{requireAdmin:auth,requireCloudinary:false,useCloudinary:false});
  app.get('/api/player/playlist',(_req,res)=>res.json({items:[],enabled:false}));

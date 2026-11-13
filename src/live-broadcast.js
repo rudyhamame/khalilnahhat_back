@@ -2,6 +2,7 @@
 function registerLiveBroadcastRoutes(app, deps) {
   const { requireAdmin, getLiveStreamConfig, LiveStreamConfig, defaults, createToken, getConfig, serialize, RoomServiceClient, randomUUID, verifyWebhook, serializePublic, prepareRecording, recordingStatus } = deps;
   const obs = deps.IngressClient ? require('./obs-broadcast').registerObsBroadcastRoutes(app, deps) : null;
+  if(obs)require('./ovh-browser-broadcast').registerOvhBrowserRoutes(app,deps,obs);
   app.get('/api/live-stream', async (_request, response) => {
     try { return response.json({ item: serializePublic(await getLiveStreamConfig()) }); }
     catch { return response.status(503).json({ message: 'Live status is temporarily unavailable.' }); }

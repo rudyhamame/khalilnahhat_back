@@ -52,3 +52,11 @@ MediaMTX: 256 MiB/0.75 CPU; controller and TURN: 128 MiB each; proxy:128 MiB. Ac
 ## Rollback
 
 Remove only the two Render relay variables to select the previous LiveKit OBS implementation. Retain OVH recordings until their archive upload is confirmed. Stopping this Compose project does not touch other apps or stored recordings.
+
+## Browser studio recording without transcoding
+
+Set `ECHO_BROWSER_TRANSPORT=ovh` on the API to enable the browser studio's direct WHIP publisher. The admin studio capability selects this transport; older clients retain their existing transport. The browser uploads one H.264 Baseline/Opus stream at 720p30 (video capped at 1.7 Mbps) with no simulcast, separate portrait encoder, or MediaRecorder. Effects and scene composition still run in the browser.
+
+MediaMTX forwards those packets to authenticated WHEP viewers and records their original encoded tracks. The existing OVH recording provider uploads closed segments to the private archive, verifies them, and then acknowledges deletion. Archive splitting uses stream copy. There is no quality ladder or transcoding worker. Recording requires Cloudinary configuration and at least 2 GiB free; an active recording stops below 1 GiB free or above 2 GiB pending media. Originals are retained on archive errors.
+
+Deploy the controller with its `live-access.cjs` mount before enabling the API flag. Restarting the controller ends active relay sessions, so check for an active broadcast first. Disable `ECHO_BROWSER_TRANSPORT` to roll back browser transport; preserve relay files until archived. Browser-direct recording again requires a local recording folder after rollback.

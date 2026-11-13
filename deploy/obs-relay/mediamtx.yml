@@ -32,5 +32,5 @@ pathDefaults:
   recordSegmentDuration: 2m
   recordDeleteAfter: 0s
   runOnRecordSegmentComplete: >-
-    wget -q -O /dev/null --post-data "{\"duration\":$MTX_SEGMENT_DURATION}" "http://127.0.0.1:18991/internal/segments/$MTX_PATH/$(basename "$MTX_SEGMENT_PATH")"
+    sh -c 'wget -q -O /dev/null --post-data={} "http://127.0.0.1:18991/internal/segments/$MTX_PATH/$(basename "$MTX_SEGMENT_PATH")"'
 paths: {}

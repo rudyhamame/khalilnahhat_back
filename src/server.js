@@ -541,6 +541,7 @@ function buildMuxPlaybackUrl(playbackId) {
 function serializeAdminLiveStreamConfig(config) {
   return {
     ...serializeLiveStreamConfig(config),
+    studio:{transport:process.env.ECHO_BROWSER_TRANSPORT==='ovh'&&require('./obs-relay-client').configured()?'ovh':'livekit'},
     streamUrl: config?.streamUrl || '',
     obs: { roomName: config?.obsRoomName || '', state: config?.obsState || '',
       saveRecording: config?.obsSaveRecording !== false,

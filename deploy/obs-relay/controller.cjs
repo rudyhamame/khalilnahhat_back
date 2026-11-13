@@ -75,7 +75,8 @@ let sweeping = false;
 async function sweep() {
  if(sweeping)return; sweeping=true;
  try {
-  const full = await storageBytes() > 2*1024*1024*1024;
+  const disk=await fs.statfs(RECORDINGS);
+  const full = await storageBytes() > 2*1024*1024*1024 || disk.bavail*disk.bsize<1024**3;
   for(const row of sessions.values()) {
    try {
     if(full && row.saveRecording!==false && !['ended','ending'].includes(row.state))await stop(row,'Recording storage is full. Save or clear recordings before another broadcast.');
@@ -125,6 +126,7 @@ async function start() {
     const data=await body(req); if(!idPattern.test(data.id) || !/^[a-f0-9]{64}$/.test(data.publishToken || ''))return json(res,400,{});
     if(data.saveRecording!==undefined && typeof data.saveRecording!=='boolean')return json(res,400,{});
     const saveRecording=data.saveRecording!==false;
+    if(saveRecording){const disk=await fs.statfs(RECORDINGS);if(disk.bavail*disk.bsize<2*1024**3)return json(res,507,{message:'OVH needs at least 2 GiB of free space before recording.'});}
     if([...sessions.values()].some(row=>row.state!=='ended'))return json(res,409,{message:'Another OBS connection is active.'});
     if(sessions.has(data.id))return json(res,409,{message:'This OBS connection already exists.'});
     if(saveRecording && await storageBytes() > 1024*1024*1024)return json(res,507,{message:'Save pending recordings before preparing another OBS connection.'});

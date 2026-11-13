@@ -16,6 +16,11 @@ vps-ba7fb4cb.vps.ovh.ca {
         reverse_proxy 127.0.0.1:18991
     }
     handle /live/* {
+        @productionOrigin header_regexp Origin ^https://(www[.])?djkhalilnahhat[.]ca$
+        header @productionOrigin {
+            Access-Control-Allow-Origin "{http.request.header.Origin}"
+            defer
+        }
         reverse_proxy 127.0.0.1:18889
     }
     handle {

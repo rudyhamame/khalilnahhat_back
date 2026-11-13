@@ -11,7 +11,7 @@ test('archive responses expose status but no private storage identifiers',()=>{
 });
 test('private multipart view exposes count/size but no asset identifiers',()=>{
  const result=view({_id:'id',status:'ready',parts:[{publicId:'secret-one',delivery:'authenticated',bytes:10,duration:2},{publicId:'secret-two',delivery:'authenticated',bytes:20,duration:4}]});
- assert.equal(result.canPreview,true);assert.equal(result.partCount,2);assert.deepEqual(result.parts,[{index:0,bytes:10,durationSec:2},{index:1,bytes:20,durationSec:4}]);assert.equal(JSON.stringify(result).includes('secret'),false);
+ assert.equal(result.canPreview,true);assert.equal(result.partCount,2);assert.deepEqual(result.parts,[{index:0,bytes:10,durationSec:2,trimStartSec:0,trimEndSec:2,selectedDurationSec:2},{index:1,bytes:20,durationSec:4,trimStartSec:0,trimEndSec:4,selectedDurationSec:4}]);assert.equal(JSON.stringify(result).includes('secret'),false);
 });
 test('preview and download routes require admin and reject missing or invalid parts',async()=>{
  const {registerLiveRecordings,LiveRecording}=require('../src/live-recordings');const routes={};const admin=()=>{};

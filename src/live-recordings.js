@@ -16,6 +16,8 @@ const {prepareRecordingFiles}=require('./recording-files');
 const partSchema={_id:false,publicId:String,delivery:String,bytes:Number,duration:Number,sha256:String,trimStart:Number,trimEnd:Number,look:{type:Object}};
 const sourceSchema={_id:false,key:String,remote:String,saved:Boolean,cleaned:Boolean,error:String,parts:[partSchema]};
 const schema=new mongoose.Schema({
+ commentsCaptured:{type:Boolean,default:false},
+ recordingTimeline:{type:[{_id:false,startMs:Number,endMs:Number,offsetSec:Number}],default:undefined},
  roomName:{type:String,unique:true,required:true},title:String,status:{type:String,default:'waiting'},egressId:String,objectKey:String,
  parts:[partSchema],sources:[sourceSchema],legacyParts:[partSchema],
  leaseToken:{type:String,default:''},cleanupPending:{type:Boolean,default:false},
@@ -159,6 +161,26 @@ async function sweepRecordings(){return pipeline.sweep();}
 let workerTimer;
 function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWorker=true}={}){
  app.get('/api/admin/live-recordings',requireAdmin,async(_req,res)=>res.json({items:(await LiveRecording.find({test:{$ne:true},deletedAt:null}).sort({createdAt:-1}).limit(500)).map(view)}));
+ app.get('/api/admin/live-recordings/:id/comments',requireAdmin,async(req,res)=>{
+  res.set('Cache-Control','no-store');
+  try{
+   const row=mongoose.isValidObjectId(req.params.id)?await LiveRecording.findOne({_id:req.params.id,deletedAt:null}):null;
+   if(!row)return res.status(404).json({message:'Recording not found.'});
+   const parts=recordingParts(row),all=req.query.part==='all',index=Number(req.query.part||0);
+   if(!all&&(!Number.isInteger(index)||!parts[index]))return res.status(400).json({message:'Choose a valid recording part.'});
+   const trim=all?wholeTrim(row,parts):partTrim(parts[index]);
+   const duration=all?wholeDuration(parts):parts[index].duration;
+   const offset=(all?0:parts.slice(0,index).reduce((sum,part)=>sum+(Number(part.duration)||0),0))+(trim?.start||0);
+   if(row.commentsCaptured){
+    const comments=await require('./recording-comments').RecordingComment.find({recordingId:row._id,atSec:{$gte:offset,$lt:offset+(trim?trim.end-trim.start:duration)}}).sort({atSec:1,_id:1}).lean();
+    const items=comments.map(item=>({id:item.commentId,name:item.name,text:item.text,atSec:item.atSec-offset,...(item.reply?.text?{reply:{text:item.reply.text,atSec:item.reply.atSec-offset}}:{})}));
+    return res.json({items,approximate:!row.recordingTimeline?.length});
+   }
+   const comments=await require('./live-comments').LiveComment.find({session:row.roomName,hidden:{$ne:true}}).sort({createdAt:1,_id:1}).lean();
+   const items=require('./recording-comments').timedComments(comments,{timeline:row.recordingTimeline||[],startedAt:row.createdAt,offsetSec:offset,durationSec:trim?trim.end-trim.start:duration});
+   return res.json({items,approximate:!row.recordingTimeline?.length});
+  }catch{return res.status(503).json({message:'Recording comments could not be loaded.'});}
+ });
  for(const route of ['download','preview']) app.get(`/api/admin/live-recordings/:id/${route}`,requireAdmin,async(req,res)=>{
   res.set('Cache-Control','no-store');
   const row=mongoose.isValidObjectId(req.params.id)?await LiveRecording.findOne({_id:req.params.id,deletedAt:null}):null;
@@ -224,6 +246,7 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
    const media=await MediaItem.find({mediaUrl:{$in:urls}}).select('_id').session(session);
    await require('./gallery-albums').GalleryAlbum.updateMany({itemIds:{$in:media.map(item=>String(item._id))}},{$pull:{itemIds:{$in:media.map(item=>String(item._id))}}},{session});
    await MediaItem.deleteMany({_id:{$in:media.map(item=>item._id)}},{session});
+   await require('./recording-comments').RecordingComment.deleteMany({recordingId:row._id},{session});
    const result=await LiveRecording.deleteOne(filter,{session});
    if(result.deletedCount!==1)throw Object.assign(new Error('Recording changed. Refresh before deleting.'),{status:409});
    return true;

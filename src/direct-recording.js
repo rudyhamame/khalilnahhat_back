@@ -53,11 +53,13 @@ async function acceptChunk(lease,index,body,mime,claimedHash){
  await save({direct:{...d.toObject?.()||d,count:d.count+1,bytes:d.bytes+body.length,mime,lastChunkAt:new Date()},captureState:'recording',status:'recording'});
  return {nextSequence:index+1};
 }
-async function seal(lease,count,complete,bytes){
+async function seal(lease,count,complete,bytes,timeline){
+ const recordingTimeline=require('./recording-comments').normalizeTimeline(timeline);
  const {row,save}=lease,d=row.direct;
  if(!Number.isSafeInteger(count)||count!==d.count||count<0)throw fail(409,'Some recording chunks have not arrived. Retry uploads before finishing.');
  if(bytes!==undefined&&bytes!==d.bytes)throw fail(409,'Received recording size does not match the Studio copy. Retry uploads before finishing.');
- if(d.state==='open')await save({direct:{...d.toObject?.()||d,state:count?'sealed':'empty',complete:count?Boolean(complete):false},captureState:'ended',status:'processing',error:'',attempts:0,nextRetryAt:new Date()});
+ if(d.state==='open'&&!row.commentsCaptured)await require('./recording-comments').archiveComments(row,recordingTimeline);
+ if(d.state==='open')await save({commentsCaptured:true,...(recordingTimeline?{recordingTimeline}:{}),direct:{...d.toObject?.()||d,state:count?'sealed':'empty',complete:count?Boolean(complete):false},captureState:'ended',status:'processing',error:'',attempts:0,nextRetryAt:new Date()});
  return {accepted:true,chunks:count};
 }
 async function materialize(row,lease){
@@ -104,7 +106,7 @@ function registerDirectRecordingRoutes(app,requireAdmin){
  const express=require('express');
  const handle=fn=>async(req,res)=>{try{res.set('Cache-Control','no-store');res.json(await withRecording(req.params.id,req.user._id,lease=>fn(req,lease)));}catch(e){res.status(e.status||503).json({message:e.status?e.message:'Recording data is retained. Please retry.'});}};
  app.post('/api/live-stream/recordings/:id/chunks/:sequence',requireAdmin,express.raw({type:'application/octet-stream',limit:CHUNK_LIMIT}),handle((req,lease)=>acceptChunk(lease,Number(req.params.sequence),req.body,req.headers['x-recording-mime'],req.headers['x-chunk-sha256'])));
- app.post('/api/live-stream/recordings/:id/finish',requireAdmin,handle((req,lease)=>seal(lease,req.body?.chunks,req.body?.complete===true,req.body?.bytes)));
+ app.post('/api/live-stream/recordings/:id/finish',requireAdmin,handle((req,lease)=>seal(lease,req.body?.chunks,req.body?.complete===true,req.body?.bytes,req.body?.timeline)));
  app.get('/api/live-stream/recordings/:id/status',requireAdmin,handle((_req,{row})=>({nextSequence:row.direct.count,state:row.direct.state,status:row.status})));
 }
 module.exports={createDirectRecording,acceptChunk,seal,directProvider,registerDirectRecordingRoutes,directory,CHUNK_LIMIT};

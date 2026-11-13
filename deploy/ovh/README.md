@@ -20,3 +20,11 @@ restored automatically (the old compose file is kept at `ci/api-compose.before-<
 Manual rollback of the API: put the previous `rh-khalil-api:<tag>` back in the compose file and
 `sudo docker compose -p khalil-api -f /srv/rh/khalil-security/api-compose.private.json up -d --no-deps rh-khalil-api`.
 Revoke the deploy key by deleting its line (comment `github-actions-deploy@khalil`) from `~ubuntu/.ssh/authorized_keys`.
+
+## Recording disk maintenance
+
+`khalil-recording-maintenance.timer` runs hourly. Its service invokes `/usr/local/sbin/khalil-recording-maintenance`, which deletes only untagged Docker images unused for at least 24 hours and verifies archived recording parts before removing redundant direct-recording folders. Tagged rollback images, volumes, active captures, unsaved recordings and folders without a database record are preserved. Recording cleanup shares the API's recording lease so it cannot race capture or archive jobs.
+
+Install the two unit files from this directory under `/etc/systemd/system/`, `recording-maintenance.sh` as `/usr/local/sbin/khalil-recording-maintenance` (0755), and `recording-maintenance.cjs` under `/usr/local/lib/khalil/` (0644). Then run `systemctl daemon-reload` and `systemctl enable --now khalil-recording-maintenance.timer`. Inspect the last run with `systemctl status khalil-recording-maintenance.service`.
+
+Recording comments are snapshotted when browser recording finalizes. Capture timelines preserve the wall-clock ranges actually recorded, excluding pauses, so archived comments and host replies follow playback and preview trims. Older recordings use an approximate timestamp based on their creation time. Device-only recordings retain their timing and available comment history in their local `recording.json` manifest.

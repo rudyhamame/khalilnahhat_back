@@ -1,0 +1,11 @@
+[Unit]
+Description=Clear unused builds and verified archived recording temp files
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/khalil-recording-maintenance
+TimeoutStartSec=10min
+Nice=15
+IOSchedulingClass=idle

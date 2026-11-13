@@ -58,7 +58,7 @@ function registerLiveBroadcastRoutes(app, deps) {
           if(expired) await new RoomServiceClient(config.wsUrl,config.apiKey,config.apiSecret).deleteRoom(roomName);
         } catch { /* The exact-room webhook can still reconcile a disconnected publisher. */ }
       },60000); expiry.unref?.();
-      return response.status(201).json({ item: serialize(updated), token, url: config.wsUrl, roomName,...(!saveRecording?{recording:{mode:'none'}}:recording?.provider==='direct'?{recording:{id:String(recording._id),mode:'direct'}}:{}) });
+      return response.status(201).json({ serverTime:Date.now(),item: serialize(updated), token, url: config.wsUrl, roomName,...(!saveRecording?{recording:{mode:'none'}}:recording?.provider==='direct'?{recording:{id:String(recording._id),mode:'direct'}}:{}) });
     } catch (error) {
       console.error('WebRTC go-live failed:', error.message);
       const status = error.status || 500;
@@ -92,7 +92,7 @@ function registerLiveBroadcastRoutes(app, deps) {
       if(!current.isLive||!current.webrtcRoomName||current.broadcastSource!=='browser'||current.obsRoomName)return response.status(409).json({message:'There is no browser live stream to reconnect.'});
       const config=getConfig(),token=await createToken({roomName:current.webrtcRoomName,identity:'khalil-broadcaster',name:'Khalil Nahhat',canPublish:true});
       const recording=await recordingStatus?.(current.webrtcRoomName);
-      return response.json({item:serialize(current),token,url:config.wsUrl,roomName:current.webrtcRoomName,...(recording?.id&&!['ready','partial','not_recorded'].includes(recording.status)?{recording:{id:recording.id,mode:'direct'}}:{recording:{mode:'none'}})});
+      return response.json({serverTime:Date.now(),item:serialize(current),token,url:config.wsUrl,roomName:current.webrtcRoomName,...(recording?.id&&!['ready','partial','not_recorded'].includes(recording.status)?{recording:{id:recording.id,mode:'direct'}}:{recording:{mode:'none'}})});
     }catch(error){console.error('WebRTC resume failed:',error.message);return response.status(503).json({message:'Could not reconnect this browser to the live stream.'});}
   });
   app.post('/api/live-stream/webrtc/end', requireAdmin, async (request, response) => {

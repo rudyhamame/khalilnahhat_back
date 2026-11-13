@@ -8,6 +8,11 @@ const input=z.object({name:z.string().trim().max(60).optional().default(''),text
 function serialize(comment){return {id:String(comment._id),name:comment.name,text:comment.text,createdAt:comment.createdAt,hidden:Boolean(comment.hidden),...(comment.reply?.text?{reply:{text:comment.reply.text,at:comment.reply.at}}:{})};}
 function registerLiveComments(app,{getLiveStreamConfig,requireAuth,requireAdmin,CommentModel=LiveComment,clock=Date.now}){
  const limits=new Map();
+ if(requireAdmin)app.get('/api/live-comments/history',requireAdmin,async(req,res)=>{
+  if(typeof req.query.session!=='string'||!req.query.session||req.query.session.length>300)return res.status(400).json({message:'Choose a valid live session.'});
+  try{const comments=await CommentModel.find({session:req.query.session,hidden:{$ne:true}}).sort({createdAt:1,_id:1}).lean();return res.set('Cache-Control','no-store').json({items:comments.map(serialize)});}
+  catch{return res.status(503).json({message:'Comment history could not be loaded.'});}
+ });
  const read=async(req,res)=>{
   const session=sessionKey(await getLiveStreamConfig());
   if(req.query?.session && req.query.session!==session)return res.status(409).json({message:'This live session has ended. Refresh to join the current broadcast.'});
@@ -52,4 +57,4 @@ function registerLiveComments(app,{getLiveStreamConfig,requireAuth,requireAdmin,
   res.status(201).json({item:serialize(item)});
  });
 }
-module.exports={registerLiveComments,sessionKey,input};
+module.exports={LiveComment,registerLiveComments,sessionKey,input};

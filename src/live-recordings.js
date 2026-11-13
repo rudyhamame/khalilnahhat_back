@@ -13,14 +13,14 @@ const {createRecordingPipeline}=require('./recording-pipeline');
 const {createRecordingProviders}=require('./recording-providers');
 const {prepareRecordingFiles}=require('./recording-files');
 
-const partSchema={_id:false,publicId:String,delivery:String,bytes:Number,duration:Number,sha256:String,trimStart:Number,trimEnd:Number};
+const partSchema={_id:false,publicId:String,delivery:String,bytes:Number,duration:Number,sha256:String,trimStart:Number,trimEnd:Number,look:{type:Object}};
 const sourceSchema={_id:false,key:String,remote:String,saved:Boolean,cleaned:Boolean,error:String,parts:[partSchema]};
 const schema=new mongoose.Schema({
  roomName:{type:String,unique:true,required:true},title:String,status:{type:String,default:'waiting'},egressId:String,objectKey:String,
  parts:[partSchema],sources:[sourceSchema],legacyParts:[partSchema],
  leaseToken:{type:String,default:''},cleanupPending:{type:Boolean,default:false},
  captureState:{type:String,default:'waiting'},captureWarning:{type:String,default:''},captureAttempts:{type:Number,default:0},endObservedAt:Date,captureCheckedAt:Date,captureRequestedAt:Date,
- publicId:String,delivery:{type:String,default:'authenticated'},bytes:{type:Number,default:0},duration:{type:Number,default:0},trimStart:Number,trimEnd:Number,
+ publicId:String,delivery:{type:String,default:'authenticated'},bytes:{type:Number,default:0},duration:{type:Number,default:0},trimStart:Number,trimEnd:Number,look:{type:Object},
  attempts:{type:Number,default:0},nextRetryAt:{type:Date,default:()=>new Date()},leaseUntil:{type:Date,default:()=>new Date(0)},
  deletedAt:{type:Date,default:null},
  provider:{type:String,default:'livekit'},relaySegments:[String],
@@ -39,21 +39,43 @@ function store(){
  return storageClient;
 }
 function sdk(Class){return new Class(process.env.LIVEKIT_URL,process.env.LIVEKIT_API_KEY,process.env.LIVEKIT_API_SECRET);}
-function recordingParts(row){return row.parts?.length?Array.from(row.parts):row.publicId?[{publicId:row.publicId,delivery:row.delivery||'authenticated',bytes:row.bytes,duration:row.duration,trimStart:row.trimStart,trimEnd:row.trimEnd}]:[];}
+function recordingParts(row){return row.parts?.length?Array.from(row.parts):row.publicId?[{publicId:row.publicId,delivery:row.delivery||'authenticated',bytes:row.bytes,duration:row.duration,trimStart:row.trimStart,trimEnd:row.trimEnd,look:row.look}]:[];}
 function partTrim(part){
  const duration=Number(part?.duration)||0,start=Number(part?.trimStart),end=Number(part?.trimEnd);
  if(!duration||!Number.isFinite(start)||!Number.isFinite(end)||start<0||end<=start||end>duration+.05)return null;
  if(start<.005&&end>=duration-.005)return null;
  return {start:Math.max(0,start),end:Math.min(duration,end)};
 }
-function view(row){const parts=recordingParts(row);return {id:String(row._id),title:row.title,status:row.status,bytes:row.status==='recording'?row.direct?.bytes||0:row.bytes,durationSec:row.status==='recording'&&row.direct?.lastChunkAt?Math.max(0,Math.round((new Date(row.direct.lastChunkAt)-new Date(row.createdAt))/1000)):row.duration,published:row.published,createdAt:row.createdAt,error:row.error||'',captureState:row.captureState||'unknown',captureCheckedAt:row.captureCheckedAt||null,warning:row.captureWarning||'',cleanupPending:Boolean(row.cleanupPending),savedPartCount:parts.length,retrying:row.status==='upload_failed'&&(row.attempts||0)<3,canRetry:['failed','upload_failed'].includes(row.status)||row.captureState==='failed'||(row.status==='partial'&&row.sources?.some(source=>!source.saved)),canRemove:!row.cleanupPending&&(['ready','partial','not_recorded'].includes(row.status)||(['failed','upload_failed'].includes(row.status)&&row.captureState==='ended')),canPreview:['ready','partial'].includes(row.status)&&parts.length>0,partCount:parts.length,parts:parts.map((part,index)=>{const trim=partTrim(part);return {index,bytes:part.bytes,durationSec:part.duration,trimStartSec:trim?.start||0,trimEndSec:trim?.end||part.duration||0,selectedDurationSec:trim?trim.end-trim.start:part.duration};})};}
+// The editor's look (beauty and lighting) for a recorded video, applied by Cloudinary when the part is previewed, downloaded or published.
+// Smoothing and side light need a live camera pipeline; they are not available on a recording, so they are never stored.
+const LOOK_LIMITS={strength:[0,100],brightness:[-30,40],contrast:[-30,30],warmth:[-50,50],tone:[0,100]};
+function normalizeLook(value){
+ if(!value||typeof value!=='object')return null;
+ const look={};
+ for(const [key,[min,max]] of Object.entries(LOOK_LIMITS)){const number=Number(value[key]);look[key]=Number.isFinite(number)?Math.max(min,Math.min(max,Math.round(number))):0;}
+ return look.strength>0?look:null;
+}
+// Cloudinary effects equivalent to the editor preview: amount = strength; brightness/contrast scale with it, tone adds a little saturation, warmth moves red against blue.
+function lookTransformation(value){
+ const look=normalizeLook(value);if(!look)return [];
+ const amount=look.strength/100,effects=[];
+ const brightness=Math.round(look.brightness*amount),contrast=Math.round(look.contrast*amount),saturation=Math.round(look.tone/5*amount),warmth=Math.round(look.warmth*amount*.4);
+ if(brightness)effects.push({effect:`brightness:${brightness}`});
+ if(contrast)effects.push({effect:`contrast:${contrast}`});
+ if(saturation)effects.push({effect:`saturation:${saturation}`});
+ if(warmth){effects.push({effect:`red:${warmth}`});effects.push({effect:`blue:${-warmth}`});}
+ return effects;
+}
+// start/end offsets first, then the look.
+function mediaTransformation(trim,look){const steps=[];if(trim)steps.push({start_offset:trim.start,end_offset:trim.end});steps.push(...lookTransformation(look));return steps.length?{transformation:steps}:{};}
+function view(row){const parts=recordingParts(row);return {id:String(row._id),title:row.title,status:row.status,bytes:row.status==='recording'?row.direct?.bytes||0:row.bytes,durationSec:row.status==='recording'&&row.direct?.lastChunkAt?Math.max(0,Math.round((new Date(row.direct.lastChunkAt)-new Date(row.createdAt))/1000)):row.duration,published:row.published,createdAt:row.createdAt,error:row.error||'',captureState:row.captureState||'unknown',captureCheckedAt:row.captureCheckedAt||null,warning:row.captureWarning||'',cleanupPending:Boolean(row.cleanupPending),savedPartCount:parts.length,retrying:row.status==='upload_failed'&&(row.attempts||0)<3,canRetry:['failed','upload_failed'].includes(row.status)||row.captureState==='failed'||(row.status==='partial'&&row.sources?.some(source=>!source.saved)),canRemove:!row.cleanupPending&&(['ready','partial','not_recorded'].includes(row.status)||(['failed','upload_failed'].includes(row.status)&&row.captureState==='ended')),canPreview:['ready','partial'].includes(row.status)&&parts.length>0,partCount:parts.length,parts:parts.map((part,index)=>{const trim=partTrim(part);return {index,bytes:part.bytes,durationSec:part.duration,trimStartSec:trim?.start||0,trimEndSec:trim?.end||part.duration||0,selectedDurationSec:trim?trim.end-trim.start:part.duration,...(normalizeLook(part.look)?{look:normalizeLook(part.look)}:{})};})};}
 function recordingLink(row,partIndex,attachment,full=false){
  const parts=recordingParts(row);const index=partIndex===undefined?0:Number(partIndex);
  if(!Number.isInteger(index)||index<0||index>=parts.length)return null;
  const part=parts[index];
  // The saved trim applies to the preview as well as to downloads and publishing; only the trimmer asks for the full source (full=1).
- const trim=!full&&partTrim(part);
- if(trim)return cloudinary.url(part.publicId,{secure:true,resource_type:'video',type:part.delivery||'authenticated',format:'mp4',sign_url:true,start_offset:trim.start,end_offset:trim.end,...(attachment?{flags:'attachment'}:{})});
+ const trim=!full&&partTrim(part),look=!full&&normalizeLook(part.look);
+ if(trim||look)return cloudinary.url(part.publicId,{secure:true,resource_type:'video',type:part.delivery||'authenticated',format:'mp4',sign_url:true,...mediaTransformation(trim,look),...(attachment?{flags:'attachment'}:{})});
  return cloudinary.utils.private_download_url(part.publicId,'mp4',{resource_type:'video',type:part.delivery||'authenticated',expires_at:Math.floor(Date.now()/1000)+180,attachment});
 }
 async function uploadRecordingPart(filename,publicId,expected={}){
@@ -145,6 +167,8 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
   const full=trimStart<.005&&trimEnd>=duration-.005;
   if(row.parts?.length){row.parts[index].trimStart=full?undefined:trimStart;row.parts[index].trimEnd=full?undefined:trimEnd;}
   else{row.trimStart=full?undefined:trimStart;row.trimEnd=full?undefined:trimEnd;}
+  // The editor's look is saved with the trim; an empty or zero-strength look clears it.
+  if('look' in (req.body||{})){const look=normalizeLook(req.body.look)||undefined;if(row.parts?.length)row.parts[index].look=look;else row.look=look;}
   await row.save();
   res.json({item:view(row)});
  });
@@ -200,7 +224,7 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
     await lease.save({parts,legacyParts:updateDelivery(row.legacyParts),sources:(row.sources||[]).map(source=>({...source.toObject?.()||source,parts:updateDelivery(source.parts)})),delivery:parts.every(p=>p.delivery==='upload')?'upload':'authenticated'});
    }
    const trim=partTrim(part),transform=trim?{start_offset:trim.start,end_offset:trim.end}:{};
-   const videoUrl=cloudinary.url(part.publicId,{secure:true,resource_type:'video',type:'upload',format:'mp4',...transform});
+   const videoUrl=cloudinary.url(part.publicId,{secure:true,resource_type:'video',type:'upload',format:'mp4',...mediaTransformation(trim,part.look)});
    const audioUrl=cloudinary.url(part.publicId,{secure:true,resource_type:'video',type:'upload',format:'mp3',...transform});
    const externalId=`live-${row._id}${parts.length>1?`-part-${index+1}`:''}`;
    const title=`${row.title}${parts.length>1?` · Part ${index+1} of ${parts.length}`:''}`;
@@ -215,4 +239,4 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
  });
  if(startWorker&&!workerTimer){workerTimer=setInterval(()=>sweepRecordings().catch(()=>{}),15000);workerTimer.unref();}
 }
-module.exports={statusForRoom,LiveRecording,prepareRecordingRoom,ensureRecording,registerLiveRecordings,sweepRecordings,transferRecording,objectBelongsToRoom,view,recordingParts,recordingLink,uploadRecordingPart};
+module.exports={normalizeLook,lookTransformation,mediaTransformation,statusForRoom,LiveRecording,prepareRecordingRoom,ensureRecording,registerLiveRecordings,sweepRecordings,transferRecording,objectBelongsToRoom,view,recordingParts,recordingLink,uploadRecordingPart};

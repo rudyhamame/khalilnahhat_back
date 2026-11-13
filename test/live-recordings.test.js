@@ -61,3 +61,14 @@ test('capture recovery starts only the intended publisher and rechecks active jo
  jobs=[{status:1}];assert.equal((await provider.inspect(row,lease)).captureState,'recording');assert.equal(started,1);
  jobs=[{status:4}];await provider.inspect(row,lease);assert.equal(started,2);
 });
+test('the editor look is clamped, ignored at zero strength, and mapped to Cloudinary effects after the trim',()=>{
+ const {normalizeLook,lookTransformation,mediaTransformation}=require('../src/live-recordings');
+ assert.equal(normalizeLook(null),null);assert.equal(normalizeLook({strength:0,brightness:20}),null);
+ assert.deepEqual(normalizeLook({strength:500,brightness:99,contrast:-99,warmth:70,tone:-4,smoothing:50,sideLight:80}),{strength:100,brightness:40,contrast:-30,warmth:50,tone:0});
+ assert.deepEqual(lookTransformation({strength:100,brightness:20,contrast:10,warmth:25,tone:50}),[{effect:'brightness:20'},{effect:'contrast:10'},{effect:'saturation:10'},{effect:'red:10'},{effect:'blue:-10'}]);
+ assert.deepEqual(lookTransformation({strength:50,brightness:20}),[{effect:'brightness:10'}]);
+ assert.deepEqual(mediaTransformation({start:1,end:5},{strength:100,brightness:10}),{transformation:[{start_offset:1,end_offset:5},{effect:'brightness:10'}]});
+ assert.deepEqual(mediaTransformation(null,null),{});
+ const view=require('../src/live-recordings').view,result=view({_id:'i',status:'ready',parts:[{publicId:'p',delivery:'authenticated',bytes:1,duration:4,look:{strength:60,brightness:10}}]});
+ assert.deepEqual(result.parts[0].look,{strength:60,brightness:10,contrast:0,warmth:0,tone:0});
+});

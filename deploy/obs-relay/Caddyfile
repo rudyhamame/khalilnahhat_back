@@ -21,6 +21,10 @@ vps-ba7fb4cb.vps.ovh.ca {
             Access-Control-Allow-Origin "{http.request.header.Origin}"
             defer
         }
+        # Accept the production origins at the proxy without restarting active media.
+        reverse_proxy @productionOrigin 127.0.0.1:18889 {
+            header_up Origin https://echo-khalil.onrender.com
+        }
         reverse_proxy 127.0.0.1:18889
     }
     handle {

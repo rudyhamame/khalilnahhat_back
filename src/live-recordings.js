@@ -68,9 +68,27 @@ function lookTransformation(value){
 }
 // start/end offsets first, then the look.
 function mediaTransformation(trim,look){const steps=[];if(trim)steps.push({start_offset:trim.start,end_offset:trim.end});steps.push(...lookTransformation(look));return steps.length?{transformation:steps}:{};}
-function view(row){const parts=recordingParts(row);return {id:String(row._id),title:row.title,status:row.status,bytes:row.status==='recording'?row.direct?.bytes||0:row.bytes,durationSec:row.status==='recording'&&row.direct?.lastChunkAt?Math.max(0,Math.round((new Date(row.direct.lastChunkAt)-new Date(row.createdAt))/1000)):row.duration,published:row.published,createdAt:row.createdAt,error:row.error||'',captureState:row.captureState||'unknown',captureCheckedAt:row.captureCheckedAt||null,warning:row.captureWarning||'',cleanupPending:Boolean(row.cleanupPending),savedPartCount:parts.length,retrying:row.status==='upload_failed'&&(row.attempts||0)<3,canRetry:['failed','upload_failed'].includes(row.status)||row.captureState==='failed'||(row.status==='partial'&&row.sources?.some(source=>!source.saved)),canRemove:!row.cleanupPending&&(['ready','partial','not_recorded'].includes(row.status)||(['failed','upload_failed'].includes(row.status)&&row.captureState==='ended')),canPreview:['ready','partial'].includes(row.status)&&parts.length>0,partCount:parts.length,parts:parts.map((part,index)=>{const trim=partTrim(part);return {index,bytes:part.bytes,durationSec:part.duration,trimStartSec:trim?.start||0,trimEndSec:trim?.end||part.duration||0,selectedDurationSec:trim?trim.end-trim.start:part.duration,...(normalizeLook(part.look)?{look:normalizeLook(part.look)}:{})};})};}
+// The whole live: every saved part joined in order by Cloudinary (the first part is the base, the others are spliced on), then the saved trim and look
+// of the whole video. Parts keep their own delivery type, so private parts can be joined before publishing.
+function wholeDuration(parts){return parts.reduce((sum,part)=>sum+(Number(part.duration)||0),0);}
+function wholeTrim(row,parts){return partTrim({duration:wholeDuration(parts),trimStart:row.trimStart,trimEnd:row.trimEnd});}
+function spliceSteps(parts){
+ const steps=[];
+ for(const part of parts.slice(1))steps.push({overlay:{resource_type:'video',...(part.delivery&&part.delivery!=='upload'?{type:part.delivery}:{}),public_id:part.publicId},flags:'splice'},{flags:'layer_apply'});
+ return steps;
+}
+function wholeTransformation(row,parts,{full=false,look=true}={}){
+ const steps=spliceSteps(parts);
+ if(!full){const trim=wholeTrim(row,parts);steps.push(...(mediaTransformation(trim,look?row.look:null).transformation||[]));}
+ return steps.length?{transformation:steps}:{};
+}
+function view(row){const parts=recordingParts(row);return {id:String(row._id),title:row.title,status:row.status,bytes:row.status==='recording'?row.direct?.bytes||0:row.bytes,durationSec:row.status==='recording'&&row.direct?.lastChunkAt?Math.max(0,Math.round((new Date(row.direct.lastChunkAt)-new Date(row.createdAt))/1000)):row.duration,published:row.published,createdAt:row.createdAt,error:row.error||'',captureState:row.captureState||'unknown',captureCheckedAt:row.captureCheckedAt||null,warning:row.captureWarning||'',cleanupPending:Boolean(row.cleanupPending),savedPartCount:parts.length,retrying:row.status==='upload_failed'&&(row.attempts||0)<3,canRetry:['failed','upload_failed'].includes(row.status)||row.captureState==='failed'||(row.status==='partial'&&row.sources?.some(source=>!source.saved)),canRemove:!row.cleanupPending&&(['ready','partial','not_recorded'].includes(row.status)||(['failed','upload_failed'].includes(row.status)&&row.captureState==='ended')),canPreview:['ready','partial'].includes(row.status)&&parts.length>0,partCount:parts.length,parts:parts.map((part,index)=>{const trim=partTrim(part);return {index,bytes:part.bytes,durationSec:part.duration,trimStartSec:trim?.start||0,trimEndSec:trim?.end||part.duration||0,selectedDurationSec:trim?trim.end-trim.start:part.duration,...(normalizeLook(part.look)?{look:normalizeLook(part.look)}:{})};}),...(parts.length>1?{whole:wholeView(row,parts)}:{})};}
+function wholeView(row,parts){const duration=wholeDuration(parts),trim=wholeTrim(row,parts),look=normalizeLook(row.look);return {durationSec:duration,trimStartSec:trim?.start||0,trimEndSec:trim?.end||duration,selectedDurationSec:trim?trim.end-trim.start:duration,...(look?{look}:{})};}
 function recordingLink(row,partIndex,attachment,full=false){
- const parts=recordingParts(row);const index=partIndex===undefined?0:Number(partIndex);
+ const parts=recordingParts(row);
+ // part=all: the whole live, built from all parts (a single-part recording is just that part).
+ if(partIndex==='all'&&parts.length>1)return cloudinary.url(parts[0].publicId,{secure:true,resource_type:'video',type:parts[0].delivery||'authenticated',format:'mp4',sign_url:true,...wholeTransformation(row,parts,{full}),...(attachment?{flags:'attachment'}:{})});
+ const index=partIndex===undefined||partIndex==='all'?0:Number(partIndex);
  if(!Number.isInteger(index)||index<0||index>=parts.length)return null;
  const part=parts[index];
  // The saved trim applies to the preview as well as to downloads and publishing; only the trimmer asks for the full source (full=1).
@@ -159,6 +177,17 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
   const row=await LiveRecording.findOne({_id:req.params.id,deletedAt:null,status:{$in:['ready','partial']}});
   if(!row)return res.status(409).json({message:'Wait for the recording to finish saving.'});
   if(row.published)return res.status(409).json({message:'This recording is already published and its trim can no longer be changed.'});
+  if(req.body?.part==='all'){
+   // The whole live (all parts joined): its trim and look are saved on the recording itself.
+   const all=recordingParts(row),total=wholeDuration(all),from=Number(req.body?.start),to=Number(req.body?.end);
+   if(all.length<2)return res.status(400).json({message:'Select a valid recording part.'});
+   if(!total||!Number.isFinite(from)||!Number.isFinite(to)||from<0||to<=from||to>total+.05||to-from<.1)return res.status(400).json({message:'Choose a valid trim range of at least 0.1 seconds.'});
+   const wholeStart=Math.round(Math.max(0,from)*1000)/1000,wholeEnd=Math.round(Math.min(total,to)*1000)/1000,untrimmed=wholeStart<.005&&wholeEnd>=total-.005;
+   row.trimStart=untrimmed?undefined:wholeStart;row.trimEnd=untrimmed?undefined:wholeEnd;
+   if('look' in req.body)row.look=normalizeLook(req.body.look)||undefined;
+   await row.save();
+   return res.json({item:view(row)});
+  }
   const index=Number(req.body?.part),start=Number(req.body?.start),end=Number(req.body?.end),parts=recordingParts(row),part=parts[index];
   if(!Number.isInteger(index)||index<0||!part)return res.status(400).json({message:'Select a valid recording part.'});
   const duration=Number(part.duration)||0;
@@ -211,9 +240,13 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
     if(!['ready','partial'].includes(row.status))return res.status(409).json({message:'Wait for the recording to finish saving.'});
     if(row.status==='partial'&&req.body?.allowPartial!==true)return res.status(409).json({message:'Confirm that you want to publish only the saved parts of this incomplete recording.'});
   const parts=recordingParts(row);
+  // body.part: 'all' publishes the whole live as one video (all parts joined); a number publishes only that part; nothing keeps the old behaviour (each part on its own).
+  const whole=req.body?.part==='all'&&parts.length>1,only=req.body?.part===undefined||req.body?.part==='all'?null:Number(req.body.part);
+  if(only!==null&&!(Number.isInteger(only)&&only>=0&&only<parts.length))return res.status(400).json({message:'Select a valid recording part.'});
   for(let index=0;index<parts.length;index++){
    await lease.assert();
    const part=parts[index];
+   if(only!==null&&index!==only)continue;
    if(part.delivery!=='upload'){
     let moved;
     try{moved=await cloudinary.uploader.rename(part.publicId,part.publicId,{resource_type:'video',type:'authenticated',to_type:'upload',overwrite:false});}
@@ -223,6 +256,7 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
     const updateDelivery=items=>(items||[]).map(item=>({...item.toObject?.()||item,delivery:parts.find(p=>p.publicId===item.publicId)?.delivery||item.delivery}));
     await lease.save({parts,legacyParts:updateDelivery(row.legacyParts),sources:(row.sources||[]).map(source=>({...source.toObject?.()||source,parts:updateDelivery(source.parts)})),delivery:parts.every(p=>p.delivery==='upload')?'upload':'authenticated'});
    }
+   if(whole)continue;
    const trim=partTrim(part),transform=trim?{start_offset:trim.start,end_offset:trim.end}:{};
    const videoUrl=cloudinary.url(part.publicId,{secure:true,resource_type:'video',type:'upload',format:'mp4',...mediaTransformation(trim,part.look)});
    const audioUrl=cloudinary.url(part.publicId,{secure:true,resource_type:'video',type:'upload',format:'mp3',...transform});
@@ -232,6 +266,15 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
    await ArchiveItem.findOneAndUpdate({externalId},{$setOnInsert:{title,artist:'DJ Khalil',category:'Live Archive',mediaType:'audio',audioUrl,description:'Audio from a recorded Echo live stream.',duration:`${Math.floor(duration/60)}:${String(Math.floor(duration%60)).padStart(2,'0')}`}},{upsert:true});
    await MediaItem.findOneAndUpdate({mediaUrl:videoUrl},{$setOnInsert:{kind:'video',title,category:'Live Archive',isPublished:true,durationSec:Math.round(duration)}},{upsert:true});
   }
+  if(whole){
+   // One video made of every part, with the whole video's trim and look.
+   const joined=wholeTrim(row,parts),total=wholeDuration(parts),duration=joined?joined.end-joined.start:total;
+   const videoUrl=cloudinary.url(parts[0].publicId,{secure:true,resource_type:'video',type:'upload',format:'mp4',...wholeTransformation(row,parts)});
+   const audioUrl=cloudinary.url(parts[0].publicId,{secure:true,resource_type:'video',type:'upload',format:'mp3',...wholeTransformation(row,parts,{look:false})});
+   const externalId=`live-${row._id}`;
+   await ArchiveItem.findOneAndUpdate({externalId},{$setOnInsert:{title:row.title,artist:'DJ Khalil',category:'Live Archive',mediaType:'audio',audioUrl,description:'Audio from a recorded Echo live stream.',duration:`${Math.floor(duration/60)}:${String(Math.floor(duration%60)).padStart(2,'0')}`}},{upsert:true});
+   await MediaItem.findOneAndUpdate({mediaUrl:videoUrl},{$setOnInsert:{kind:'video',title:row.title,category:'Live Archive',isPublished:true,durationSec:Math.round(duration)}},{upsert:true});
+  }
     await lease.save({published:true});return res.json({item:view(row)});
    });
    if(outcome?.busy)return res.status(409).json({message:'This recording is being processed. Refresh and try again.'});
@@ -239,4 +282,4 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
  });
  if(startWorker&&!workerTimer){workerTimer=setInterval(()=>sweepRecordings().catch(()=>{}),15000);workerTimer.unref();}
 }
-module.exports={normalizeLook,lookTransformation,mediaTransformation,statusForRoom,LiveRecording,prepareRecordingRoom,ensureRecording,registerLiveRecordings,sweepRecordings,transferRecording,objectBelongsToRoom,view,recordingParts,recordingLink,uploadRecordingPart};
+module.exports={wholeDuration,wholeTrim,wholeTransformation,spliceSteps,normalizeLook,lookTransformation,mediaTransformation,statusForRoom,LiveRecording,prepareRecordingRoom,ensureRecording,registerLiveRecordings,sweepRecordings,transferRecording,objectBelongsToRoom,view,recordingParts,recordingLink,uploadRecordingPart};

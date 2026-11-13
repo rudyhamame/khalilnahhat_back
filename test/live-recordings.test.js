@@ -72,3 +72,18 @@ test('the editor look is clamped, ignored at zero strength, and mapped to Cloudi
  const view=require('../src/live-recordings').view,result=view({_id:'i',status:'ready',parts:[{publicId:'p',delivery:'authenticated',bytes:1,duration:4,look:{strength:60,brightness:10}}]});
  assert.deepEqual(result.parts[0].look,{strength:60,brightness:10,contrast:0,warmth:0,tone:0});
 });
+test('the whole live is the first part with every other part spliced on, then the whole trim and look',()=>{
+ const {wholeDuration,wholeTrim,wholeTransformation,view}=require('../src/live-recordings');
+ const parts=[{publicId:'live/a',delivery:'authenticated',duration:10},{publicId:'live/b',delivery:'authenticated',duration:20},{publicId:'live/c',delivery:'upload',duration:5}];
+ assert.equal(wholeDuration(parts),35);
+ assert.deepEqual(wholeTransformation({},parts),{transformation:[{overlay:{resource_type:'video',type:'authenticated',public_id:'live/b'},flags:'splice'},{flags:'layer_apply'},{overlay:{resource_type:'video',public_id:'live/c'},flags:'splice'},{flags:'layer_apply'}]});
+ const row={trimStart:5,trimEnd:30,look:{strength:100,brightness:10}};
+ assert.deepEqual(wholeTrim(row,parts),{start:5,end:30});
+ assert.deepEqual(wholeTransformation(row,parts).transformation.slice(4),[{start_offset:5,end_offset:30},{effect:'brightness:10'}]);
+ assert.deepEqual(wholeTransformation(row,parts,{full:true}).transformation.length,4);
+ assert.deepEqual(wholeTransformation(row,parts,{look:false}).transformation.slice(4),[{start_offset:5,end_offset:30}]);
+ assert.deepEqual(wholeTransformation({},[parts[0]]),{});
+ const shown=view({_id:'i',status:'ready',trimStart:5,trimEnd:30,look:{strength:100,brightness:10},parts});
+ assert.deepEqual(shown.whole,{durationSec:35,trimStartSec:5,trimEndSec:30,selectedDurationSec:25,look:{strength:100,brightness:10,contrast:0,warmth:0,tone:0}});
+ assert.equal(view({_id:'i',status:'ready',parts:[parts[0]]}).whole,undefined);
+});

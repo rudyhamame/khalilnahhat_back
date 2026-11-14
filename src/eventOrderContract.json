@@ -160,8 +160,7 @@
      "options": [
       "gta",
       "outside_gta"
-     ],
-     "required": true
+     ]
     },
     {
      "key": "event.venue.setting",

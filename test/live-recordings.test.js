@@ -87,3 +87,15 @@ test('the whole live is the first part with every other part spliced on, then th
  assert.deepEqual(shown.whole,{durationSec:35,trimStartSec:5,trimEndSec:30,selectedDurationSec:25,look:{strength:100,brightness:10,contrast:0,warmth:0,tone:0}});
  assert.equal(view({_id:'i',status:'ready',parts:[parts[0]]}).whole,undefined);
 });
+
+test('the preview link outlives a viewing session while downloads stay short-lived',()=>{
+ const {recordingLink}=require('../src/live-recordings');const cloudinary=require('cloudinary').v2;
+ const old=cloudinary.config();cloudinary.config({cloud_name:'test',api_key:'test',api_secret:'test'});
+ try{
+  const row={parts:[{publicId:'owned/part1',delivery:'authenticated'}]},now=Date.now()/1000;
+  const preview=Number(new URL(recordingLink(row,'0',false,false,6*60*60)).searchParams.get('expires_at'));
+  const download=Number(new URL(recordingLink(row,'0',true)).searchParams.get('expires_at'));
+  assert.ok(preview>now+5*60*60,'a preview must stay valid for hours, or playback fails mid-way');
+  assert.ok(download<=now+181,'a download link stays short-lived');
+ }finally{cloudinary.config(old);}
+});

@@ -418,6 +418,10 @@ function serializeLiveSession(session) {
     sourceUrl: session.sourceUrl || '',
     audioUrl: session.audioUrl || '',
     audioOriginalName: session.audioOriginalName || '',
+    requestExternalId: session.requestExternalId || '',
+    audioPreparation: session.audioPreparation || '',
+    audioError: session.audioError || '',
+    audioConversionStartedAt: session.audioConversionStartedAt || null,
     coverImage: session.coverImage || '',
     coverPublicId: session.coverPublicId || '',
     coverOriginalName: session.coverOriginalName || '',
@@ -461,6 +465,9 @@ function serializeLiveRequest(request) {
     thumbnailUrl: request.thumbnailUrl || '',
     audioUrl: request.audioUrl || '',
     audioOriginalName: request.audioOriginalName || '',
+    audioPreparation: request.audioPreparation || '',
+    audioError: request.audioError || '',
+    audioConversionStartedAt: request.audioConversionStartedAt || null,
     paymentStatus: request.paymentStatus || 'paid',
     receiptSentAt: request.receiptSentAt || null,
     analysisSources: Array.isArray(request.analysisSources) ? request.analysisSources : [],
@@ -1329,36 +1336,8 @@ app.get('/api/youtube/search', requireAuth, async (request, response) => {
   }
 });
 
-app.post('/api/live-requests/:id/to-wav', requireAdmin, async (request, response) => {
-  const liveRequest = await LiveRequest.findOne({ externalId: request.params.id });
-
-  if (!liveRequest) {
-    return response.status(404).json({ message: 'Audience request not found.' });
-  }
-
-  if (liveRequest.sourcePlatform !== 'youtube' || !liveRequest.sourceUrl) {
-    return response.status(400).json({ message: 'This request does not contain a YouTube source URL.' });
-  }
-
-  try {
-    const result = await convertYoutubeToWav(liveRequest.sourceUrl);
-    const uploadResult = await uploadAudioBufferToCloudinary({
-      buffer: result.buffer,
-      originalname: result.fileName,
-      mimetype: 'audio/wav',
-    });
-    liveRequest.audioUrl = uploadResult.secure_url || uploadResult.url || '';
-    liveRequest.audioPublicId = uploadResult.public_id || '';
-    liveRequest.audioOriginalName = result.fileName;
-    await liveRequest.save();
-
-    return response.json({ item: serializeLiveRequest(liveRequest) });
-  } catch (error) {
-    console.error('Audience request WAV conversion failed:', error);
-    return response.status(502).json({
-      message: 'Could not convert this YouTube request to WAV. Confirm the backend tools are installed and the audio is permitted for use.',
-    });
-  }
+require('./live-request-audio').registerLiveRequestAudio(app,{
+ requireAdmin,LiveRequest,LiveSession,convert:convertArchiveYoutube,upload:uploadAudioBufferToCloudinary,serialize:serializeLiveRequest,
 });
 
 require('./live-requests').registerLiveRequestRoutes(app,{
@@ -1427,12 +1406,15 @@ async function convertArchiveYoutube(sourceUrl) {
   youtubeConversionActive = true;
   try {
     const result = await convertYoutubeToWav(sourceUrl);
-    await youtubeSessionStore.recordPublicAccess('ready', 'Public video downloaded and converted without an account.').catch(() => {});
+    if(result.authenticationMode==='session')await youtubeSessionStore.recordAccess('ready','Saved YouTube session downloaded and converted this video successfully.').catch(()=>{});
+    else await youtubeSessionStore.recordPublicAccess('ready', 'Public video downloaded and converted without an account.').catch(() => {});
     return result;
   } catch (error) {
-    await youtubeSessionStore.recordPublicAccess(error.code === 'YOUTUBE_PUBLIC_ACCESS_BLOCKED' ? 'blocked' : 'error', error.code === 'YOUTUBE_PUBLIC_ACCESS_BLOCKED'
-      ? 'YouTube blocked public download access. Upload an audio file instead.'
-      : error.code === 'YOUTUBE_WORKER_UNAVAILABLE' ? 'The local audio service is offline. Keep the admin computer online.' : 'This video could not be converted. Check availability, duration and file size.').catch(() => {});
+    const connection=await youtubeSessionStore.status().catch(()=>({connected:false}));
+    const blocked=error.code==='YOUTUBE_PUBLIC_ACCESS_BLOCKED';
+    const message=error.code==='YOUTUBE_SESSION_EXPIRED'?'The saved session expired. Connect a new YouTube session.':error.code==='YOUTUBE_SESSION_UNAVAILABLE'?'Private session storage could not be read.':blocked?(connection.connected?'YouTube did not accept this session from OVH. Reconnect the session and check access again.':'YouTube blocked public access. Connect a YouTube session or upload an audio file.'):'This video could not be converted. Check availability, duration and file size.';
+    if(connection.connected||error.code?.startsWith('YOUTUBE_SESSION_'))await youtubeSessionStore.recordAccess(blocked?'blocked':'error',message).catch(()=>{});
+    else await youtubeSessionStore.recordPublicAccess(blocked?'blocked':'error',message).catch(()=>{});
     throw error;
   } finally { youtubeConversionActive = false; }
 }

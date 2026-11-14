@@ -1,4 +1,5 @@
 const permanentDeletion=require('./permanent-deletion');
+const {audioFields}=require('./live-request-audio');
 const {sessionKey:liveBroadcastSession,requestScope,memberName}=require('./live-interactions');
 // Manual dashboard and Echo AI Administrator dispatch through these same handlers.
 function registerLiveRequestRoutes(app,{
@@ -214,6 +215,7 @@ app.patch('/api/live-requests/:id/review', requireAdmin, async (request, respons
     beat: liveRequest.beat,
     themes: liveRequest.themes,
     explicit: liveRequest.explicit,
+    ...audioFields(liveRequest),
     playState: 'requested',
     sortOrder: 0,
     sourcePlatform: liveRequest.sourcePlatform,
@@ -221,6 +223,10 @@ app.patch('/api/live-requests/:id/review', requireAdmin, async (request, respons
     requestExternalId: liveRequest.externalId,
   }}, {upsert:true,new:true});
 
+  // A conversion may finish while approval is building the queue. Re-read ready
+  // audio after insertion so that approving an already-converted request keeps it.
+  const readyAudio=await LiveRequest.findOne({_id:liveRequest._id});
+  if(readyAudio?.audioUrl)await LiveSession.updateOne({_id:createdSession._id},{$set:audioFields(readyAudio)});
   const reorderedQueue = buildReorderedQueue(liveSessions, createdSession, analysis.insertion.insertIndex);
   await Promise.all(
     reorderedQueue.map(({ session, sortOrder }) =>

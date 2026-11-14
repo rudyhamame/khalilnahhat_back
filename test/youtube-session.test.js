@@ -55,3 +55,10 @@ test('public access reports verification and blocks without a saved account', as
     if (file) await assert.rejects(fs.access(file));
   }
 });
+
+test('connected session status stays unverified until a successful conversion and expires independently',async t=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'youtube-auth-status-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));const file=path.join(dir,'cookies.txt'),store=createYoutubeSessionStore(file);
+ await store.recordPublicAccess('ready','Earlier public check passed');await store.save(session,'Converter account');let status=await store.status();assert.equal(status.authenticationMode,'session');assert.equal(status.accessStatus,'unchecked');
+ await store.recordAccess('ready','Session conversion passed');assert.equal((await store.status()).accessStatus,'ready');await store.save(session,'Replacement');assert.equal((await store.status()).accessStatus,'unchecked');
+ await fs.writeFile(file,session.replace('2147483647','1'));status=await store.status();assert.equal(status.connected,false);assert.equal(status.sessionExpired,true);assert.match(status.message,/expired/);assert.doesNotMatch(JSON.stringify(status),/private-session-secret/);
+});

@@ -3,6 +3,7 @@ const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
 const { convertViaYoutubeWorker } = require('./youtube-worker-client');
+const { filterYoutubeSession } = require('./youtube-session');
 
 function normalizeYoutubeUrl(value) {
   try {
@@ -67,12 +68,31 @@ async function convertYoutubeToWav(sourceUrl, { localOnly = false, command } = {
   const ffmpegCommand = process.env.FFMPEG_PATH;
 
   try {
+    // Give each conversion a private snapshot. yt-dlp may update its cookie jar;
+    // replacing/signing out of the saved session must not race that write.
+    let sessionFile='';
+    if(process.env.YT_DLP_COOKIES_FILE){
+      let text;
+      try{text=await fs.readFile(process.env.YT_DLP_COOKIES_FILE,'utf8');}
+      catch(error){if(error.code!=='ENOENT')throw Object.assign(new Error('The saved YouTube session could not be read.'),{code:'YOUTUBE_SESSION_UNAVAILABLE'});}
+      if(text!==undefined){
+        let filtered;
+        try{filtered=filterYoutubeSession(text);}
+        catch{throw Object.assign(new Error('The saved YouTube session expired. Reconnect it in Admin → YouTube.'),{code:'YOUTUBE_SESSION_EXPIRED'});}
+        sessionFile=path.join(tempDirectory,'session.txt');
+        await fs.writeFile(sessionFile,filtered,{mode:0o600});
+      }
+    }
     await runCommand(ytDlpCommand, [
       '--ignore-config',
-      '--no-cookies',
+      ...(sessionFile?['--cookies',sessionFile]:['--no-cookies']),
       '--no-cookies-from-browser',
       '--no-playlist',
       '--js-runtimes', 'node',
+      ...(process.env.YOUTUBE_PO_TOKEN_BASE_URL ? [
+        '--extractor-args', 'youtube:player_client=mweb',
+        '--extractor-args', `youtubepot-bgutilhttp:base_url=${process.env.YOUTUBE_PO_TOKEN_BASE_URL}`,
+      ] : []),
       '--format', 'bestaudio/best',
       '--match-filter', 'duration <= 1800 & !is_live',
       '--socket-timeout', '20',
@@ -102,6 +122,7 @@ async function convertYoutubeToWav(sourceUrl, { localOnly = false, command } = {
     return {
       buffer: await fs.readFile(path.join(tempDirectory, wavName)),
       fileName: wavName,
+      authenticationMode: sessionFile?'session':'public',
     };
   } catch (error) {
     if (/sign in to confirm|login.required|cookies.*authentication|sign in.*not a bot|private video|members.only|age.restrict|confirm your age/i.test(error.message || '')) {

@@ -27,16 +27,16 @@ function createYoutubeSessionStore(cookieFile) {
   async function metadata() { try { return JSON.parse(await fs.readFile(metadataFile, 'utf8')); } catch { return {}; } }
   async function status() {
     if (!cookieFile) return { publicAccess, configured: false, connected: false, accessStatus: 'disconnected', message: 'YouTube session storage is not configured on the server.' };
-    let connected = false;
-    try { filterYoutubeSession(await fs.readFile(cookieFile, 'utf8')); connected = true; } catch { /* Missing or expired session. */ }
+    let connected = false, sessionExpired = false;
+    try {const text=await fs.readFile(cookieFile,'utf8');try{filterYoutubeSession(text);connected=true;}catch{sessionExpired=true;}}catch{/* No readable session saved. */}
     const data = await metadata();
     return {
       publicAccess: data.publicAccess || publicAccess,
-      configured: true, connected, accountLabel: connected ? String(data.accountLabel || 'Account label not set').slice(0, 120) : '',
+      configured: true, connected, sessionExpired, authenticationMode:connected?'session':'public', accountLabel: connected ? String(data.accountLabel || 'Account label not set').slice(0, 120) : '',
       connectedAt: connected ? data.connectedAt || null : null,
       lastCheckedAt: data.lastCheckedAt || null,
       accessStatus: connected ? data.accessStatus || 'unchecked' : 'disconnected',
-      message: connected ? data.message || 'Session saved. Server download access has not been checked.' : 'No usable server session. Sign in on YouTube, then connect a session file here.',
+      message: sessionExpired?'The saved YouTube session expired. Connect a new session.':connected ? data.message || 'Session saved. Server download access has not been checked.' : 'No usable server session. Sign in on YouTube, then connect a session file here.',
     };
   }
   return {

@@ -86,7 +86,10 @@ function wholeTransformation(row,parts,{full=false,look=true}={}){
 }
 function view(row){const parts=recordingParts(row);return {id:String(row._id),title:row.title,status:row.status,bytes:row.status==='recording'?row.direct?.bytes||0:row.bytes,durationSec:row.status==='recording'&&row.direct?.lastChunkAt?Math.max(0,Math.round((new Date(row.direct.lastChunkAt)-new Date(row.createdAt))/1000)):row.duration,published:row.published,createdAt:row.createdAt,error:row.error||'',captureState:row.captureState||'unknown',captureCheckedAt:row.captureCheckedAt||null,warning:row.captureWarning||'',cleanupPending:Boolean(row.cleanupPending),savedPartCount:parts.length,retrying:row.status==='upload_failed'&&(row.attempts||0)<3,canRetry:['failed','upload_failed'].includes(row.status)||row.captureState==='failed'||(row.status==='partial'&&row.sources?.some(source=>!source.saved)),canRemove:!row.cleanupPending&&(['ready','partial','not_recorded'].includes(row.status)||(['failed','upload_failed'].includes(row.status)&&row.captureState==='ended')),canPreview:['ready','partial'].includes(row.status)&&parts.length>0,partCount:parts.length,parts:parts.map((part,index)=>{const trim=partTrim(part);return {index,bytes:part.bytes,durationSec:part.duration,trimStartSec:trim?.start||0,trimEndSec:trim?.end||part.duration||0,selectedDurationSec:trim?trim.end-trim.start:part.duration,...(normalizeLook(part.look)?{look:normalizeLook(part.look)}:{})};}),...(parts.length>1?{whole:wholeView(row,parts)}:{})};}
 function wholeView(row,parts){const duration=wholeDuration(parts),trim=wholeTrim(row,parts),look=normalizeLook(row.look);return {durationSec:duration,trimStartSec:trim?.start||0,trimEndSec:trim?.end||duration,selectedDurationSec:trim?trim.end-trim.start:duration,...(look?{look}:{})};}
-function recordingLink(row,partIndex,attachment,full=false){
+// ttl: how long the private link works (seconds). A download starts at once, so 3 minutes is plenty; a <video> keeps asking for more of the file
+// while it plays, pauses and seeks, so the preview link must outlive the viewing session.
+const PREVIEW_LINK_TTL=6*60*60;
+function recordingLink(row,partIndex,attachment,full=false,ttl=180){
  const parts=recordingParts(row);
  // part=all: the whole live, built from all parts (a single-part recording is just that part).
  if(partIndex==='all'&&parts.length>1)return cloudinary.url(parts[0].publicId,{secure:true,resource_type:'video',type:parts[0].delivery||'authenticated',format:'mp4',sign_url:true,...wholeTransformation(row,parts,{full}),...(attachment?{flags:'attachment'}:{})});
@@ -96,7 +99,7 @@ function recordingLink(row,partIndex,attachment,full=false){
  // The saved trim applies to the preview as well as to downloads and publishing; only the trimmer asks for the full source (full=1).
  const trim=!full&&partTrim(part),look=!full&&normalizeLook(part.look);
  if(trim||look)return cloudinary.url(part.publicId,{secure:true,resource_type:'video',type:part.delivery||'authenticated',format:'mp4',sign_url:true,...mediaTransformation(trim,look),...(attachment?{flags:'attachment'}:{})});
- return cloudinary.utils.private_download_url(part.publicId,'mp4',{resource_type:'video',type:part.delivery||'authenticated',expires_at:Math.floor(Date.now()/1000)+180,attachment});
+ return cloudinary.utils.private_download_url(part.publicId,'mp4',{resource_type:'video',type:part.delivery||'authenticated',expires_at:Math.floor(Date.now()/1000)+ttl,attachment});
 }
 async function uploadRecordingPart(filename,publicId,expected={}){
  try {const existing=await cloudinary.api.resource(publicId,{resource_type:'video',type:'authenticated'});if(existing.public_id!==publicId||!(existing.bytes>0)||(expected.bytes&&existing.bytes!==expected.bytes))throw new Error('Archive identity or size mismatch');return existing;}
@@ -185,9 +188,10 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
   res.set('Cache-Control','no-store');
   const row=mongoose.isValidObjectId(req.params.id)?await LiveRecording.findOne({_id:req.params.id,deletedAt:null}):null;
   if(!row||!['ready','partial'].includes(row.status))return res.status(404).json({message:'The recording is not ready.'});
-  const url=recordingLink(row,req.query.part,route==='download',route==='preview'&&req.query.full==='1');
+  const ttl=route==='preview'?PREVIEW_LINK_TTL:180;
+  const url=recordingLink(row,req.query.part,route==='download',route==='preview'&&req.query.full==='1',ttl);
   if(!url)return res.status(400).json({message:'Select a valid recording part.'});
-  res.json({url,expiresIn:180});
+  res.json({url,expiresIn:ttl});
  });
  app.post('/api/admin/live-recordings/:id/retry',requireAdmin,async(req,res)=>{
   const row=mongoose.isValidObjectId(req.params.id)?await LiveRecording.findOneAndUpdate({_id:req.params.id,deletedAt:null,$or:[{status:{$in:['failed','upload_failed']}},{status:'recording',captureState:'failed'},{status:'partial',sources:{$elemMatch:{saved:false}}}],leaseUntil:{$lte:new Date()}},{$set:{attempts:0,captureAttempts:0,status:'upload_failed',nextRetryAt:new Date()}},{new:true}):null;

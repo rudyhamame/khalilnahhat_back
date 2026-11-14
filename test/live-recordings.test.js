@@ -76,7 +76,7 @@ test('the whole live is the first part with every other part spliced on, then th
  const {wholeDuration,wholeTrim,wholeTransformation,view}=require('../src/live-recordings');
  const parts=[{publicId:'live/a',delivery:'authenticated',duration:10},{publicId:'live/b',delivery:'authenticated',duration:20},{publicId:'live/c',delivery:'upload',duration:5}];
  assert.equal(wholeDuration(parts),35);
- assert.deepEqual(wholeTransformation({},parts),{transformation:[{overlay:{resource_type:'video',type:'authenticated',public_id:'live/b'},flags:'splice'},{flags:'layer_apply'},{overlay:{resource_type:'video',public_id:'live/c'},flags:'splice'},{flags:'layer_apply'}]});
+ assert.deepEqual(wholeTransformation({},parts),{transformation:[{overlay:{resource_type:'video',type:'authenticated',public_id:'live:b'},flags:'splice'},{flags:'layer_apply'},{overlay:{resource_type:'video',public_id:'live:c'},flags:'splice'},{flags:'layer_apply'}]});
  const row={trimStart:5,trimEnd:30,look:{strength:100,brightness:10}};
  assert.deepEqual(wholeTrim(row,parts),{start:5,end:30});
  assert.deepEqual(wholeTransformation(row,parts).transformation.slice(4),[{start_offset:5,end_offset:30},{effect:'brightness:10'}]);
@@ -97,5 +97,16 @@ test('the preview link outlives a viewing session while downloads stay short-liv
   const download=Number(new URL(recordingLink(row,'0',true)).searchParams.get('expires_at'));
   assert.ok(preview>now+5*60*60,'a preview must stay valid for hours, or playback fails mid-way');
   assert.ok(download<=now+181,'a download link stays short-lived');
+ }finally{cloudinary.config(old);}
+});
+
+test('joining parts keeps deep folders intact: the layer id has no slash left in it',()=>{
+ const {recordingLink}=require('../src/live-recordings');const cloudinary=require('cloudinary').v2;
+ const old=cloudinary.config();cloudinary.config({cloud_name:'test',api_key:'test',api_secret:'test'});
+ try{
+  const row={parts:[{publicId:'Live/khalil-live-x/saved/abc/part-001',delivery:'authenticated',duration:10},{publicId:'Live/khalil-live-x/saved/abc/part-002',delivery:'authenticated',duration:10}]};
+  const path=decodeURIComponent(new URL(recordingLink(row,'all',false)).pathname);
+  const layer=path.split('/').flatMap(piece=>piece.split(',')).find(piece=>piece.startsWith('l_video'));
+  assert.equal(layer,'l_video:authenticated:Live:khalil-live-x:saved:abc:part-002');
  }finally{cloudinary.config(old);}
 });

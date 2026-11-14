@@ -76,7 +76,8 @@ function wholeDuration(parts){return parts.reduce((sum,part)=>sum+(Number(part.d
 function wholeTrim(row,parts){return partTrim({duration:wholeDuration(parts),trimStart:row.trimStart,trimEnd:row.trimEnd});}
 function spliceSteps(parts){
  const steps=[];
- for(const part of parts.slice(1))steps.push({overlay:{resource_type:'video',...(part.delivery&&part.delivery!=='upload'?{type:part.delivery}:{}),public_id:part.publicId},flags:'splice'},{flags:'layer_apply'});
+ // A layer's public id uses ':' for every '/' (the Cloudinary library only converts the first one, which broke every folder deeper than one level).
+ for(const part of parts.slice(1))steps.push({overlay:{resource_type:'video',...(part.delivery&&part.delivery!=='upload'?{type:part.delivery}:{}),public_id:String(part.publicId).replace(/\//g,':')},flags:'splice'},{flags:'layer_apply'});
  return steps;
 }
 function wholeTransformation(row,parts,{full=false,look=true}={}){

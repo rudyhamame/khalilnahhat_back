@@ -69,7 +69,16 @@ function createYoutubeSessionStore(cookieFile) {
   };
 }
 function registerYoutubeSessionRoutes(app, { requireAdmin, upload, store, convert, normalizeUrl, isBusy = () => false, usesLocalWorker = () => false }) {
-  const getStatus = async () => ({ ...await store.status(), processingLocation: usesLocalWorker() ? 'admin-computer' : 'server' });
+  let checkActive = false;
+  const getStatus = async () => {
+    const item = { ...await store.status(), processingLocation: usesLocalWorker() ? 'admin-computer' : 'server', checking: checkActive };
+    if (checkActive) {
+      const message = 'Downloading and converting the video to check access. This can take up to three minutes.';
+      if (item.connected) Object.assign(item, { accessStatus: 'checking', message });
+      else item.publicAccess = { ...item.publicAccess, status: 'checking', message };
+    }
+    return item;
+  };
   app.get('/api/admin/youtube-session', requireAdmin, async (_request, response) => response.json({ item: await getStatus() }));
   app.post('/api/admin/youtube-session', requireAdmin, (request, response, next) => {
     upload(request, response, error => error ? response.status(400).json({ message: 'Upload one cookies.txt file under 1 MB.' }) : next());
@@ -89,12 +98,14 @@ function registerYoutubeSessionRoutes(app, { requireAdmin, upload, store, conver
   });
   app.post('/api/admin/youtube-session/check', requireAdmin, async (request, response) => {
     if (!normalizeUrl(request.body?.sourceUrl)) return response.status(400).json({ message: 'Enter a YouTube music link before checking access.' });
-    try {
-      await convert(request.body.sourceUrl);
-      return response.json({ item: await getStatus() });
-    } catch (error) {
-      return response.status(['YOUTUBE_BUSY', 'YOUTUBE_WORKER_UNAVAILABLE'].includes(error.code) ? 503 : 502).json({ item: await getStatus(), message: error.code === 'YOUTUBE_WORKER_UNAVAILABLE' ? 'The local YouTube audio service is offline. Keep the admin computer online or upload an Audio file.' : error.code === 'YOUTUBE_BUSY' ? 'Another conversion is running. Try again shortly.' : 'The server could not download this video. See the connection status.' });
-    }
+    if (checkActive || isBusy()) return response.status(409).json({ message: 'Another conversion is running. Wait for it to finish.' });
+    checkActive = true;
+    // The converter persists success/failure. Keep the HTTP request short enough
+    // for proxies, and expose its current state through the status endpoint.
+    void Promise.resolve().then(() => convert(request.body.sourceUrl))
+      .catch(() => {})
+      .finally(() => { checkActive = false; });
+    return response.status(202).json({ item: await getStatus() });
   });
 }
 module.exports = { filterYoutubeSession, createYoutubeSessionStore, registerYoutubeSessionRoutes };

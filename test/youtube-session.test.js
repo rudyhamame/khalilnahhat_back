@@ -62,3 +62,46 @@ test('connected session status stays unverified until a successful conversion an
  await store.recordAccess('ready','Session conversion passed');assert.equal((await store.status()).accessStatus,'ready');await store.save(session,'Replacement');assert.equal((await store.status()).accessStatus,'unchecked');
  await fs.writeFile(file,session.replace('2147483647','1'));status=await store.status();assert.equal(status.connected,false);assert.equal(status.sessionExpired,true);assert.match(status.message,/expired/);assert.doesNotMatch(JSON.stringify(status),/private-session-secret/);
 });
+
+
+test('access checks return immediately, expose progress, reject duplicates and publish the conversion result', async t => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'youtube-check-'));
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  const store = createYoutubeSessionStore(path.join(dir, 'cookies.txt'));
+  await store.save(session, 'Converter');
+  const routes = {};
+  const app = Object.fromEntries(['get', 'post', 'delete'].map(method => [method, (path, ...handlers) => { routes[`${method} ${path}`] = handlers.at(-1); }]));
+  let finish, calls = 0;
+  const pending = new Promise(resolve => { finish = resolve; });
+  registerYoutubeSessionRoutes(app, { requireAdmin() {}, upload() {}, store, normalizeUrl: value => value === 'valid',
+    convert: async () => { calls++; await pending; await store.recordAccess('ready', 'Conversion verified'); } });
+  const response = () => ({ code: 200, status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; } });
+  let result = response();
+  await routes['post /api/admin/youtube-session/check']({body:{sourceUrl:'invalid'}}, result);
+  assert.equal(result.code, 400); assert.equal(calls, 0);
+  result = response();
+  await routes['post /api/admin/youtube-session/check']({body:{sourceUrl:'valid'}}, result);
+  assert.equal(result.code, 202); assert.equal(result.body.item.checking, true); assert.equal(result.body.item.accessStatus, 'checking');
+  result = response(); await routes['post /api/admin/youtube-session/check']({body:{sourceUrl:'valid'}}, result);
+  assert.equal(result.code, 409); assert.equal(calls, 1);
+  result = response(); await routes['delete /api/admin/youtube-session']({}, result); assert.equal(result.code, 409);
+  finish();
+  for (let i=0;i<50;i++) {
+    result=response(); await routes['get /api/admin/youtube-session']({},result);
+    if(!result.body.item.checking) break;
+    await new Promise(resolve=>setTimeout(resolve,5));
+  }
+  assert.equal(result.body.item.checking, false); assert.equal(result.body.item.accessStatus, 'ready');
+});
+
+test('a rejected background conversion clears progress and exposes its recorded failure without an unhandled rejection', async t => {
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'youtube-check-error-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+  const store=createYoutubeSessionStore(path.join(dir,'cookies.txt'));await store.save(session,'Converter');
+  const routes={};const app=Object.fromEntries(['get','post','delete'].map(method=>[method,(path,...handlers)=>{routes[`${method} ${path}`]=handlers.at(-1);} ]));
+  let fail;const pending=new Promise(resolve=>{fail=resolve;});
+  registerYoutubeSessionRoutes(app,{requireAdmin(){},upload(){},store,normalizeUrl:()=>true,convert:async()=>{await pending;await store.recordAccess('error','Video unavailable');throw new Error('Download failed');}});
+  const result={status(){return this;},json(body){this.body=body;return this;}};
+  await routes['post /api/admin/youtube-session/check']({body:{sourceUrl:'valid'}},result);fail();
+  for(let i=0;i<50;i++){await routes['get /api/admin/youtube-session']({},result);if(!result.body.item.checking)break;await new Promise(resolve=>setTimeout(resolve,5));}
+  assert.equal(result.body.item.checking,false);assert.equal(result.body.item.accessStatus,'error');assert.equal(result.body.item.message,'Video unavailable');
+});

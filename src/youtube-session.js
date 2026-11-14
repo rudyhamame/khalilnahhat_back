@@ -84,7 +84,7 @@ function registerYoutubeSessionRoutes(app, { requireAdmin, upload, store, conver
     upload(request, response, error => error ? response.status(400).json({ message: 'Upload one cookies.txt file under 1 MB.' }) : next());
   }, async (request, response) => {
     try {
-      if (isBusy()) return response.status(409).json({ message: 'Wait for the active conversion before changing the session.' });
+      if (checkActive || isBusy()) return response.status(409).json({ message: 'Wait for the active conversion before changing the session.' });
       if (!request.file) return response.status(400).json({ message: 'Choose a YouTube cookies.txt session file.' });
       const item = await store.save(request.file.buffer.toString('utf8'), request.body.accountLabel);
       return response.json({ item });
@@ -93,7 +93,7 @@ function registerYoutubeSessionRoutes(app, { requireAdmin, upload, store, conver
     }
   });
   app.delete('/api/admin/youtube-session', requireAdmin, async (_request, response) => {
-    if (isBusy()) return response.status(409).json({ message: 'Wait for the active conversion before signing out.' });
+    if (checkActive || isBusy()) return response.status(409).json({ message: 'Wait for the active conversion before signing out.' });
     return response.json({ item: await store.clear() });
   });
   app.post('/api/admin/youtube-session/check', requireAdmin, async (request, response) => {

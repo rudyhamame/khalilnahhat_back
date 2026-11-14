@@ -45,7 +45,7 @@ function runCommand(command, args, { timeout = 180000 } = {}) {
     child.on('error', (error) => { clearTimeout(timer); reject(error); });
     child.on('close', (code) => {
       clearTimeout(timer);
-      if (timedOut) return reject(new Error('YouTube conversion timed out.'));
+      if (timedOut) return reject(Object.assign(new Error('YouTube conversion timed out.'), { code: 'YOUTUBE_TIMEOUT' }));
       if (code === 0) return resolve();
       reject(new Error(stderr.trim() || `${command} exited with status ${code}.`));
     });
@@ -83,16 +83,16 @@ async function convertYoutubeToWav(sourceUrl, { localOnly = false, command } = {
         await fs.writeFile(sessionFile,filtered,{mode:0o600});
       }
     }
-    await runCommand(ytDlpCommand, [
+    const downloadArgs = (client) => [
       '--ignore-config',
       ...(sessionFile?['--cookies',sessionFile]:['--no-cookies']),
       '--no-cookies-from-browser',
       '--no-playlist',
       '--js-runtimes', 'node',
       ...(process.env.YOUTUBE_PO_TOKEN_BASE_URL ? [
-        '--extractor-args', 'youtube:player_client=mweb',
         '--extractor-args', `youtubepot-bgutilhttp:base_url=${process.env.YOUTUBE_PO_TOKEN_BASE_URL}`,
       ] : []),
+      ...(client ? ['--extractor-args', `youtube:player_client=${client}`] : []),
       '--format', 'bestaudio/best',
       '--match-filter', 'duration <= 1800 & !is_live',
       '--socket-timeout', '20',
@@ -105,7 +105,19 @@ async function convertYoutubeToWav(sourceUrl, { localOnly = false, command } = {
       ...(ffmpegCommand ? ['--ffmpeg-location', ffmpegCommand] : []),
       '--output', outputTemplate,
       '--', normalizedUrl,
-    ], { timeout: 180000 });
+    ];
+    const deadline = Date.now() + 180000;
+    try {
+      await runCommand(ytDlpCommand, downloadArgs(process.env.YOUTUBE_PO_TOKEN_BASE_URL ? 'mweb' : ''), { timeout: 180000 });
+    } catch (error) {
+      // Some videos reject mweb media URLs even with a valid account/token.
+      // Safari's HLS route can download those using the same saved session.
+      if (!/HTTP(?: Error)? 403\b/i.test(error.message || '') || Date.now() >= deadline) throw error;
+      for (const file of await fs.readdir(tempDirectory)) {
+        if (path.join(tempDirectory, file) !== sessionFile) await fs.rm(path.join(tempDirectory, file), { recursive: true, force: true });
+      }
+      await runCommand(ytDlpCommand, downloadArgs('web_safari'), { timeout: Math.max(1, deadline - Date.now()) });
+    }
 
     const files = await fs.readdir(tempDirectory);
     const wavName = files.find((fileName) => fileName.toLowerCase().endsWith('.wav'));
@@ -127,6 +139,8 @@ async function convertYoutubeToWav(sourceUrl, { localOnly = false, command } = {
   } catch (error) {
     if (/sign in to confirm|login.required|cookies.*authentication|sign in.*not a bot|private video|members.only|age.restrict|confirm your age/i.test(error.message || '')) {
       error.code = 'YOUTUBE_PUBLIC_ACCESS_BLOCKED';
+    } else if (/HTTP(?: Error)? 403\b/i.test(error.message || '')) {
+      error.code = 'YOUTUBE_MEDIA_FORBIDDEN';
     }
     throw error;
   } finally {

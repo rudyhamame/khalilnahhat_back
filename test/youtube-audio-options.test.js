@@ -28,3 +28,27 @@ test('failed downloads remove their credential snapshot and leave the saved sess
 test('expired sessions fail clearly without passing credentials to the downloader',async t=>{
  const h=await sessionFixture(t,{expired:true});await assert.rejects(convertYoutubeToWav('https://youtu.be/abcdefghijk',{localOnly:true,command:h.command}),error=>error.code==='YOUTUBE_SESSION_EXPIRED'&&!error.message.includes('dummy-test-session'));await assert.rejects(fs.access(h.log));
 });
+
+test('a forbidden media download retries with Safari HLS using the private session and removes partial output', async t => {
+ const h=await sessionFixture(t);const attempts=path.join(path.dirname(h.log),'attempts.json');
+ await fs.writeFile(h.command,`#!/usr/bin/env node
+ const fs=require('node:fs'),path=require('node:path');const args=process.argv.slice(2),template=args[args.indexOf('--output')+1],dir=path.dirname(template),cookie=args[args.indexOf('--cookies')+1];
+ const log=${JSON.stringify(attempts)};const calls=fs.existsSync(log)?JSON.parse(fs.readFileSync(log)):[];calls.push({args,partialExists:fs.existsSync(path.join(dir,'partial.part')),cookieExists:fs.existsSync(cookie)});fs.writeFileSync(log,JSON.stringify(calls));
+ if(calls.length===1){fs.writeFileSync(path.join(dir,'partial.part'),'incomplete');console.error('ERROR: unable to download video data: HTTP Error 403: Forbidden');process.exit(1);}
+ if(!args.includes('youtube:player_client=web_safari'))process.exit(2);
+ fs.writeFileSync(template.replace('%(ext)s','wav'),Buffer.from('RIFFtestWAVE'));
+ `,{mode:0o755});
+ const result=await convertYoutubeToWav('https://www.youtube.com/watch?v=IWKyykQBRKo&list=RDMMmk7OOfgdtcw&index=6',{localOnly:true,command:h.command});
+ const calls=JSON.parse(await fs.readFile(attempts));assert.equal(calls.length,2);assert.equal(calls[1].partialExists,false);assert.equal(calls[1].cookieExists,true);assert.equal(calls[1].args.at(-1),'https://www.youtube.com/watch?v=IWKyykQBRKo');assert.ok(calls[1].args.includes('--no-playlist'));assert.equal(result.authenticationMode,'session');assert.equal(await fs.readFile(h.session,'utf8'),h.original);await assert.rejects(fs.access(calls[1].args[calls[1].args.indexOf('--cookies')+1]));
+});
+
+test('two forbidden download methods report the media failure and clean credentials; unrelated failures do not retry',async t=>{
+ for(const message of ['ERROR: HTTP Error 403: Forbidden','ERROR: Video unavailable']){
+  const h=await sessionFixture(t);const attempts=path.join(path.dirname(h.log),'attempts.json');
+  await fs.writeFile(h.command,`#!/usr/bin/env node
+ const fs=require('node:fs');const args=process.argv.slice(2);const log=${JSON.stringify(attempts)},calls=fs.existsSync(log)?JSON.parse(fs.readFileSync(log)):[];calls.push(args);fs.writeFileSync(log,JSON.stringify(calls));console.error(${JSON.stringify(message)});process.exit(1);
+ `,{mode:0o755});
+  await assert.rejects(convertYoutubeToWav('https://youtu.be/abcdefghijk',{localOnly:true,command:h.command}),error=>message.includes('403')?error.code==='YOUTUBE_MEDIA_FORBIDDEN':/Video unavailable/.test(error.message));
+  const calls=JSON.parse(await fs.readFile(attempts));assert.equal(calls.length,message.includes('403')?2:1);await assert.rejects(fs.access(calls[0][calls[0].indexOf('--cookies')+1]));assert.equal(await fs.readFile(h.session,'utf8'),h.original);
+ }
+});

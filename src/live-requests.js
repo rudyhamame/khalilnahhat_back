@@ -199,6 +199,7 @@ app.patch('/api/live-requests/:id/review', requireAdmin, async (request, respons
   if (session !== liveBroadcastSession(await getLiveStreamConfig())) throw Object.assign(new Error('The broadcast ended during review. Refresh its status.'),{status:409});
   const createdSession = await LiveSession.findOneAndUpdate({requestExternalId:liveRequest.externalId}, {$setOnInsert:{
     externalId: `live-session-request-${liveRequest.externalId}`,
+    youtubeMetadata:liveRequest.youtubeMetadata||null,
     track: liveRequest.track,
     artist: liveRequest.artist,
     duration: liveRequest.duration,

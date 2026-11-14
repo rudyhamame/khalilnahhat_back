@@ -52,3 +52,11 @@ test('two forbidden download methods report the media failure and clean credenti
   const calls=JSON.parse(await fs.readFile(attempts));assert.equal(calls.length,message.includes('403')?2:1);await assert.rejects(fs.access(calls[0][calls[0].indexOf('--cookies')+1]));assert.equal(await fs.readFile(h.session,'utf8'),h.original);
  }
 });
+
+test('metadata-only requests retain public info, skip audio processing and clean the private snapshot',async t=>{
+ const h=await sessionFixture(t);
+ await fs.writeFile(h.command,`#!/usr/bin/env node
+ const fs=require('node:fs'),args=process.argv.slice(2);fs.writeFileSync(${JSON.stringify(h.log)},JSON.stringify(args));const template=args[args.indexOf('--output')+1];fs.writeFileSync(template.replace('%(ext)s','info.json'),JSON.stringify({id:'abcdefghijk',title:'Video title',track:'Song',artist:'Artist',duration:120,http_headers:{Cookie:'DO_NOT_STORE'},url:'https://signed.example/DO_NOT_STORE'}));
+ `,{mode:0o755});
+ const result=await convertYoutubeToWav('https://youtu.be/abcdefghijk',{localOnly:true,command:h.command,metadataOnly:true});const args=JSON.parse(await fs.readFile(h.log));assert.ok(args.includes('--skip-download'));assert.equal(args.includes('--extract-audio'),false);assert.equal(result.metadata.track,'Song');assert.equal(result.buffer,undefined);assert.doesNotMatch(JSON.stringify(result.metadata),/DO_NOT_STORE|http_headers/);await assert.rejects(fs.access(args[args.indexOf('--cookies')+1]));assert.equal(await fs.readFile(h.session,'utf8'),h.original);
+});

@@ -40,6 +40,7 @@ userSchema.index({ email: 1 }, { unique: true, collation: { locale: 'en', streng
 const liveSessionSchema = new mongoose.Schema(
   {
     externalId: { type: String, required: true, unique: true, trim: true },
+    youtubeMetadata: { type: mongoose.Schema.Types.Mixed, default: null },
     track: { type: String, required: true, trim: true },
     artist: { type: String, default: '', trim: true },
     duration: { type: String, default: '', trim: true },
@@ -114,6 +115,7 @@ const liveRequestSchema = new mongoose.Schema(
     sourcePlatform: { type: String, default: 'manual', trim: true },
     sourceUrl: { type: String, default: '', trim: true },
     thumbnailUrl: { type: String, default: '', trim: true },
+    youtubeMetadata: { type: mongoose.Schema.Types.Mixed, default: null },
     audioUrl: { type: String, default: '', trim: true },
     audioPublicId: { type: String, default: '', trim: true },
     audioOriginalName: { type: String, default: '', trim: true },

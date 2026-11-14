@@ -4,6 +4,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { convertViaYoutubeWorker } = require('./youtube-worker-client');
 const { filterYoutubeSession } = require('./youtube-session');
+const { youtubeMetadata } = require('./youtube-metadata');
 
 function normalizeYoutubeUrl(value) {
   try {
@@ -52,13 +53,13 @@ function runCommand(command, args, { timeout = 180000 } = {}) {
   });
 }
 
-async function convertYoutubeToWav(sourceUrl, { localOnly = false, command } = {}) {
+async function convertYoutubeToWav(sourceUrl, { localOnly = false, command, metadataOnly = false } = {}) {
   const normalizedUrl = normalizeYoutubeUrl(sourceUrl);
   if (!normalizedUrl) {
     throw new Error('Only YouTube URLs can be converted.');
   }
 
-  if (!localOnly && process.env.YOUTUBE_PROCESSING_MODE !== 'server' && process.env.YOUTUBE_WORKER_SOCKET) {
+  if (!metadataOnly && !localOnly && process.env.YOUTUBE_PROCESSING_MODE !== 'server' && process.env.YOUTUBE_WORKER_SOCKET) {
     return convertViaYoutubeWorker(normalizedUrl, { socketPath: process.env.YOUTUBE_WORKER_SOCKET, keyFile: process.env.YOUTUBE_WORKER_KEY_FILE });
   }
 
@@ -99,16 +100,16 @@ async function convertYoutubeToWav(sourceUrl, { localOnly = false, command } = {
       '--retries', '2',
       '--max-filesize', '100M',
       '--no-warnings',
-      '--extract-audio',
-      '--audio-format', 'wav',
-      '--audio-quality', '0',
+      '--write-info-json',
+      ...(metadataOnly ? ['--skip-download'] : ['--extract-audio','--audio-format','wav','--audio-quality','0']),
       ...(ffmpegCommand ? ['--ffmpeg-location', ffmpegCommand] : []),
       '--output', outputTemplate,
       '--', normalizedUrl,
     ];
-    const deadline = Date.now() + 180000;
+    const budget=metadataOnly?30000:180000;
+    const deadline = Date.now() + budget;
     try {
-      await runCommand(ytDlpCommand, downloadArgs(process.env.YOUTUBE_PO_TOKEN_BASE_URL ? 'mweb' : ''), { timeout: 180000 });
+      await runCommand(ytDlpCommand, downloadArgs(process.env.YOUTUBE_PO_TOKEN_BASE_URL ? 'mweb' : ''), { timeout: budget });
     } catch (error) {
       // Some videos reject mweb media URLs even with a valid account/token.
       // Safari's HLS route can download those using the same saved session.
@@ -120,6 +121,10 @@ async function convertYoutubeToWav(sourceUrl, { localOnly = false, command } = {
     }
 
     const files = await fs.readdir(tempDirectory);
+    const infoName=files.find(name=>name.endsWith('.info.json'));
+    let metadata=null;
+    if(infoName){try{metadata=youtubeMetadata(JSON.parse(await fs.readFile(path.join(tempDirectory,infoName),'utf8')));}catch{/* The audio remains usable if source metadata is unavailable. */}}
+    if(metadataOnly){if(!metadata)throw new Error('YouTube did not return song metadata.');return {metadata,authenticationMode:sessionFile?'session':'public'};}
     const wavName = files.find((fileName) => fileName.toLowerCase().endsWith('.wav'));
 
     if (!wavName) {
@@ -134,6 +139,7 @@ async function convertYoutubeToWav(sourceUrl, { localOnly = false, command } = {
     return {
       buffer: await fs.readFile(path.join(tempDirectory, wavName)),
       fileName: wavName,
+      metadata,
       authenticationMode: sessionFile?'session':'public',
     };
   } catch (error) {

@@ -394,6 +394,7 @@ function serializeServiceRequest(serviceRequest, includeQuote = true) {
 
 function serializeLiveSession(session) {
   return {
+    youtubeMetadata: session.youtubeMetadata || null,
     id: session.externalId || session.id,
     track: session.track,
     artist: session.artist || '',
@@ -436,6 +437,7 @@ function uploadPosterBufferToCloudinary(file){return uploadAsset(file.buffer,{fo
 function uploadCoverBufferToCloudinary(file){return uploadAsset(file.buffer,{folder:'khalil/song-covers',resource_type:'image'});}
 function serializeLiveRequest(request) {
   return {
+    youtubeMetadata: request.youtubeMetadata || null,
     broadcastSessionId: request.broadcastSessionId || request.broadcastRoomName || '',
     id: request.externalId || request.id,
     requesterName: request.requesterName || 'Audience',
@@ -1337,7 +1339,7 @@ app.get('/api/youtube/search', requireAuth, async (request, response) => {
 });
 
 require('./live-request-audio').registerLiveRequestAudio(app,{
- requireAdmin,LiveRequest,LiveSession,convert:convertArchiveYoutube,upload:uploadAudioBufferToCloudinary,serialize:serializeLiveRequest,
+ requireAdmin,LiveRequest,LiveSession,convert:convertArchiveYoutube,metadata:source=>convertArchiveYoutube(source,{metadataOnly:true}),upload:uploadAudioBufferToCloudinary,serialize:serializeLiveRequest,
 });
 
 require('./live-requests').registerLiveRequestRoutes(app,{
@@ -1401,15 +1403,17 @@ require('./live-access').registerLiveAccess(app, { requireAuth, getLiveStreamCon
 
 const youtubeSessionStore = createYoutubeSessionStore(process.env.YT_DLP_COOKIES_FILE);
 let youtubeConversionActive = false;
-async function convertArchiveYoutube(sourceUrl) {
+async function convertArchiveYoutube(sourceUrl,options={}) {
   if (youtubeConversionActive) throw Object.assign(new Error('Another conversion is running.'), { code: 'YOUTUBE_BUSY' });
   youtubeConversionActive = true;
   try {
-    const result = await convertYoutubeToWav(sourceUrl);
+    const result = await convertYoutubeToWav(sourceUrl,options);
+    if(options.metadataOnly)return result;
     if(result.authenticationMode==='session')await youtubeSessionStore.recordAccess('ready','Saved YouTube session downloaded and converted this video successfully.').catch(()=>{});
     else await youtubeSessionStore.recordPublicAccess('ready', 'Public video downloaded and converted without an account.').catch(() => {});
     return result;
   } catch (error) {
+    if(options.metadataOnly)throw error;
     const connection=await youtubeSessionStore.status().catch(()=>({connected:false}));
     const blocked=error.code==='YOUTUBE_PUBLIC_ACCESS_BLOCKED';
     const message=error.code==='YOUTUBE_SESSION_EXPIRED'?'The saved session expired. Connect a new YouTube session.':error.code==='YOUTUBE_SESSION_UNAVAILABLE'?'Private session storage could not be read.':blocked?(connection.connected?'YouTube did not accept this session from OVH. Reconnect the session and check access again.':'YouTube blocked public access. Connect a YouTube session or upload an audio file.'):error.code==='YOUTUBE_MEDIA_FORBIDDEN'?'YouTube refused this video’s audio download (HTTP 403), including the fallback method. Try another source or upload the audio file.':error.code==='YOUTUBE_TIMEOUT'?'The video download exceeded three minutes. Retry or upload the audio file.':'This video could not be converted. Check availability, duration and file size.';

@@ -1499,6 +1499,7 @@ registerMeetingRoom(app, { requireAuth, Meeting: MeetingModel });
 registerAccount(app, { requireAuth, getFrontendUrl });
 registerContent(app, requireAdmin);
 require('./seasonal-theme').registerSeasonalTheme(app, { requireAdmin });
+require('./instagram-profile').registerInstagramProfile(app, { requireAdmin });
 registerPayments(app, { requireAuth, requireAdmin, serialize: serializeServiceRequest });
 registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize: serializeServiceRequest });
 

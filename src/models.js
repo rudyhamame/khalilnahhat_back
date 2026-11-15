@@ -7,7 +7,7 @@ const userSchema = new mongoose.Schema(
     username: { type: String, required: true, unique: true, trim: true, lowercase: true },
     passwordHash: { type: String, required: true },
     email: { type: String, required: true, trim: true, lowercase: true },
-    phoneNumber: { type: String, required() { return !this.googleSubject; }, trim: true },
+    phoneNumber: { type: String, default: '', trim: true },
     isAdmin: { type: Boolean, default: false },
     adminGrantedAt: { type: Date, default: null },
     adminGrantedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
@@ -25,6 +25,8 @@ const userSchema = new mongoose.Schema(
     lastLoginAt: { type: Date, default: null },
     googleSubject: { type: String, unique: true, sparse: true },
     emailVerified: { type: Boolean, default: false },
+    // Password sign-ups wait for the email link: no session and no login until it is verified.
+    awaitingVerification: { type: Boolean, default: false },
     verifyTokenHash: { type: String, default: '' },
     verifyExpires: { type: Date, default: null },
     resetTokenHash: { type: String, default: '' },

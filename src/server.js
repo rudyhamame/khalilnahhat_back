@@ -97,9 +97,9 @@ const signupSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required.'),
   lastName: z.string().trim().min(1, 'Last name is required.'),
   username: z.string().trim().min(1).optional(),
-  password: z.string().min(12, 'Choose a password of at least 12 characters.').max(128),
+  password: z.string().min(8, 'Choose a password of at least 8 characters.').max(128),
   email: z.string().trim().email('A valid email is required.'),
-  phoneNumber: z.string().trim().min(1, 'Phone number is required.'),
+  phoneNumber: z.string().trim().max(40).default(''),
 });
 
 const loginSchema = z.object({
@@ -869,6 +869,8 @@ app.post('/api/auth/login', async (request, response) => {
 
   if (user.isBlocked) return response.status(403).json({ message: 'This account is blocked. Contact support.' });
 
+  if (user.awaitingVerification && !user.emailVerified) return response.status(403).json({ code: 'EMAIL_UNVERIFIED', message: 'Please verify your email address first. Open the link we sent to your inbox.' });
+
   if (isAdminUser(user) && !user.isAdmin) {
     user.isAdmin = true;
   }
@@ -910,14 +912,15 @@ app.post('/api/auth/signup', async (request, response) => {
     email: parsed.data.email.toLowerCase(),
     passwordHash: await hashPassword(parsed.data.password),
     isAdmin: normalizedUsername === ADMIN_USERNAME,
+    awaitingVerification: true,
   });
 
-  const token = await accountSessions.issueSession(user, request, isAdminUser);
+  // Manual verification: no session is issued; the account opens once the emailed link is used.
   sendVerification(user, getFrontendUrl()).catch((error) => console.error('Verification email failed:', error));
 
-  return response.status(201).json({
-    token,
-    user: serializeUser(user),
+  return response.status(202).json({
+    pending: true,
+    email: user.email,
   });
 });
 

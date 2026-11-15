@@ -25,6 +25,14 @@ function registerAccount(app, { requireAuth, getFrontendUrl }) {
     res.json({ ok: true });
   });
 
+  // Public resend for sign-ups still waiting on their link. Always answers ok, so it cannot reveal which emails are registered.
+  app.post('/api/auth/resend-signup-verification', async (req, res) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase().slice(0, 254) : '';
+    const user = email && await User.findOne({ email, awaitingVerification: true, emailVerified: { $ne: true } });
+    if (user) await sendVerification(user, getFrontendUrl()).catch((e) => console.error('Verification email failed:', e));
+    res.json({ ok: true });
+  });
+
   app.post('/api/auth/verify-email', async (req, res) => {
     const token = typeof req.body?.token === 'string' && /^[a-f0-9]{64}$/.test(req.body.token) ? req.body.token : '';
     const user = token && await User.findOneAndUpdate({ verifyTokenHash: sha(token), verifyExpires: { $gt: new Date() } }, { emailVerified: true, verifyTokenHash: '', verifyExpires: null });
@@ -52,8 +60,8 @@ function registerAccount(app, { requireAuth, getFrontendUrl }) {
   });
 
   app.post('/api/auth/reset-password', async (req, res) => {
-    const parsed = z.object({ token: z.string().min(10), password: z.string().min(12).max(128) }).safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: 'Choose a password of at least 12 characters.' });
+    const parsed = z.object({ token: z.string().min(10), password: z.string().min(8).max(128) }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: 'Choose a password of at least 8 characters.' });
     const user = await User.findOneAndUpdate(
       { resetTokenHash: sha(parsed.data.token), resetExpires: { $gt: new Date() } },
       { passwordHash: await hashPassword(parsed.data.password), ...require('./account-sessions').clearFields(), resetTokenHash: '', resetExpires: null, emailVerified: true },

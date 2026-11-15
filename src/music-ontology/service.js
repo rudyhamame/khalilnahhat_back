@@ -151,9 +151,18 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    if(old&&value.kind!=='genre'&&value.parentId!==old.parentId)fail('Parent identity cannot be changed for this entity; create a separate entity.');
    if(old&&value.revision!==old.revision)fail('This entity changed. Reload before editing.',409);
    if(value.languageIds?.length)await references(value.languageIds,'language',session);
+   const dialectIds=value.dialectIds??old?.dialectIds??[];
+   if(dialectIds.length){
+    if(value.kind!=='artist')fail('Only vocalists have dialect dependencies.');
+    const languageIds=value.languageIds??old?.languageIds??[];
+    const dialects=await Vocabulary.find({externalId:{$in:dialectIds},kind:'dialect',archived:{$ne:true}}).session(session).lean();
+    if(dialects.length!==dialectIds.length)fail('Choose existing dialect terms.');
+    if(!languageIds.length||dialects.some(dialect=>![...(dialect.languageIds||[]),dialect.parentId].filter(Boolean).some(languageId=>languageIds.includes(languageId))))fail('Choose dialects belonging to the vocalist’s selected languages.');
+   }
+
    if(value.instrumentIds?.length){if(value.kind!=='musician')fail('Only musicians have instruments.');if(await Vocabulary.countDocuments({externalId:{$in:value.instrumentIds},kind:'instrument',archived:{$ne:true}}).session(session)!==new Set(value.instrumentIds).size)fail('Choose existing instruments for this musician.');}
    if(value.instrumentId){if(value.kind!=='musician')fail('Only musicians have an instrument dependency.');const instrument=await Vocabulary.findOne({externalId:value.instrumentId,kind:'instrument',archived:{$ne:true}}).session(session);if(!instrument)fail('Choose an existing instrument for this musician.');}
-   const data={...value,...(value.kind==='musician'?{instrumentIds:value.instrumentIds!==undefined?[...new Set(value.instrumentIds)]:old?.instrumentIds||[],instrumentId:value.instrumentIds!==undefined?(value.instrumentIds[0]||null):value.instrumentId!==undefined?value.instrumentId:old?.instrumentId}:{}),languageIds:value.languageIds??old?.languageIds??[],externalId:id||makeId(value.kind),normalizedName:norm(value.name),provenance:provenance(value.provenance,actor),revision:(old?.revision||0)+1};
+   const data={...value,...(value.kind==='musician'?{instrumentIds:value.instrumentIds!==undefined?[...new Set(value.instrumentIds)]:old?.instrumentIds||[],instrumentId:value.instrumentIds!==undefined?(value.instrumentIds[0]||null):value.instrumentId!==undefined?value.instrumentId:old?.instrumentId}:{}),languageIds:value.languageIds??old?.languageIds??[],dialectIds,externalId:id||makeId(value.kind),normalizedName:norm(value.name),provenance:provenance(value.provenance,actor),revision:(old?.revision||0)+1};
    if(old){old.set(data);await old.save({session});return plain(old);}
    return plain((await Vocabulary.create([data],{session}))[0]);
   });

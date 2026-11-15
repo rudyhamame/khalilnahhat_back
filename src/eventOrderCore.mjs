@@ -1,3 +1,4 @@
+import {validFavouriteSongs} from './favouriteSongs.mjs';
 import contract from './eventOrderContract.json' with { type: 'json' };
 export { contract };
 export const fields = contract.sections.flatMap(section => section.fields.map(field => ({ ...field, gate: section.gate })));
@@ -34,6 +35,7 @@ export function createEventOrder() {
   return order;
 }
 export function validValue(field, value) {
+  if(field.key==='music.favouriteSongs')return validFavouriteSongs(value);
   if(field.type==='equipment')return Array.isArray(value)&&value.length<=100&&new Set(value.map(item=>item?.id)).size===value.length&&value.every(item=>item&&typeof item.id==='string'&&/^[a-z0-9-]+$/.test(item.id)&&item.id.length<=160&&Number.isSafeInteger(item.quantity)&&item.quantity>0&&item.quantity<=10000);
   // Ordered suggested songs: [{phase,song}], e.g. an intro song, then an outro song.
   if(field.type==='songs')return Array.isArray(value)&&value.length<=30&&value.every(item=>item&&typeof item==='object'&&typeof item.song==='string'&&item.song.trim().length>0&&item.song.length<=200&&typeof item.phase==='string'&&item.phase.length<=80&&(item.link===undefined||(typeof item.link==='string'&&item.link.length<=2048&&/^https:\/\/\S+$/i.test(item.link)))&&(!field.phases||item.phase===''||field.phases.includes(item.phase)));

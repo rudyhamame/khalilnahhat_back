@@ -39,6 +39,7 @@ userSchema.index({ email: 1 }, { unique: true, collation: { locale: 'en', streng
 
 const liveSessionSchema = new mongoose.Schema(
   {
+    broadcastSessionId: { type: String, default: "", index: true },
     externalId: { type: String, required: true, unique: true, trim: true },
     youtubeMetadata: { type: mongoose.Schema.Types.Mixed, default: null },
     track: { type: String, required: true, trim: true },

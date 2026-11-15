@@ -164,6 +164,9 @@ async function ensureRecording(roomName){
 async function sweepRecordings(){return pipeline.sweep();}
 let workerTimer;
 function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWorker=true}={}){
+ require('./recording-session-metadata').registerRecordingSessionMetadata(app,requireAdmin,{
+  Recording:LiveRecording,...require('./models'),LiveComment:require('./live-comments').LiveComment,isValidId:mongoose.isValidObjectId,
+ });
  app.get('/api/admin/live-recordings',requireAdmin,async(_req,res)=>res.json({items:(await LiveRecording.find({test:{$ne:true},deletedAt:null}).sort({createdAt:-1}).limit(500)).map(view)}));
  app.get('/api/admin/live-recordings/:id/comments',requireAdmin,async(req,res)=>{
   res.set('Cache-Control','no-store');

@@ -408,7 +408,7 @@
      "key": "music.favouriteSongs",
      "label": "Favourite songs (optional)",
      "ar": "الأغاني المفضلة (اختياري)",
-     "type": "tags",
+     "type": "songs",
      "hidden": true
     },
     {

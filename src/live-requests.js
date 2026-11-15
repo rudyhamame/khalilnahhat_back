@@ -18,7 +18,7 @@ app.post('/api/live-requests/analyze', requireAuth, async (request, response) =>
     });
   }
 
-  const liveSessions = await getOrderedLiveSessions();
+  const liveSessions = await getOrderedLiveSessions(liveBroadcastSession(await getLiveStreamConfig()));
   const analysis = await analyzeLiveRequest(parsed.data.message, liveSessions, {
     requesterName: parsed.data.requesterName,
   });
@@ -157,7 +157,7 @@ app.patch('/api/live-requests/:id/review', requireAdmin, async (request, respons
   const claimed = await LiveRequest.updateOne({_id:liveRequest._id, requestStatus:'pending_admin'}, {$set:{requestStatus:'reviewing'}});
   if (!claimed.modifiedCount) return response.status(409).json({message:'This request is being reviewed. Refresh its status.'});
   try {
-  const liveSessions = await getOrderedLiveSessions();
+  const liveSessions = await getOrderedLiveSessions(liveBroadcastSession(await getLiveStreamConfig()));
   const analysis = await analyzeLiveRequest(liveRequest.message, liveSessions, {
     requesterName: liveRequest.requesterName,
     track: liveRequest.track,
@@ -199,6 +199,7 @@ app.patch('/api/live-requests/:id/review', requireAdmin, async (request, respons
   if (session !== liveBroadcastSession(await getLiveStreamConfig())) throw Object.assign(new Error('The broadcast ended during review. Refresh its status.'),{status:409});
   const createdSession = await LiveSession.findOneAndUpdate({requestExternalId:liveRequest.externalId}, {$setOnInsert:{
     externalId: `live-session-request-${liveRequest.externalId}`,
+    broadcastSessionId: session,
     youtubeMetadata:liveRequest.youtubeMetadata||null,
     track: liveRequest.track,
     artist: liveRequest.artist,

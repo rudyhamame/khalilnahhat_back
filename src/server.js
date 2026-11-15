@@ -394,6 +394,7 @@ function serializeServiceRequest(serviceRequest, includeQuote = true) {
 
 function serializeLiveSession(session) {
   return {
+    broadcastSessionId: session.broadcastSessionId || "",
     youtubeMetadata: session.youtubeMetadata || null,
     id: session.externalId || session.id,
     track: session.track,
@@ -641,13 +642,9 @@ async function getLiveStreamConfig() {
   return config;
 }
 
-async function getOrderedLiveSessions() {
-  return LiveSession.find().sort({ sortOrder: 1, createdAt: 1 });
-}
-
-async function getNextLiveSessionSortOrder() {
-  const lastSession = await LiveSession.findOne().sort({ sortOrder: -1, createdAt: -1 });
-  return lastSession ? Number(lastSession.sortOrder || 0) + 100 : 100;
+async function getOrderedLiveSessions(session) {
+  if (session === undefined) session = liveBroadcastSession(await getLiveStreamConfig());
+  return require('./live-setlist').orderedSetList(LiveSession, session);
 }
 
 async function createMuxLiveStream(title) {
@@ -778,10 +775,10 @@ app.get('/api/ready', async (_request, response) => {
 });
 
 app.get('/api/bootstrap', async (_request, response) => {
-  const [liveSessions, archiveItems, liveStreamConfig] = await Promise.all([
-    getOrderedLiveSessions(),
+  const liveStreamConfig = await getLiveStreamConfig();
+  const [liveSessions, archiveItems] = await Promise.all([
+    getOrderedLiveSessions(liveBroadcastSession(liveStreamConfig)),
     require('./music-archive').publicSongs(),
-    getLiveStreamConfig(),
   ]);
 
   response.json({
@@ -1061,31 +1058,9 @@ app.patch('/api/prices/:id', requireAdmin, async (request, response) => {
   return response.json({ item: serializeServicePrice(price, equipment) });
 });
 
-app.post('/api/live-sessions', requireAdmin, async (request, response) => {
-  const parsed = liveSessionSchema.safeParse(request.body);
-
-  if (!parsed.success) {
-    return response.status(400).json({
-      message: 'Live session payload failed validation.',
-      errors: parsed.error.flatten().fieldErrors,
-    });
-  }
-
-  const nextSortOrder =
-    typeof parsed.data.sortOrder === 'number' && Number.isFinite(parsed.data.sortOrder)
-      ? parsed.data.sortOrder
-      : await getNextLiveSessionSortOrder();
-  const { sortOrder: _ignoredSortOrder, ...sessionPayload } = parsed.data;
-
-  const session = await LiveSession.create({
-    externalId: `live-session-${Date.now()}`,
-    sortOrder: nextSortOrder,
-    ...sessionPayload,
-  });
-
-  return response.status(201).json({
-    item: serializeLiveSession(session),
-  });
+require('./live-setlist').registerLiveSetList(app, {
+  requireAuth, requireAdmin, getLiveStreamConfig, LiveSession,
+  input: liveSessionSchema, serialize: serializeLiveSession, remove: permanentDeletion.remove,
 });
 
 app.post('/api/live-sessions/upload-audio', requireAdmin, upload.single('audio'), async (request, response) => {
@@ -1162,50 +1137,6 @@ app.post('/api/live-sessions/upload-cover', requireAdmin, upload.single('cover')
     console.error('Cloudinary cover upload failed:', error);
     return response.status(500).json({ message: 'Cover image upload failed.' });
   }
-});
-
-app.patch('/api/live-sessions/:id', requireAdmin, async (request, response) => {
-  const parsed = liveSessionSchema.partial().safeParse(request.body);
-
-  if (!parsed.success) {
-    return response.status(400).json({
-      message: 'Live session update failed validation.',
-      errors: parsed.error.flatten().fieldErrors,
-    });
-  }
-
-  const session = await LiveSession.findOneAndUpdate(
-    { externalId: request.params.id },
-    parsed.data,
-    { new: true },
-  );
-
-  if (!session) {
-    return response.status(404).json({
-      message: 'Live session not found.',
-    });
-  }
-
-  return response.json({
-    item: serializeLiveSession(session),
-  });
-});
-
-app.delete('/api/live-sessions/:id', requireAdmin, async (request, response) => {
-  const deleted = await permanentDeletion.remove(LiveSession,{externalId:request.params.id});
-
-  if (!deleted) {
-    return response.status(404).json({
-      message: 'Live session not found.',
-    });
-  }
-
-  // The asset worker removes audio only after its last reference is gone.
-
-  return response.json({
-    ok: true,
-    cloudinaryCleanupPending:Boolean(deleted.cloudinaryCleanupPending),
-  });
 });
 
 app.patch('/api/live-stream', requireAdmin, async (request, response) => {

@@ -7,7 +7,7 @@ const path = require('path');
 const multer = require('multer');
 const { z } = require('zod');
 const cloudinary = require('cloudinary').v2;
-const { User, ServiceRequest, Booking, ArchiveItem, LiveSession, LiveRequest } = require('./models');
+const { User, ServiceRequest, Booking, ArchiveItem, LiveSession, LiveRequest, LiveStreamConfig } = require('./models');
 const { EventBooking } = require('./payments');
 const { Meeting } = require('./meetings');
 const { MediaItem, Testimonial } = require('./content');
@@ -193,7 +193,8 @@ function registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest 
     res.json({items:rows.map(x=>{const {_id,__v,...rest}=x;return {...rest,id:x.externalId||String(_id),playerEligible:require('./archive-player').isCloudinaryAudio(x.audioUrl)};})});
   });
   app.get('/api/admin/sessions', requireAdmin, async (_req,res) => {
-    const rows=await LiveSession.find().sort({sortOrder:1}).limit(500).lean();
+    const session=require('./live-interactions').sessionKey(await LiveStreamConfig.findOne({key:require('./default-data').defaultLiveStreamConfig.key}));
+    const rows=session?await LiveSession.find({broadcastSessionId:session}).sort({sortOrder:1}).limit(500).lean():[];
     res.json({items:rows.map(x=>{const {_id,__v,...rest}=x;return {...rest,id:x.externalId||String(_id),playerEligible:require('./archive-player').isCloudinaryAudio(x.audioUrl)};})});
   });
   app.get('/api/admin/storage', requireAdmin, async (req,res) => {

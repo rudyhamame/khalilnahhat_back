@@ -37,9 +37,9 @@ function createWorkElements(service){
  }
  // Public, read-only: the options of an admin-managed preset list, in the order they were added.
  async function presetOptions(key){
-  if(!['influences','moments'].includes(key))fail('Unknown list.',404);
+  if(key!=='moments')fail('Unknown list.',404);
   if(key==='moments')await ensureMoments();
-  return (await Option.find({key,archived:{$ne:true}}).sort({_id:1}).lean()).map(option=>({id:String(option._id),value:option.value,...(key==='influences'?{description:option.description||''}:{})}));
+  return (await Option.find({key,archived:{$ne:true}}).sort({_id:1}).lean()).map(option=>({id:String(option._id),value:option.value}));
  }
  async function list(){
   const [vocabulary,options,types,recordings,works]=await Promise.all([Vocabulary.find({kind:{$nin:['concept','lyricist']}}).sort({name:1}).lean(),Option.find({archived:{$ne:true}}).sort({value:1}).lean(),service.listWorkTypes(),ArchiveItem.find().select('externalId title ontologyRevision').lean(),service.models.Work.find().select('externalId title revision').lean()]);
@@ -69,7 +69,7 @@ function createWorkElements(service){
    return service.saveWorkType({languageIds:data.languageIds??old?.languageIds??[],name:data.value,nameArabic:old?.nameArabic||'',amount:old?.amount||data.amount||'INDIVIDUAL',details:old?.details||'',detailsArabic:old?.detailsArabic||'',artworkUrl:old?.artworkUrl||'',...(old?{revision:data.revision}:{})},id);
   }
   validateValue(key,data.value);
-  const descriptionSet=key==='influences'&&data.description!==undefined?{description:data.description}:{};
+  const descriptionSet={};
   const languageSet=data.languageIds!==undefined?{languageIds:data.languageIds}:{};
   if(languageSet.languageIds?.length&&await Vocabulary.countDocuments({externalId:{$in:languageSet.languageIds},kind:'language'})!==languageSet.languageIds.length)fail('Choose existing language terms.');
   if(id){if(!mongoose.isValidObjectId(id))fail('Option not found.',404);const result=await Option.findOneAndUpdate({_id:id,key,revision:data.revision,archived:{$ne:true}},{$set:{value:data.value,normalizedValue:norm(data.value),...descriptionSet,...languageSet},$inc:{revision:1}},{new:true,runValidators:true});if(!result)fail('This option changed. Reload before editing.',409);return result;}

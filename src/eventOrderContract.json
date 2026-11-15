@@ -33,8 +33,8 @@
     },
     {
      "key": "customer.contactMethod",
-     "label": "How should we reach you?",
-     "ar": "كيف نتواصل معك؟",
+     "label": "Preferred contact method",
+     "ar": "طريقة التواصل المفضلة",
      "options": [
       "email",
       "phone",
@@ -59,8 +59,8 @@
    "fields": [
     {
      "key": "event.type",
-     "label": "What kind of event is it?",
-     "ar": "ما نوع الفعالية؟",
+     "label": "Event type",
+     "ar": "نوع الفعالية",
      "options": [
       "wedding",
       "engagement",
@@ -89,22 +89,22 @@
     },
     {
      "key": "event.startTime",
-     "label": "What time does it start?",
-     "ar": "متى تبدأ؟",
+     "label": "Start time",
+     "ar": "وقت البداية",
      "type": "time",
      "required": true
     },
     {
      "key": "event.endTime",
-     "label": "What time does it end? (after midnight is fine)",
-     "ar": "متى تنتهي؟ (بعد منتصف الليل مقبول)",
+     "label": "End time (after midnight is fine)",
+     "ar": "وقت الانتهاء (يمكن أن يكون بعد منتصف الليل)",
      "type": "time",
      "required": true
     },
     {
      "key": "event.guestCount",
-     "label": "About how many guests?",
-     "ar": "كم عدد الضيوف تقريباً؟",
+     "label": "Guest count",
+     "ar": "عدد الضيوف",
      "type": "number",
      "max": 100000,
      "required": true
@@ -119,7 +119,7 @@
     {
      "key": "event.venue.address",
      "label": "Venue street address",
-     "ar": "عنوان المكان",
+     "ar": "عنوان الشارع",
      "maxLength": 240,
      "required": true,
      "private": true
@@ -164,8 +164,8 @@
     },
     {
      "key": "event.venue.setting",
-     "label": "Indoor or outdoor?",
-     "ar": "داخلي أم خارجي؟",
+     "label": "Indoor or outdoor",
+     "ar": "داخلي أو خارجي",
      "options": [
       "indoor",
       "outdoor",

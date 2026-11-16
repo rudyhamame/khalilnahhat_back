@@ -136,6 +136,7 @@ export function validateEventOrder(input,{submission=false,today=new Date().toLo
     if(input?.event?.date&&input.event.date<today)errors.push('event.date');
     if(input?.event?.startTime&&input.event.startTime===input.event.endTime)errors.push('event.endTime');
     if(input?.customer?.phone&&input.customer.phone.trim().length<5)errors.push('customer.phone');
+    if(['phone','whatsapp'].includes(input?.customer?.contactMethod)&&!input?.customer?.phone?.trim())errors.push('customer.contactMethod'); // phone or WhatsApp needs a number
     if(input?.studio?.requested&&input.studio.delivery?.requestedDate<today)errors.push('studio.delivery.requestedDate');
   }
   return [...new Set(errors)];

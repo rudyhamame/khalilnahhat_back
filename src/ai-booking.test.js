@@ -224,3 +224,12 @@ test('AI patch schema and sanitizer reject all account contact edits',()=>{
  for(const path of paths)assert.ok(!orderPatchJsonSchema.items.properties.path.enum.includes(path));
  assert.deepEqual(sanitizeOrderPatch(paths.map(path=>({path,value:'Changed'}))),[]);
 });
+test('live service catalog is split into the DJ section and the rental section',()=>{
+  const {serviceCatalogInstructions}=require('./ai-booking');
+  const text=serviceCatalogInstructions([{kind:'service',id:'dj',name:'DJ'},{kind:'service',id:'photo-booth',name:'Photo booth'},{kind:'service',id:'mc',name:'MC',selectionField:'music.mcRequested'},{kind:'service',id:'old',name:'Old',isActive:false},{kind:'event',id:'wedding',name:'Wedding'}]);
+  assert.match(text,/Section 1[^[]*\[\{"id":"dj"/);
+  assert.match(text,/"id":"photo-booth","name":"Photo booth","bookingServiceId":"rental"/);
+  assert.match(text,/"id":"mc"[^}]*"selectionField":"music.mcRequested"/);
+  assert.doesNotMatch(text,/Old|Wedding/);
+  assert.equal(serviceCatalogInstructions([]),'');
+});

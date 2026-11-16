@@ -1480,6 +1480,7 @@ registerAiBilling(app, {
 });
 const aiBooking=require('./ai-booking'),aiBookingRoutes=aiBooking.registerAiBooking(app, {
   configService:aiConfiguration,
+  loadServiceCatalog:()=>require('./setup-catalog').list(),
   requireAuth: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest }),
   loadJourney: require('./booking-journey-summary').createJourneyLoader({ Model: ServiceRequest, serialize: serializeServiceRequest }),
 });

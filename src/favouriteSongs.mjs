@@ -16,6 +16,6 @@ export function validFavouriteSongs(value){
   // Keep names already saved before artist and YouTube fields were available.
   typeof row==='string'?row.trim().length>0&&row.length<=80:
   row&&typeof row==='object'&&typeof row.song==='string'&&row.song.trim().length>0&&row.song.length<=200&&
-  typeof row.artist==='string'&&row.artist.trim().length>0&&row.artist.length<=200&&
+  (row.artist===undefined||(typeof row.artist==='string'&&row.artist.length<=200))&& // the artist is optional
   (row.link===undefined||isYouTubeLink(row.link)));
 }

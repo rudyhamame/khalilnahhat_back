@@ -969,6 +969,8 @@ app.get('/api/service-requests/mine', requireAuth, async (request, response) => 
   });
 });
 
+require('./posting-studio').registerPostingStudio(app,{requireAdmin});
+
 app.get('/api/service-requests/admin', requireAdmin, async (_request, response) => {
   const [requests,equipment,prices]=await Promise.all([ServiceRequest.find().sort({createdAt:-1}),Equipment.find().select('slug priceCents'),ServicePrice.find({isActive:true}).select('serviceId amountCents')]);
   const defaults=new Map([...prices.map(item=>[item.serviceId,Number(item.amountCents)/100]),...equipment.map(item=>[item.slug,Number(item.priceCents)/100])]);

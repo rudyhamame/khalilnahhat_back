@@ -9,10 +9,10 @@ function setup(overrides = {}) {
     LiveStreamConfig: { findOneAndUpdate: async (filter, change) => { writes.push({ filter, change }); return { ...current, ...change }; } },
     defaults: { key: 'live', title: 'Live', statusLabel: 'Offline' }, createToken: async () => 'temporary-token',
     getConfig: () => ({ wsUrl: 'wss://media.example', apiKey: 'key', apiSecret: 'secret' }), serialize: value => value, serializePublic: value => value, verifyWebhook: async body => JSON.parse(body),
-    RoomServiceClient: class { async deleteRoom(name) { deleted.push(name); } }, randomUUID: () => 'new', ...overrides };
-  registerLiveBroadcastRoutes({ get: (path, handler) => { routes.status = handler; }, post: (path, auth, handler) => { if (handler) assert.equal(auth, deps.requireAdmin); routes[path.split('/').pop()] = handler || auth; } }, deps);
+    RoomServiceClient: class { async deleteRoom(name) { deleted.push(name); } }, randomUUID: () => 'new', disableLiveReconcile: true, ...overrides };
+  const api = registerLiveBroadcastRoutes({ get: (path, handler) => { routes.status = handler; }, post: (path, auth, handler) => { if (handler) assert.equal(auth, deps.requireAdmin); routes[path.split('/').pop()] = handler || auth; } }, deps);
   const call = async (name, body = {}) => { const res = { statusCode: 200, status(n) { this.statusCode = n; return this; }, json(value) { this.body = value; return this; } }; await routes[name]({ body, rawBody: JSON.stringify(body), headers: {} }, res); return res; };
-  return { call, writes, deleted, current };
+  return { call, writes, deleted, current, reconcile: api.reconcile };
 }
 test('missing media configuration does not publish a false live status', async () => {
   const ctx = setup({ getConfig: () => { throw Object.assign(new Error('Not configured'), { status:503 }); } });
@@ -134,4 +134,20 @@ test('saving remains enabled by default and only an explicit false disables it',
   const result=await ctx.call('go-live',{recordingMode:'direct',...(value===undefined?{}:{saveRecording:value})});
   assert.equal(result.statusCode,201);assert.equal(prepared,1);assert.deepEqual(JSON.parse(JSON.stringify(result.body.recording)),{id:'recording-1',mode:'direct'});
  }
+});
+test('a dead reservation is reclaimable and a live whose room vanished is reconciled, but errors never clear a live', async () => {
+  const old = new Date(Date.now() - 600000);
+  const stale = setup();
+  Object.assign(stale.current, { webrtcRoomName: 'dead-room', updatedAt: old });
+  const claimed = await stale.call('go-live');
+  assert.equal(claimed.statusCode, 201); assert.deepEqual(stale.deleted, ['dead-room']);
+  assert.equal(stale.writes[0].filter.webrtcRoomName, 'dead-room');
+  const fresh = setup();
+  Object.assign(fresh.current, { webrtcRoomName: 'new-room', updatedAt: new Date() });
+  assert.equal((await fresh.call('go-live')).statusCode, 409);
+  const mk = rooms => { const ctx = setup({ RoomServiceClient: class { async listRooms() { if (rooms instanceof Error) throw rooms; return rooms; } } }); Object.assign(ctx.current, { isLive: true, webrtcRoomName: 'r', updatedAt: old }); return ctx; };
+  const gone = mk([]); assert.equal(await gone.reconcile(), true); assert.deepEqual(gone.writes[0].filter, { key: 'live', broadcastMode: 'webrtc', webrtcRoomName: 'r' });
+  const present = mk([{ name: 'r' }]); assert.equal(await present.reconcile(), false); assert.equal(present.writes.length, 0);
+  const down = mk(new Error('network')); await assert.rejects(down.reconcile()); assert.equal(down.writes.length, 0);
+  const recent = mk([]); recent.current.updatedAt = new Date(); assert.equal(await recent.reconcile(), false);
 });

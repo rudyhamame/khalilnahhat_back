@@ -1,0 +1,26 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs/promises');
+const os=require('node:os');
+const path=require('node:path');
+const {promisify}=require('node:util');
+const {execFile}=require('node:child_process');
+const express=require('express');
+const {registerPostingStudio}=require('../src/posting-studio');
+const exec=promisify(execFile);
+test('posting MP4 export is admin-only and produces H.264/AAC without storing a public asset',async t=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'posting-test-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+ const input=path.join(dir,'source.webm'),output=path.join(dir,'result.mp4');
+ await exec('ffmpeg',['-hide_banner','-loglevel','error','-y','-f','lavfi','-i','color=c=blue:s=320x240:d=1','-f','lavfi','-i','sine=frequency=440:duration=1','-shortest','-c:v','libvpx-vp9','-c:a','libopus',input]);
+ const app=express();registerPostingStudio(app,{requireAdmin:(req,res,next)=>req.headers.authorization==='Bearer test-admin'?next():res.sendStatus(403)});
+ const server=await new Promise(resolve=>{const server=app.listen(0,'127.0.0.1',()=>resolve(server));});t.after(()=>new Promise(resolve=>server.close(resolve)));
+ const url=`http://127.0.0.1:${server.address().port}/api/admin/posting-studio/mp4`;
+ assert.equal((await fetch(url,{method:'POST'})).status,403);
+ const body=new FormData();body.append('video',new Blob([await fs.readFile(input)],{type:'video/webm'}),'source.webm');
+ const response=await fetch(url,{method:'POST',headers:{Authorization:'Bearer test-admin'},body});
+ assert.equal(response.status,200);assert.match(response.headers.get('content-type'),/video\/mp4/);assert.equal(response.headers.get('cache-control'),'no-store');
+ await fs.writeFile(output,Buffer.from(await response.arrayBuffer()));
+ const {stdout}=await exec('ffprobe',['-v','error','-show_entries','stream=codec_name,width,height','-of','json',output]);
+ const streams=JSON.parse(stdout).streams;assert.ok(streams.some(s=>s.codec_name==='h264'&&s.width===320&&s.height===240));assert.ok(streams.some(s=>s.codec_name==='aac'));
+ const empty=await fetch(url,{method:'POST',headers:{Authorization:'Bearer test-admin'},body:new FormData()});assert.equal(empty.status,400);
+});

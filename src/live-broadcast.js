@@ -1,8 +1,19 @@
+const STALE_RESERVATION_MS = 90000, RECONCILE_AFTER_MS = 120000;
 // Atomic room ownership prevents a delayed phone stop from ending a newer broadcast.
 function registerLiveBroadcastRoutes(app, deps) {
   const { requireAdmin, getLiveStreamConfig, LiveStreamConfig, defaults, createToken, getConfig, serialize, RoomServiceClient, randomUUID, verifyWebhook, serializePublic, prepareRecording, recordingStatus } = deps;
   const obs = deps.IngressClient ? require('./obs-broadcast').registerObsBroadcastRoutes(app, deps) : null;
   if(obs)require('./ovh-browser-broadcast').registerOvhBrowserRoutes(app,deps,obs);
+  // Missed room_finished webhook (deploy, outage): the site must not stay "live" for a room LiveKit no longer has.
+  // Only a definitive "room is gone" answer clears it; any error keeps the status.
+  async function reconcile() {
+    const current = await getLiveStreamConfig(), room = current.webrtcRoomName;
+    if (!room || current.obsRoomName || !current.updatedAt || Date.now() - new Date(current.updatedAt) < RECONCILE_AFTER_MS) return false;
+    const { wsUrl, apiKey, apiSecret } = getConfig();
+    if ((await new RoomServiceClient(wsUrl, apiKey, apiSecret).listRooms([room])).length) return false;
+    return Boolean(await LiveStreamConfig.findOneAndUpdate({ key: defaults.key, broadcastMode: 'webrtc', webrtcRoomName: room }, { isLive: false, webrtcRoomName: '', statusLabel: defaults.statusLabel }, { new: true }));
+  }
+  if (!deps.disableLiveReconcile) { const timer = setInterval(() => reconcile().catch(() => {}), 30000); timer.unref?.(); }
   app.get('/api/live-stream', async (_request, response) => {
     try { return response.json({ item: serializePublic(await getLiveStreamConfig()) }); }
     catch { return response.status(503).json({ message: 'Live status is temporarily unavailable.' }); }
@@ -29,7 +40,10 @@ function registerLiveBroadcastRoutes(app, deps) {
   app.post('/api/live-stream/webrtc/go-live', requireAdmin, async (request, response) => {
     try {
       const current = await getLiveStreamConfig();
-      if (current.isLive || current.webrtcRoomName || current.obsRoomName) return response.status(409).json({ message: 'A live stream is already active. End it before starting another.' });
+      // A reservation that never went on air is dead once its 60s expiry is past, even if the timer died with a server restart.
+      const stale = !current.isLive && current.webrtcRoomName && !current.obsRoomName && current.updatedAt && Date.now() - new Date(current.updatedAt) > STALE_RESERVATION_MS;
+      if ((current.isLive || current.webrtcRoomName || current.obsRoomName) && !stale) return response.status(409).json({ message: 'A live stream is already active. End it before starting another.' });
+      if (stale) await new RoomServiceClient(getConfig().wsUrl, getConfig().apiKey, getConfig().apiSecret).deleteRoom(current.webrtcRoomName).catch(() => {});
       const roomName = `khalil-live-${randomUUID()}`;
       const config = getConfig();
       const token = await createToken({ roomName, identity: 'khalil-broadcaster', name: 'Khalil Nahhat', canPublish: true });
@@ -38,7 +52,7 @@ function registerLiveBroadcastRoutes(app, deps) {
       const title = typeof request.body?.title === 'string' ? request.body.title.trim().slice(0, 180) : '';
       // getLiveStreamConfig creates the singleton first. Never upsert a conditional claim.
       const updated = await LiveStreamConfig.findOneAndUpdate(
-        { key: defaults.key, isLive: { $ne: true }, webrtcRoomName: { $in: ['', null] }, obsRoomName: { $in: ['', null] } },
+        { key: defaults.key, isLive: { $ne: true }, webrtcRoomName: stale ? current.webrtcRoomName : { $in: ['', null] }, obsRoomName: { $in: ['', null] } },
         { isLive: false, title: title || current.title || defaults.title, streamUrl: '',
           statusLabel: 'Connecting browser…', broadcastMode: 'webrtc', broadcastSource: source, webrtcRoomName: roomName },
         { new: true },
@@ -127,5 +141,6 @@ function registerLiveBroadcastRoutes(app, deps) {
       return response.status(500).json({ message: 'Could not clear the broadcast status. Try again.' });
     }
   });
+  return { reconcile };
 }
 module.exports = { registerLiveBroadcastRoutes };

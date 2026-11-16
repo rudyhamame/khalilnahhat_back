@@ -10,7 +10,7 @@ async function fixture(t,options={}) {
  const saved=[];const counters={notify:0,reserve:0,release:0};
  const app=express();app.use(express.json());
  registerServiceRequestSubmission(app,{
-  requireAuth:(req,res,next)=>{if(!req.headers.authorization)return res.status(401).json({message:'Sign in.'});req.authUser={_id:req.headers.authorization,firstName:'Test',lastName:'Client',username:'test',email:'test@example.invalid'};next();},
+  requireAuth:(req,res,next)=>{if(!req.headers.authorization)return res.status(401).json({message:'Sign in.'});req.authUser={_id:req.headers.authorization,firstName:'Test',lastName:'Client',username:'test',email:'test@example.invalid',phoneNumber:'4165550100'};next();},
   ServiceRequest:{
    init:async()=>{if(options.failIndex)throw new Error('Index creation failed');},
    findOne:query=>({select:async()=>saved.find(item=>item.userId===query.userId&&item.clientSubmissionId===query.clientSubmissionId)}),

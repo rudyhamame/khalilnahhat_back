@@ -14,7 +14,7 @@ const {createRecordingProviders}=require('./recording-providers');
 const {prepareRecordingFiles}=require('./recording-files');
 const {captureOutputs,outputView,recordingGroups,ratio}=require('./recording-outputs');
 
-const partSchema={_id:false,publicId:String,delivery:String,bytes:Number,duration:Number,width:Number,height:Number,sha256:String,trimStart:Number,trimEnd:Number,look:{type:Object}};
+const partSchema={_id:false,publicId:String,delivery:String,bytes:Number,duration:Number,width:Number,height:Number,sha256:String,trimStart:Number,trimEnd:Number,look:{type:Object},skipped:{type:Boolean,default:false}};
 const sourceSchema={_id:false,key:String,remote:String,saved:Boolean,cleaned:Boolean,error:String,parts:[partSchema]};
 const schema=new mongoose.Schema({
  commentsCaptured:{type:Boolean,default:false},
@@ -97,7 +97,7 @@ function renderView(row){return Array.from(row.renders||[],item=>({id:String(ite
  // A job that was running when the server restarted never finishes: show it as failed instead of spinning forever.
  status:item.status==='processing'&&Date.now()-new Date(item.createdAt)>2*3600*1000?'failed':item.status,error:item.status==='processing'&&Date.now()-new Date(item.createdAt)>2*3600*1000?'The render was interrupted. Start it again.':item.error||'',bytes:item.bytes||0,duration:item.duration||0,width:item.width||null,height:item.height||null,createdAt:item.createdAt}));}
 function editionView(row){return Array.from(row.editions||[],edition=>({id:String(edition._id),name:edition.name,part:edition.part||0,start:edition.start,end:edition.end,goal:edition.goal||'',...(normalizeLook(edition.look)?{look:normalizeLook(edition.look)}:{}),createdAt:edition.createdAt}));}
-function view(row){const parts=recordingParts(row);return {...outputView(row),editions:editionView(row),renders:renderView(row),...(row.outputRecordings?.length?{outputs:Array.from(row.outputRecordings,out=>({id:String(out.id),key:out.key,width:out.width||null,height:out.height||null,aspectRatio:ratio(out.width,out.height)}))}:{}),title:row.title,status:row.status,bytes:row.status==='recording'?row.direct?.bytes||0:row.bytes,durationSec:row.status==='recording'&&row.direct?.lastChunkAt?Math.max(0,Math.round((new Date(row.direct.lastChunkAt)-new Date(row.createdAt))/1000)):row.duration,published:row.published,createdAt:row.createdAt,error:row.error||'',captureState:row.captureState||'unknown',captureCheckedAt:row.captureCheckedAt||null,warning:row.captureWarning||'',cleanupPending:Boolean(row.cleanupPending),savedPartCount:parts.length,retrying:row.status==='upload_failed'&&(row.attempts||0)<3,canRetry:['failed','upload_failed'].includes(row.status)||row.captureState==='failed'||(row.status==='partial'&&row.sources?.some(source=>!source.saved)),canRemove:!row.cleanupPending&&(['ready','partial','not_recorded'].includes(row.status)||(['failed','upload_failed'].includes(row.status)&&row.captureState==='ended')),canPreview:['ready','partial'].includes(row.status)&&parts.length>0,partCount:parts.length,parts:parts.map((part,index)=>{const trim=partTrim(part);return {index,bytes:part.bytes,durationSec:part.duration,trimStartSec:trim?.start||0,trimEndSec:trim?.end||part.duration||0,selectedDurationSec:trim?trim.end-trim.start:part.duration,...(normalizeLook(part.look)?{look:normalizeLook(part.look)}:{})};}),...(parts.length>1?{whole:wholeView(row,parts)}:{})};}
+function view(row){const parts=recordingParts(row);return {...outputView(row),editions:editionView(row),renders:renderView(row),...(row.outputRecordings?.length?{outputs:Array.from(row.outputRecordings,out=>({id:String(out.id),key:out.key,width:out.width||null,height:out.height||null,aspectRatio:ratio(out.width,out.height)}))}:{}),title:row.title,status:row.status,bytes:row.status==='recording'?row.direct?.bytes||0:row.bytes,durationSec:row.status==='recording'&&row.direct?.lastChunkAt?Math.max(0,Math.round((new Date(row.direct.lastChunkAt)-new Date(row.createdAt))/1000)):row.duration,published:row.published,createdAt:row.createdAt,error:row.error||'',captureState:row.captureState||'unknown',captureCheckedAt:row.captureCheckedAt||null,warning:row.captureWarning||'',cleanupPending:Boolean(row.cleanupPending),savedPartCount:parts.length,retrying:row.status==='upload_failed'&&(row.attempts||0)<3,canRetry:['failed','upload_failed'].includes(row.status)||row.captureState==='failed'||(row.status==='partial'&&row.sources?.some(source=>!source.saved)),canRemove:!row.cleanupPending&&(['ready','partial','not_recorded'].includes(row.status)||(['failed','upload_failed'].includes(row.status)&&row.captureState==='ended')),canPreview:['ready','partial'].includes(row.status)&&parts.length>0,partCount:parts.length,parts:parts.map((part,index)=>{const trim=partTrim(part);return {index,bytes:part.bytes,durationSec:part.duration,trimStartSec:trim?.start||0,trimEndSec:trim?.end||part.duration||0,selectedDurationSec:trim?trim.end-trim.start:part.duration,skipped:Boolean(part.skipped),...(normalizeLook(part.look)?{look:normalizeLook(part.look)}:{})};}),...(parts.length>1?{whole:wholeView(row,parts)}:{})};}
 function wholeView(row,parts){const duration=wholeDuration(parts),trim=wholeTrim(row,parts),look=normalizeLook(row.look);return {durationSec:duration,trimStartSec:trim?.start||0,trimEndSec:trim?.end||duration,selectedDurationSec:trim?trim.end-trim.start:duration,...(look?{look}:{})};}
 // ttl: how long the private link works (seconds). A download starts at once, so 3 minutes is plenty; a <video> keeps asking for more of the file
 // while it plays, pauses and seeks, so the preview link must outlive the viewing session.
@@ -290,6 +290,28 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
   if(!row)return res.status(404).json({message:'Recording not found.'});
   res.json({item:view(row)});
  });
+ // One range over the whole recording's timeline, split across its stored parts: [{index,start,end,skipped}] in each part's own seconds, plus one look for all.
+ app.post('/api/admin/live-recordings/:id/trims',requireAdmin,async(req,res)=>{
+  if(!mongoose.isValidObjectId(req.params.id))return res.status(400).json({message:'Invalid recording.'});
+  const row=await LiveRecording.findOne({_id:req.params.id,deletedAt:null,status:{$in:['ready','partial']}});
+  if(!row)return res.status(409).json({message:'Wait for the recording to finish saving.'});
+  if(row.published)return res.status(409).json({message:'This recording is already published and its trim can no longer be changed.'});
+  const parts=recordingParts(row),items=Array.isArray(req.body?.parts)?req.body.parts:[];
+  if(!row.parts?.length||items.length!==parts.length)return res.status(400).json({message:'Send one range for every part.'});
+  const plan=[];
+  for(const [index,item] of items.entries()){
+   const part=parts[index],duration=Number(part.duration)||0;
+   if(Number(item?.index)!==index||!duration)return res.status(400).json({message:'Select a valid recording part.'});
+   if(item.skipped===true){plan.push({skipped:true});continue;}
+   const start=Number(item.start),end=Number(item.end);
+   if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||end<=start||end>duration+.05||end-start<.1)return res.status(400).json({message:'Choose a valid trim range of at least 0.1 seconds.'});
+   const from=Math.round(start*1000)/1000,to=Math.round(Math.min(duration,end)*1000)/1000;plan.push({skipped:false,full:from<.005&&to>=duration-.005,from,to});
+  }
+  if(plan.every(p=>p.skipped))return res.status(400).json({message:'Keep at least part of the recording.'});
+  const look='look' in (req.body||{})?(normalizeLook(req.body.look)||undefined):null;
+  plan.forEach((p,index)=>{const part=row.parts[index];part.skipped=p.skipped;if(p.skipped)return;part.trimStart=p.full?undefined:p.from;part.trimEnd=p.full?undefined:p.to;if(look!==null)part.look=look;});
+  await row.save();res.json({item:view(row)});
+ });
  app.post('/api/admin/live-recordings/:id/trim',requireAdmin,async(req,res)=>{
   if(!mongoose.isValidObjectId(req.params.id))return res.status(400).json({message:'Invalid recording.'});
   const row=await LiveRecording.findOne({_id:req.params.id,deletedAt:null,status:{$in:['ready','partial']}});
@@ -370,6 +392,7 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
   if(only!==null&&!(Number.isInteger(only)&&only>=0&&only<parts.length))return res.status(400).json({message:'Select a valid recording part.'});
   for(let index=0;index<parts.length;index++){
    await lease.assert();
+   if(parts[index]?.skipped&&only===null)continue; // a part the editor left outside the edit is not published
    const part=parts[index];
    if(only!==null&&index!==only)continue;
    if(part.delivery!=='upload'){

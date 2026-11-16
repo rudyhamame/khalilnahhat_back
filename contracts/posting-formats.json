@@ -42,6 +42,22 @@
     ]
   },
   "platforms": {
+    "echo": {
+      "label": "Echo (Reels music box)",
+      "types": [
+        {
+          "id": "reel",
+          "label": "Reel video",
+          "kind": "video",
+          "ratios": [
+            "9:16",
+            "4:5",
+            "1:1",
+            "16:9"
+          ]
+        }
+      ]
+    },
     "instagram": {
       "label": "Instagram",
       "types": [

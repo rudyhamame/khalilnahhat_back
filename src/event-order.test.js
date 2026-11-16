@@ -89,8 +89,8 @@ test('every field has one short name in both languages, and no two form fields s
   assert.equal(core.fieldName('not.a.field'),'');
 });
 test('option names come from the contract in both languages',()=>{
-  assert.equal(core.optionName('customer.contactMethod','phone'),'Phone');
-  assert.equal(core.optionName('customer.contactMethod','whatsapp',true),'واتساب');
+  assert.equal(core.optionName('customer.contactMethod','phone'),'Phone only');
+  assert.equal(core.optionName('customer.contactMethod','whatsapp',true),'واتساب فقط');
   assert.equal(core.optionName('customer.contactMethod','other'),'other');
 });
 

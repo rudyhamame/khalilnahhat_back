@@ -858,7 +858,7 @@ app.patch('/api/auth/profile', async (request, response) => {
   if (lastName !== undefined && (lastName.length > 80 || (!lastName && !user.googleSubject))) return response.status(400).json({ message: 'Enter a last name (up to 80 characters).' });
   if (phoneNumber !== undefined && !/^[0-9+()\-.\s]{0,30}$/.test(phoneNumber)) return response.status(400).json({ message: 'Enter a valid phone number.' });
   if (company !== undefined && company.length > 120) return response.status(400).json({ message: 'Company name can be up to 120 characters.' });
-  if (body.preferredContact !== undefined && !['email', 'phone', 'whatsapp'].includes(body.preferredContact)) return response.status(400).json({ message: 'Choose email, phone or WhatsApp.' });
+  if (body.preferredContact !== undefined && !['any', 'email', 'phone', 'whatsapp'].includes(body.preferredContact)) return response.status(400).json({ message: 'Choose any method, email only, phone only or WhatsApp only.' });
   if (body.emailNotifications !== undefined && typeof body.emailNotifications !== 'boolean') return response.status(400).json({ message: 'Notifications must be on or off.' });
   for (const [key, value] of Object.entries({ firstName, lastName, phoneNumber, company, preferredContact: body.preferredContact, emailNotifications: body.emailNotifications })) if (value !== undefined) user[key] = value;
   await user.save();

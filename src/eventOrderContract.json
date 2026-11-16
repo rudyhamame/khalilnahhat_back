@@ -45,26 +45,32 @@
      "label": "Preferred contact method",
      "ar": "طريقة التواصل المفضلة",
      "options": [
+      "any",
       "email",
       "phone",
       "whatsapp"
      ],
      "required": true,
      "private": true,
+     "locked": "account",
      "short": "Preferred contact",
      "shortAr": "طريقة التواصل المفضلة",
      "optionNames": {
+      "any": [
+       "Any (email, phone or WhatsApp)",
+       "أي طريقة (بريد أو هاتف أو واتساب)"
+      ],
       "email": [
-       "Email",
-       "البريد الإلكتروني"
+       "Email only",
+       "البريد الإلكتروني فقط"
       ],
       "phone": [
-       "Phone",
-       "الهاتف"
+       "Phone only",
+       "الهاتف فقط"
       ],
       "whatsapp": [
-       "WhatsApp",
-       "واتساب"
+       "WhatsApp only",
+       "واتساب فقط"
       ]
      }
     },

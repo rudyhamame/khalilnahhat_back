@@ -83,6 +83,7 @@ export function accountProfile(user){
     'customer.email':user.email||null,
     'customer.phone':user.phoneNumber||user.phone||null,
     'customer.company':user.company||null,
+    'customer.contactMethod':['any','email','phone','whatsapp'].includes(user.preferredContact)?user.preferredContact:'email',
   };
 }
 export function applyAccountProfile(order,user){

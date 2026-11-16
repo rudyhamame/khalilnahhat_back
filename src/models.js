@@ -10,7 +10,7 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, trim: true, lowercase: true },
     phoneNumber: { type: String, default: '', trim: true },
     company: { type: String, default: '', trim: true },
-    preferredContact: { type: String, enum: ['email', 'phone', 'whatsapp'], default: 'email' },
+    preferredContact: { type: String, enum: ['any', 'email', 'phone', 'whatsapp'], default: 'email' },
     emailNotifications: { type: Boolean, default: true },
     isAdmin: { type: Boolean, default: false },
     adminGrantedAt: { type: Date, default: null },

@@ -72,7 +72,10 @@ export function normalizeEventOrder(input) {
 // Contract fields marked locked:"account" belong to the signed-in account (name, email, phone, company). A booking shows them but never edits them:
 // no form input, no AI patch, no stored draft can change them. Only applyAccountProfile writes them.
 export const lockedFields=fields.filter(field=>field.locked==='account');
-export const isLockedField=path=>lockedFields.some(field=>field.key===path);
+// A guest (not signed in) fills these four in themselves; once they verify their email they become the account's.
+let accountLock=true;
+export const setAccountLock=value=>{accountLock=Boolean(value);};
+export const isLockedField=path=>accountLock&&lockedFields.some(field=>field.key===path);
 export function accountProfile(user){
   if(!user)return {};
   return {

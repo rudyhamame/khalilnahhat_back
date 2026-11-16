@@ -29,6 +29,8 @@ const userSchema = new mongoose.Schema(
     lastLoginAt: { type: Date, default: null },
     googleSubject: { type: String, unique: true, sparse: true },
     emailVerified: { type: Boolean, default: false },
+    // A guest verified their email with a code instead of signing up: a passwordless account that owns their booking.
+    isGuest: { type: Boolean, default: false },
     // Password sign-ups wait for the email link: no session and no login until it is verified.
     awaitingVerification: { type: Boolean, default: false },
     verifyTokenHash: { type: String, default: '' },

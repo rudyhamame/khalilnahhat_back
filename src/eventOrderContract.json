@@ -106,7 +106,37 @@
      ],
      "required": true,
      "short": "Event type",
-     "shortAr": "نوع الفعالية"
+     "shortAr": "نوع الفعالية",
+     "optionNames": {
+      "wedding": [
+       "Wedding",
+       "عرس"
+      ],
+      "engagement": [
+       "Engagement",
+       "خطوبة"
+      ],
+      "birthday": [
+       "Birthday",
+       "عيد ميلاد"
+      ],
+      "corporate": [
+       "Corporate Event",
+       "فعالية شركة"
+      ],
+      "party": [
+       "Private Party",
+       "حفلة خاصة"
+      ],
+      "graduation": [
+       "Graduation",
+       "تخرج"
+      ],
+      "other": [
+       "Other",
+       "أخرى"
+      ]
+     }
     },
     {
      "key": "event.title",
@@ -222,7 +252,21 @@
      ],
      "required": true,
      "short": "Venue setting",
-     "shortAr": "طبيعة المكان"
+     "shortAr": "طبيعة المكان",
+     "optionNames": {
+      "indoor": [
+       "Indoor",
+       "داخلي"
+      ],
+      "outdoor": [
+       "Outdoor",
+       "خارجي"
+      ],
+      "both": [
+       "Indoor and outdoor",
+       "داخلي وخارجي"
+      ]
+     }
     },
     {
      "key": "event.setup.requirements",

@@ -92,8 +92,14 @@ export function applyAccountProfile(order,user){
   for(const [path,value] of Object.entries(accountProfile(user)))put(next,path,value);
   return next;
 }
+// Awareness is broader than write access: location provenance is readable, but
+// only a real venue selection may write it. Account fields stay account-owned.
+export function isAiEditableField(path){
+ const field=aiFields.find(item=>item.key===path);
+ return Boolean(field&&!field.manualOnly&&!isLockedField(path));
+}
 export function updateOrderField(order,path,value,{ai=false}={}) {
-  if(isLockedField(path))return order;
+  if(isLockedField(path)||(ai&&!isAiEditableField(path)))return order;
   const field=(ai?aiFields:fields).find(item=>item.key===path);
   if(!field||!validValue(field,value))return order;
   const next=structuredClone(order);put(next,path,value);
@@ -154,6 +160,13 @@ export function orderToLegacy(order) {
   const legacy={eventType:e.type||'other',eventDate:e.date||'',startTime:e.startTime||'',endTime:e.endTime||'',phone:c.phone||'',contactMethod:c.contactMethod||'email',company:c.company||'',venueName:e.venue.name||'',venueAddress:e.venue.address||'',city:e.venue.city||'',postalCode:e.venue.postalCode||'',indoor:e.venue.setting!=='outdoor',guests:e.guestCount??0,services:order.services,musicStyle:m.styles.find(value=>['arabic','english','mixed','other'].includes(value))||'other',notes:order.additional.notes||'',setupRequirements:e.setup.requirements||'',otherMusic:m.otherPreferences||'',djMc:m.djMc||'',entrance:m.entrance||'',customMix:m.customMix||'',announcements:m.announcements||''};
   for(const key of ['setupRequirements','otherMusic','djMc','entrance','customMix','announcements'])legacy[key]=legacy[key].slice(0,2000);
   return legacy;
+}
+// Hydrate validated current context without treating existing read-only facts as
+// proposed AI edits. Iterate known paths only; never accept arbitrary paths.
+export function orderFromContext(context={}){
+ const order=createEventOrder();
+ for(const field of aiFields){const value=decodePatchValue(field,context[field.key]);if(value!==undefined&&validValue(field,value))put(order,field.key,value);}
+ return order;
 }
 export function aiOrderContext(order) {
   return Object.fromEntries(aiFields.map(field=>[field.key,getPath(order,field.key)??(['multi','links','attachments','equipment'].includes(field.type)?[]:null)]));

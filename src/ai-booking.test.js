@@ -4,7 +4,7 @@ const express=require('express');
 const {registerAiBooking,instructions}=require('./ai-booking');
 async function fixture(t,options={}){
   const app=express();app.use(express.json());
-  registerAiBooking(app,{loadBookingData:options.loadBookingData|| (async year=>({year,availability:{status:'ready',data:{days:{}}}})),loadSetupCatalog:async()=>[],configService:options.configService||null,requireAuth:(req,res,next)=>{if(req.headers.authorization!=='Bearer unit-test')return res.status(401).json({message:'Sign in is required.'});req.authUser={id:'unit-user'};next();},env:options.env||{OPENAI_API_KEY:'test-only'},recordMetric:options.recordMetric||(()=>{}),fetchImpl:options.fetchImpl||(()=>{throw new Error('Unexpected provider request');})});
+  registerAiBooking(app,{loadBookingData:options.loadBookingData|| (async year=>({year,availability:{status:'ready',data:{days:{}}}})),loadSetupCatalog:async()=>[],configService:options.configService||null,requireAuth:(req,res,next)=>{if(req.headers.authorization!=='Bearer unit-test')return res.status(401).json({message:'Sign in is required.'});req.authUser={id:'unit-user',email:'private@example.invalid'};next();},env:options.env||{OPENAI_API_KEY:'test-only'},recordMetric:options.recordMetric||(()=>{}),fetchImpl:options.fetchImpl||(()=>{throw new Error('Unexpected provider request');})});
   const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
   t.after(()=>new Promise(resolve=>server.close(resolve)));
   return (path,body,auth=true,extraHeaders={})=>fetch(`http://127.0.0.1:${server.address().port}/api/ai-booking/${path}`,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',...(auth?{Authorization:'Bearer unit-test'}:{}),...extraHeaders},body:body?JSON.stringify(body):undefined});
@@ -35,14 +35,14 @@ test('empty summary text falls back to a review prompt without claiming submissi
     assert.equal(r.status,200);const body=await r.json();assert.equal(body.draft,undefined);assert.match(body.reply,/review your event details/);assert.match(body.reply,/No booking has been submitted/);
   }
 });
-test('AI draft updates accept client contact fields as a reviewable patch',async t=>{
+test('AI reads account contacts and returns editable event patches',async t=>{
   const request=await fixture(t,{fetchImpl:async(_url,options)=>{
     const sent=JSON.parse(options.body);assert.match(JSON.stringify(sent.input),/private@example.invalid/);
     assert.ok(sent.text.format.schema.required.includes('orderPatch'));
-    return Response.json({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({reply:'What date?',section:'none',face:'none',orderPatch:[{path:'event.guestCount',value:'150'},{path:'customer.email',value:'private@example.invalid'}]})}]}]});
+    return Response.json({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({reply:'What date?',section:'none',face:'none',orderPatch:[{path:'event.guestCount',value:'150'}]})}]}]});
   }});
   const response=await request('chat',{consent:true,order:{'event.type':'wedding','customer.email':'private@example.invalid'},messages:[{role:'user',content:'We expect 150 guests.'}]});
-  assert.equal(response.status,200);assert.deepEqual((await response.json()).orderPatch,[{path:'event.guestCount',value:'150'},{path:'customer.email',value:'private@example.invalid'}]);
+  assert.equal(response.status,200);assert.deepEqual((await response.json()).orderPatch,[{path:'event.guestCount',value:'150'}]);
 });
 test('incomplete replies fail clearly without exposing a partial draft',async t=>{
   const request=await fixture(t,{fetchImpl:async()=>Response.json({status:'incomplete',output:[{content:[{type:'output_text',text:'partial sensitive response'}]}]})});
@@ -76,10 +76,10 @@ test('modern chat requests one shared patch and records usage without content',a
     const body=JSON.parse(options.body);
     assert.deepEqual(body.text.format.schema.required,['reply','orderPatch','section','face']);
     assert.deepEqual(Object.keys(body.text.format.schema.properties),['reply','section','face','orderPatch']);
-    return Response.json({status:'completed',usage:{input_tokens:120,output_tokens:30,input_tokens_details:{cached_tokens:80}},output:[{content:[{type:'output_text',text:JSON.stringify({reply:'Which date?',orderPatch:[{path:'event.type',value:'wedding'},{path:'customer.email',value:'private@example.invalid'}]})}]}]});
+    return Response.json({status:'completed',usage:{input_tokens:120,output_tokens:30,input_tokens_details:{cached_tokens:80}},output:[{content:[{type:'output_text',text:JSON.stringify({reply:'Which date?',orderPatch:[{path:'event.type',value:'wedding'}]})}]}]});
   }});
   const response=await request('chat',{consent:true,responseFormat:'patch',messages:[{role:'user',content:'PRIVATE wedding information'}]});
-  assert.deepEqual(await response.json(),{reply:'Which date?',orderPatch:[{path:'event.type',value:'wedding'},{path:'customer.email',value:'private@example.invalid'}]});
+  assert.deepEqual(await response.json(),{reply:'Which date?',orderPatch:[{path:'event.type',value:'wedding'}]});
   assert.equal(metrics[0].inputTokens,120);assert.equal(metrics[0].cachedInputTokens,80);assert.equal(metrics[0].outputTokens,30);
   assert.doesNotMatch(JSON.stringify(metrics),/PRIVATE|wedding|private@example/);
 });
@@ -93,7 +93,7 @@ test('streamed reply arrives before the validated final patch',async t=>{
     const body=new ReadableStream({async start(controller){
       controller.enqueue(encoder.encode('data: '+JSON.stringify({type:'response.output_text.delta',delta:'{"reply":"Hello'})+'\n\n'));
       await gate;
-      const result={reply:'Hello there',orderPatch:[{path:'event.type',value:'wedding'},{path:'customer.email',value:'private@example.invalid'}]};
+      const result={reply:'Hello there',orderPatch:[{path:'event.type',value:'wedding'}]};
       controller.enqueue(encoder.encode('data: '+JSON.stringify({type:'response.completed',response:{status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify(result)}]}]}})+'\n\n'));controller.close();
     }});
     return new Response(body,{headers:{'Content-Type':'text/event-stream'}});
@@ -104,7 +104,7 @@ test('streamed reply arrives before the validated final patch',async t=>{
   assert.match(first,/reply.delta/);assert.match(first,/Hello/);assert.doesNotMatch(first,/orderPatch/);
   release();let remaining='';while(true){const chunk=await reader.read();if(chunk.done)break;remaining+=decoder.decode(chunk.value);}
   const complete=remaining.trim().split('\n').map(JSON.parse).find(event=>event.type==='complete');
-  assert.deepEqual(complete.orderPatch,[{path:'event.type',value:'wedding'},{path:'customer.email',value:'private@example.invalid'}]);
+  assert.deepEqual(complete.orderPatch,[{path:'event.type',value:'wedding'}]);
 });
 test('stream interruption returns an error event and never a draft patch',async t=>{
   const text='data: '+JSON.stringify({type:'response.output_text.delta',delta:'{"reply":"Hello","orderPatch":['})+'\n\n';
@@ -169,10 +169,10 @@ test('OpenRouter free chat preserves validated order patches and never calls pai
   assert.equal(body.response_format.json_schema.schema.properties.reply.pattern,undefined);
   assert.equal(body.response_format.json_schema.schema.properties.reply.minLength,8);
   assert.match(JSON.stringify(body.messages),/private@example.invalid/);
-  return Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify({reply:'What date would you like?',orderPatch:[{path:'event.type',value:'wedding'},{path:'customer.email',value:'private@example.invalid'}]})}}],usage:{prompt_tokens:100,completion_tokens:20}});
+  return Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify({reply:'What date would you like?',orderPatch:[{path:'event.type',value:'wedding'}]})}}],usage:{prompt_tokens:100,completion_tokens:20}});
  }});
  const result=await request('chat',{consent:true,responseFormat:'patch',order:{'customer.email':'private@example.invalid'},messages:[{role:'user',content:'A wedding'}]},true,{Accept:'application/x-ndjson'});
- assert.equal(result.status,200);const events=(await result.text()).trim().split('\n').map(JSON.parse);assert.equal(events[0].type,'complete');assert.deepEqual(events[0].orderPatch,[{path:'event.type',value:'wedding'},{path:'customer.email',value:'private@example.invalid'}]);assert.ok(sent.every(url=>!url.includes('openai.com')));
+ assert.equal(result.status,200);const events=(await result.text()).trim().split('\n').map(JSON.parse);assert.equal(events[0].type,'complete');assert.deepEqual(events[0].orderPatch,[{path:'event.type',value:'wedding'}]);assert.ok(sent.every(url=>!url.includes('openai.com')));
 });
 test('Alibaba voice issues a one-time socket ticket and bridges it to the provider',async t=>{
  const {WebSocketServer,WebSocket}=require('ws');const {attachAlibabaVoiceSocket}=require('./ai-booking');const {defaults}=require('./ai-configuration');
@@ -216,4 +216,11 @@ test('text never forwards an arbitrary navigation face',async t=>{
  const request=await fixture(t,{fetchImpl:async()=>Response.json({output:[{content:[{type:'output_text',text:JSON.stringify({reply:'Here is your calendar.',section:'availability',face:'javascript:invalid',orderPatch:[]})}]}]})});
  const response=await request('chat',{consent:true,responseFormat:'patch',messages:[{role:'user',content:'Show calendar.'}]});
  assert.equal(response.status,200);assert.equal((await response.json()).face,undefined);
+});
+
+test('AI patch schema and sanitizer reject all account contact edits',()=>{
+ const {orderPatchJsonSchema,sanitizeOrderPatch}=require('./event-order');
+ const paths=['customer.fullName','customer.email','customer.phone','customer.company'];
+ for(const path of paths)assert.ok(!orderPatchJsonSchema.items.properties.path.enum.includes(path));
+ assert.deepEqual(sanitizeOrderPatch(paths.map(path=>({path,value:'Changed'}))),[]);
 });

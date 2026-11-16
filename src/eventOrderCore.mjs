@@ -64,7 +64,27 @@ export function normalizeEventOrder(input) {
   if(Array.isArray(input?.equipment))order.equipment=input.equipment.filter(item=>item&&typeof item.id==='string'&&item.id.length<=160&&Number.isInteger(item.quantity)&&item.quantity>0&&item.quantity<=10000).slice(0,100).map(item=>({id:item.id,name:String(item.name||'').slice(0,240),quantity:item.quantity}));
   return order;
 }
+// Contract fields marked locked:"account" belong to the signed-in account (name, email, phone, company). A booking shows them but never edits them:
+// no form input, no AI patch, no stored draft can change them. Only applyAccountProfile writes them.
+export const lockedFields=fields.filter(field=>field.locked==='account');
+export const isLockedField=path=>lockedFields.some(field=>field.key===path);
+export function accountProfile(user){
+  if(!user)return {};
+  return {
+    'customer.fullName':`${user.firstName||''} ${user.lastName||''}`.trim()||null,
+    'customer.email':user.email||null,
+    'customer.phone':user.phoneNumber||user.phone||null,
+    'customer.company':user.company||null,
+  };
+}
+export function applyAccountProfile(order,user){
+  if(!user)return order;
+  const next=structuredClone(order);
+  for(const [path,value] of Object.entries(accountProfile(user)))put(next,path,value);
+  return next;
+}
 export function updateOrderField(order,path,value,{ai=false}={}) {
+  if(isLockedField(path))return order;
   const field=(ai?aiFields:fields).find(item=>item.key===path);
   if(!field||!validValue(field,value))return order;
   const next=structuredClone(order);put(next,path,value);

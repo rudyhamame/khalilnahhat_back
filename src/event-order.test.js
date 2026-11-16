@@ -6,7 +6,7 @@ const core=require('./event-order');
 function completed(){
   let order=core.createEventOrder();
   for(const [key,value] of Object.entries({'customer.fullName':'Example Client','customer.email':'example@example.invalid','customer.phone':'4165550123','customer.contactMethod':'email','event.type':'wedding','event.date':'2099-06-20','event.startTime':'18:00','event.endTime':'01:00','event.guestCount':150,'event.venue.name':'Example venue','event.venue.address':'1 Example Street','event.venue.city':'Toronto','event.venue.postalCode':'M1A 1A1','event.venue.area':'gta','event.venue.setting':'indoor',services:['dj']}))order=core.updateOrderField(order,key,value);
-  return order;
+  return core.applyAccountProfile(order,{firstName:'Example',lastName:'Client',email:'example@example.invalid',phoneNumber:'4165550123'});
 }
 test('new order has unknown answers, explicit Toronto time and separate post-booking planning',()=>{
   const order=core.createEventOrder();assert.equal(order.event.guestCount,null);assert.equal(order.event.venue.area,null);assert.equal(order.event.venue.setting,null);assert.deepEqual(order.services,[]);assert.equal(order.event.timezone,'America/Toronto');assert.equal(order.planning.phase,'after_confirmation');assert.equal(order.planning.firstDance,null);
@@ -19,9 +19,9 @@ test('manual and AI produce the same event fields without treating ranges as a n
   assert.equal(ai.event.guestCount,150);assert.equal(ai.event.type,'wedding');assert.deepEqual(ai.services,['dj']);
   assert.equal(core.applyOrderPatch(ai,[{path:'event.date',value:'2099-02-30'}]).event.date,null);
 });
-test('AI can edit client draft contact fields but cannot inject unknown keys or confirm orders',()=>{
+test('AI cannot edit account contacts, inject unknown keys or confirm orders',()=>{
   const order=core.applyOrderPatch(core.createEventOrder(),[{path:'customer.email',value:'attack@example.invalid'},{path:'studio.rights.confirmed',value:'true'},{path:'status',value:'confirmed'},{path:'__proto__.polluted',value:'yes'}]);
-  assert.equal(order.customer.email,'attack@example.invalid');assert.equal(order.studio,undefined);assert.equal(order.status,undefined);assert.equal({}.polluted,undefined);
+  assert.equal(order.customer.email,null);assert.equal(order.studio,undefined);assert.equal(order.status,undefined);assert.equal({}.polluted,undefined);
 });
 test('submission validates required details; overnight times are valid',()=>{
   const order=completed();assert.deepEqual(core.validateEventOrder(order,{submission:true}),[]);
@@ -30,7 +30,7 @@ test('submission validates required details; overnight times are valid',()=>{
 });
 test('server retains full brief, enforces identity and selections, and cannot receive client pricing/status',()=>{
   const order=completed();order.status='confirmed';order.price=1;order.event.setup.requirements='x'.repeat(2800);
-  const user={firstName:'Verified',lastName:'Client',email:'verified@example.invalid'};
+  const user={firstName:'Verified',lastName:'Client',email:'verified@example.invalid',phoneNumber:'4165550123',company:'Verified Company'};
   const result=core.prepareSubmittedOrder(order,user,[{serviceId:'svc-dj',name:'DJ',category:'service',quantity:1}],[]);
   assert.equal(result.order.customer.fullName,'Verified Client');assert.equal(result.order.event.setup.requirements.length,2800);assert.equal(result.event.setupRequirements.length,2000);assert.equal(result.order.status,undefined);assert.equal(result.order.price,undefined);
   assert.throws(()=>core.prepareSubmittedOrder(order,user,[{serviceId:'svc-lighting',name:'Lighting',category:'service',quantity:1}],[]),/selections changed/);
@@ -56,10 +56,25 @@ test('dialect catalog has unique ids matching the contract, with English and Ara
   assert.deepEqual(core.updateOrderField(core.createEventOrder(),'music.dialects',['made-up']).music.dialects,[]);
 });
 
-test('full client draft edits include contacts, venue, planning, equipment and explicit clearing',()=>{
+test('client draft edits preserve account contacts while editing venue, planning and equipment',()=>{
  let order=core.applyOrderPatch(core.createEventOrder(),[{path:'customer.phone',value:'4165550123'},{path:'event.venue.address',value:'Client supplied address'},{path:'planning.mustPlay',value:'Requested song'},{path:'equipment',value:'[{"id":"speaker","quantity":2}]'}]);
- assert.equal(order.customer.phone,'4165550123');assert.equal(order.event.venue.address,'Client supplied address');assert.equal(order.equipment[0].quantity,2);assert.equal(core.normalizeEventOrder(order).planning.mustPlay,'Requested song');
+ assert.equal(order.customer.phone,null);assert.equal(order.event.venue.address,'Client supplied address');assert.equal(order.equipment[0].quantity,2);assert.equal(core.normalizeEventOrder(order).planning.mustPlay,'Requested song');
  assert.equal(core.aiOrderContext(order)['equipment'][0].id,'speaker');
  order=core.applyOrderPatch(order,[{path:'customer.phone',value:'null'},{path:'equipment',value:'[]'}]);assert.equal(order.customer.phone,null);assert.deepEqual(order.equipment,[]);
  assert.equal(core.applyOrderPatch(order,[{path:'status',value:'confirmed'}]).status,undefined);
 });
+
+ test('account identity resists manual, AI and clear patches; submission replaces forged contacts',()=>{
+ const user={firstName:'Original',lastName:'Client',email:'original@example.invalid',phoneNumber:'4165550199',company:'Original Company'};
+ const order=core.applyAccountProfile(completed(),user);
+ for(const field of core.lockedFields){
+  assert.strictEqual(core.updateOrderField(order,field.key,'Changed'),order);
+  assert.strictEqual(core.updateOrderField(order,field.key,null),order);
+  assert.equal(core.getPath(core.applyOrderPatch(order,[{path:field.key,value:'Changed'}]),field.key),core.getPath(order,field.key));
+  assert.ok(!core.orderPatchJsonSchema.items.properties.path.enum.includes(field.key));
+ }
+ const forged=structuredClone(order);for(const key of Object.keys(forged.customer))if(key!=='contactMethod')forged.customer[key]='Forged';
+ const result=core.prepareSubmittedOrder(forged,user,[{serviceId:'svc-dj',name:'DJ',category:'service',quantity:1}],[]);
+ assert.deepEqual(result.order.customer,order.customer);
+ assert.equal(core.applyAccountProfile(order,{...user,company:''}).customer.company,null);
+ });

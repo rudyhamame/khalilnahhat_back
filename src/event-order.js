@@ -2,20 +2,22 @@ const { z } = require('zod');
 const core = require('./eventOrderCore.mjs');
 const {eventSchema,normalizeQuoteItems}=require('./quote-validation');
 const orderSchema = z.custom(value => value && core.validateEventOrder(value).length === 0, 'Invalid event order JSON.');
-const orderPatchJsonSchema = { type:'array', maxItems:40, items:{type:'object',additionalProperties:false,required:['path','value'],properties:{path:{type:'string',enum:core.aiFields.map(field=>field.key)},value:{type:'string',maxLength:20000,description:'The actual stated answer: for 180 guests return the string 180; for services return a JSON array string such as ["dj"]. Omit unknown answers entirely; do not emit null.'}}} };
+// The AI is only offered fields it may change; account-owned contact details are read-only for it.
+const aiEditable = core.aiFields.filter(field => !core.isLockedField(field.key));
+const orderPatchJsonSchema = { type:'array', maxItems:40, items:{type:'object',additionalProperties:false,required:['path','value'],properties:{path:{type:'string',enum:aiEditable.map(field=>field.key)},value:{type:'string',maxLength:20000,description:'The actual stated answer: for 180 guests return the string 180; for services return a JSON array string such as ["dj"]. Omit unknown answers entirely; do not emit null.'}}} };
 function sanitizeOrderPatch(patch){
   if(!Array.isArray(patch))return [];
   return patch.slice(0,40).filter(change=>{
-    const field=core.aiFields.find(item=>item.key===change?.path);if(!field)return false;
+    const field=aiEditable.find(item=>item.key===change?.path);if(!field)return false;
     const value=core.decodePatchValue(field,change.value);
     return core.validValue(field,value);
   });
 }
 function prepareSubmittedOrder(value,user,lines,catalog){
-  const errors=core.validateEventOrder(value,{submission:true});
+  // Contact details always come from the signed-in account, never from the submitted draft.
+  const order=core.applyAccountProfile(core.normalizeEventOrder(value),user);
+  const errors=core.validateEventOrder(order,{submission:true});
   if(errors.length)throw Object.assign(new Error('Complete the required event details before submitting.'),{status:400,fields:errors});
-  const order=core.normalizeEventOrder(value);
-  order.customer.fullName=`${user.firstName} ${user.lastName}`.trim();order.customer.email=user.email;
   const legacy=eventSchema.safeParse(core.orderToLegacy(order));
   if(!legacy.success)throw Object.assign(new Error('Event details failed validation.'),{status:400});
   const items=normalizeQuoteItems(lines,catalog);

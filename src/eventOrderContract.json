@@ -12,7 +12,8 @@
      "label": "Your name",
      "ar": "اسمك الكامل",
      "required": true,
-     "private": true
+     "private": true,
+     "locked": "account"
     },
     {
      "key": "customer.email",
@@ -20,7 +21,8 @@
      "ar": "البريد الإلكتروني",
      "type": "email",
      "required": true,
-     "private": true
+     "private": true,
+     "locked": "account"
     },
     {
      "key": "customer.phone",
@@ -29,7 +31,8 @@
      "type": "tel",
      "maxLength": 30,
      "required": true,
-     "private": true
+     "private": true,
+     "locked": "account"
     },
     {
      "key": "customer.contactMethod",
@@ -48,7 +51,8 @@
      "label": "Company name (only if this is a business event)",
      "ar": "اسم الشركة (فقط إذا كانت فعالية شركة)",
      "maxLength": 120,
-     "private": true
+     "private": true,
+     "locked": "account"
     }
    ]
   },

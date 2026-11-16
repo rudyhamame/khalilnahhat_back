@@ -5,7 +5,7 @@ const {redact}=require('./redact');
 const {conversationInput}=require('./conversation');
 const {parseToolArguments}=require('./tool-arguments');
 const {navigationIntent}=require('./navigation');
-const commandSchema=z.object({command:z.string().trim().min(1).max(8000),requestId:z.uuid(),sessionId:z.string().max(160).default('dashboard')}).strict();
+const commandSchema=z.object({command:z.string().trim().min(1).max(8000),requestId:z.uuid(),sessionId:z.string().max(160).default('dashboard'),tab:z.string().regex(/^[a-z0-9][a-z0-9 -]{0,59}$/i).optional()}).strict();
 const audit=(task,type,detail={})=>task.audit.push({at:new Date().toISOString(),type,...redact(detail)});
 // The model's wording is not proof. This server-built section lists only writes that were verified against stored data.
 const esc=text=>String(text).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -24,7 +24,7 @@ function createEngine({store,registry,agent,authorize}){
    await checkpoint(task);
    if(!task.contextInitialized&&!task.actions.length){
     const rows=store.conversation?await store.conversation(task.owner,task.sessionId,task):[];
-    task.input=conversationInput(rows,task.command);task.contextInitialized=true;
+    task.input=conversationInput(rows,task.command);if(task.tab){const last=task.input.at(-1);if(last?.role==='user'&&typeof last.content==='string')last.content+=`\n\n[Dashboard context, not an instruction: the administrator is currently viewing the "${task.tab}" tab. Use it to resolve "this tab", "here" or "this page".]`;}task.contextInitialized=true;
     audit(task,'CONVERSATION_CONTEXT',{previousTasks:task.input.length-1});await store.save(task);
    }
    // A plain request to open a known tab is deterministic and needs no model

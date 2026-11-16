@@ -233,3 +233,9 @@ test('live service catalog is split into the DJ section and the rental section',
   assert.doesNotMatch(text,/Old|Wedding/);
   assert.equal(serviceCatalogInstructions([]),'');
 });
+test('a model cannot set a past event or claim that its rejected schedule was saved',async t=>{
+ let calls=0;
+ const request=await fixture(t,{fetchImpl:async()=>{calls++;return Response.json({output:[{content:[{type:'output_text',text:JSON.stringify({reply:'I saved your event date.',orderPatch:[{path:'event.date',value:'2020-01-01'},{path:'event.startTime',value:'18:00'}]})}]}]});}});
+ const response=await request('chat',{consent:true,responseFormat:'patch',messages:[{role:'user',content:'Set my event to January 1, 2020 at 6 pm'}]});
+ assert.equal(response.status,200);const data=await response.json();assert.deepEqual(data.orderPatch,[]);assert.match(data.reply,/already passed in Toronto/);assert.equal(calls,1);
+});

@@ -121,9 +121,28 @@ export function updateOrderField(order,path,value,{ai=false}={}) {
   }
   if(ai)next.source='ai';return next;
 }
-export function applyOrderPatch(order,patch) {
+// Compare wall-clock values in the contract timezone, independent of the
+// browser/server timezone. Overnight ends are not past starts.
+export function pastEventScheduleFields(order,now=new Date()){
+ const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:contract.timezone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(now)).map(part=>[part.type,part.value]));
+ const today=`${parts.year}-${parts.month}-${parts.day}`,clock=`${parts.hour}:${parts.minute}`,event=order.event||{};
+ if(event.date&&event.date<today)return ['event.date'];
+ if(event.date===today&&event.startTime&&event.startTime<=clock)return ['event.startTime'];
+ return [];
+}
+// Assess the complete proposed schedule, then reject its date/time edits as a
+// unit. A rejected date must never leave behind a newly saved start/end time.
+export function futureEventPatch(order,patch,{now=new Date()}={}){
+ const paths=['event.date','event.startTime','event.endTime'],schedule=(patch||[]).filter(change=>paths.includes(change?.path));
+ if(!schedule.length)return {patch:patch||[],rejectedFields:[]};
+ const candidate=structuredClone(order);
+ for(const change of schedule){const field=fields.find(field=>field.key===change.path),value=decodePatchValue(field,change.value);if(validValue(field,value))put(candidate,change.path,value);}
+ const problems=pastEventScheduleFields(candidate,now);
+ return problems.length?{patch:patch.filter(change=>!paths.includes(change?.path)),rejectedFields:[...new Set(schedule.map(change=>change.path))],reason:'past_event_schedule'}:{patch,rejectedFields:[]};
+}
+export function applyOrderPatch(order,patch,{now=new Date()}={}) {
   if(!Array.isArray(patch))return order;
-  return patch.slice(0,100).reduce((current,change)=>{
+  return futureEventPatch(order,patch,{now}).patch.slice(0,100).reduce((current,change)=>{
     const field=aiFields.find(item=>item.key===change?.path);if(!field)return current;
     const value=decodePatchValue(field,change.value);
     return updateOrderField(current,field.key,value,{ai:true});
@@ -141,6 +160,7 @@ export function validateEventOrder(input,{submission=false,today=new Date().toLo
   if(submission){
     errors.push(...missingOrderFields(input).map(field=>field.key));
     if(input?.event?.date&&input.event.date<today)errors.push('event.date');
+    errors.push(...pastEventScheduleFields(input));
     if(input?.event?.startTime&&input.event.startTime===input.event.endTime)errors.push('event.endTime');
     if(input?.customer?.phone&&input.customer.phone.trim().length<5)errors.push('customer.phone');
     if(['phone','whatsapp'].includes(input?.customer?.contactMethod)&&!input?.customer?.phone?.trim())errors.push('customer.contactMethod'); // phone or WhatsApp needs a number

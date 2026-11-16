@@ -18,3 +18,13 @@ test('AI context preserves current venue provenance without granting a write too
  assert.equal(core.applyOrderPatch(order,[{path:'event.venue.latitude',value:44}]).event.venue.latitude,43.65);
  assert.equal(core.applyOrderPatch(order,[{path:'event.guestCount',value:'120'}]).event.guestCount,120);
 });
+test('past schedule checks use Toronto’s date, handle winter/summer and accept future overnight ends',()=>{
+ const order=core.createEventOrder();Object.assign(order.event,{date:'2027-06-12',startTime:'19:00',endTime:'01:00'});
+ const now=new Date('2027-06-12T16:00:00Z');
+ assert.deepEqual(core.sanitizeOrderPatch([{path:'event.date',value:'2027-06-11'},{path:'event.startTime',value:'20:00'}],{order,now}),[]);
+ assert.deepEqual(core.sanitizeOrderPatch([{path:'event.startTime',value:'11:30'}],{order,now}),[]);
+ assert.deepEqual(core.sanitizeOrderPatch([{path:'event.startTime',value:'12:00'}],{order,now}),[]);
+ assert.equal(core.sanitizeOrderPatch([{path:'event.startTime',value:'18:00'},{path:'event.endTime',value:'01:00'}],{order,now}).length,2);
+ assert.deepEqual(core.pastEventScheduleFields({event:{date:'2027-01-01',startTime:'23:00'}},new Date('2027-01-02T03:00:00Z')),[]); // still Jan 1, 22:00 Toronto
+ assert.deepEqual(core.pastEventScheduleFields({event:{date:'2027-01-01',startTime:'21:00'}},new Date('2027-01-02T03:00:00Z')),['event.startTime']);
+});

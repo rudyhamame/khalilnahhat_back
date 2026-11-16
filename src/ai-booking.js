@@ -2,6 +2,7 @@ const {createOpenRouter,providerKey}=require('./openrouter');
 const {WebSocketServer}=require('ws');
 const {bridgeAlibabaVoice}=require('./ai-voice-alibaba');
 const {voiceNavigationTool,voiceNavigationInstructions,textNavigationInstructions}=require('./voice-navigation');
+const {withGuestCount}=require('./guest-count');
 const {bookingDataTool,bookingDataInstructions,createBookingData}=require('./ai-booking-data');
 const { z } = require('zod');
 const crypto = require('node:crypto');
@@ -159,6 +160,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
         if(!parsed||!Array.isArray(parsed.orderPatch)||unusableProposal(parsed))throw new Error('AI did not provide reviewable proposals');
       }
       stage = 'draft_validation';
+      parsed=withGuestCount(parsed,input.data.messages.at(-1).content,input.data.order);
       // A summary may contain a useful draft but no conversational text.
       // Preserve the review-only draft; the fallback makes no booking claims.
       const reply = typeof parsed.reply === 'string' && !parsed.reply.trim()

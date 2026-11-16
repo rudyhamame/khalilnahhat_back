@@ -28,6 +28,10 @@ const schema=new mongoose.Schema({
  publicId:String,delivery:{type:String,default:'authenticated'},bytes:{type:Number,default:0},duration:{type:Number,default:0},trimStart:Number,trimEnd:Number,look:{type:Object},
  attempts:{type:Number,default:0},nextRetryAt:{type:Date,default:()=>new Date()},leaseUntil:{type:Date,default:()=>new Date(0)},
  deletedAt:{type:Date,default:null},
+ // Saved editions of this live session: named trim + look + goal, kept so they can be reopened in the editor.
+ // Rendered reframes (free ffmpeg crops) of this live: one stored file each.
+ renders:[{name:String,part:Number,start:Number,end:Number,goal:String,status:String,error:String,publicId:String,delivery:String,bytes:Number,duration:Number,width:Number,height:Number,createdAt:{type:Date,default:Date.now}}],
+ editions:[{name:String,part:Number,start:Number,end:Number,look:{type:Object},goal:String,createdAt:{type:Date,default:Date.now}}],
  provider:{type:String,default:'livekit'},relaySegments:[String],
  direct:{ownerId:String,mime:String,count:{type:Number,default:0},bytes:{type:Number,default:0},state:String,complete:Boolean,lastChunkAt:Date},
  error:{type:String,default:''},published:{type:Boolean,default:false},test:{type:Boolean,default:false},
@@ -88,7 +92,12 @@ function wholeTransformation(row,parts,{full=false,look=true}={}){
  if(!full){const trim=wholeTrim(row,parts);steps.push(...(mediaTransformation(trim,look?row.look:null).transformation||[]));}
  return steps.length?{transformation:steps}:{};
 }
-function view(row){const parts=recordingParts(row);return {...outputView(row),...(row.outputRecordings?.length?{outputs:Array.from(row.outputRecordings,out=>({id:String(out.id),key:out.key,width:out.width||null,height:out.height||null,aspectRatio:ratio(out.width,out.height)}))}:{}),title:row.title,status:row.status,bytes:row.status==='recording'?row.direct?.bytes||0:row.bytes,durationSec:row.status==='recording'&&row.direct?.lastChunkAt?Math.max(0,Math.round((new Date(row.direct.lastChunkAt)-new Date(row.createdAt))/1000)):row.duration,published:row.published,createdAt:row.createdAt,error:row.error||'',captureState:row.captureState||'unknown',captureCheckedAt:row.captureCheckedAt||null,warning:row.captureWarning||'',cleanupPending:Boolean(row.cleanupPending),savedPartCount:parts.length,retrying:row.status==='upload_failed'&&(row.attempts||0)<3,canRetry:['failed','upload_failed'].includes(row.status)||row.captureState==='failed'||(row.status==='partial'&&row.sources?.some(source=>!source.saved)),canRemove:!row.cleanupPending&&(['ready','partial','not_recorded'].includes(row.status)||(['failed','upload_failed'].includes(row.status)&&row.captureState==='ended')),canPreview:['ready','partial'].includes(row.status)&&parts.length>0,partCount:parts.length,parts:parts.map((part,index)=>{const trim=partTrim(part);return {index,bytes:part.bytes,durationSec:part.duration,trimStartSec:trim?.start||0,trimEndSec:trim?.end||part.duration||0,selectedDurationSec:trim?trim.end-trim.start:part.duration,...(normalizeLook(part.look)?{look:normalizeLook(part.look)}:{})};}),...(parts.length>1?{whole:wholeView(row,parts)}:{})};}
+const RENDER_GOALS={'instagram-reel-p':9/16,'instagram-reel-l':16/9,'youtube-short-p':9/16,'youtube-short-l':16/9,'youtube-video-l':16/9,'tiktok-p':9/16,'tiktok-l':16/9};
+function renderView(row){return Array.from(row.renders||[],item=>({id:String(item._id),name:item.name,part:item.part||0,start:item.start,end:item.end,goal:item.goal||'',
+ // A job that was running when the server restarted never finishes: show it as failed instead of spinning forever.
+ status:item.status==='processing'&&Date.now()-new Date(item.createdAt)>2*3600*1000?'failed':item.status,error:item.status==='processing'&&Date.now()-new Date(item.createdAt)>2*3600*1000?'The render was interrupted. Start it again.':item.error||'',bytes:item.bytes||0,duration:item.duration||0,width:item.width||null,height:item.height||null,createdAt:item.createdAt}));}
+function editionView(row){return Array.from(row.editions||[],edition=>({id:String(edition._id),name:edition.name,part:edition.part||0,start:edition.start,end:edition.end,goal:edition.goal||'',...(normalizeLook(edition.look)?{look:normalizeLook(edition.look)}:{}),createdAt:edition.createdAt}));}
+function view(row){const parts=recordingParts(row);return {...outputView(row),editions:editionView(row),renders:renderView(row),...(row.outputRecordings?.length?{outputs:Array.from(row.outputRecordings,out=>({id:String(out.id),key:out.key,width:out.width||null,height:out.height||null,aspectRatio:ratio(out.width,out.height)}))}:{}),title:row.title,status:row.status,bytes:row.status==='recording'?row.direct?.bytes||0:row.bytes,durationSec:row.status==='recording'&&row.direct?.lastChunkAt?Math.max(0,Math.round((new Date(row.direct.lastChunkAt)-new Date(row.createdAt))/1000)):row.duration,published:row.published,createdAt:row.createdAt,error:row.error||'',captureState:row.captureState||'unknown',captureCheckedAt:row.captureCheckedAt||null,warning:row.captureWarning||'',cleanupPending:Boolean(row.cleanupPending),savedPartCount:parts.length,retrying:row.status==='upload_failed'&&(row.attempts||0)<3,canRetry:['failed','upload_failed'].includes(row.status)||row.captureState==='failed'||(row.status==='partial'&&row.sources?.some(source=>!source.saved)),canRemove:!row.cleanupPending&&(['ready','partial','not_recorded'].includes(row.status)||(['failed','upload_failed'].includes(row.status)&&row.captureState==='ended')),canPreview:['ready','partial'].includes(row.status)&&parts.length>0,partCount:parts.length,parts:parts.map((part,index)=>{const trim=partTrim(part);return {index,bytes:part.bytes,durationSec:part.duration,trimStartSec:trim?.start||0,trimEndSec:trim?.end||part.duration||0,selectedDurationSec:trim?trim.end-trim.start:part.duration,...(normalizeLook(part.look)?{look:normalizeLook(part.look)}:{})};}),...(parts.length>1?{whole:wholeView(row,parts)}:{})};}
 function wholeView(row,parts){const duration=wholeDuration(parts),trim=wholeTrim(row,parts),look=normalizeLook(row.look);return {durationSec:duration,trimStartSec:trim?.start||0,trimEndSec:trim?.end||duration,selectedDurationSec:trim?trim.end-trim.start:duration,...(look?{look}:{})};}
 // ttl: how long the private link works (seconds). A download starts at once, so 3 minutes is plenty; a <video> keeps asking for more of the file
 // while it plays, pauses and seeks, so the preview link must outlive the viewing session.
@@ -211,6 +220,73 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
   const row=mongoose.isValidObjectId(req.params.id)?await LiveRecording.findOneAndUpdate({_id:req.params.id,deletedAt:null,$or:[{status:{$in:['failed','upload_failed']}},{status:'recording',captureState:'failed'},{status:'partial',sources:{$elemMatch:{saved:false}}}],leaseUntil:{$lte:new Date()}},{$set:{attempts:0,captureAttempts:0,status:'upload_failed',nextRetryAt:new Date()}},{new:true}):null;
   if(!row)return res.status(409).json({message:'This recording cannot be retried now.'});
   res.json({item:view(row)});sweep().catch(()=>{});
+ });
+ // Renders: one queue, one ffmpeg at a time (free server CPU, no paid transformations).
+ let renderQueue=Promise.resolve();
+ async function runRender(rowId,renderId,job){
+  const fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path'),{renderCrop}=require('./portrait-render');
+  const mark=fields=>LiveRecording.updateOne({_id:rowId,'renders._id':renderId},{$set:Object.fromEntries(Object.entries(fields).map(([k,v])=>['renders.$.'+k,v]))});
+  let dir;
+  try{
+   dir=await fs.mkdtemp(path.join(os.tmpdir(),'echo-render-'));
+   const inputUrl=cloudinary.utils.private_download_url(job.part.publicId,'mp4',{resource_type:'video',type:job.part.delivery||'authenticated',expires_at:Math.floor(Date.now()/1000)+7200});
+   const out=path.join(dir,'render.mp4'),info=await renderCrop({inputUrl,start:job.start,end:job.end,frame:job.frame,ratio:job.ratio,track:job.track,outFile:out,workDir:dir});
+   const publicId=`Live/${job.room}/renders/${renderId}`;
+   await new Promise((resolve,reject)=>{const stream=cloudinary.uploader.upload_large(out,{resource_type:'video',type:'authenticated',public_id:publicId,overwrite:true,chunk_size:20*1024*1024,timeout:600000},(error,result)=>error?reject(error):resolve(result));stream.on('error',reject);});
+   await mark({status:'ready',error:'',publicId,delivery:'authenticated',bytes:info.bytes,duration:info.duration,width:info.width,height:info.height});
+  }catch(error){
+   await mark({status:'failed',error:String(error?.message||'The render failed.').slice(0,200)}).catch(()=>{});
+  }finally{if(dir)fs.rm(dir,{recursive:true,force:true}).catch(()=>{});}
+ }
+ app.post('/api/admin/live-recordings/:id/renders',requireAdmin,async(req,res)=>{
+  if(!mongoose.isValidObjectId(req.params.id))return res.status(400).json({message:'Invalid recording.'});
+  const row=await LiveRecording.findOne({_id:req.params.id,deletedAt:null,status:{$in:['ready','partial']}});
+  if(!row)return res.status(409).json({message:'Wait for the recording to finish saving.'});
+  const parts=recordingParts(row),index=Number(req.body?.part)||0,part=parts[index],duration=Number(part?.duration)||0,start=Number(req.body?.start),end=Number(req.body?.end),f=req.body?.frame||{},ratio=RENDER_GOALS[req.body?.goal];
+  if(!part||!duration||!Number.isFinite(start)||!Number.isFinite(end)||start<0||end<=start||end>duration+.05||end-start<.5)return res.status(400).json({message:'Choose a valid range of at least half a second.'});
+  if(!ratio)return res.status(400).json({message:'Choose an editing goal.'});
+  const frame={x:Number(f.x),y:Number(f.y),w:Number(f.w)};
+  if(![frame.x,frame.y,frame.w].every(Number.isFinite)||frame.w<.05||frame.w>1||frame.x<0||frame.y<0)return res.status(400).json({message:'The crop frame is not valid.'});
+  const track=(Array.isArray(req.body?.track)?req.body.track:[]).slice(0,5000).map(p=>[Number(p?.[0]),Number(p?.[1])]).filter(p=>p.every(Number.isFinite)).map(([t,x])=>[t-start,x]).filter(([t])=>t>=-1&&t<=end-start+1);
+  if(row.renders.filter(item=>item.status==='processing').length>=3)return res.status(409).json({message:'Three renders are already waiting. Try again in a few minutes.'});
+  if(row.renders.length>=20)return res.status(409).json({message:'This live has 20 renders. Delete one first.'});
+  const name=String(req.body?.name||'').trim().slice(0,80)||`Render ${row.renders.length+1}`;
+  row.renders.push({name,part:index,start:Math.round(start*1000)/1000,end:Math.round(Math.min(duration,end)*1000)/1000,goal:req.body.goal,status:'processing',error:''});
+  await row.save();
+  const renderId=row.renders.at(-1)._id;
+  renderQueue=renderQueue.then(()=>runRender(row._id,renderId,{part,start,end:Math.min(duration,end),frame,ratio,track,room:String(row.roomName||row._id).replace(/[^\w-]/g,'')})).catch(()=>{});
+  res.status(202).json({item:view(row)});
+ });
+ app.get('/api/admin/live-recordings/:id/renders/:renderId/download',requireAdmin,async(req,res)=>{
+  res.set('Cache-Control','no-store');
+  if(!mongoose.isValidObjectId(req.params.id))return res.status(400).json({message:'Invalid recording.'});
+  const row=await LiveRecording.findOne({_id:req.params.id,deletedAt:null}),item=row?.renders.id(req.params.renderId);
+  if(!item||item.status!=='ready'||!item.publicId)return res.status(404).json({message:'The render is not ready.'});
+  res.json({url:cloudinary.utils.private_download_url(item.publicId,'mp4',{resource_type:'video',type:item.delivery||'authenticated',expires_at:Math.floor(Date.now()/1000)+180,attachment:true}),expiresIn:180});
+ });
+ app.delete('/api/admin/live-recordings/:id/renders/:renderId',requireAdmin,async(req,res)=>{
+  if(!mongoose.isValidObjectId(req.params.id)||!mongoose.isValidObjectId(req.params.renderId))return res.status(400).json({message:'Invalid render.'});
+  const row=await LiveRecording.findOne({_id:req.params.id,deletedAt:null}),item=row?.renders.id(req.params.renderId);
+  if(!item)return res.status(404).json({message:'Render not found.'});
+  if(item.publicId)await cloudinary.uploader.destroy(item.publicId,{resource_type:'video',type:item.delivery||'authenticated'}).catch(()=>{});
+  item.deleteOne();await row.save();res.json({item:view(row)});
+ });
+ app.post('/api/admin/live-recordings/:id/editions',requireAdmin,async(req,res)=>{
+  if(!mongoose.isValidObjectId(req.params.id))return res.status(400).json({message:'Invalid recording.'});
+  const row=await LiveRecording.findOne({_id:req.params.id,deletedAt:null,status:{$in:['ready','partial']}});
+  if(!row)return res.status(409).json({message:'Wait for the recording to finish saving.'});
+  const parts=recordingParts(row),part=Number(req.body?.part)||0,start=Number(req.body?.start),end=Number(req.body?.end),duration=Number(parts[part]?.duration)||0,name=String(req.body?.name||'').trim().slice(0,80);
+  if(!parts[part]||!duration||!Number.isFinite(start)||!Number.isFinite(end)||start<0||end<=start||end>duration+.05||end-start<.1)return res.status(400).json({message:'Choose a valid trim range of at least 0.1 seconds.'});
+  if(!name)return res.status(400).json({message:'Name this edition.'});
+  if((row.editions?.length||0)>=30)return res.status(409).json({message:'This live has 30 editions. Delete one first.'});
+  row.editions.push({name,part,start:Math.round(start*1000)/1000,end:Math.round(Math.min(duration,end)*1000)/1000,look:normalizeLook(req.body?.look)||undefined,goal:String(req.body?.goal||'').slice(0,40)});
+  await row.save();res.json({item:view(row)});
+ });
+ app.delete('/api/admin/live-recordings/:id/editions/:editionId',requireAdmin,async(req,res)=>{
+  if(!mongoose.isValidObjectId(req.params.id)||!mongoose.isValidObjectId(req.params.editionId))return res.status(400).json({message:'Invalid edition.'});
+  const row=await LiveRecording.findOneAndUpdate({_id:req.params.id,deletedAt:null},{$pull:{editions:{_id:req.params.editionId}}},{new:true});
+  if(!row)return res.status(404).json({message:'Recording not found.'});
+  res.json({item:view(row)});
  });
  app.post('/api/admin/live-recordings/:id/trim',requireAdmin,async(req,res)=>{
   if(!mongoose.isValidObjectId(req.params.id))return res.status(400).json({message:'Invalid recording.'});

@@ -6,7 +6,7 @@ const planningFields=['brideName','groomName','timeline','partyEntrances','entra
 planningFields.push({key:'planning.musicUploads',label:'Planning music references',type:'links'});
 export const aiFields = [...fields,...planningFields,{key:'equipment',label:'Equipment and complete sets',type:'equipment'}];
 export function decodePatchValue(field,value){
- if(typeof value==='string'&&(value==='null'||['number','coordinate','boolean','multi','links','songs','tags','pairs','equipment'].includes(field.type))){try{return JSON.parse(value);}catch{return undefined;}}
+ if(typeof value==='string'&&(value==='null'||['number','coordinate','boolean','multi','links','songs','tags','pairs','attachments','equipment'].includes(field.type))){try{return JSON.parse(value);}catch{return undefined;}}
  return value;
 }
 export const getPath = (object, path) => path.split('.').reduce((value, key) => value?.[key], object);
@@ -27,7 +27,7 @@ export function hasEventDraftContent(order) {
 }
 export function createEventOrder() {
   const order={schemaVersion:contract.version,source:'manual'};
-  for(const field of fields)put(order,field.key,['multi','links','songs','tags','pairs'].includes(field.type)?[]:null);
+  for(const field of fields)put(order,field.key,['multi','links','songs','tags','pairs','attachments'].includes(field.type)?[]:null);
   order.event.timezone=contract.timezone;
   order.equipment=[];
   // This belongs to the confirmed-booking workflow, not the quote questionnaire.
@@ -40,9 +40,10 @@ export function validValue(field, value) {
   // Ordered suggested songs: [{phase,song}], e.g. an intro song, then an outro song.
   if(field.type==='songs')return Array.isArray(value)&&value.length<=30&&value.every(item=>item&&typeof item==='object'&&typeof item.song==='string'&&item.song.trim().length>0&&item.song.length<=200&&typeof item.phase==='string'&&item.phase.length<=80&&(item.link===undefined||(typeof item.link==='string'&&item.link.length<=2048&&/^https:\/\/\S+$/i.test(item.link)))&&(!field.phases||item.phase===''||field.phases.includes(item.phase)));
   // Lists chosen from the Work Elements (genres) are free text names; language pairs are {language, dialect}.
+  if(field.type==='attachments')return Array.isArray(value)&&value.length<=12&&value.every(item=>item&&typeof item==='object'&&typeof item.url==='string'&&item.url.length<=2048&&/^https:\/\//i.test(item.url)&&safeLink(item.url)&&new URL(item.url).hostname==='res.cloudinary.com'&&typeof item.name==='string'&&item.name.length>0&&item.name.length<=160&&(item.comment===undefined||(typeof item.comment==='string'&&item.comment.length<=500)));
   if(field.type==='tags')return Array.isArray(value)&&value.length<=40&&value.every(item=>typeof item==='string'&&item.trim().length>0&&item.length<=80);
   if(field.type==='pairs')return Array.isArray(value)&&value.length<=40&&value.every(item=>item&&typeof item==='object'&&typeof item.language==='string'&&item.language.trim().length>0&&item.language.length<=80&&typeof item.dialect==='string'&&item.dialect.length<=80);
-  if(value===null)return !['multi','links','songs','tags','pairs'].includes(field.type);
+  if(value===null)return !['multi','links','songs','tags','pairs','attachments'].includes(field.type);
   if(field.type==='coordinate')return typeof value==='number'&&Number.isFinite(value)&&Math.abs(value)<=field.max;
   if(field.type==='number')return typeof value==='number'&&Number.isInteger(value)&&value>=0&&value<=(field.max||100000);
   if(field.type==='boolean')return typeof value==='boolean';
@@ -125,7 +126,7 @@ export function orderToLegacy(order) {
   return legacy;
 }
 export function aiOrderContext(order) {
-  return Object.fromEntries(aiFields.map(field=>[field.key,getPath(order,field.key)??(['multi','links','equipment'].includes(field.type)?[]:null)]));
+  return Object.fromEntries(aiFields.map(field=>[field.key,getPath(order,field.key)??(['multi','links','attachments','equipment'].includes(field.type)?[]:null)]));
 }
 
 // Opening line for a voice call: greet, say what the assistant is for, recap the draft, then offer help with what is still empty.

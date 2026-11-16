@@ -339,6 +339,9 @@ function serializeUser(user) {
     lastName: user.lastName,
     email: user.email,
     phoneNumber: user.phoneNumber,
+    company: user.company || '',
+    preferredContact: user.preferredContact || 'email',
+    emailNotifications: user.emailNotifications !== false,
     emailVerified: Boolean(user.emailVerified),
     isAdmin: isAdminUser(user),
   };
@@ -841,6 +844,23 @@ app.get('/api/auth/me', async (request, response) => {
   return response.json({
     user: serializeUser(user),
   });
+});
+
+// Client "Personal info" tab: the signed-in person edits their own profile only (the id comes from the session, never the body).
+app.patch('/api/auth/profile', async (request, response) => {
+  const user = await authFromRequest(request);
+  if (!user) return response.status(401).json({ message: 'No active session.' });
+  const body = request.body || {}, text = (key) => (typeof body[key] === 'string' ? body[key].trim() : undefined);
+  const firstName = text('firstName'), lastName = text('lastName'), phoneNumber = text('phoneNumber'), company = text('company');
+  if (firstName !== undefined && (!firstName || firstName.length > 80)) return response.status(400).json({ message: 'Enter a first name (up to 80 characters).' });
+  if (lastName !== undefined && (lastName.length > 80 || (!lastName && !user.googleSubject))) return response.status(400).json({ message: 'Enter a last name (up to 80 characters).' });
+  if (phoneNumber !== undefined && !/^[0-9+()\-.\s]{0,30}$/.test(phoneNumber)) return response.status(400).json({ message: 'Enter a valid phone number.' });
+  if (company !== undefined && company.length > 120) return response.status(400).json({ message: 'Company name can be up to 120 characters.' });
+  if (body.preferredContact !== undefined && !['email', 'phone', 'whatsapp'].includes(body.preferredContact)) return response.status(400).json({ message: 'Choose email, phone or WhatsApp.' });
+  if (body.emailNotifications !== undefined && typeof body.emailNotifications !== 'boolean') return response.status(400).json({ message: 'Notifications must be on or off.' });
+  for (const [key, value] of Object.entries({ firstName, lastName, phoneNumber, company, preferredContact: body.preferredContact, emailNotifications: body.emailNotifications })) if (value !== undefined) user[key] = value;
+  await user.save();
+  return response.json({ user: serializeUser(user) });
 });
 
 require('./google-auth').registerGoogleAuth(app, {

@@ -463,6 +463,22 @@
      "private": true
     },
     {
+     "key": "references.photos",
+     "label": "Inspiration photos with comments (optional)",
+     "ar": "صور ملهمة مع تعليقات (اختياري)",
+     "type": "attachments",
+     "hidden": true,
+     "private": true
+    },
+    {
+     "key": "references.files",
+     "label": "Event documents with notes (optional)",
+     "ar": "مستندات الفعالية مع ملاحظات (اختياري)",
+     "type": "attachments",
+     "hidden": true,
+     "private": true
+    },
+    {
      "key": "additional.specialRequests",
      "label": "Any special requests? (optional)",
      "ar": "طلبات خاصة؟ (اختياري)",

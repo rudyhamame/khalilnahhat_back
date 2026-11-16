@@ -188,6 +188,9 @@ async function sendServiceQuoteNotification(serviceRequest) {
 }
 
 async function sendQuoteExpiryReminder(serviceRequest, expiresAt) {
+  // Reminders are optional: respect the client's "email notifications" switch (quotes, confirmations and account emails are always sent).
+  const account = await require('./models').User.findOne({ email: String(serviceRequest.customerEmail || '').toLowerCase() }).select('emailNotifications').lean().catch(() => null);
+  if (account?.emailNotifications === false) return { skipped: 'email-notifications-off' };
   const when = new Intl.DateTimeFormat('en-CA', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Toronto' }).format(expiresAt);
 
   return sendBrevoEmail({

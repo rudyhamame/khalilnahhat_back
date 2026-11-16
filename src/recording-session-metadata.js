@@ -20,7 +20,7 @@ function registerRecordingSessionMetadata(app,requireAdmin,{Recording,LiveSessio
   res.set('Cache-Control','no-store');
   const row=isValidId(req.params.id)?await Recording.findOne({_id:req.params.id,deletedAt:null}):null;
   if(!row)return res.status(404).json({message:'Recording not found.'});
-  return res.json(await sessionMetadata(row.roomName,{LiveSession,LiveRequest,LiveComment}));
+  return res.json(await sessionMetadata(row.sessionRoomName||row.roomName,{LiveSession,LiveRequest,LiveComment}));
  });
 }
 module.exports={sessionMetadata,registerRecordingSessionMetadata};

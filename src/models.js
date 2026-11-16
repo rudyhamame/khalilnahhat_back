@@ -253,6 +253,7 @@ const liveStreamConfigSchema = new mongoose.Schema(
     webrtcRoomName: { type: String, default: '', trim: true },
     broadcastSource: { type: String, enum: ['', 'browser', 'android', 'obs'], default: '' },
     obsRoomName: { type: String, default: '' },
+    obsPortraitRoomName: { type: String, default: '' },
     obsIngressId: { type: String, default: '' },
     obsUrl: { type: String, default: '' },
     obsStreamKey: { type: String, default: '' },

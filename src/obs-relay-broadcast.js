@@ -5,8 +5,9 @@ function createRelayBroadcast(deps) {
  async function stop(row) {
   const ending=await LiveStreamConfig.findOneAndUpdate(owned(row),{isLive:false,obsState:'ending',streamUrl:'',statusLabel:defaults.statusLabel},{new:true});
   if(!ending)return getLiveStreamConfig();
+  if(row.obsPortraitRoomName)await relay.request(relay.sessionRoute(row.obsPortraitRoomName),{method:'DELETE',allowMissing:true});
   await relay.request(relay.sessionRoute(row.obsRoomName),{method:'DELETE',allowMissing:true});
-  return await LiveStreamConfig.findOneAndUpdate(owned(row),{isLive:false,webrtcRoomName:'',obsRoomName:'',obsIngressId:'',obsUrl:'',obsStreamKey:'',obsState:'',obsExpiresAt:null,streamUrl:'',statusLabel:defaults.statusLabel},{new:true}) || getLiveStreamConfig();
+  return await LiveStreamConfig.findOneAndUpdate(owned(row),{isLive:false,webrtcRoomName:'',obsRoomName:'',obsPortraitRoomName:'',obsIngressId:'',obsUrl:'',obsStreamKey:'',obsState:'',obsExpiresAt:null,streamUrl:'',statusLabel:defaults.statusLabel},{new:true}) || getLiveStreamConfig();
  }
  async function synchronize(row) {
   if(row.obsState==='ending')return stop(row);
@@ -16,7 +17,9 @@ function createRelayBroadcast(deps) {
    const cleared=await stop(row);
    return status?.error?Object.assign(cleared,{_obsRelayError:status.error}):cleared;
   }
-  const live=status.state==='live';
+  const portrait=row.obsPortraitRoomName?await relay.request(relay.sessionRoute(row.obsPortraitRoomName),{allowMissing:true}):null;
+  if(portrait?.state==='ended')return stop(row);
+  const live=status.state==='live'&&(!row.obsPortraitRoomName||portrait?.state==='live');
   const updated=await LiveStreamConfig.findOneAndUpdate({...owned(row),obsState:{$in:['preparing','waiting','live']}},
    {isLive:live,obsState:live?'live':'waiting',streamUrl:live?status.playbackUrl:'',statusLabel:live?'Live now — DJ Khalil is on air.':defaults.statusLabel},{new:true});
   if(updated)await deps.notifyLiveTransition?.(row,updated);

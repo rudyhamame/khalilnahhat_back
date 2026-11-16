@@ -1,5 +1,6 @@
 const {randomBytes}=require('node:crypto');
 const defaultRelay=require('./obs-relay-client');
+const {captureOutputs,outputView}=require('./recording-outputs');
 // The browser sends one H.264/Opus stream directly to OVH. MediaMTX forwards it
 // and packages the same encoded tracks into private recording segments.
 function registerOvhBrowserRoutes(app,deps,legacy,{relay=defaultRelay,env=process.env,Recording}={}){
@@ -7,8 +8,12 @@ function registerOvhBrowserRoutes(app,deps,legacy,{relay=defaultRelay,env=proces
  const enabled=()=>env.ECHO_BROWSER_TRANSPORT==='ovh'&&relay.configured();
  const active=row=>row.broadcastSource==='browser'&&row.broadcastMode==='whep'&&row.obsRoomName;
  const records=()=>Recording||require('./live-recordings').LiveRecording;
- const responseFor=async row=>({item:serialize(row),transport:'ovh',roomName:row.obsRoomName,url:new URL(`/live/${row.obsRoomName}/whip`,env.ECHO_OBS_RELAY_URL).href,token:row.obsStreamKey,
-  recording:row.obsSaveRecording!==false?{id:String((await records().findOne({roomName:row.obsRoomName,deletedAt:null}))?._id||''),mode:'ovh'}:{mode:'none'}});
+ const responseFor=async row=>{
+  const recording=row.obsSaveRecording!==false?await records().findOne({roomName:row.obsRoomName,deletedAt:null}):null;
+  return {item:serialize(row),transport:'ovh',roomName:row.obsRoomName,url:new URL(`/live/${row.obsRoomName}/whip`,env.ECHO_OBS_RELAY_URL).href,token:row.obsStreamKey,
+   ...(row.obsPortraitRoomName?{portraitPublisher:{url:new URL(`/live/${row.obsPortraitRoomName}/whip`,env.ECHO_OBS_RELAY_URL).href,token:row.obsStreamKey}}:{}),
+   recording:recording?{id:String(recording._id),mode:'ovh',outputs:recording.outputRecordings?.length?recording.outputRecordings.map(out=>({id:String(out.id),key:out.key,width:out.width,height:out.height})):[outputView(recording)]}:{mode:'none'}};
+ };
  app.post('/api/live-stream/webrtc/go-live',requireAdmin,async(req,res,next)=>{
   if(req.body?.transport!=='ovh')return next();
   res.set?.('Cache-Control','no-store');
@@ -17,18 +22,26 @@ function registerOvhBrowserRoutes(app,deps,legacy,{relay=defaultRelay,env=proces
   try{
    const current=await getLiveStreamConfig();
    if(current.isLive||current.webrtcRoomName||current.obsRoomName)return res.status(409).json({message:'End the current live before starting another.'});
-   const id=`khalil-obs-${randomUUID()}`,publishToken=randomBytes(32).toString('hex'),saveRecording=req.body.saveRecording!==false,title=String(req.body.title||current.title||defaults.title).trim().slice(0,180);
+   const outputs=captureOutputs(req.body.outputs);
+   const id=`khalil-obs-${randomUUID()}`,portraitId=outputs.length===2?`khalil-obs-${randomUUID()}`:'',publishToken=randomBytes(32).toString('hex'),saveRecording=req.body.saveRecording!==false,title=String(req.body.title||current.title||defaults.title).trim().slice(0,180);
    if(saveRecording&&!env.CLOUDINARY_API_SECRET)throw Object.assign(new Error('Private recording archive is not configured.'),{status:503});
    await relay.request('health');
-   claimed=await LiveStreamConfig.findOneAndUpdate({key:defaults.key,isLive:{$ne:true},webrtcRoomName:{$in:['',null]},obsRoomName:{$in:['',null]}},{isLive:false,title,broadcastMode:'whep',broadcastSource:'browser',webrtcRoomName:id,obsRoomName:id,obsStreamKey:publishToken,obsUrl:'',obsState:'preparing',obsSaveRecording:saveRecording,obsExpiresAt:new Date(Date.now()+120000),streamUrl:'',statusLabel:'Connecting browser…'},{new:true});
+   claimed=await LiveStreamConfig.findOneAndUpdate({key:defaults.key,isLive:{$ne:true},webrtcRoomName:{$in:['',null]},obsRoomName:{$in:['',null]}},{isLive:false,title,broadcastMode:'whep',broadcastSource:'browser',webrtcRoomName:id,obsRoomName:id,obsPortraitRoomName:portraitId,obsStreamKey:publishToken,obsUrl:'',obsState:'preparing',obsSaveRecording:saveRecording,obsExpiresAt:new Date(Date.now()+120000),streamUrl:'',statusLabel:'Connecting browser…'},{new:true});
    if(!claimed)return res.status(409).json({message:'Another source started first.'});
    await relay.request('sessions',{method:'POST',body:{id,publishToken,saveRecording}});
-   if(saveRecording)await records().create({roomName:id,title,provider:'ovh',captureState:'waiting'});
+   if(portraitId)await relay.request('sessions',{method:'POST',body:{id:portraitId,publishToken,saveRecording}});
+   if(saveRecording){
+    const main=await records().create({roomName:id,title,provider:'ovh',captureState:'waiting',outputKey:'main',width:outputs[0].width,height:outputs[0].height});
+    if(portraitId){
+     const child=await records().create({roomName:portraitId,title,provider:'ovh',captureState:'waiting',parentRecordingId:main._id,sessionRoomName:id,outputKey:'portrait',width:outputs[1].width,height:outputs[1].height});
+     main.outputRecordings=[outputView(main),outputView(child)];await main.save();
+    }
+   }
    return res.status(201).json(await responseFor(claimed));
   }catch(error){
    // Do not release ownership until publishing credentials have been revoked.
    if(claimed)try{await legacy.stop(claimed);}catch{/* The synchronizer retains and retries the reservation. */}
-   return res.status(error.status===409?409:503).json({message:error.status?error.message:'OVH could not prepare the broadcast. No browser recording was started.'});
+   return res.status(error.status===400?400:error.status===409?409:503).json({message:error.status?error.message:'OVH could not prepare the broadcast. No browser recording was started.'});
   }
  });
  app.post('/api/live-stream/webrtc/ready',requireAdmin,async(req,res,next)=>{
@@ -39,7 +52,14 @@ function registerOvhBrowserRoutes(app,deps,legacy,{relay=defaultRelay,env=proces
    let status;
    for(let attempt=0;attempt<20;attempt++){
     status=await relay.request(relay.sessionRoute(current.obsRoomName));
-    if(status.state==='live')break;
+    if(status.state==='live'){
+     if(!current.obsPortraitRoomName)break;
+     const portrait=await relay.request(relay.sessionRoute(current.obsPortraitRoomName));
+     if(current.obsSaveRecording!==false&&portrait.saveRecording===false)throw new Error('The portrait camera recording did not start.');
+     if(portrait.state==='live')break;
+     if(portrait.state==='ended')throw new Error('The portrait camera disconnected.');
+     status={state:'waiting'};
+    }
     if(status.state==='ended')throw new Error('OVH rejected the media codec or the source stopped.');
     await new Promise(resolve=>setTimeout(resolve,250));
    }

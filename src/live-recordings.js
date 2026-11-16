@@ -12,11 +12,14 @@ const {recordingStorageConfig}=require('./recording-storage');
 const {createRecordingPipeline}=require('./recording-pipeline');
 const {createRecordingProviders}=require('./recording-providers');
 const {prepareRecordingFiles}=require('./recording-files');
+const {captureOutputs,outputView,recordingGroups,ratio}=require('./recording-outputs');
 
-const partSchema={_id:false,publicId:String,delivery:String,bytes:Number,duration:Number,sha256:String,trimStart:Number,trimEnd:Number,look:{type:Object}};
+const partSchema={_id:false,publicId:String,delivery:String,bytes:Number,duration:Number,width:Number,height:Number,sha256:String,trimStart:Number,trimEnd:Number,look:{type:Object}};
 const sourceSchema={_id:false,key:String,remote:String,saved:Boolean,cleaned:Boolean,error:String,parts:[partSchema]};
 const schema=new mongoose.Schema({
  commentsCaptured:{type:Boolean,default:false},
+ sessionRoomName:String,parentRecordingId:{type:mongoose.Schema.Types.ObjectId,index:true},outputKey:{type:String,default:'main'},width:Number,height:Number,
+ outputRecordings:[{_id:false,id:mongoose.Schema.Types.ObjectId,key:String,width:Number,height:Number}],
  recordingTimeline:{type:[{_id:false,startMs:Number,endMs:Number,offsetSec:Number}],default:undefined},
  roomName:{type:String,unique:true,required:true},title:String,status:{type:String,default:'waiting'},egressId:String,objectKey:String,
  parts:[partSchema],sources:[sourceSchema],legacyParts:[partSchema],
@@ -85,7 +88,7 @@ function wholeTransformation(row,parts,{full=false,look=true}={}){
  if(!full){const trim=wholeTrim(row,parts);steps.push(...(mediaTransformation(trim,look?row.look:null).transformation||[]));}
  return steps.length?{transformation:steps}:{};
 }
-function view(row){const parts=recordingParts(row);return {id:String(row._id),title:row.title,status:row.status,bytes:row.status==='recording'?row.direct?.bytes||0:row.bytes,durationSec:row.status==='recording'&&row.direct?.lastChunkAt?Math.max(0,Math.round((new Date(row.direct.lastChunkAt)-new Date(row.createdAt))/1000)):row.duration,published:row.published,createdAt:row.createdAt,error:row.error||'',captureState:row.captureState||'unknown',captureCheckedAt:row.captureCheckedAt||null,warning:row.captureWarning||'',cleanupPending:Boolean(row.cleanupPending),savedPartCount:parts.length,retrying:row.status==='upload_failed'&&(row.attempts||0)<3,canRetry:['failed','upload_failed'].includes(row.status)||row.captureState==='failed'||(row.status==='partial'&&row.sources?.some(source=>!source.saved)),canRemove:!row.cleanupPending&&(['ready','partial','not_recorded'].includes(row.status)||(['failed','upload_failed'].includes(row.status)&&row.captureState==='ended')),canPreview:['ready','partial'].includes(row.status)&&parts.length>0,partCount:parts.length,parts:parts.map((part,index)=>{const trim=partTrim(part);return {index,bytes:part.bytes,durationSec:part.duration,trimStartSec:trim?.start||0,trimEndSec:trim?.end||part.duration||0,selectedDurationSec:trim?trim.end-trim.start:part.duration,...(normalizeLook(part.look)?{look:normalizeLook(part.look)}:{})};}),...(parts.length>1?{whole:wholeView(row,parts)}:{})};}
+function view(row){const parts=recordingParts(row);return {...outputView(row),...(row.outputRecordings?.length?{outputs:Array.from(row.outputRecordings,out=>({id:String(out.id),key:out.key,width:out.width||null,height:out.height||null,aspectRatio:ratio(out.width,out.height)}))}:{}),title:row.title,status:row.status,bytes:row.status==='recording'?row.direct?.bytes||0:row.bytes,durationSec:row.status==='recording'&&row.direct?.lastChunkAt?Math.max(0,Math.round((new Date(row.direct.lastChunkAt)-new Date(row.createdAt))/1000)):row.duration,published:row.published,createdAt:row.createdAt,error:row.error||'',captureState:row.captureState||'unknown',captureCheckedAt:row.captureCheckedAt||null,warning:row.captureWarning||'',cleanupPending:Boolean(row.cleanupPending),savedPartCount:parts.length,retrying:row.status==='upload_failed'&&(row.attempts||0)<3,canRetry:['failed','upload_failed'].includes(row.status)||row.captureState==='failed'||(row.status==='partial'&&row.sources?.some(source=>!source.saved)),canRemove:!row.cleanupPending&&(['ready','partial','not_recorded'].includes(row.status)||(['failed','upload_failed'].includes(row.status)&&row.captureState==='ended')),canPreview:['ready','partial'].includes(row.status)&&parts.length>0,partCount:parts.length,parts:parts.map((part,index)=>{const trim=partTrim(part);return {index,bytes:part.bytes,durationSec:part.duration,trimStartSec:trim?.start||0,trimEndSec:trim?.end||part.duration||0,selectedDurationSec:trim?trim.end-trim.start:part.duration,...(normalizeLook(part.look)?{look:normalizeLook(part.look)}:{})};}),...(parts.length>1?{whole:wholeView(row,parts)}:{})};}
 function wholeView(row,parts){const duration=wholeDuration(parts),trim=wholeTrim(row,parts),look=normalizeLook(row.look);return {durationSec:duration,trimStartSec:trim?.start||0,trimEndSec:trim?.end||duration,selectedDurationSec:trim?trim.end-trim.start:duration,...(look?{look}:{})};}
 // ttl: how long the private link works (seconds). A download starts at once, so 3 minutes is plenty; a <video> keeps asking for more of the file
 // while it plays, pauses and seeks, so the preview link must outlive the viewing session.
@@ -115,9 +118,16 @@ function recordingFile(roomName,config){
 }
 async function prepareRecordingRoom(roomName,title,test=false,options={}){
  if(options.mode==='direct'){
-  const recording=await require('./direct-recording').createDirectRecording(roomName,title,options.ownerId);
+  const outputs=captureOutputs(options.outputs),direct=require('./direct-recording');
+  const recording=await direct.createDirectRecording(roomName,title,options.ownerId,outputs[0]);
+  if(outputs.length===2){
+   try{
+    const child=await direct.createDirectRecording(`${roomName}-portrait`,title,options.ownerId,{...outputs[1],parentRecordingId:recording._id,sessionRoomName:roomName});
+    recording.outputRecordings=[outputView(recording),outputView(child)];await recording.save();
+   }catch(error){await LiveRecording.updateMany({$or:[{_id:recording._id},{parentRecordingId:recording._id}]},{$set:{status:'failed',captureState:'ended',error:'The recording outputs could not start.'}});throw error;}
+  }
   try{await sdk(RoomServiceClient).createRoom({name:roomName,emptyTimeout:180,departureTimeout:15});}
-  catch(error){await LiveRecording.updateOne({_id:recording._id},{$set:{captureState:'ended',status:'failed',error:'The live room could not start.'}});throw error;}
+  catch(error){await LiveRecording.updateMany({$or:[{_id:recording._id},{parentRecordingId:recording._id}]},{$set:{captureState:'ended',status:'failed',error:'The live room could not start.'}});throw error;}
   return recording;
  }
  if(!configured())throw Object.assign(new Error('Automatic recording storage is not configured.'),{status:503});
@@ -152,7 +162,7 @@ const pipeline=createRecordingPipeline({Model:LiveRecording,
  prepareFiles:prepareRecordingFiles,upload:uploadRecordingPart,verify:verifyArchivedPart});
 async function statusForRoom(roomName){
  if(!roomName)return null;
- try{const row=await LiveRecording.findOne({roomName,deletedAt:null});return row?view(row):null;}catch{return {status:'unavailable',captureState:'unknown',error:'Recording status could not be checked.'};}
+ try{const row=await LiveRecording.findOne({roomName,deletedAt:null});if(!row)return null;const children=row.outputRecordings?.length>1?await LiveRecording.find({parentRecordingId:row._id,deletedAt:null}):[];return recordingGroups([row,...children],view)[0];}catch{return {status:'unavailable',captureState:'unknown',error:'Recording status could not be checked.'};}
 }
 async function transferRecording(row){return pipeline.run(row._id);}
 async function ensureRecording(roomName){
@@ -167,7 +177,7 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
  require('./recording-session-metadata').registerRecordingSessionMetadata(app,requireAdmin,{
   Recording:LiveRecording,...require('./models'),LiveComment:require('./live-comments').LiveComment,isValidId:mongoose.isValidObjectId,
  });
- app.get('/api/admin/live-recordings',requireAdmin,async(_req,res)=>res.json({items:(await LiveRecording.find({test:{$ne:true},deletedAt:null}).sort({createdAt:-1}).limit(500)).map(view)}));
+ app.get('/api/admin/live-recordings',requireAdmin,async(_req,res)=>{const parents=await LiveRecording.find({test:{$ne:true},deletedAt:null,parentRecordingId:null}).sort({createdAt:-1}).limit(500);const children=parents.length?await LiveRecording.find({parentRecordingId:{$in:parents.map(row=>row._id)},deletedAt:null}):[];res.json({items:recordingGroups([...parents,...children],view)});});
  app.get('/api/admin/live-recordings/:id/comments',requireAdmin,async(req,res)=>{
   res.set('Cache-Control','no-store');
   try{
@@ -183,7 +193,7 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
     const items=comments.map(item=>({id:item.commentId,name:item.name,text:item.text,atSec:item.atSec-offset,...(item.reply?.text?{reply:{text:item.reply.text,atSec:item.reply.atSec-offset}}:{})}));
     return res.json({items,approximate:!row.recordingTimeline?.length});
    }
-   const comments=await require('./live-comments').LiveComment.find({session:row.roomName,hidden:{$ne:true}}).sort({createdAt:1,_id:1}).lean();
+   const comments=await require('./live-comments').LiveComment.find({session:row.sessionRoomName||row.roomName,hidden:{$ne:true}}).sort({createdAt:1,_id:1}).lean();
    const items=require('./recording-comments').timedComments(comments,{timeline:row.recordingTimeline||[],startedAt:row.createdAt,offsetSec:offset,durationSec:trim?trim.end-trim.start:duration});
    return res.json({items,approximate:!row.recordingTimeline?.length});
   }catch{return res.status(503).json({message:'Recording comments could not be loaded.'});}
@@ -237,14 +247,19 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
   const removed=await mongoose.connection.transaction(async session=>{
    await mongoose.connection.collection('musicontologylocks').updateOne({_id:'source-graph'},{$inc:{revision:1}},{upsert:true,session});
    const filter={_id:req.params.id,deletedAt:null,status:{$in:['ready','partial','failed','upload_failed','not_recorded']},$or:[{status:{$in:['ready','partial','not_recorded']}},{captureState:'ended'}],leaseUntil:{$lt:new Date()},cleanupPending:{$ne:true}};
-   const row=await LiveRecording.findOne(filter).session(session);
-   if(!row)return false;
+   const root=await LiveRecording.findOne(filter).session(session);
+   if(!root)return false;
+   if(root.parentRecordingId)throw Object.assign(new Error('Delete the live session from its recording row to remove both camera recordings together.'),{status:409});
+   const children=root.outputRecordings?.length>1?await LiveRecording.find({parentRecordingId:root._id}).session(session):[];
+   for(const row of [root,...children]){
+   const rowFilter={...filter,_id:row._id};
+   if(row!==root&&!await LiveRecording.exists(rowFilter).session(session))throw Object.assign(new Error('A camera recording is still active or saving. Wait before deleting this session.'),{status:409});
    const prefix=`live-${row._id}`,ownedIds=new RegExp('^'+prefix+'(?:-part-[0-9]+)?$');
    const published=await ArchiveItem.find({externalId:ownedIds}).session(session);
    const ids=published.map(item=>item.externalId);
    if(ids.length&&await ArchiveItem.exists({externalId:{$nin:ids},sourceRecordingIds:{$in:ids}}).session(session))throw Object.assign(new Error('This live recording is used as a source. Remove its source links before deleting it.'),{status:409});
    const versions=ids.length?await require('./music-ontology/models').Version.find({recordingId:{$in:ids}}).session(session):[];
-   keys=await permanentDeletion.prepare([row.toObject(),...published.map(item=>item.toObject()),...versions.map(item=>item.toObject())],{session});
+   keys.push(...await permanentDeletion.prepare([row.toObject(),...published.map(item=>item.toObject()),...versions.map(item=>item.toObject())],{session}));
    if(ids.length){
     await require('./music-archive').Collection.updateMany({recordingIds:{$in:ids}},{$pull:{recordingIds:{$in:ids}}},{session});
     await require('./music-ontology/models').Version.deleteMany({recordingId:{$in:ids}},{session});
@@ -255,8 +270,9 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
    await require('./gallery-albums').GalleryAlbum.updateMany({itemIds:{$in:media.map(item=>String(item._id))}},{$pull:{itemIds:{$in:media.map(item=>String(item._id))}}},{session});
    await MediaItem.deleteMany({_id:{$in:media.map(item=>item._id)}},{session});
    await require('./recording-comments').RecordingComment.deleteMany({recordingId:row._id},{session});
-   const result=await LiveRecording.deleteOne(filter,{session});
+   const result=await LiveRecording.deleteOne(rowFilter,{session});
    if(result.deletedCount!==1)throw Object.assign(new Error('Recording changed. Refresh before deleting.'),{status:409});
+   }
    return true;
   });
   if(!removed)return res.status(409).json({message:'This recording is active, saving, or already deleted. Refresh and try again.'});

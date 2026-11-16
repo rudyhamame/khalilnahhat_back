@@ -27,6 +27,22 @@ test('direct recording durable chunks and archive lifecycle',{timeout:90000},asy
   await pipeline.run(row._id);let saved=await LiveRecording.findById(row._id);assert.equal(saved.status,'upload_failed');await fs.access(path.join(direct.directory(saved),'capture.mp4'));
   fail=false;await pipeline.run(row._id);saved=await LiveRecording.findById(row._id);assert.equal(saved.status,'ready');assert.equal(saved.parts.length,1);assert.equal(saved.cleanupPending,false);assert.ok(saved.duration>0);await assert.rejects(fs.access(direct.directory(saved)),{code:'ENOENT'});assert.equal(uploads,2);
  });
+ await t.test('both camera files archive independently and remain one live recording',async()=>{
+  const main=await direct.createDirectRecording('test-dual-main','Two cameras','owner',{key:'main',width:160,height:90});
+  const child=await direct.createDirectRecording('test-dual-portrait','Two cameras','owner',{key:'portrait',width:90,height:160,parentRecordingId:main._id,sessionRoomName:main.roomName});
+  main.outputRecordings=[{id:main._id,key:'main',width:160,height:90},{id:child._id,key:'portrait',width:90,height:160}];await main.save();
+  const {LiveStreamConfig}=require('../src/models');const live=await LiveStreamConfig.create({key:'dual-test',webrtcRoomName:main.roomName});
+  await LiveRecording.updateOne({_id:child._id},{$set:{'direct.lastChunkAt':new Date(Date.now()-7*3600*1000)}});
+  const state=await jobs.run(child._id,lease=>direct.directProvider().inspect(lease.row,lease));assert.equal(state.active,true);await LiveStreamConfig.deleteOne({_id:live._id});
+  const portrait=path.join(dir,'portrait.webm');execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','testsrc2=size=90x160:rate=10','-f','lavfi','-i','sine=frequency=440:sample_rate=48000','-t','1','-c:v','libvpx','-c:a','libopus',portrait]);
+  for(const [r,data] of [[main,bytes],[child,await fs.readFile(portrait)]]){await jobs.run(r._id,l=>direct.acceptChunk(l,0,data,'video/webm'));await jobs.run(r._id,l=>direct.seal(l,1,true));}
+  const archived=[];const pipeline=require('../src/recording-pipeline').createRecordingPipeline({Model:LiveRecording,providers:{direct:direct.directProvider()},prepareFiles:require('../src/recording-files').prepareRecordingFiles,upload:async(file,id)=>{
+   const probe=JSON.parse(execFileSync('ffprobe',['-v','error','-show_streams','-of','json',file])),video=probe.streams.find(stream=>stream.codec_type==='video');assert.ok(probe.streams.some(stream=>stream.codec_type==='audio'));archived.push({id,width:video.width,height:video.height});return {public_id:id,bytes:(await fs.stat(file)).size,width:video.width,height:video.height};
+  }});
+  await pipeline.run(main._id);await pipeline.run(child._id);
+  const saved=await LiveRecording.find({_id:{$in:[main._id,child._id]}});assert.equal(archived.length,2);assert.deepEqual(archived.map(out=>[out.width,out.height]),[[160,90],[90,160]]);assert.ok(saved.every(row=>row.status==='ready'&&row.parts.length===1));
+  const grouped=require('../src/recording-outputs').recordingGroups(saved,require('../src/live-recordings').view);assert.equal(grouped.length,1);assert.equal(grouped[0].outputs.length,2);assert.deepEqual(grouped[0].outputs.map(out=>out.aspectRatio),['16:9','9:16']);
+ });
  await t.test('AAC stereo source is archived without changing a single encoded audio packet',async()=>{
   const source=path.join(dir,'stereo.mp4');
   execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','testsrc2=size=160x90:rate=10','-f','lavfi','-i','aevalsrc=sin(2*PI*440*t)|sin(2*PI*880*t):s=48000','-t','1','-c:v','libx264','-c:a','aac','-b:a','256k',source]);

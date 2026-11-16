@@ -56,7 +56,7 @@ function createRecordingPipeline({Model,providers,prepareFiles,upload,verify=asy
       const digest=await fileDigest(file.filename),publicId=partId(row.roomName,source.key,index,digest);
       const output=await upload(file.filename,publicId,{bytes:file.bytes});
       if(output.public_id!==publicId||output.bytes!==file.bytes)throw new Error('Archive did not confirm the exact recording part');
-      saved.push({publicId,delivery:'authenticated',bytes:output.bytes,duration:file.duration,sha256:digest});
+      saved.push({publicId,delivery:'authenticated',bytes:output.bytes,duration:file.duration,sha256:digest,...(output.width&&output.height?{width:output.width,height:output.height}:{})});
      }
      source.parts=saved;source.saved=true;source.error='';
      // Persist the complete source manifest before acknowledging or deleting any original.

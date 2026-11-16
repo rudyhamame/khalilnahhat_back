@@ -52,6 +52,17 @@ test('permanent media deletion, cloud outages, shared files and live publication
  app.use((error,req,res,next)=>res.status(error.status||500).json({message:error.message}));
  const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));t.after(()=>new Promise(r=>server.close(r)));
  const request=async(id,method='DELETE',suffix='',authorized=true)=>{const response=await fetch(`http://127.0.0.1:${server.address().port}/api/admin/live-recordings/${id}${suffix}`,{method,headers:authorized?{Authorization:'qa-admin'}:{}});return {status:response.status,body:await response.json().catch(()=>({}))};};
+ await t.test('two camera outputs appear in one row and delete as one protected session',async()=>{
+  const main=await LiveRecording.create({roomName:'qa-dual',status:'ready',width:1280,height:720,parts:[{publicId:'Live/qa-dual-main',delivery:'upload',durationSec:10}]});
+  const child=await LiveRecording.create({roomName:'qa-dual-portrait',sessionRoomName:main.roomName,parentRecordingId:main._id,outputKey:'portrait',status:'processing',width:720,height:1280,parts:[{publicId:'Live/qa-dual-portrait',delivery:'upload',durationSec:10}]});
+  main.outputRecordings=[{id:main._id,key:'main',width:1280,height:720},{id:child._id,key:'portrait',width:720,height:1280}];await main.save();
+  const list=await request('','GET');assert.equal(list.status,200);
+  const rows=list.body.items.filter(row=>row.id===main.id||row.id===child.id);assert.equal(rows.length,1);assert.equal(rows[0].outputs.length,2);assert.deepEqual(rows[0].outputs.map(row=>row.aspectRatio),['16:9','9:16']);
+  assert.equal((await request(main.id)).status,409);assert.ok(await LiveRecording.exists({_id:main._id}));assert.ok(await LiveRecording.exists({_id:child._id}));
+  child.status='ready';await child.save();assert.equal((await request(child.id)).status,409);
+  const result=await request(main.id);assert.equal(result.status,200,JSON.stringify(result.body));assert.equal(await LiveRecording.countDocuments({_id:{$in:[main._id,child._id]}}),0);
+  assert.ok(deleted.some(row=>row.id==='Live/qa-dual-main'));assert.ok(deleted.some(row=>row.id==='Live/qa-dual-portrait'));
+ });
  await t.test('live recording deletion removes published records and files atomically and has no restore route',async()=>{
   const row=await LiveRecording.create({roomName:'qa-finished',title:'QA',status:'ready',parts:[{publicId:'Live/finished',delivery:'upload'}]});
   const externalId=`live-${row._id}`,video=cloudinary.url('Live/finished',{secure:true,resource_type:'video',type:'upload',format:'mp4'});

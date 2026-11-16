@@ -16,10 +16,10 @@ const chunkPath=(row,n)=>path.join(directory(row),String(n).padStart(8,'0')+'.ch
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 function models(){return require('./live-recordings');}
 async function diskCheck(reserve=2*1024**3){await fs.mkdir(ROOT,{recursive:true,mode:0o700});const disk=await fs.statfs(ROOT),free=disk.bavail*disk.bsize-reservedBytes();if(free<reserve){const gb=n=>(Math.max(0,n)/1024**3).toFixed(1)+' GB';throw fail(507,`The OVH server's recording disk is full (${gb(free)} free, ${gb(reserve)} needed). This is the server, not your computer: your recording is safe in your chosen folder and will upload automatically once space is freed on the server.`);}}
-async function createDirectRecording(roomName,title,ownerId){
+async function createDirectRecording(roomName,title,ownerId,output={}){
  if(!ownerId)throw fail(401,'Recording owner is required.');
  await diskCheck(require('./recording-storage').recordingDiskReserve()||2*1024**3);
- const row=await models().LiveRecording.create({roomName,title,provider:'direct',status:'recording',captureState:'waiting',direct:{ownerId:String(ownerId),count:0,bytes:0,state:'open',lastChunkAt:new Date()},nextRetryAt:new Date(Date.now()+15000)});
+ const row=await models().LiveRecording.create({roomName,title,outputKey:output.key||'main',width:output.width,height:output.height,parentRecordingId:output.parentRecordingId,sessionRoomName:output.sessionRoomName,provider:'direct',status:'recording',captureState:'waiting',direct:{ownerId:String(ownerId),count:0,bytes:0,state:'open',lastChunkAt:new Date()},nextRetryAt:new Date(Date.now()+15000)});
  await fs.mkdir(directory(row),{recursive:true,mode:0o700});return row;
 }
 async function withRecording(id,owner,work){
@@ -84,7 +84,7 @@ function directProvider(){return {
  async inspect(row,lease){
   if(row.direct.state==='empty'){await fs.rm(directory(row),{recursive:true,force:true});return {sources:[],active:false,ended:true,captureState:'ended',warning:''};}
   if(row.direct.state==='open'){
-   const active=await require('./models').LiveStreamConfig.exists({webrtcRoomName:row.roomName});
+   const active=await require('./models').LiveStreamConfig.exists({webrtcRoomName:row.sessionRoomName||row.roomName});
    const idle=Date.now()-new Date(row.direct.lastChunkAt).getTime();
    // Parts are uploaded after the live ends, so an ended live waits for them (hours, not minutes) before sealing what arrived.
    if(!active&&idle>(Number(process.env.ECHO_RECORDING_IDLE_MS)||6*3600*1000)){

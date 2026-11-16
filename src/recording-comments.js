@@ -28,7 +28,7 @@ const snapshotSchema=new mongoose.Schema({recordingId:{type:mongoose.Schema.Type
 snapshotSchema.index({recordingId:1,commentId:1},{unique:true});snapshotSchema.index({recordingId:1,atSec:1});
 const RecordingComment=mongoose.models.RecordingComment||mongoose.model('RecordingComment',snapshotSchema);
 async function archiveComments(row,timeline){
- const originals=await require('./live-comments').LiveComment.find({session:row.roomName,hidden:{$ne:true}}).sort({createdAt:1,_id:1}).lean();
+ const originals=await require('./live-comments').LiveComment.find({session:row.sessionRoomName||row.roomName,hidden:{$ne:true}}).sort({createdAt:1,_id:1}).lean();
  const items=timedComments(originals,{timeline:timeline||[],startedAt:row.createdAt});
  if(items.length)await RecordingComment.bulkWrite(items.map(({id,...item})=>({updateOne:{filter:{recordingId:row._id,commentId:id},update:{$set:{...item,recordingId:row._id,commentId:id}},upsert:true}})));
  await RecordingComment.deleteMany({recordingId:row._id,commentId:{$nin:items.map(item=>item.id)}});

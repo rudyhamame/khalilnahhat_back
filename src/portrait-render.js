@@ -26,6 +26,35 @@ function xExpression(track,w,iw){
  return expr;
 }
 
+// points: [[seconds, value]...] -> ffmpeg expression, linear between points (about 1 point per 0.5 s kept).
+function pathExpression(points,minGap=.5){
+ const list=[];
+ for(const [t,v] of [...points].filter(p=>p.every(Number.isFinite)).sort((a,b)=>a[0]-b[0])){const last=list.at(-1);if(last&&t-last[0]<minGap)continue;list.push([Math.max(0,t),v]);}
+ if(!list.length)return {expr:'0',from:0,to:0};
+ let expr=list[0][1].toFixed(1);
+ for(let i=0;i<list.length-1;i++){const [t0,v0]=list[i],[t1,v1]=list[i+1],d=v1-v0;if(Math.abs(d)<.5)continue;expr+=`+(${d.toFixed(1)})*clip((t-${t0.toFixed(2)})/${Math.max(.05,t1-t0).toFixed(2)},0,1)`;}
+ return {expr,from:list[0][0],to:list.at(-1)[0]};
+}
+const even=v=>Math.max(2,Math.floor(v/2)*2);
+// blur: [{pts:[[t,x,y,w,h]...]}] normalised boxes (top-left, size) of people to hide; t in seconds from clip start. Returns the filter-graph lines that blur those regions.
+function blurGraph(blur,iw,ih){
+ const slots=(blur||[]).slice(0,6).map(slot=>({pts:(slot.pts||[]).filter(p=>p.length===5&&p.every(Number.isFinite)).slice(0,1500)})).filter(slot=>slot.pts.length);
+ if(!slots.length)return null;
+ const n=slots.length,lines=[];
+ lines.push(`[0:v]split=2[base][raw]`,`[raw]boxblur=28:4[bl]`);
+ if(n>1)lines.push(`[bl]split=${n}${slots.map((_,i)=>`[b${i}]`).join('')}`);
+ let prev='base';
+ slots.forEach((slot,i)=>{
+  const W=Math.min(even(Math.max(...slot.pts.map(p=>p[3]))*iw),even(iw)),H=Math.min(even(Math.max(...slot.pts.map(p=>p[4]))*ih),even(ih));
+  const X=pathExpression(slot.pts.map(p=>[p[0],(p[1]+p[3]/2)*iw-W/2])),Y=pathExpression(slot.pts.map(p=>[p[0],(p[2]+p[4]/2)*ih-H/2]));
+  const x=`clip(${X.expr},0,${iw-W})`,y=`clip(${Y.expr},0,${ih-H})`,src=n>1?`b${i}`:'bl',last=i===n-1?'blurred':`o${i}`;
+  lines.push(`[${src}]crop=${W}:${H}:'${x}':'${y}'[c${i}]`);
+  lines.push(`[${prev}][c${i}]overlay=x='${x}':y='${y}':enable='between(t,${Math.max(0,X.from-.3).toFixed(2)},${(X.to+.6).toFixed(2)})'[${last}]`);
+  prev=last;
+ });
+ return lines;
+}
+
 async function probeSize(url){
  const {stdout}=await exec(FFPROBE,['-v','error','-select_streams','v:0','-show_entries','stream=width,height','-of','json',url],{timeout:120000,maxBuffer:1024*1024});
  const stream=JSON.parse(stdout).streams?.[0];
@@ -34,7 +63,7 @@ async function probeSize(url){
 }
 
 // frame: {x,y,w} as fractions of the picture (w = width). ratio: crop width/height. start/end in seconds of the part.
-async function renderCrop({inputUrl,start,end,frame,ratio,track,outFile,workDir}){
+async function renderCrop({inputUrl,start,end,frame,ratio,track,blur,outFile,workDir}){
  const {iw,ih}=await probeSize(inputUrl);
  const cw=Math.floor(clamp(frame.w,.05,1)*iw/2)*2;
  const ch=Math.min(Math.floor(cw/ratio/2)*2,Math.floor(ih/2)*2);
@@ -43,13 +72,15 @@ async function renderCrop({inputUrl,start,end,frame,ratio,track,outFile,workDir}
  const staticX=Math.round(clamp(frame.x,0,1-widthFraction)*iw);
  const expr=xExpression(track||[],widthFraction,iw);
  const [outW,outH]=ratio<1?[1080,1920]:[1920,1080];
- const filter=`crop=${cw}:${ch}:'${expr?`clip(${expr},0,${iw-cw})`:staticX}':${cy},scale=${outW}:${outH}:flags=lanczos,setsar=1`;
- const script=path.join(workDir,'filter.txt');await fs.writeFile(script,filter);
- await exec(FFMPEG,['-hide_banner','-loglevel','error','-nostdin','-y','-ss',String(start),'-i',inputUrl,'-t',String(end-start),'-filter_script:v',script,
+ const reframe=`crop=${cw}:${ch}:'${expr?`clip(${expr},0,${iw-cw})`:staticX}':${cy},scale=${outW}:${outH}:flags=lanczos,setsar=1`;
+ const graph=blurGraph(blur,iw,ih),script=path.join(workDir,'filter.txt');
+ // With blur: a full graph (blur the people, then reframe); without: the plain crop chain.
+ await fs.writeFile(script,graph?`${graph.join(';\n')};\n[blurred]${reframe}[v]`:reframe);
+ await exec(FFMPEG,['-hide_banner','-loglevel','error','-nostdin','-y','-ss',String(start),'-i',inputUrl,'-t',String(end-start),...(graph?['-filter_complex_script',script,'-map','[v]','-map','0:a?']:['-filter_script:v',script]),
   '-c:v','libx264','-preset','veryfast','-crf','22','-maxrate','4M','-bufsize','8M','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart',outFile],{timeout:30*60*1000,maxBuffer:1024*1024});
  const stat=await fs.stat(outFile);
  if(!stat.size)throw new Error('The render was empty.');
  if(stat.size>MAX_BYTES)throw new Error('The render is larger than the 100 MB storage limit. Pick a shorter range.');
  return {bytes:stat.size,width:outW,height:outH,duration:end-start};
 }
-module.exports={renderCrop,xExpression};
+module.exports={renderCrop,xExpression,blurGraph};

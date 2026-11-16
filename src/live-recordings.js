@@ -230,7 +230,7 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
   try{
    dir=await fs.mkdtemp(path.join(os.tmpdir(),'echo-render-'));
    const inputUrl=cloudinary.utils.private_download_url(job.part.publicId,'mp4',{resource_type:'video',type:job.part.delivery||'authenticated',expires_at:Math.floor(Date.now()/1000)+7200});
-   const out=path.join(dir,'render.mp4'),info=await renderCrop({inputUrl,start:job.start,end:job.end,frame:job.frame,ratio:job.ratio,track:job.track,outFile:out,workDir:dir});
+   const out=path.join(dir,'render.mp4'),info=await renderCrop({inputUrl,start:job.start,end:job.end,frame:job.frame,ratio:job.ratio,track:job.track,blur:job.blur,outFile:out,workDir:dir});
    const publicId=`Live/${job.room}/renders/${renderId}`;
    await new Promise((resolve,reject)=>{const stream=cloudinary.uploader.upload_large(out,{resource_type:'video',type:'authenticated',public_id:publicId,overwrite:true,chunk_size:20*1024*1024,timeout:600000},(error,result)=>error?reject(error):resolve(result));stream.on('error',reject);});
    await mark({status:'ready',error:'',publicId,delivery:'authenticated',bytes:info.bytes,duration:info.duration,width:info.width,height:info.height});
@@ -250,11 +250,13 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
   const track=(Array.isArray(req.body?.track)?req.body.track:[]).slice(0,5000).map(p=>[Number(p?.[0]),Number(p?.[1])]).filter(p=>p.every(Number.isFinite)).map(([t,x])=>[t-start,x]).filter(([t])=>t>=-1&&t<=end-start+1);
   if(row.renders.filter(item=>item.status==='processing').length>=3)return res.status(409).json({message:'Three renders are already waiting. Try again in a few minutes.'});
   if(row.renders.length>=20)return res.status(409).json({message:'This live has 20 renders. Delete one first.'});
+  // People to blur: up to 6 tracks of [t,x,y,w,h] (normalised boxes), times made relative to the clip start.
+  const blur=(Array.isArray(req.body?.blur)?req.body.blur:[]).slice(0,6).map(slot=>({pts:(Array.isArray(slot?.pts)?slot.pts:[]).slice(0,1500).map(p=>Array.isArray(p)?p.map(Number):[]).filter(p=>p.length===5&&p.every(Number.isFinite)).map(([t,x,y,w,h])=>[t-start,Math.max(0,Math.min(1,x)),Math.max(0,Math.min(1,y)),Math.max(.01,Math.min(1,w)),Math.max(.01,Math.min(1,h))]).filter(p=>p[0]>=-1&&p[0]<=end-start+1)})).filter(slot=>slot.pts.length);
   const name=String(req.body?.name||'').trim().slice(0,80)||`Render ${row.renders.length+1}`;
   row.renders.push({name,part:index,start:Math.round(start*1000)/1000,end:Math.round(Math.min(duration,end)*1000)/1000,goal:req.body.goal,status:'processing',error:''});
   await row.save();
   const renderId=row.renders.at(-1)._id;
-  renderQueue=renderQueue.then(()=>runRender(row._id,renderId,{part,start,end:Math.min(duration,end),frame,ratio,track,room:String(row.roomName||row._id).replace(/[^\w-]/g,'')})).catch(()=>{});
+  renderQueue=renderQueue.then(()=>runRender(row._id,renderId,{part,start,end:Math.min(duration,end),frame,ratio,track,blur,room:String(row.roomName||row._id).replace(/[^\w-]/g,'')})).catch(()=>{});
   res.status(202).json({item:view(row)});
  });
  app.get('/api/admin/live-recordings/:id/renders/:renderId/download',requireAdmin,async(req,res)=>{

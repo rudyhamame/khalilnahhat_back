@@ -2,9 +2,14 @@ import {validFavouriteSongs} from './favouriteSongs.mjs';
 import contract from './eventOrderContract.json' with { type: 'json' };
 export { contract };
 export const fields = contract.sections.flatMap(section => section.fields.map(field => ({ ...field, gate: section.gate })));
-const planningFields=['brideName','groomName','timeline','partyEntrances','entranceSongs','firstDance','parentDances','dinnerMusic','cakeCutting','announcements','mustPlay','doNotPlay','specialRequests'].map(key=>({key:'planning.'+key,label:key,type:'textarea'}));
-planningFields.push({key:'planning.musicUploads',label:'Planning music references',type:'links'});
-export const aiFields = [...fields,...planningFields,{key:'equipment',label:'Equipment and complete sets',type:'equipment'}];
+const planningNames={brideName:['Bride','العروس'],groomName:['Groom','العريس'],timeline:['Timeline','الجدول الزمني'],partyEntrances:['Party entrances','دخول المدعوين'],entranceSongs:['Entrance songs','أغاني الدخول'],firstDance:['First dance','الرقصة الأولى'],parentDances:['Parent dances','رقصات الأهل'],dinnerMusic:['Dinner music','موسيقى العشاء'],cakeCutting:['Cake cutting','تقطيع الكعكة'],announcements:['Announcements','الإعلانات'],mustPlay:['Must play','أغانٍ مطلوبة'],doNotPlay:['Do not play','أغانٍ ممنوعة'],specialRequests:['Special requests','طلبات خاصة']};
+const planningFields=Object.entries(planningNames).map(([key,[short,shortAr]])=>({key:'planning.'+key,label:key,short,shortAr,type:'textarea'}));
+planningFields.push({key:'planning.musicUploads',label:'Planning music references',short:'Music references',shortAr:'مراجع موسيقية',type:'links'});
+export const aiFields = [...fields,...planningFields,{key:'equipment',label:'Equipment and complete sets',short:'Equipment',shortAr:'المعدات',type:'equipment'}];
+// The short name people see in summaries, reviews and task lists (the long `label` is the form prompt). One place, both languages.
+// The shown name of one option of a field (for example the "phone" contact method), from the same contract.
+export const optionName=(key,option,ar=false)=>{const names=aiFields.find(item=>item.key===key)?.optionNames?.[option];return names?names[ar?1:0]:String(option??'');};
+export const fieldName=(key,ar=false)=>{const field=aiFields.find(item=>item.key===key);return field?(ar?field.shortAr:field.short)||field.label:'';};
 export function decodePatchValue(field,value){
  if(typeof value==='string'&&(value==='null'||['number','coordinate','boolean','multi','links','songs','tags','pairs','attachments','equipment'].includes(field.type))){try{return JSON.parse(value);}catch{return undefined;}}
  return value;

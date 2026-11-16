@@ -71,7 +71,8 @@ async function renderCrop({inputUrl,start,end,frame,ratio,track,blur,outFile,wor
  const cy=Math.round(clamp(frame.y*ih,0,ih-ch));
  const staticX=Math.round(clamp(frame.x,0,1-widthFraction)*iw);
  const expr=xExpression(track||[],widthFraction,iw);
- const [outW,outH]=ratio<1?[1080,1920]:[1920,1080];
+ const scale=Math.min(1080/Math.min(ratio,1),1920/Math.max(ratio,1));
+ const [outW,outH]=[even(ratio*scale),even(scale)];
  const reframe=`crop=${cw}:${ch}:'${expr?`clip(${expr},0,${iw-cw})`:staticX}':${cy},scale=${outW}:${outH}:flags=lanczos,setsar=1`;
  const graph=blurGraph(blur,iw,ih),script=path.join(workDir,'filter.txt');
  // With blur: a full graph (blur the people, then reframe); without: the plain crop chain.

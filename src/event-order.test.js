@@ -78,3 +78,18 @@ test('client draft edits preserve account contacts while editing venue, planning
  assert.deepEqual(result.order.customer,order.customer);
  assert.equal(core.applyAccountProfile(order,{...user,company:''}).customer.company,null);
  });
+test('every field has one short name in both languages, and no two form fields share one',()=>{
+  for(const field of core.aiFields){
+    assert.ok(field.short&&field.shortAr,`${field.key} needs short and shortAr in the contract`);
+    assert.equal(core.fieldName(field.key),field.short);
+    assert.equal(core.fieldName(field.key,true),field.shortAr);
+  }
+  const names=core.fields.map(field=>field.short);
+  assert.deepEqual(names.filter((name,index)=>names.indexOf(name)!==index),[],'two contract fields share a short name');
+  assert.equal(core.fieldName('not.a.field'),'');
+});
+test('option names come from the contract in both languages',()=>{
+  assert.equal(core.optionName('customer.contactMethod','phone'),'Phone');
+  assert.equal(core.optionName('customer.contactMethod','whatsapp',true),'واتساب');
+  assert.equal(core.optionName('customer.contactMethod','other'),'other');
+});

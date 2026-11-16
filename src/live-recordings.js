@@ -92,7 +92,7 @@ function wholeTransformation(row,parts,{full=false,look=true}={}){
  if(!full){const trim=wholeTrim(row,parts);steps.push(...(mediaTransformation(trim,look?row.look:null).transformation||[]));}
  return steps.length?{transformation:steps}:{};
 }
-const RENDER_GOALS={'instagram-reel-p':9/16,'instagram-reel-l':16/9,'youtube-short-p':9/16,'youtube-short-l':16/9,'youtube-video-l':16/9,'tiktok-p':9/16,'tiktok-l':16/9};
+const {postingGoalRatio}=require('./posting-formats');
 function renderView(row){return Array.from(row.renders||[],item=>({id:String(item._id),name:item.name,part:item.part||0,start:item.start,end:item.end,goal:item.goal||'',
  // A job that was running when the server restarted never finishes: show it as failed instead of spinning forever.
  status:item.status==='processing'&&Date.now()-new Date(item.createdAt)>2*3600*1000?'failed':item.status,error:item.status==='processing'&&Date.now()-new Date(item.createdAt)>2*3600*1000?'The render was interrupted. Start it again.':item.error||'',bytes:item.bytes||0,duration:item.duration||0,width:item.width||null,height:item.height||null,createdAt:item.createdAt}));}
@@ -242,7 +242,7 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
   if(!mongoose.isValidObjectId(req.params.id))return res.status(400).json({message:'Invalid recording.'});
   const row=await LiveRecording.findOne({_id:req.params.id,deletedAt:null,status:{$in:['ready','partial']}});
   if(!row)return res.status(409).json({message:'Wait for the recording to finish saving.'});
-  const parts=recordingParts(row),index=Number(req.body?.part)||0,part=parts[index],duration=Number(part?.duration)||0,start=Number(req.body?.start),end=Number(req.body?.end),f=req.body?.frame||{},ratio=RENDER_GOALS[req.body?.goal];
+  const parts=recordingParts(row),index=Number(req.body?.part)||0,part=parts[index],duration=Number(part?.duration)||0,start=Number(req.body?.start),end=Number(req.body?.end),f=req.body?.frame||{},ratio=postingGoalRatio(req.body?.goal);
   if(!part||!duration||!Number.isFinite(start)||!Number.isFinite(end)||start<0||end<=start||end>duration+.05||end-start<.5)return res.status(400).json({message:'Choose a valid range of at least half a second.'});
   if(!ratio)return res.status(400).json({message:'Choose an editing goal.'});
   const frame={x:Number(f.x),y:Number(f.y),w:Number(f.w)};

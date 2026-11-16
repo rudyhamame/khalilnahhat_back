@@ -47,8 +47,10 @@ test('viewer leaving does not end the broadcaster', async () => {
   const ctx=setup(); await ctx.call('webhook',{event:'participant_left',room:{name:'current'},participant:{identity:'viewer-1'}});
   assert.equal(ctx.writes.length,0);
 });
-test('verified broadcaster departure clears only its exact room', async () => {
+test('a refresh (participant_left) keeps the reservation; only the exact finished room is cleared', async () => {
   const ctx=setup(); await ctx.call('webhook',{event:'participant_left',room:{name:'old-room'},participant:{identity:'khalil-broadcaster'}});
+  assert.equal(ctx.writes.length,0);
+  await ctx.call('webhook',{event:'room_finished',room:{name:'old-room'}});
   assert.deepEqual(ctx.writes[0].filter,{key:'live',broadcastMode:'webrtc',webrtcRoomName:'old-room'});
 });
 
@@ -130,6 +132,6 @@ test('saving remains enabled by default and only an explicit false disables it',
   let prepared=0;
   const ctx=setup({prepareRecording:async(_room,_title,_test,options)=>{prepared++;assert.equal(options.mode,'direct');return {_id:'recording-1',provider:'direct'};}});
   const result=await ctx.call('go-live',{recordingMode:'direct',...(value===undefined?{}:{saveRecording:value})});
-  assert.equal(result.statusCode,201);assert.equal(prepared,1);assert.deepEqual(result.body.recording,{id:'recording-1',mode:'direct'});
+  assert.equal(result.statusCode,201);assert.equal(prepared,1);assert.deepEqual(JSON.parse(JSON.stringify(result.body.recording)),{id:'recording-1',mode:'direct'});
  }
 });

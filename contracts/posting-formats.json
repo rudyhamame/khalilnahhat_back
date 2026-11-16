@@ -1,0 +1,254 @@
+{
+  "aspects": {
+    "9:16": [
+      1080,
+      1920
+    ],
+    "3:4": [
+      1080,
+      1440
+    ],
+    "4:5": [
+      1080,
+      1350
+    ],
+    "1:1": [
+      1080,
+      1080
+    ],
+    "4:3": [
+      1440,
+      1080
+    ],
+    "16:9": [
+      1920,
+      1080
+    ],
+    "1.91:1": [
+      1910,
+      1000
+    ],
+    "2:3": [
+      1080,
+      1620
+    ],
+    "2:1": [
+      1920,
+      960
+    ],
+    "21:9": [
+      2520,
+      1080
+    ]
+  },
+  "platforms": {
+    "instagram": {
+      "label": "Instagram",
+      "types": [
+        {
+          "id": "post",
+          "label": "Feed post",
+          "kind": "image",
+          "ratios": [
+            "1:1",
+            "4:5",
+            "3:4",
+            "1.91:1"
+          ]
+        },
+        {
+          "id": "carousel",
+          "label": "Carousel slide",
+          "kind": "image",
+          "ratios": [
+            "1:1",
+            "4:5",
+            "3:4",
+            "1.91:1"
+          ]
+        },
+        {
+          "id": "story",
+          "label": "Story",
+          "kind": "image",
+          "ratios": [
+            "9:16"
+          ]
+        },
+        {
+          "id": "story-video",
+          "label": "Story video",
+          "kind": "video",
+          "ratios": [
+            "9:16"
+          ]
+        },
+        {
+          "id": "reel",
+          "label": "Reel",
+          "kind": "video",
+          "ratios": [
+            "9:16",
+            "4:5",
+            "1:1",
+            "16:9"
+          ]
+        },
+        {
+          "id": "cover",
+          "label": "Reel cover",
+          "kind": "image",
+          "ratios": [
+            "9:16",
+            "3:4"
+          ]
+        },
+        {
+          "id": "feed-video",
+          "label": "Feed / carousel video",
+          "kind": "video",
+          "ratios": [
+            "4:5",
+            "1:1",
+            "16:9"
+          ]
+        }
+      ]
+    },
+    "youtube": {
+      "label": "YouTube",
+      "types": [
+        {
+          "id": "video",
+          "label": "Video",
+          "kind": "video",
+          "ratios": [
+            "9:16",
+            "3:4",
+            "4:5",
+            "1:1",
+            "4:3",
+            "16:9",
+            "1.91:1",
+            "2:3",
+            "2:1",
+            "21:9"
+          ]
+        },
+        {
+          "id": "short",
+          "label": "Short",
+          "kind": "video",
+          "ratios": [
+            "9:16",
+            "3:4",
+            "4:5",
+            "1:1"
+          ]
+        },
+        {
+          "id": "thumbnail",
+          "label": "Video thumbnail",
+          "kind": "image",
+          "ratios": [
+            "16:9"
+          ]
+        },
+        {
+          "id": "short-cover",
+          "label": "Short thumbnail",
+          "kind": "image",
+          "ratios": [
+            "9:16"
+          ]
+        },
+        {
+          "id": "community",
+          "label": "Community image / carousel",
+          "kind": "image",
+          "ratios": [
+            "1:1",
+            "4:5",
+            "16:9"
+          ]
+        },
+        {
+          "id": "podcast",
+          "label": "Podcast cover",
+          "kind": "image",
+          "ratios": [
+            "1:1"
+          ]
+        }
+      ]
+    },
+    "tiktok": {
+      "label": "TikTok",
+      "types": [
+        {
+          "id": "video",
+          "label": "Video",
+          "kind": "video",
+          "ratios": [
+            "9:16",
+            "3:4",
+            "4:5",
+            "1:1",
+            "4:3",
+            "16:9",
+            "1.91:1",
+            "2:3",
+            "2:1",
+            "21:9"
+          ]
+        },
+        {
+          "id": "photo",
+          "label": "Photo / carousel",
+          "kind": "image",
+          "ratios": [
+            "9:16",
+            "3:4",
+            "4:5",
+            "1:1",
+            "16:9"
+          ]
+        },
+        {
+          "id": "cover",
+          "label": "Video cover",
+          "kind": "image",
+          "ratios": [
+            "9:16",
+            "3:4"
+          ]
+        },
+        {
+          "id": "story",
+          "label": "Story",
+          "kind": "image",
+          "ratios": [
+            "9:16"
+          ]
+        },
+        {
+          "id": "story-video",
+          "label": "Story video",
+          "kind": "video",
+          "ratios": [
+            "9:16"
+          ]
+        },
+        {
+          "id": "text",
+          "label": "Text card",
+          "kind": "image",
+          "ratios": [
+            "9:16",
+            "1:1"
+          ]
+        }
+      ]
+    }
+  }
+}

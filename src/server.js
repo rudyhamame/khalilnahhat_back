@@ -1524,6 +1524,7 @@ registerMeetingRoom(app, { requireAuth, Meeting: MeetingModel });
 registerAccount(app, { requireAuth, getFrontendUrl });
 registerContent(app, requireAdmin);
 require('./seasonal-theme').registerSeasonalTheme(app, { requireAdmin });
+require('./concept-map').registerConceptMap(app, { requireAdmin });
 require('./instagram-profile').registerInstagramProfile(app, { requireAdmin });
 require('./youtube-channel').registerYouTubeChannel(app, { requireAdmin });
 registerPayments(app, { requireAuth, requireAdmin, serialize: serializeServiceRequest });

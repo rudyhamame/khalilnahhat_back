@@ -3,7 +3,7 @@ const sections={
  'live-stream':'Live stream','live-archive':'Live Recordings','clients':'Registered Clients','bookings':'Booking requests','testimonials':"Clients’ Testimonials",'meetings':'Meeting requests',
  'youtube':'YouTube','gallery':'Gallery','prices':'Events, Services & Equipment','transactions':'Transactions','availability':'Availability','vouchers':'Vouchers',
  'notifications':'Notifications','service-overview-operations-guide':'Service Overview & Operations Guide',
- 'ai-administrator':'Echo AI Administrator','ai-configuration':'ECHO AI Configuration','ai-billing':'Echo AI billing','seasonal-theme':'Seasonal theme',
+ 'ai-administrator':'Echo AI Administrator','ai-configuration':'ECHO AI Configuration','ai-billing':'Echo AI billing','seasonal-theme':'Seasonal theme','concept-map':'Concept map',
 };
 const normalize=value=>String(value).toLowerCase().replace(/[’']/g,'').replace(/[-_]/g,' ').replace(/\s+/g,' ').trim();
 const aliases=new Map(Object.entries(sections).flatMap(([key,label])=>[[normalize(key),key],[normalize(label),key]]));

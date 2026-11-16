@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const { z } = require('zod');
 const deletedDrafts=require('./deleted-event-drafts');
 
-const messageSchema = z.object({ id: z.uuid(), role: z.enum(['user', 'assistant']), content: z.string().trim().min(1).max(4000), mode: z.enum(['chat', 'voice']), segmentId: z.uuid().optional(), fieldPath:z.string().max(120).optional(), section:z.enum(['none','home','tree','work','availability','music','setup','simulation','booking','live','about']).optional(), face:z.enum(['none','calendar','venue']).optional() });
+const messageSchema = z.object({ id: z.uuid(), role: z.enum(['user', 'assistant']), content: z.string().trim().min(1).max(4000), mode: z.enum(['chat', 'voice']), segmentId: z.uuid().nullish().transform(value=>value??undefined), fieldPath:z.string().max(120).nullish().transform(value=>value??undefined), section:z.enum(['none','home','tree','work','availability','music','setup','simulation','booking','live','about']).nullish().transform(value=>value??undefined), face:z.enum(['none','calendar','venue']).nullish().transform(value=>value??undefined) });
 const appendSchema = z.object({ consent: z.literal(true), id: z.uuid(), messages: z.array(messageSchema).min(1).max(8) });
 const schema = new mongoose.Schema({
   _id: String,
@@ -56,11 +56,11 @@ function registerBookingConversations(app, { requireAuth, store = mongoStore }) 
   }));
   app.post('/api/ai-booking/conversations', requireAuth, guarded(async (req, res) => {
     const input = appendSchema.safeParse(req.body);
-    if (!input.success) return res.status(400).json({ message: 'Send valid conversation messages and accept the AI notice.' });
+    if (!input.success) return res.status(400).json({ message: 'Send valid conversation messages and accept the AI notice.', fields:input.error.issues.map(issue=>issue.path.join('.')) });
     const now = Date.now();
     for (const [id, value] of usage) if (value.until <= now) usage.delete(id);
     const bucket = usage.get(owner(req)) || { count: 0, until: now + 600000 };
-    if (bucket.count >= 180 || usage.size > 5000) return res.status(429).json({ message: 'History save limit reached. Please retry later.' });
+    if (bucket.count >= 600 || usage.size > 5000) {res.set('Retry-After',String(Math.max(1,Math.ceil((bucket.until-now)/1000))));return res.status(429).json({ message: 'History save limit reached. Please retry later.' });}
     bucket.count++; usage.set(owner(req), bucket);
     const item = await store.append(owner(req), input.data.id, input.data.messages);
     if (!item) return res.status(404).json({ message: 'Conversation not found.' });

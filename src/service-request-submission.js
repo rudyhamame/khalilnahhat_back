@@ -7,6 +7,7 @@ const { evaluateSubmissionReplay, fingerprintSubmission, isSubmissionDuplicateKe
 const serviceRequestCreateSchema = z.object({
   clientSubmissionId: z.string().uuid().optional(),
   draftId: z.string().uuid().optional(),
+  conversationMessageIds:z.array(z.uuid()).max(1000).optional(),
   items: z.array(z.object({
     serviceId: z.string().trim().min(1),
     name: z.string().trim().min(1),
@@ -29,11 +30,12 @@ function registerServiceRequestSubmission(app, { requireAuth, ServiceRequest, Eq
       });
     }
 
+    if(parsed.data.conversationMessageIds?.length&&!parsed.data.draftId)return response.status(400).json({message:'A conversation must belong to a booking draft.'});
     const user = request.authUser;
     const draftVoucher=parsed.data.order?.additional?.voucherCode?.trim().toUpperCase();
     if(draftVoucher&&parsed.data.voucherCode&&draftVoucher!==parsed.data.voucherCode.trim().toUpperCase())return response.status(400).json({message:'The voucher changed. Review the current draft code before submitting.'});
     if(draftVoucher&&!parsed.data.voucherCode)parsed.data.voucherCode=draftVoucher;
-    const submissionPayload = { items: parsed.data.items, event: parsed.data.event || null, order: parsed.data.order || null, voucherCode: parsed.data.voucherCode || '', ...(parsed.data.draftId?{draftId:parsed.data.draftId}:{}) };
+    const submissionPayload = { items: parsed.data.items, event: parsed.data.event || null, order: parsed.data.order || null, voucherCode: parsed.data.voucherCode || '', ...(parsed.data.draftId?{draftId:parsed.data.draftId}:{}),...(parsed.data.conversationMessageIds?{conversationMessageIds:parsed.data.conversationMessageIds}:{}) };
     const submissionHash = parsed.data.clientSubmissionId ? fingerprintSubmission(submissionPayload) : undefined;
     const findExistingSubmission = async () => ServiceRequest.findOne({ userId: user._id, clientSubmissionId: parsed.data.clientSubmissionId }).select('+submissionHash');
     const sendReplay = async (existing) => {
@@ -61,6 +63,8 @@ function registerServiceRequestSubmission(app, { requireAuth, ServiceRequest, Eq
     if(parsed.data.draftId){
       try{
         const saved=await loadConversation(String(user._id||user.id),parsed.data.draftId);
+        const savedIds=new Set((saved?.messages||[]).map(message=>message.id));
+        if(parsed.data.conversationMessageIds?.some(id=>!savedIds.has(id)))return response.status(409).json({message:'Your conversation has not finished saving. Retry saving it before submitting the booking.'});
         conversation={draftId:parsed.data.draftId,messages:(saved?.messages||[]).map(({id,role,content,mode,segmentId,fieldPath,section,face,createdAt})=>({id,role,content,mode,segmentId,fieldPath,section,face,createdAt}))};
       }catch{return response.status(503).json({message:'The draft conversation could not be attached. Please retry; nothing was submitted.'});}
     }

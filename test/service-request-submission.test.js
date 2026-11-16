@@ -22,6 +22,7 @@ async function fixture(t,options={}) {
   },Equipment:{find:async()=>options.catalog||[]},
   vouchers:{reserve:async()=>{counters.reserve++;return {voucher:{code:'TEST'}};},release:async()=>{counters.release++;},snapshot:v=>v,record:async()=>{}},
   serializeServiceRequest:item=>({id:item.externalId,status:item.status,customerEmail:item.customerEmail}),
+  loadConversation:options.loadConversation,
   sendServiceRequestNotification:async()=>{counters.notify++;if(options.failEmail)throw new Error('Mail unavailable');return {sent:true};},
  });
  app.use((error,req,res,next)=>res.status(500).json({message:'Unable to save request.'}));
@@ -83,4 +84,19 @@ test('a successful request can be replayed after its equipment leaves the active
 
 test('protected submissions do not write when unique-index initialization fails',async t=>{
  const f=await fixture(t,{failIndex:true});assert.equal((await f.post()).status,500);assert.equal(f.saved.length,0);assert.equal(f.counters.notify,0);
+});
+
+test('booking submission waits for every owned conversation message and snapshots the right draft',async t=>{
+ const {randomUUID}=require('node:crypto'),draftId=randomUUID(),first=randomUUID(),last=randomUUID(),calls=[];
+ const rows=[{id:first,role:'user',content:'My event',mode:'chat'}];
+ const f=await fixture(t,{loadConversation:async(owner,id)=>{calls.push({owner,id});return {messages:rows};}});
+ const request={...payload(),draftId,conversationMessageIds:[first,last]};
+ assert.equal((await f.post(request)).status,409);assert.equal(f.saved.length,0);
+ rows.push({id:last,role:'assistant',content:'Your event plan',mode:'voice'});
+ assert.equal((await f.post(request)).status,201);assert.equal(f.saved.length,1);
+ assert.deepEqual(calls,[{owner:'client-1',id:draftId},{owner:'client-1',id:draftId}]);
+ assert.equal(f.saved[0].conversation.draftId,draftId);assert.deepEqual(f.saved[0].conversation.messages.map(row=>row.id),[first,last]);
+ // A later draft conversation cannot alter the submitted booking snapshot.
+ rows.push({id:randomUUID(),role:'user',content:'Another booking',mode:'chat'});
+ assert.equal(f.saved[0].conversation.messages.length,2);
 });

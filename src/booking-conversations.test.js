@@ -48,3 +48,11 @@ test('storage errors remain distinct from an empty history and do not leak trans
   const request=await fixture(t,{list:async()=>{throw new Error('secret transcript');}});
   const response=await request();assert.equal(response.status,503);assert.doesNotMatch(await response.text(),/secret/);
 });
+
+test('missing field or viewport metadata from completed chapters accepts null and saves later turns',async t=>{
+ const request=await fixture(t),input=body();Object.assign(input.messages[1],{fieldPath:null,face:null,section:null,segmentId:null});
+ assert.equal((await request('',input)).status,200);
+ const next={...input,messages:[{id:randomUUID(),role:'user',mode:'voice',content:'Add lighting please.'}]};
+ assert.equal((await request('',next)).status,200);
+ const {item}=await(await request('/'+input.id)).json();assert.equal(item.messages.length,3);assert.equal(item.messages[1].fieldPath,undefined);
+});

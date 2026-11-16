@@ -1,5 +1,6 @@
 const { z } = require('zod');
 const { ServiceRequest } = require('./models');
+const journey = require('./booking-journey');
 
 const text = z.string().trim().max(3000).default('');
 const planningSchema = z.object({
@@ -15,7 +16,7 @@ function registerPlanning(app, { requireAuth, serialize }) {
     if (!parsed.success) return res.status(400).json({ message: 'Planning details failed validation.' });
     const sr = await ServiceRequest.findOne({ externalId: req.params.id });
     if (!sr || String(sr.userId) !== String(req.authUser._id)) return res.status(404).json({ message: 'Service request not found.' });
-    if (sr.status !== 'confirmed') return res.status(409).json({ message: 'Event planning opens once your booking is confirmed.' });
+    if (!journey.rule(sr.status).isBooked) return res.status(409).json({ message: 'Event planning opens once your booking is confirmed.' });
     sr.planning = { ...parsed.data, djSet: sr.planning?.djSet, updatedAt: new Date() };
     await sr.save();
     return res.json({ item: serialize(sr, false) });

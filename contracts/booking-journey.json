@@ -1,0 +1,129 @@
+{
+ "_about": "The ONE description of what each booking-request status means. Owned by khalil-back/contracts; src/booking-journey.js loads it and the frontend keeps a synced copy for documentation. Edit here only.",
+ "facts": {
+  "holdsStock": "its equipment counts against stock for upcoming events",
+  "expires": "the quote lapses automatically after its valid-days window",
+  "showsPrices": "the client may see the quote prices",
+  "needsAdmin": "an administrator must act (counted as 'needs attention')",
+  "repriceable": "an administrator may publish or republish a quote",
+  "extendable": "an administrator may extend or reactivate the quote",
+  "awaitingClient": "a quote is out and the client must accept or ask for changes (reminders go out here)",
+  "canRecordDeposit": "manual payments are recorded by administrators only; the deposit confirms the booking",
+  "isBooked": "a confirmed booking: its date is blocked, balance/refunds can be recorded, planning and the DJ set open",
+  "cancellable": "an administrator may cancel the request"
+ },
+ "path": [
+  "pending",
+  "quoted",
+  "accepted",
+  "confirmed"
+ ],
+ "statuses": {
+  "pending": {
+   "label": "Quote requested",
+   "labelAr": "تم طلب عرض السعر",
+   "step": 0,
+   "facts": [
+    "cancellable",
+    "holdsStock",
+    "needsAdmin",
+    "repriceable"
+   ],
+   "clientNext": "wait_for_quote",
+   "adminNext": "publish_quote",
+   "meaning": "Client request received; no quote has been sent and the date is not reserved.",
+   "whoActsNext": "Administrator reviews and prepares a quote."
+  },
+  "quoted": {
+   "label": "Quote ready",
+   "labelAr": "عرض السعر جاهز",
+   "step": 1,
+   "facts": [
+    "awaitingClient",
+    "cancellable",
+    "expires",
+    "extendable",
+    "holdsStock",
+    "repriceable",
+    "showsPrices"
+   ],
+   "clientNext": "accept_or_request_changes",
+   "adminNext": "wait_for_client",
+   "meaning": "A quote is available and has an expiry.",
+   "whoActsNext": "Client accepts or requests changes."
+  },
+  "accepted": {
+   "label": "Quote accepted",
+   "labelAr": "تم قبول العرض",
+   "step": 2,
+   "facts": [
+    "canRecordDeposit",
+    "cancellable",
+    "expires",
+    "holdsStock",
+    "repriceable",
+    "showsPrices"
+   ],
+   "clientNext": "pay_deposit",
+   "adminNext": "record_deposit",
+   "meaning": "Client accepted the active quote. This alone does not confirm the booking.",
+   "whoActsNext": "Administrator records the deposit."
+  },
+  "changes_requested": {
+   "label": "Changes requested",
+   "labelAr": "طُلبت تعديلات",
+   "step": 1,
+   "facts": [
+    "cancellable",
+    "extendable",
+    "holdsStock",
+    "needsAdmin",
+    "repriceable"
+   ],
+   "clientNext": "wait_for_revised_quote",
+   "adminNext": "publish_revised_quote",
+   "meaning": "Client asked for quote changes.",
+   "whoActsNext": "Administrator reviews and sends a revised quote."
+  },
+  "expired": {
+   "label": "Expired",
+   "labelAr": "منتهي",
+   "step": null,
+   "facts": [
+    "cancellable",
+    "extendable",
+    "repriceable",
+    "showsPrices"
+   ],
+   "clientNext": "contact_to_reactivate",
+   "adminNext": "reactivate_or_close",
+   "meaning": "Quote validity ended before acceptance or deposit confirmation.",
+   "whoActsNext": "Administrator extends/reactivates if appropriate."
+  },
+  "confirmed": {
+   "label": "Booking confirmed",
+   "labelAr": "تم تأكيد الحجز",
+   "step": 3,
+   "facts": [
+    "cancellable",
+    "holdsStock",
+    "isBooked",
+    "showsPrices"
+   ],
+   "clientNext": "plan_the_event",
+   "adminNext": "prepare_event",
+   "meaning": "Deposit threshold was recorded and date/equipment checks passed.",
+   "whoActsNext": "Client and team can proceed with the confirmed event."
+  },
+  "cancelled": {
+   "label": "Cancelled",
+   "labelAr": "ملغى",
+   "step": null,
+   "facts": [],
+   "clientNext": "none",
+   "adminNext": "none",
+   "meaning": "Administrator cancelled the request/quote.",
+   "whoActsNext": "Contact the team through existing account support channels."
+  }
+ }
+}

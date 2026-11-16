@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const journey = require('./booking-journey');
 
 const userSchema = new mongoose.Schema(
   {
@@ -292,8 +293,8 @@ const serviceRequestSchema = new mongoose.Schema(
     items: { type: [serviceRequestItemSchema], required: true },
     status: {
       type: String,
-      enum: ['pending', 'quoted', 'accepted', 'changes_requested', 'expired', 'cancelled', 'confirmed'],
-      default: 'pending',
+      enum: [...journey.STATUSES],
+      default: journey.STATUS.PENDING,
       trim: true,
     },
     voucher: { type: new mongoose.Schema({ code: String, title: String, kind: String, amountCents: Number, percent: Number }, { _id: false }), default: null },

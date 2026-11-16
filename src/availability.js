@@ -1,5 +1,6 @@
 const mongoose=require('mongoose');
 const {ServiceRequest}=require('./models');
+const journey=require('./booking-journey');
 // Days the owner marks unavailable by hand (travel, rest, another commitment). One document per calendar day.
 const Block=mongoose.models.AvailabilityBlock||mongoose.model('AvailabilityBlock',new mongoose.Schema({date:{type:String,required:true,unique:true},note:{type:String,default:'',maxlength:200}},{timestamps:true}));
 const date=value=>typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&!Number.isNaN(Date.parse(value+'T12:00:00Z'))&&new Date(value+'T12:00:00Z').toISOString().slice(0,10)===value;
@@ -13,7 +14,7 @@ function mergeRanges(days){
 // Confirmed bookings as busy ranges per day of `year`.
 async function bookingDays(year){
  const from=`${year-1}-12-31`,to=`${year+1}-01-01`;
- const rows=await ServiceRequest.find({status:'confirmed',$or:[{'order.event.date':{$gte:from,$lte:to}},{'event.eventDate':{$gte:from,$lte:to}}]}).select('order.event.date order.event.startTime order.event.endTime event.eventDate event.startTime event.endTime -_id').limit(5001).lean();
+ const rows=await ServiceRequest.find({status:{$in:journey.statusesWhere('isBooked')},$or:[{'order.event.date':{$gte:from,$lte:to}},{'event.eventDate':{$gte:from,$lte:to}}]}).select('order.event.date order.event.startTime order.event.endTime event.eventDate event.startTime event.endTime -_id').limit(5001).lean();
  if(rows.length>5000)throw Object.assign(new Error('incomplete'),{incomplete:true});
  const days={};
  const add=(key,start,end)=>{if(key>=`${year}-01-01`&&key<=`${year}-12-31`&&end>start)(days[key]||=[]).push({start,end});};

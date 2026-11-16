@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const multer = require('multer');
 const { z } = require('zod');
 const { stockView } = require('./equipment-stock');
+const journey = require('./booking-journey');
 
 const equipmentSchema = new mongoose.Schema(
   {
@@ -102,7 +103,7 @@ function registerEquipmentRoutes(app, requireAdmin) {
     // Reserved = equipment quantities on live client orders whose event date has not passed.
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
     const rows = await require('./models').ServiceRequest.aggregate([
-      { $match: { status: { $in: ['pending', 'quoted', 'accepted', 'changes_requested', 'confirmed'] }, $or: [{ 'event.eventDate': { $gte: today } }, { 'event.eventDate': { $exists: false } }] } },
+      { $match: { status: { $in: journey.statusesWhere('holdsStock') }, $or: [{ 'event.eventDate': { $gte: today } }, { 'event.eventDate': { $exists: false } }] } },
       { $unwind: '$items' },
       { $group: { _id: '$items.serviceId', reserved: { $sum: '$items.quantity' } } },
     ]);

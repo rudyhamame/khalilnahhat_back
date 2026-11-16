@@ -43,6 +43,7 @@ const { registerMeetingRoom } = require('./meeting-room');
 const { registerAccount, sendVerification } = require('./account');
 const { registerContent } = require('./content');
 const { DAY_MS, quoteTotals, registerQuoteLifecycle } = require('./quote-lifecycle');
+const journey = require('./booking-journey');
 const { createSessionToken, hashPassword, verifyPassword } = require('./security');
 const { convertYoutubeToWav, normalizeYoutubeUrl } = require('./youtube-audio');
 const { createYoutubeSessionStore, registerYoutubeSessionRoutes } = require('./youtube-session');
@@ -348,7 +349,7 @@ function serializeUser(user) {
 }
 
 function serializeServiceRequest(serviceRequest, includeQuote = true) {
-  const isQuoted = ['quoted', 'accepted', 'expired', 'confirmed'].includes(serviceRequest.status);
+  const isQuoted = journey.rule(serviceRequest.status).showsPrices;
   const items = serviceRequest.items.map((item) => {
     const serializedItem = {
       serviceId: item.serviceId,
@@ -377,6 +378,7 @@ function serializeServiceRequest(serviceRequest, includeQuote = true) {
     customerEmail: serviceRequest.customerEmail,
     items,
     status: serviceRequest.status,
+    journey: journey.describe(serviceRequest.status),
     currency: serviceRequest.currency || 'CAD',
     adminNote: isQuoted || includeQuote ? serviceRequest.adminNote || '' : '',
     total: isQuoted || includeQuote
@@ -993,7 +995,7 @@ app.patch('/api/service-requests/:id/quote', requireAdmin, async (request, respo
     });
   }
 
-  if (['confirmed', 'cancelled'].includes(serviceRequest.status) || (serviceRequest.payments || []).some((p) => !p.voided)) {
+  if (!journey.rule(serviceRequest.status).repriceable || (serviceRequest.payments || []).some((p) => !p.voided)) {
     return response.status(409).json({ message: 'A cancelled or paid booking cannot be repriced through the quote editor.' });
   }
 
@@ -1015,7 +1017,7 @@ app.patch('/api/service-requests/:id/quote', requireAdmin, async (request, respo
     item.unitPrice = quoteByServiceId.get(item.serviceId);
   });
   serviceRequest.adminNote = parsed.data.adminNote;
-  serviceRequest.status = 'quoted';
+  serviceRequest.status = journey.STATUS.QUOTED;
   serviceRequest.quotedAt = new Date();
   if (parsed.data.validDays) serviceRequest.validDays = parsed.data.validDays;
   if (parsed.data.taxPercent !== undefined) serviceRequest.taxPercent = parsed.data.taxPercent;
@@ -1477,6 +1479,7 @@ registerAiBilling(app, {
 const aiBooking=require('./ai-booking'),aiBookingRoutes=aiBooking.registerAiBooking(app, {
   configService:aiConfiguration,
   requireAuth: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest }),
+  loadJourney: require('./booking-journey-summary').createJourneyLoader({ Model: ServiceRequest, serialize: serializeServiceRequest }),
 });
 require('./venue-map/routes').registerVenueMap(app, { requireAuth });
 

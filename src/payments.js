@@ -2,6 +2,7 @@ const {equipmentDemand}=require('./equipment-demand');
 const mongoose = require('mongoose');
 const { z } = require('zod');
 const { ServiceRequest } = require('./models');
+const journey = require('./booking-journey');
 const { Equipment } = require('./equipment');
 const { sendBookingConfirmation } = require('./brevo');
 const { quoteTotals, isExpired } = require('./quote-lifecycle');
@@ -68,8 +69,8 @@ function registerPayments(app, { requireAuth, requireAdmin, serialize, Model = S
 
     if (kind === 'deposit' && isExpired(sr)) return fail(res, 409, 'This quote has expired. Extend and accept it again before recording a deposit.');
     if (kind !== 'refund' && net + cents > totalCents) return fail(res, 400, 'That is more than the remaining balance.');
-    if (kind === 'deposit' && sr.status !== 'accepted') return fail(res, 409, 'A deposit can be recorded once the customer has accepted the quote.');
-    if (kind !== 'deposit' && sr.status !== 'confirmed') return fail(res, 409, 'Confirm the booking with a deposit first.');
+    if (kind === 'deposit' && !journey.rule(sr.status).canRecordDeposit) return fail(res, 409, 'A deposit can be recorded once the customer has accepted the quote.');
+    if (kind !== 'deposit' && !journey.rule(sr.status).isBooked) return fail(res, 409, 'Confirm the booking with a deposit first.');
     if (kind === 'balance' && net + cents > totalCents) return fail(res, 400, 'That is more than the remaining balance.');
     if (kind === 'refund' && cents > net) return fail(res, 400, 'Refund is larger than the amount received.');
 
@@ -90,7 +91,7 @@ function registerPayments(app, { requireAuth, requireAdmin, serialize, Model = S
     }
 
     sr.payments.push({ kind, amountCents: kind === 'refund' ? -cents : cents, method, reference, paidAt: receivedAt || new Date() });
-    if (booking) sr.status = 'confirmed';
+    if (booking) sr.status = journey.STATUS.CONFIRMED;
     try {
       await sr.save();
     } catch (e) {

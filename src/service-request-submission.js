@@ -1,6 +1,7 @@
 const { z } = require('zod');
 const { eventSchema, normalizeQuoteItems } = require('./quote-validation');
 const eventOrder = require('./event-order');
+const { STATUS } = require('./booking-journey');
 const { evaluateSubmissionReplay, fingerprintSubmission, isSubmissionDuplicateKey } = require('./service-request-idempotency');
 
 const serviceRequestCreateSchema = z.object({
@@ -83,7 +84,7 @@ function registerServiceRequestSubmission(app, { requireAuth, ServiceRequest, Eq
       order: parsed.data.order || null,
       conversation,
       requestNumber: `ECHO-${Date.now().toString(36).toUpperCase()}`,
-      status: 'pending',
+      status: STATUS.PENDING,
       voucher: voucher ? vouchers.snapshot(voucher) : null,
       ...(parsed.data.clientSubmissionId ? { clientSubmissionId: parsed.data.clientSubmissionId, submissionHash } : {}),
     }); } catch (error) {

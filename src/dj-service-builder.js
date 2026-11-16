@@ -1,4 +1,5 @@
 const { z } = require('zod');
+const journey = require('./booking-journey');
 const { ArchiveItem, ServiceRequest, LiveStreamConfig } = require('./models');
 
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
@@ -24,7 +25,7 @@ function registerDjServiceBuilder(app, { requireAdmin, ArchiveModel = ArchiveIte
   app.put('/api/admin/dj-service-builder/:bookingId', requireAdmin, async (req, res) => {
     try {
       const djSet=await validateSet(req,res);if(!djSet)return;
-      const item = await BookingModel.findOne({ externalId: req.params.bookingId, status: 'confirmed' });
+      const item = await BookingModel.findOne({ externalId: req.params.bookingId, status: { $in: journey.statusesWhere('isBooked') } });
       if (!item) return res.status(409).json({ message: 'This confirmed booking could not be found. Refresh the booking list.' });
       item.planning = { ...(item.planning || {}), djSet, updatedAt: new Date() };
       await item.save();

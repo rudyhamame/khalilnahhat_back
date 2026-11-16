@@ -6,6 +6,7 @@ const fs = require('fs/promises');
 const path = require('path');
 const multer = require('multer');
 const { z } = require('zod');
+const journey = require('./booking-journey');
 const cloudinary = require('cloudinary').v2;
 const { User, ServiceRequest, Booking, ArchiveItem, LiveSession, LiveRequest, LiveStreamConfig } = require('./models');
 const { EventBooking } = require('./payments');
@@ -58,7 +59,7 @@ function registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest 
   app.get('/api/admin/overview', requireAdmin, async (_req,res) => {
     const [clients,requests,pending,confirmed,media,archive,vault,queue,meetings,equipment] = await Promise.all([
       User.countDocuments({isAdmin:{$ne:true},username:{$nin:[...ADMIN_USERNAMES]}}),ServiceRequest.countDocuments(),
-      ServiceRequest.countDocuments({status:{$in:['pending','changes_requested']}}),EventBooking.countDocuments(),MediaItem.countDocuments(),
+      ServiceRequest.countDocuments({status:{$in:journey.statusesWhere('needsAdmin')}}),EventBooking.countDocuments(),MediaItem.countDocuments(),
       ArchiveItem.countDocuments(),StoredFile.countDocuments({archived:false}),LiveRequest.countDocuments({requestStatus:'pending'}),
       Meeting.countDocuments({status:'booked',start:{$gte:new Date()}}),Equipment.countDocuments(),
     ]);
@@ -182,7 +183,7 @@ function registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest 
     const fields=['brideName','groomName','timeline','partyEntrances','entranceSongs','firstDance','parentDances','dinnerMusic','cakeCutting','announcements','mustPlay','doNotPlay','musicLinks','specialRequests'];
     const parsed=z.object(Object.fromEntries(fields.map(key=>[key,z.string().trim().max(3000).default('')]))).strict().safeParse(req.body);
     if(!parsed.success) return fail(res,400,'Invalid planning details.');
-    const item=await ServiceRequest.findOne({externalId:req.params.id,status:'confirmed'});
+    const item=await ServiceRequest.findOne({externalId:req.params.id,status:{$in:journey.statusesWhere('isBooked')}});
     if(!item)return fail(res,409,'Planning requires a confirmed booking.');
     item.planning={...(item.planning||{}),...parsed.data,updatedAt:new Date()};
     await item.save();

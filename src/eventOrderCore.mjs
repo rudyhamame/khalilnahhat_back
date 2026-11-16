@@ -146,7 +146,7 @@ export function legacyToOrder(order, draft) {
 }
 export function orderToLegacy(order) {
   const e=order.event,m=order.music,c=order.customer;
-  const legacy={eventType:e.type||'other',eventDate:e.date||'',startTime:e.startTime||'',endTime:e.endTime||'',phone:c.phone||'',contactMethod:c.contactMethod||'email',company:c.company||'',venueName:e.venue.name||'',venueAddress:e.venue.address||'',city:e.venue.city||'',postalCode:e.venue.postalCode||'',inGta:e.venue.area==='gta',indoor:e.venue.setting!=='outdoor',guests:e.guestCount??0,services:order.services,musicStyle:m.styles.find(value=>['arabic','english','mixed','other'].includes(value))||'other',notes:order.additional.notes||'',setupRequirements:e.setup.requirements||'',otherMusic:m.otherPreferences||'',djMc:m.djMc||'',entrance:m.entrance||'',customMix:m.customMix||'',announcements:m.announcements||''};
+  const legacy={eventType:e.type||'other',eventDate:e.date||'',startTime:e.startTime||'',endTime:e.endTime||'',phone:c.phone||'',contactMethod:c.contactMethod||'email',company:c.company||'',venueName:e.venue.name||'',venueAddress:e.venue.address||'',city:e.venue.city||'',postalCode:e.venue.postalCode||'',indoor:e.venue.setting!=='outdoor',guests:e.guestCount??0,services:order.services,musicStyle:m.styles.find(value=>['arabic','english','mixed','other'].includes(value))||'other',notes:order.additional.notes||'',setupRequirements:e.setup.requirements||'',otherMusic:m.otherPreferences||'',djMc:m.djMc||'',entrance:m.entrance||'',customMix:m.customMix||'',announcements:m.announcements||''};
   for(const key of ['setupRequirements','otherMusic','djMc','entrance','customMix','announcements'])legacy[key]=legacy[key].slice(0,2000);
   return legacy;
 }

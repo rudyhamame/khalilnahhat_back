@@ -206,17 +206,6 @@
      "shortAr": "الوحدة / معلومات إضافية"
     },
     {
-     "key": "event.venue.area",
-     "label": "Is the venue inside the GTA (Greater Toronto Area)?",
-     "ar": "هل المكان داخل تورونتو الكبرى (GTA)؟",
-     "options": [
-      "gta",
-      "outside_gta"
-     ],
-     "short": "Inside the GTA",
-     "shortAr": "داخل تورونتو الكبرى"
-    },
-    {
      "key": "event.venue.setting",
      "label": "Indoor or outdoor",
      "ar": "داخلي أو خارجي",

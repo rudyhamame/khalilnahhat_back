@@ -5,11 +5,11 @@ const path=require('node:path');
 const core=require('./event-order');
 function completed(){
   let order=core.createEventOrder();
-  for(const [key,value] of Object.entries({'customer.fullName':'Example Client','customer.email':'example@example.invalid','customer.phone':'4165550123','customer.contactMethod':'email','event.type':'wedding','event.date':'2099-06-20','event.startTime':'18:00','event.endTime':'01:00','event.guestCount':150,'event.venue.name':'Example venue','event.venue.address':'1 Example Street','event.venue.city':'Toronto','event.venue.postalCode':'M1A 1A1','event.venue.area':'gta','event.venue.setting':'indoor',services:['dj']}))order=core.updateOrderField(order,key,value);
+  for(const [key,value] of Object.entries({'customer.fullName':'Example Client','customer.email':'example@example.invalid','customer.phone':'4165550123','customer.contactMethod':'email','event.type':'wedding','event.date':'2099-06-20','event.startTime':'18:00','event.endTime':'01:00','event.guestCount':150,'event.venue.name':'Example venue','event.venue.address':'1 Example Street','event.venue.city':'Toronto','event.venue.postalCode':'M1A 1A1','event.venue.setting':'indoor',services:['dj']}))order=core.updateOrderField(order,key,value);
   return core.applyAccountProfile(order,{firstName:'Example',lastName:'Client',email:'example@example.invalid',phoneNumber:'4165550123'});
 }
 test('new order has unknown answers, explicit Toronto time and separate post-booking planning',()=>{
-  const order=core.createEventOrder();assert.equal(order.event.guestCount,null);assert.equal(order.event.venue.area,null);assert.equal(order.event.venue.setting,null);assert.deepEqual(order.services,[]);assert.equal(order.event.timezone,'America/Toronto');assert.equal(order.planning.phase,'after_confirmation');assert.equal(order.planning.firstDance,null);
+  const order=core.createEventOrder();assert.equal(order.event.guestCount,null);assert.equal(order.event.venue.setting,null);assert.deepEqual(order.services,[]);assert.equal(order.event.timezone,'America/Toronto');assert.equal(order.planning.phase,'after_confirmation');assert.equal(order.planning.firstDance,null);
 });
 test('canonical JSON contract and helpers are identical in frontend and backend',()=>{
   for(const name of ['eventOrderContract.json','eventOrderCore.mjs'])assert.equal(fs.readFileSync(path.join(__dirname,name),'utf8').trim(),fs.readFileSync(path.join(__dirname,'../../khalil-front/src/lib',name),'utf8').trim());
@@ -41,7 +41,7 @@ test('reference links are metadata, not fetched, and non-HTTPS references are re
 
 test('quote questionnaire asks only what the brief lists plus language and dialect',()=>{
   const keys=core.fields.filter(field=>!field.hidden).map(field=>field.key).sort();
-  const brief=['customer.fullName','customer.email','customer.phone','customer.contactMethod','customer.company','event.type','event.date','event.startTime','event.endTime','event.guestCount','event.venue.name','event.venue.address','event.venue.city','event.venue.postalCode','event.venue.country','event.venue.addressDetails','event.venue.area','event.venue.setting','event.setup.requirements','services','music.djRequested','music.mcRequested','rental.requested','music.styles','music.otherLanguage','music.dialects','music.otherPreferences','music.djMc','music.entrance','music.customMix','music.announcements','references.images','references.documents','additional.specialRequests','additional.notes'].sort();
+  const brief=['customer.fullName','customer.email','customer.phone','customer.contactMethod','customer.company','event.type','event.date','event.startTime','event.endTime','event.guestCount','event.venue.name','event.venue.address','event.venue.city','event.venue.postalCode','event.venue.country','event.venue.addressDetails','event.venue.setting','event.setup.requirements','services','music.djRequested','music.mcRequested','rental.requested','music.styles','music.otherLanguage','music.dialects','music.otherPreferences','music.djMc','music.entrance','music.customMix','music.announcements','references.images','references.documents','additional.specialRequests','additional.notes'].sort();
   assert.deepEqual(keys,brief);
 });
 
@@ -92,4 +92,16 @@ test('option names come from the contract in both languages',()=>{
   assert.equal(core.optionName('customer.contactMethod','phone'),'Phone');
   assert.equal(core.optionName('customer.contactMethod','whatsapp',true),'واتساب');
   assert.equal(core.optionName('customer.contactMethod','other'),'other');
+});
+
+test('retired GTA venue atom is absent from forms, AI tools and new/legacy orders',()=>{
+ const retired='event.venue.area',order=completed();
+ assert.ok(!core.fields.some(field=>field.key===retired));assert.ok(!core.aiFields.some(field=>field.key===retired));
+ assert.ok(!core.orderPatchJsonSchema.items.properties.path.enum.includes(retired));
+ order.event.venue.area='gta';const normalized=core.normalizeEventOrder(order);
+ assert.equal(Object.hasOwn(normalized.event.venue,'area'),false);
+ assert.equal(Object.hasOwn(core.orderToLegacy(normalized),'inGta'),false);
+ assert.equal(core.applyOrderPatch(normalized,[{path:retired,value:'gta'}]).event.venue.area,undefined);
+ assert.deepEqual(core.validateEventOrder(normalized,{submission:true}),[]);
+ assert.doesNotMatch(core.orderInstructions(),/postal code, GTA area|coordinates, GTA area/);
 });

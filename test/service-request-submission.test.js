@@ -66,7 +66,7 @@ test('mail failure preserves a successfully saved request',async t=>{
 test('canonical submissions retain the brief but enforce account identity and reject mismatched services',async t=>{
  const core=require('../src/event-order');
  let order=core.createEventOrder();
- for(const [key,value] of Object.entries({'customer.fullName':'Forged Name','customer.email':'forged@example.invalid','customer.phone':'4165550100','customer.contactMethod':'email','event.type':'wedding','event.date':'2099-10-12','event.startTime':'18:00','event.endTime':'01:00','event.guestCount':100,'event.venue.name':'Test Hall','event.venue.address':'1 Example Street','event.venue.city':'Toronto','event.venue.postalCode':'M1A 1A1','event.venue.area':'gta','event.venue.setting':'indoor',services:['dj']}))order=core.updateOrderField(order,key,value);
+ for(const [key,value] of Object.entries({'customer.fullName':'Forged Name','customer.email':'forged@example.invalid','customer.phone':'4165550100','customer.contactMethod':'email','event.type':'wedding','event.date':'2099-10-12','event.startTime':'18:00','event.endTime':'01:00','event.guestCount':100,'event.venue.name':'Test Hall','event.venue.address':'1 Example Street','event.venue.city':'Toronto','event.venue.postalCode':'M1A 1A1','event.venue.setting':'indoor',services:['dj']}))order=core.updateOrderField(order,key,value);
  order.additional.voucherCode='TEST';
  const f=await fixture(t);
  assert.equal((await f.post({...payload(),order,voucherCode:'OTHER'})).status,400);

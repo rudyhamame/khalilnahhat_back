@@ -53,6 +53,7 @@ function registerBookingSignup(app, { User, serializeUser, isAdminUser, issueSes
       if (existing.length) await User.updateOne({ _id: existing[0]._id }, { firstName: data.firstName, lastName: data.lastName, passwordHash, phoneNumber: data.phoneNumber, company: data.company, ...contact(data) });
       else await User.create({ username: `client-${crypto.randomUUID()}`, firstName: data.firstName, lastName: data.lastName, email: data.email, passwordHash,
         phoneNumber: data.phoneNumber, company: data.company, ...contact(data), isAdmin: false, awaitingVerification: true, emailVerified: false });
+      if (!existing.length) require('./admin-alerts').alert('signup');
       const retryAfter = await sendCode(data.email, data.firstName);
       return res.status(202).json({ pending: true, email: data.email, retryAfter });
     } catch (error) {

@@ -53,7 +53,7 @@ function createReceiver({
         data: Buffer.from(file.content),
         size: file.size || file.content.length,
       }));
-    return store.receive({
+    const saved = await store.receive({
       mailbox: BOOKINGS,
       folder: "1",
       state: "received",
@@ -81,6 +81,8 @@ function createReceiver({
       bytes: raw.length,
       time: new Date(clock()),
     });
+    require("../admin-alerts").alert("email");
+    return saved;
   };
 }
 module.exports = { createReceiver };

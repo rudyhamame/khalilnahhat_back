@@ -13,7 +13,7 @@ function registerAiAdministrator(app,{requireAdmin,authorize,configService,env=p
  const store=createStore(),registry=createRegistry({invoke:createRouteAdapter(app),app});
  const adminServices=createAdminServices({configService,env});
  const agent=createEchoAdminAgent({registry,configService,adminServices,env});const engine=createEngine({store,registry,agent,authorize});
- const push=createPush({store,env,authorize});let pushTimer=null,notifying=false;
+ const push=createPush({store,env,authorize});require('../admin-alerts').setSender((...a)=>push.notify(...a));let pushTimer=null,notifying=false;
  const start=async()=>{await push.init();await engine.start();if(!pushTimer){pushTimer=setInterval(async()=>{if(notifying)return;notifying=true;try{await push.tick();}catch(error){console.error('Administrator notification:',error.name);}finally{notifying=false;}},5000);pushTimer.unref?.();}};
  const base='/api/admin/ai-administrator';
  const guard=fn=>async(req,res)=>{res.set('Cache-Control','no-store');try{await fn(req,res);}catch(error){res.status(error instanceof z.ZodError?400:[400,401,403,404,409,422,429,503].includes(error.status)?error.status:503).json({message:error instanceof z.ZodError?error.issues[0].message:error.status?error.message:'AI Administrator is temporarily unavailable.'});}};

@@ -99,6 +99,7 @@ function registerServiceRequestSubmission(app, { requireAuth, ServiceRequest, Eq
       }
       throw error;
     }
+    require('./admin-alerts').alert('booking');
     if (voucher) await vouchers.record(voucher, user, serviceRequest).catch((error) => console.error('Voucher redemption record failed:', error));
 
     let notificationSent = false;

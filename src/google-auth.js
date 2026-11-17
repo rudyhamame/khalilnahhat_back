@@ -59,6 +59,7 @@ function registerGoogleAuth(app, { User, serializeUser, isAdminUser, clientId = 
             // Google accounts have no usable local password. Password reset can add one.
             passwordHash: await hashPassword(crypto.randomBytes(48).toString('hex')),
           });
+          require('./admin-alerts').alert('signup');
         }
       }
       if (user.isBlocked) return res.status(403).json({ message: 'This account is blocked. Contact support.' });

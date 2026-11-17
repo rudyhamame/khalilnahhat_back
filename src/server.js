@@ -939,6 +939,7 @@ app.post('/api/auth/signup', async (request, response) => {
     awaitingVerification: true,
   });
 
+  require('./admin-alerts').alert('signup');
   // Manual verification: no session is issued; the account opens once the emailed link is used.
   sendVerification(user, getFrontendUrl()).catch((error) => console.error('Verification email failed:', error));
 
@@ -1454,6 +1455,7 @@ app.post('/api/bookings', async (request, response) => {
 
   const reference = createReference('KN');
 
+  require('./admin-alerts').alert('booking');
   await Booking.create({
     reference,
     ...parsed.data,
@@ -1539,6 +1541,8 @@ const aiAdministrator=require('./ai-admin/routes').registerAiAdministrator(app,{
  requireAdmin,configService:aiConfiguration,
  authorize:async (owner,token,binding)=>{if(!require('mongoose').isValidObjectId(owner))return null;const user=await User.findById(owner).select('+sessionTokenEncrypted +androidSessionTokenEncrypted');const active=accountSessions.selectSession(user,token,binding);return isAdminUser(user)&&active?accountSessions.sessionActor(user,active):null;},
 });
+
+require('./admin-alerts').register(app, { requireAdmin });
 
 app.use(require('./security-controls').securityError);
 

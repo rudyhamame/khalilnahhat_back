@@ -128,6 +128,10 @@ test('a phone number needs one phone contact option; without a phone it is not a
   withPhone.customer.phoneContact='whatsapp-call';
   assert.equal(core.missingOrderFields(withPhone).some(field=>field.key==='customer.phoneContact'),false);
   assert.equal(core.accountProfile({preferredContact:'whatsapp'})['customer.contactMethod'],'phone'); // old accounts
+  // A signed-in client's Personal info is complete: an older account with a phone but no phone contact choice reads as Phone call.
+  const legacy=core.applyAccountProfile(core.createEventOrder(),{firstName:'Ada',lastName:'Client',email:'ada@example.invalid',phoneNumber:'4165550123'});
+  assert.equal(legacy.customer.phoneContact,'call');assert.equal(core.missingOrderFields(legacy).some(field=>field.key.startsWith('customer.')),false);
+  assert.equal(core.accountProfile({email:'a@b.co',firstName:'A',lastName:'B'})['customer.phoneContact'],null); // no phone, nothing to ask
 });
 
 test('the AI instructions follow the booking data atoms bible: no retired atoms, no planning or upload writes',()=>{

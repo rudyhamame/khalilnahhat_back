@@ -342,7 +342,7 @@ function serializeUser(user) {
     phoneNumber: user.phoneNumber,
     company: user.company || '',
     preferredContact: user.preferredContact === 'whatsapp' ? 'phone' : user.preferredContact || 'email',
-    phoneContact: user.phoneContact || (user.preferredContact === 'whatsapp' ? 'whatsapp-text' : ''),
+    phoneContact: user.phoneContact || (user.preferredContact === 'whatsapp' ? 'whatsapp-text' : user.phoneNumber ? 'call' : ''),
     emailNotifications: user.emailNotifications !== false,
     emailVerified: Boolean(user.emailVerified),
     isAdmin: isAdminUser(user),

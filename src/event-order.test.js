@@ -144,3 +144,12 @@ test('the AI instructions follow the booking data atoms bible: no retired atoms,
   for(const item of guide)assert.equal(item.readOnly,!core.isAiEditableField(item.path),item.path);
   assert.equal(core.isAiEditableField('planning.mustPlay'),false);
 });
+
+test('a guest can have Personal info saved by the AI; a signed-in client cannot change account fields', () => {
+  const { sanitizeOrderPatch, guestOrderPatchJsonSchema, orderPatchJsonSchema } = require('./event-order');
+  const patch = [{ path: 'customer.fullName', value: 'Sam Lee' }, { path: 'customer.email', value: 'sam@example.com' }, { path: 'customer.phone', value: '4165550123' }];
+  assert.equal(sanitizeOrderPatch(patch, { guest: true }).length, 3);
+  assert.equal(sanitizeOrderPatch(patch).length, 0);
+  assert.ok(guestOrderPatchJsonSchema.items.properties.path.enum.includes('customer.email'));
+  assert.ok(!orderPatchJsonSchema.items.properties.path.enum.includes('customer.email'));
+});

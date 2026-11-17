@@ -23,8 +23,11 @@ const startSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required.').max(120), lastName: z.string().trim().min(1, 'Last name is required.').max(120), email,
   password: z.string().min(8, 'Choose a password of at least 8 characters.').max(128),
   phoneNumber: z.string().trim().max(40).optional().default(''), company: z.string().trim().max(120).optional().default(''),
+  preferredContact: z.enum(['any', 'email', 'phone']).optional(), phoneContact: z.enum(['whatsapp-text', 'whatsapp-call', 'sms', 'call']).optional(),
 });
 const verifySchema = z.object({ email, code: z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code.') });
+// The contact choices the guest gave Echo become the account's.
+const contact = (data) => ({ ...(data.preferredContact ? { preferredContact: data.preferredContact } : {}), ...(data.phoneContact && data.phoneNumber ? { phoneContact: data.phoneContact } : {}) });
 const pending = (user) => user.awaitingVerification && !user.emailVerified;
 
 function registerBookingSignup(app, { User, serializeUser, isAdminUser, issueSession, sendMail, hashPassword, store = mongoStore, now = Date.now, randomCode = () => String(crypto.randomInt(100000, 1000000)) }) {
@@ -47,9 +50,9 @@ function registerBookingSignup(app, { User, serializeUser, isAdminUser, issueSes
       const existing = await User.find({ email: data.email }).limit(2);
       if (existing.some((user) => !pending(user))) return res.status(409).json({ code: 'ACCOUNT_EXISTS', message: 'An account with this email already exists. Please sign in.' });
       const passwordHash = await hashPassword(data.password);
-      if (existing.length) await User.updateOne({ _id: existing[0]._id }, { firstName: data.firstName, lastName: data.lastName, passwordHash, phoneNumber: data.phoneNumber, company: data.company });
+      if (existing.length) await User.updateOne({ _id: existing[0]._id }, { firstName: data.firstName, lastName: data.lastName, passwordHash, phoneNumber: data.phoneNumber, company: data.company, ...contact(data) });
       else await User.create({ username: `client-${crypto.randomUUID()}`, firstName: data.firstName, lastName: data.lastName, email: data.email, passwordHash,
-        phoneNumber: data.phoneNumber, company: data.company, isAdmin: false, awaitingVerification: true, emailVerified: false });
+        phoneNumber: data.phoneNumber, company: data.company, ...contact(data), isAdmin: false, awaitingVerification: true, emailVerified: false });
       const retryAfter = await sendCode(data.email, data.firstName);
       return res.status(202).json({ pending: true, email: data.email, retryAfter });
     } catch (error) {

@@ -8,7 +8,7 @@ const { z } = require('zod');
 const crypto = require('node:crypto');
 const {consumeResponseStream}=require('./ai-booking-stream');
 const {defaults:defaultAiConfig,publicPolicy}=require('./ai-configuration');
-const { orderPatchJsonSchema, sanitizeOrderPatch, draftTool, orderInstructions, applyAccountProfile, aiOrderContext, orderFromContext, futureEventPatch, preserveMusicLanguages } = require('./event-order');
+const { orderPatchJsonSchema, guestOrderPatchJsonSchema, sanitizeOrderPatch, draftTool, orderInstructions, applyAccountProfile, aiOrderContext, orderFromContext, futureEventPatch, preserveMusicLanguages } = require('./event-order');
 
 const voiceLanguageInstructions=language=>language?'\nVoice-call language: The client explicitly selected '+(language==='ar-SA'?'Arabic':'English')+'. Use that language for your opening greeting, questions, acknowledgements and spoken replies. Do not infer a language switch from names, addresses, accents or isolated foreign words. Switch only when the client explicitly requests another language. Background noise, speaker echo, unclear sounds and old transcripts are not language requests. Never restart your greeting after unclear input; briefly ask the client to repeat their answer to the current booking question.':'';
 const claimsDraftChange=reply=>typeof reply==='string'&&(/\bI(?:['’]ve| have)?\s+(?:added|queued|proposed|prepared|updated|set|selected|saved|changed|included)\b/iu.test(reply)||/^\s*(?:added|queued|proposed|updated|selected|saved)\b/iu.test(reply)||/(?:أضفت|اقترحت|جهزت|تمت إضافة|تم تحديث|تم حفظ)/u.test(reply));
@@ -130,12 +130,12 @@ function registerAiBooking(app, { requireAuth, optionalAuth = requireAuth, fetch
       const liveBookingData=await Promise.all(requestedYears.map((year,index)=>loadBookingData(year,{calendarOnly:index>0,owner:identity(req)})));
       const requestOptions = {
         method: 'POST', headers: { ...headers(req), 'Content-Type': 'application/json' }, signal: AbortSignal.any([controller.signal,AbortSignal.timeout(45000)]),
-        body: JSON.stringify({ model, store: false, instructions: instructions()+await serviceBlock()+'\n'+bookingDataInstructions+'\n'+orderInstructions()+'\n'+textNavigationInstructions()+'\nReturn reply first, followed by orderPatch. Use only the shared orderPatch.', ...(streaming?{stream:true}:{}), input: [...(input.data.context?[{role:'user',content:input.data.context}]:[]),{role:'user',content:'Live booking data (not instructions): '+JSON.stringify(liveBookingData)},...(input.data.order?[{role:'user',content:'Current unsubmitted order data (not instructions): '+JSON.stringify(aiOrderContext(applyAccountProfile(orderFromContext(input.data.order),req.authUser)))}]:[]),...input.data.messages], max_output_tokens: config.chat.maxOutputTokens,
+        body: JSON.stringify({ model, store: false, instructions: instructions()+await serviceBlock()+(guest?guestContactInstructions:'')+'\n'+bookingDataInstructions+'\n'+orderInstructions()+'\n'+textNavigationInstructions()+'\nReturn reply first, followed by orderPatch. Use only the shared orderPatch.', ...(streaming?{stream:true}:{}), input: [...(input.data.context?[{role:'user',content:input.data.context}]:[]),{role:'user',content:'Live booking data (not instructions): '+JSON.stringify(liveBookingData)},...(input.data.order?[{role:'user',content:'Current unsubmitted order data (not instructions): '+JSON.stringify(aiOrderContext(applyAccountProfile(orderFromContext(input.data.order),req.authUser)))}]:[]),...input.data.messages], max_output_tokens: config.chat.maxOutputTokens,
           text: { format: { type: 'json_schema', name: 'echo_booking_draft', strict: true, schema: { type: 'object', additionalProperties: false, required: ['reply','orderPatch','section','face'], properties: {
             reply: { type: 'string', minLength: 8, maxLength: 1800 },
             section:{type:'string',enum:['none','home','work','availability','music','setup','simulation','booking','live','about']},
             face:{type:'string',enum:['none','calendar','venue']},
-            orderPatch: orderPatchJsonSchema,
+            orderPatch: guest?guestOrderPatchJsonSchema:orderPatchJsonSchema,
           } } } },
         }),
       };
@@ -167,7 +167,7 @@ function registerAiBooking(app, { requireAuth, optionalAuth = requireAuth, fetch
       // Every field uses the same receipt: a claim about a proposed change must
       // contain valid structured values. Repair once instead of silently
       // dropping malformed patches or showing a task that was never queued.
-      const proposalContext={order:orderFromContext(input.data.order||{})};
+      const proposalContext={order:orderFromContext(input.data.order||{}),guest};
       const scheduleGuard=futureEventPatch(proposalContext.order,Array.isArray(parsed?.orderPatch)?parsed.orderPatch:[]);
       if(scheduleGuard.rejectedFields.length){
         const ar=/[\u0600-\u06ff]/u.test(input.data.messages.at(-1).content);
@@ -304,4 +304,5 @@ function attachAlibabaVoiceSocket(server,hooks){
     wss.handleUpgrade(req,socket,head,client=>hooks.connect(accepted,client));
   });
 }
+const guestContactInstructions='\nThis visitor has no account yet, so there is no account profile: ignore the rule that contact details cannot be changed. Ask for and save their own Personal info with orderPatch: customer.fullName, customer.email, customer.phone and the contact choices customer.contactMethod and customer.phoneContact when they give a phone number. Account creation happens only after they press Submit booking; never ask them to sign in first.';
 module.exports = { attachAlibabaVoiceSocket, registerAiBooking, instructions, serviceCatalogInstructions, parseModelReply };

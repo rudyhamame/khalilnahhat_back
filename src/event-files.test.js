@@ -13,7 +13,8 @@ async function fixture(t){
 const JPEG=[0xff,0xd8,0xff,0xe0,0,0,0,0],PDF=[0x25,0x50,0x44,0x46,0x2d,0x31];
 test('visitors can upload photos and documents without an account; the file must really be what it claims',async t=>{
   const {send,uploads}=await fixture(t);
-  assert.equal((await send(JPEG,'image/jpeg','photo')).status,200);
+  const photo=await send(JPEG,'image/jpeg','photo');assert.equal(photo.status,200);
+  assert.match((await photo.json()).sha256,/^[a-f0-9]{64}$/);
   assert.equal((await send(PDF,'application/pdf','file')).status,200);
   assert.equal((await send(Buffer.from('#!/bin/sh\nrm -rf /'),'image/jpeg','photo')).status,400); // a script renamed as a photo
   assert.equal((await send(JPEG,'image/jpeg','file')).status,400); // a photo is not a document

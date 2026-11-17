@@ -1,4 +1,5 @@
 const multer = require('multer');
+const { createHash } = require('node:crypto');
 const { uploadAsset } = require('./cloudinary-assets');
 // Client reference files for an event draft: inspiration photos and event documents.
 const TYPES = {
@@ -33,7 +34,7 @@ function createUploadLimiter(now = Date.now) {
   };
 }
 function registerEventFiles(app, { requireAuth, optionalAuth = requireAuth, uploadImpl = uploadAsset, limiter = createUploadLimiter() }) {
-  const guestKey = req => `guest:${require('crypto').createHash('sha256').update(`${req.ip || ''}|${String(req.get?.('user-agent') || '').slice(0, 160)}`).digest('hex').slice(0, 24)}`;
+  const guestKey = req => `guest:${createHash('sha256').update(`${req.ip || ''}|${String(req.get?.('user-agent') || '').slice(0, 160)}`).digest('hex').slice(0, 24)}`;
   app.post('/api/ai-booking/event-files', optionalAuth, (req, res, next) => {
     const guest = !req.authUser, owner = guest ? guestKey(req) : `user:${req.authUser._id || req.authUser.id}`;
     if (!limiter(owner, guest ? LIMITS.guest : LIMITS.client) || (guest && !limiter('all-guests', LIMITS.allGuests))) return res.status(429).json({ message: 'Too many uploads for now. Please try again in a few minutes.' });
@@ -45,9 +46,10 @@ function registerEventFiles(app, { requireAuth, optionalAuth = requireAuth, uplo
     if (kind === 'photo' && type[0] !== 'image') return res.status(400).json({ message: 'Photos must be JPG, PNG or WebP.' });
     if (kind === 'file' && type[0] === 'image') return res.status(400).json({ message: 'Documents must be PDF, Word or text files.' });
     try {
+      const sha256 = createHash('sha256').update(req.file.buffer).digest('hex');
       const result = await uploadImpl(req.file.buffer, { folder: 'khalil/event-references', resource_type: type[0], type: 'upload', public_id: `file.${type[1]}` });
       const name = String(req.file.originalname || `file.${type[1]}`).replace(/[\u0000-\u001f]/g, '').slice(0, 160);
-      res.json({ url: result.secure_url, name });
+      res.json({ url: result.secure_url, name, sha256 });
     } catch (error) { console.error('Event file upload failed:', error); res.status(502).json({ message: 'Could not store that file. Try again.' }); }
   });
 }

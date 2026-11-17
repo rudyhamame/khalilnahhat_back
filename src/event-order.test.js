@@ -38,6 +38,12 @@ test('server retains full brief, enforces identity and selections, and cannot re
 test('reference links are metadata, not fetched, and non-HTTPS references are rejected',()=>{
   const field=core.fields.find(field=>field.key==='references.images');assert.equal(core.validValue(field,['https://example.invalid/inspiration.jpg']),true);assert.equal(core.validValue(field,['javascript:alert(1)']),false);
 });
+test('uploaded photo hashes are retained only when they are valid SHA-256 values',()=>{
+  const field=core.fields.find(field=>field.key==='references.photos'),base={url:'https://res.cloudinary.com/demo/image/upload/photo.jpg',name:'photo.jpg',comment:''};
+  assert.equal(core.validValue(field,[{...base,sha256:'a'.repeat(64)}]),true);
+  assert.equal(core.validValue(field,[{...base,sha256:'not-a-hash'}]),false);
+  assert.equal(core.normalizeEventOrder({references:{photos:[{...base,sha256:'b'.repeat(64)}]}}).references.photos[0].sha256,'b'.repeat(64));
+});
 
 test('quote questionnaire asks only what the brief lists plus language and dialect',()=>{
   const keys=core.fields.filter(field=>!field.hidden).map(field=>field.key).sort();

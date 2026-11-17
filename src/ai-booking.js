@@ -72,7 +72,7 @@ function registerAiBooking(app, { requireAuth, optionalAuth = requireAuth, fetch
   // A visitor without an account is told apart only by connection and browser (hashed), just enough to rate-limit them.
   const guestId = req => `guest:${crypto.createHash('sha256').update(`${req.ip||''}|${String(req.get?.('user-agent')||'').slice(0,160)}`).digest('hex').slice(0,24)}`;
   const identity = req => String(req.authUser?._id || req.authUser?.id || guestId(req));
-  const GUEST_CHAT_PER_10_MIN = 8, ALL_GUESTS_CHAT_PER_10_MIN = 150;
+  const GUEST_CHAT_PER_10_MIN = 20, ALL_GUESTS_CHAT_PER_10_MIN = 300;
   const safety = req => crypto.createHash('sha256').update(identity(req)).digest('hex');
   const configured = (kind='chat',config=null) => kind==='chat'?Boolean(providerKey(env,config?.chat?.provider)):config?.voice?.provider==='alibaba'?Boolean(env.DASHSCOPE_API_KEY):config?.voice?.provider==='openrouter'?Boolean(env.OPENROUTER_API_KEY&&config.chat.provider==='openrouter'&&config.chat.enabled):Boolean(env.OPENAI_API_KEY);
   const admitted = (req, res, kind, limit,config,{bucketKind=kind}={}) => {
@@ -111,7 +111,8 @@ function registerAiBooking(app, { requireAuth, optionalAuth = requireAuth, fetch
     const guest=!req.authUser;
     // Guests get a smaller allowance of their own, and all guests together share one more, so an open chat cannot run up the AI bill.
     const refund=admitted(req, res, 'chat', guest?Math.min(GUEST_CHAT_PER_10_MIN,config.chat.requestsPer10Min):config.chat.requestsPer10Min,config);if(!refund)return;
-    if(guest){const shared=admitted({authUser:{id:'all-guests'}}, res, 'chat', ALL_GUESTS_CHAT_PER_10_MIN, config);if(!shared){refund();return;}}
+    let refundShared=null;
+    if(guest){const shared=admitted({authUser:{id:'all-guests'}}, res, 'chat', ALL_GUESTS_CHAT_PER_10_MIN, config);if(!shared){refund();return;}refundShared=shared;}
     pending.add(lock);
     let stage = 'provider_request';
     const streaming=req.get('accept')?.includes('application/x-ndjson');
@@ -216,6 +217,8 @@ function registerAiBooking(app, { requireAuth, optionalAuth = requireAuth, fetch
     }
     finally {
       pending.delete(lock);res.off('close',disconnected);
+      // A reply that failed did not give the visitor anything, so it does not use up their allowance.
+      if(metricStatus!=='completed'){refund();refundShared?.();}
       if(ticket&&!['completed','refused'].includes(metricStatus))await configService.fail(ticket).catch(()=>{});
       recordMetric({mode:'chat',model,status:controller.signal.aborted?'aborted':metricStatus,durationMs:Math.round(performance.now()-started),firstReplyMs,inputTokens:usage?.input_tokens??null,outputTokens:usage?.output_tokens??null,cachedInputTokens:usage?.input_tokens_details?.cached_tokens??null});
     }

@@ -26,7 +26,7 @@ test('voice requires sign-in, while the text conversation is open to visitors wi
 });
 test('a guest has a small chat allowance of their own',async t=>{
   const request=await fixture(t,{fetchImpl:async()=>new Response(JSON.stringify({output:[{content:[{type:'output_text',text:JSON.stringify({reply:'Hi.',orderPatch:[],section:'none',face:'none'})}]}]}),{status:200})});
-  let last;for(let i=0;i<9;i++)last=await request('chat',{consent:true,messages:[{role:'user',content:`Hello ${i}`}]},false);
+  let last;for(let i=0;i<21;i++)last=await request('chat',{consent:true,messages:[{role:'user',content:`Hello ${i}`}]},false);
   assert.equal(last.status,429);
   assert.equal((await request('chat',{consent:true,messages:[{role:'user',content:'Signed in'}]})).status,200); // signed-in clients are not affected
 });
@@ -312,4 +312,11 @@ test('a visitor without an account gets their Personal info and venue saved by t
   assert.equal(response.status,200);const body=await response.json();
   assert.deepEqual(body.orderPatch.map(change=>change.path),patch.map(change=>change.path));
   assert.ok(calls<=2);
+});
+
+test('failed guest replies are refunded, so retries after an error do not use up the allowance',async t=>{
+  let fail=true;
+  const request=await fixture(t,{fetchImpl:async()=>fail?new Response('upstream',{status:500}):Response.json({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({reply:'Hello there.',orderPatch:[],section:'none',face:'none'})}]}]})});
+  for(let i=0;i<25;i++)assert.notEqual((await request('chat',{consent:true,messages:[{role:'user',content:`Try ${i}`}]},false)).status,429);
+  fail=false;assert.equal((await request('chat',{consent:true,messages:[{role:'user',content:'Now it works'}]},false)).status,200);
 });

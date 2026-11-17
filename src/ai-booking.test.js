@@ -10,6 +10,28 @@ async function fixture(t,options={}){
   return (path,body,auth=true,extraHeaders={})=>fetch(`http://127.0.0.1:${server.address().port}/api/ai-booking/${path}`,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',...(auth?{Authorization:'Bearer unit-test'}:{}),...extraHeaders},body:body?JSON.stringify(body):undefined});
 }
 test('status exposes availability, never credentials',async t=>{const request=await fixture(t,{env:{}});const r=await request('status');assert.deepEqual(await r.json(),{configured:false,voiceConfigured:false,requiresSignIn:true,maxCallSeconds:300});});
+test('chat language follows the interface even when the message uses the other language',async t=>{
+ const seen=[];
+ const request=await fixture(t,{fetchImpl:async(_url,options)=>{seen.push(JSON.parse(options.body));return Response.json({output:[{content:[{type:'output_text',text:JSON.stringify({reply:'What venue?',orderPatch:[]})}]}]});}});
+ for(const [language,content] of [['en','اعرض النتائج'],['ar','Show all venue results']]){
+  assert.equal((await request('chat',{consent:true,language,messages:[{role:'user',content}]})).status,200);
+ }
+ assert.match(seen[0].instructions,/Interface language: English/);
+ assert.match(seen[0].instructions,/Never append Arabic text/);
+ assert.match(seen[1].instructions,/Interface language: Arabic/);
+ assert.match(seen[1].instructions,/English is allowed only for proper nouns/);
+ assert.match(seen[1].instructions,/Never append an English translation/);
+ assert.equal((await request('chat',{consent:true,language:'fr',messages:[{role:'user',content:'Bonjour'}]})).status,400);
+});
+test('app-generated replies use the interface language instead of guessing from the message',async t=>{
+ const request=await fixture(t);
+ const english=await (await request('chat',{consent:true,language:'en',order:{},messages:[{role:'user',content:'أريد إضافة رابط'}]})).json();
+ const arabic=await (await request('chat',{consent:true,language:'ar',order:{},messages:[{role:'user',content:'I want to add a link'}]})).json();
+ assert.match(english.reply,/paste the link/);
+ assert.doesNotMatch(english.reply,/\p{Script=Arabic}/u);
+ assert.match(arabic.reply,/أرسل الرابط/);
+ assert.doesNotMatch(arabic.reply,/[A-Za-z]/);
+});
 test('booking data requires sign-in and chat receives the same fresh snapshots',async t=>{
  const years=[],year=new Date().getUTCFullYear();let sent;
  const request=await fixture(t,{loadBookingData:async year=>{years.push(year);return {year,availability:{status:'ready',data:{days:{[`${year}-11-14`]:[{start:0,end:1440}]}}}};},fetchImpl:async(_url,options)=>{sent=JSON.parse(options.body);return Response.json({output:[{content:[{type:'output_text',text:JSON.stringify({reply:'That day is busy.',orderPatch:[],section:'availability'})}]}]});}});

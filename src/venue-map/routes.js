@@ -6,9 +6,10 @@ function parseBounds(value){const a=String(value||'').split(',').map(Number);if(
 const NOT_VENUE=new Set(['country','state','county','city','postcode','suburb','district','locality','street']);
 const isVenueResult=p=>!NOT_VENUE.has(p.result_type);
 const TYPE_CATEGORIES={restaurant:'catering.restaurant',banquet_hall:'activity.community_center,entertainment,accommodation.hotel',outdoor:'leisure.park,natural,beach',other:''};
-function registerVenueMap(app,{requireAuth,env=process.env,fetchImpl=fetch}={}){
+// Venue search and the map are open to visitors without an account (signing in happens when the booking is sent). The search is rate-limited per signed-in client or, for a visitor, per connection.
+function registerVenueMap(app,{requireAuth,optionalAuth=requireAuth,env=process.env,fetchImpl=fetch}={}){
  const buckets=new Map();let active=0;
- const guard=fn=>[requireAuth,async(req,res)=>{res.set('Cache-Control','no-store');try{await fn(req,res);}catch(e){res.status(e.status||503).json({message:e.status?e.message:'Venue service unavailable. Please retry.'});}}];
+ const guard=fn=>[optionalAuth,async(req,res)=>{res.set('Cache-Control','no-store');try{await fn(req,res);}catch(e){res.status(e.status||503).json({message:e.status?e.message:'Venue service unavailable. Please retry.'});}}];
  app.get('/api/venue-map/configuration',...guard(async(_req,res)=>res.json({searchConfigured:!!env.VENUE_SEARCH_API_KEY,searchProvider:env.VENUE_SEARCH_PROVIDER||'geoapify'})));
  const search=async(req,res)=>{
   if((env.VENUE_SEARCH_PROVIDER||'geoapify')!=='geoapify'||!env.VENUE_SEARCH_API_KEY)return res.status(503).json({message:'Place search needs a server-side Geoapify key.'});

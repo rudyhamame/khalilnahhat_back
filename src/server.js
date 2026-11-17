@@ -1487,7 +1487,7 @@ const aiBooking=require('./ai-booking'),aiBookingRoutes=aiBooking.registerAiBook
   optionalAuth: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, optional: true }), // the text conversation is open to visitors without an account
   loadJourney: require('./booking-journey-summary').createJourneyLoader({ Model: ServiceRequest, serialize: serializeServiceRequest }),
 });
-require('./venue-map/routes').registerVenueMap(app, { requireAuth });
+require('./venue-map/routes').registerVenueMap(app, { requireAuth, optionalAuth: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, optional: true }) });
 
 require('./venue-intelligence/routes').registerVenueIntelligence(app, {
   requireAuth: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest }),

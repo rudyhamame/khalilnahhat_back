@@ -108,3 +108,12 @@ test('retired GTA venue atom is absent from forms, AI tools and new/legacy order
  assert.deepEqual(core.validateEventOrder(normalized,{submission:true}),[]);
  assert.doesNotMatch(core.orderInstructions(),/postal code, GTA area|coordinates, GTA area/);
 });
+
+test('Special requests is not a data atom any more: old text becomes the Additional notes, the AI cannot set it, and Event document links are gone',()=>{
+  assert.equal(core.fields.some(field=>field.key==='additional.specialRequests'||field.key==='references.documents'),false);
+  assert.equal(core.sanitizeOrderPatch([{path:'additional.specialRequests',value:'"x"'}]).length,0);
+  assert.equal(core.normalizeEventOrder({additional:{specialRequests:'No flash photography'}}).additional.notes,'No flash photography');
+  assert.equal(core.normalizeEventOrder({additional:{notes:'Keep me',specialRequests:'Old'}}).additional.notes,'Keep me');
+  for(const key of ['references.photos','references.files'])assert.equal(core.isAiEditableField(key),false,key); // uploads come from the client, never from the AI
+  assert.equal(core.isAiEditableField('references.images'),true);
+});

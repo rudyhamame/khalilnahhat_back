@@ -30,5 +30,5 @@ test('an accepted quote must still be valid before deposit recording', () => {
   assert.equal(isExpired({ status: 'accepted', expiresAt: new Date(Date.now() + 10000) }), false);
 });
 test('quote totals preserve quantities, tax and deposit limit', () => {
-  assert.deepEqual(quoteTotals({ items: [{ unitPrice: 35, quantity: 10 }], taxPercent: 13, depositAmount: 100 }), { subtotal: 350, taxPercent: 13, tax: 45.5, total: 395.5, deposit: 100, balance: 295.5 });
+  assert.deepEqual(quoteTotals({ items: [{ unitPrice: 35, quantity: 10 }], taxPercent: 13, depositAmount: 100 }), { subtotal: 350, discount: 0, discountType: 'amount', discountValue: 0, taxableSubtotal: 350, taxPercent: 13, tax: 45.5, total: 395.5, deposit: 100, balance: 295.5 });
 });

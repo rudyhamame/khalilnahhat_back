@@ -51,10 +51,10 @@ test('nonces expire and cannot be replayed',async t=>{
 test('untrusted origins and missing challenges never reach token verification',async t=>{
   const api=await setup(t);await api.config();assert.equal((await api.post(undefined,'https://attacker.example')).status,403);assert.equal((await api.post({credential:'token'})).status,401);assert.equal(api.stats().verified,0);
 });
-test('Google-only profiles allow missing phone and surname; password accounts still require them',async()=>{
+test('Google-only profiles allow a missing surname; password accounts still require one (the phone number is optional for everyone)',async()=>{
   const {User}=require('./models');
   const google=new User({googleSubject:'subject',firstName:'Client',lastName:'',username:'client',passwordHash:'unusable',email:'client@gmail.com',phoneNumber:''});assert.equal(google.validateSync(),undefined);
-  const password=new User({firstName:'Client',lastName:'',username:'client',passwordHash:'hash',email:'client@gmail.com',phoneNumber:''});const errors=password.validateSync().errors;assert.ok(errors.lastName);assert.ok(errors.phoneNumber);
+  const password=new User({firstName:'Client',lastName:'',username:'client',passwordHash:'hash',email:'client@gmail.com',phoneNumber:''});const errors=password.validateSync().errors;assert.ok(errors.lastName);assert.equal(errors.phoneNumber,undefined); // the phone number is optional
 });
 
 test('rate limits are bounded per client behind the hosting proxy',async t=>{

@@ -26,13 +26,13 @@ test('quantity editing requires admin, rejects invalid counts and updates the pu
  const rows=[{slug:'qsc-k122',category:'sound',name:'QSC',quantityOwned:1,stockTracked:false,isActive:true},{slug:'hidden',category:'sound',name:'Hidden',isActive:false},{slug:'dj',category:'dj',name:'DJ',isActive:true}];
  const originals={bulkWrite:Equipment.bulkWrite,find:Equipment.find,findOneAndUpdate:Equipment.findOneAndUpdate};
  Equipment.bulkWrite=async()=>{};
- Equipment.find=filter=>({sort:async()=>rows.filter(row=>!filter||!filter.isActive||row.isActive===filter.isActive&&row.category!==filter.category.$ne)});
+ Equipment.find=filter=>({sort:async()=>rows.filter(row=>!filter||filter.isActive===undefined||(row.isActive??true)===filter.isActive)});
  Equipment.findOneAndUpdate=async(filter,body)=>{const item=rows.find(row=>row.slug===filter.slug);if(item)Object.assign(item,body);return item;};
  t.after(()=>Object.assign(Equipment,originals));
  const app=express();app.use(express.json());registerEquipmentRoutes(app,(req,res,next)=>req.get('authorization')==='Bearer admin'?next():res.sendStatus(401));
  const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));const base=`http://127.0.0.1:${server.address().port}/api/equipment`;
  const patch=async(body,token='admin')=>fetch(base+'/qsc-k122',{method:'PATCH',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
- let result=await (await fetch(base)).json();assert.equal(result.items.length,1);assert.equal(result.items[0].availableQuantity,null);
+ let result=await (await fetch(base)).json();assert.equal(result.items.length,2);assert.equal(result.items[0].availableQuantity,null); // active items of every category, the hidden one excluded
  assert.equal((await patch({quantityOwned:10,stockTracked:true},'client')).status,401);assert.equal(rows[0].stockTracked,false);
  for(const count of [-1,0.5,'2',null])assert.equal((await patch({quantityOwned:count,stockTracked:true})).status,400);
  result=await (await patch({quantityOwned:7,stockTracked:true})).json();assert.equal(result.item.availableQuantity,7);

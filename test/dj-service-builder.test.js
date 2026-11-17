@@ -20,9 +20,9 @@ test('confirmed booking set plan is saved within its planning record', async t =
   const response = await fetch(`${api.base}/booking-1`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ djSet }) });
   assert.equal(response.status, 200);
   const payload = await response.json();
-  assert.deepEqual(payload.djSet, djSet);
+  assert.deepEqual(payload.djSet, { ...djSet, segments: [{ ...djSet.segments[0], manualTracks: [] }] }); // the server adds the empty manual track list
   assert.equal(api.querySeen.externalId, 'booking-1');
-  assert.equal(api.querySeen.status, 'confirmed');
+  assert.deepEqual(api.querySeen.status, { $in: ['confirmed'] });
   assert.equal(api.saved.planning.djSet.notes, djSet.notes);
   assert.equal(api.saved.planning.timeline, 'Client timeline');
   assert.ok(api.saved.planning.updatedAt instanceof Date);

@@ -61,12 +61,35 @@ export function validValue(field, value) {
   return true;
 }
 function safeLink(value){try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password&&!!u.hostname;}catch{return false;}}
+// Text and voice use additive language edits unless the client explicitly replaces or removes them.
+export function preserveMusicLanguages(order,patch,message=''){
+ const paths=['music.styles','music.languagePairs','music.dialects'];
+ const names=[...(order.music?.styles||[]),...(order.music?.languagePairs||[]).map(row=>row.language),...patch.filter(row=>paths.includes(row.path)).flatMap(row=>{const field=aiFields.find(field=>field.key===row.path),value=field?decodePatchValue(field,row.value):null;return Array.isArray(value)?value.map(item=>typeof item==='string'?item:item.language):[];})].filter(value=>typeof value==='string'&&value.trim());
+ const escape=value=>value.replace(/[.*+?^${}()|[\]\]/g,'\$&');
+ const terms=['languages?','dialects?',...names.map(escape)].join('|');
+ const replace=new RegExp(`\b(?:replace|reset|clear|remove|drop|only|instead of|switch to|change to)\b.{0,40}\b(?:${terms})\b|\b(?:${terms})\b.{0,25}\b(?:only|instead)\b`,'iu').test(message)||/^\s*(?:clear|remove|reset)\s+(?:it|them|all)\b/iu.test(message)||/فقط|استبدل|احذف|امسح/u.test(message);
+ if(replace)return patch;
+ return patch.map(change=>{
+  if(!paths.includes(change.path))return change;
+  const field=aiFields.find(field=>field.key===change.path),incoming=decodePatchValue(field,change.value),previous=getPath(order,change.path)||[];
+  if(!Array.isArray(incoming)||!incoming.length)return change;
+  const key=value=>typeof value==='string'?value.trim().toLowerCase():`${value.language?.trim().toLowerCase()}|${value.dialect?.trim().toLowerCase()}`;
+  let combined=[...previous,...incoming].filter((value,index,all)=>all.findIndex(item=>key(item)===key(value))===index);
+  if(change.path==='music.languagePairs')combined=combined.filter(row=>row.dialect||!combined.some(item=>item.language.toLowerCase()===row.language.toLowerCase()&&item.dialect));
+  if(!validValue(field,combined))return change;
+  return {...change,value:typeof change.value==='string'?JSON.stringify(combined):combined};
+ });
+}
+export function entranceFromSongs(rows=[]){
+ return rows.filter(row=>row&&typeof row==='object'&&/^(?:(?:grand|bridal|couple|wedding party|party)\s+)?entrance$|^(?:دخول|الدخول|دخول العروسين|الزفة)$/iu.test(String(row.phase||'').trim())).map(row=>[row.song,row.artist].filter(Boolean).join(' — ')+(row.link?' ('+row.link+')':'')).join('\n').slice(0,3000);
+}
 export function normalizeEventOrder(input) {
   const order=createEventOrder();
   for(const field of fields){const value=getPath(input,field.key);if(value!==undefined&&validValue(field,value))put(order,field.key,Array.isArray(value)?[...new Set(value)]:value);}
   for(const field of planningFields){const value=getPath(input,field.key);if(value!==undefined&&validValue(field,value))put(order,field.key,value);}
   if(['manual','ai'].includes(input?.source))order.source=input.source;
   if(Array.isArray(input?.equipment))order.equipment=input.equipment.filter(item=>item&&typeof item.id==='string'&&item.id.length<=160&&Number.isInteger(item.quantity)&&item.quantity>0&&item.quantity<=10000).slice(0,100).map(item=>({id:item.id,name:String(item.name||'').slice(0,240),quantity:item.quantity}));
+  if(!order.music.entrance)order.music.entrance=entranceFromSongs(order.music.suggestedSongs)||null;
   return order;
 }
 // Contract fields marked locked:"account" belong to the signed-in account (name, email, phone, company). A booking shows them but never edits them:
@@ -103,6 +126,7 @@ export function updateOrderField(order,path,value,{ai=false}={}) {
   const field=(ai?aiFields:fields).find(item=>item.key===path);
   if(!field||!validValue(field,value))return order;
   const next=structuredClone(order);put(next,path,value);
+  if(path==='music.suggestedSongs'&&(!order.music?.entrance||order.music.entrance===entranceFromSongs(order.music.suggestedSongs)))next.music.entrance=entranceFromSongs(value)||null;
   // Explicit service decisions stay in sync with the canonical booking selections.
   if(path==='music.djRequested'&&typeof value==='boolean')next.services=value?[...new Set([...(next.services||[]),'dj'])]:(next.services||[]).filter(id=>id!=='dj');
   if(path==='services'&&Array.isArray(value)){

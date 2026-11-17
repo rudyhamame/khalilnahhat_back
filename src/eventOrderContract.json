@@ -425,8 +425,8 @@
      "ar": "الأغاني المقترحة بالترتيب، لكل أغنية لحظتها (مقدمة، ختام ...)",
      "type": "songs",
      "hidden": true,
-     "short": "Suggested songs",
-     "shortAr": "أغانٍ مقترحة"
+     "short": "Songs for event moments",
+     "shortAr": "أغاني لحظات الفعالية"
     },
     {
      "key": "music.otherLanguage",

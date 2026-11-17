@@ -8,7 +8,7 @@ const { z } = require('zod');
 const crypto = require('node:crypto');
 const {consumeResponseStream}=require('./ai-booking-stream');
 const {defaults:defaultAiConfig,publicPolicy}=require('./ai-configuration');
-const { orderPatchJsonSchema, sanitizeOrderPatch, draftTool, orderInstructions, applyAccountProfile, aiOrderContext, orderFromContext, futureEventPatch } = require('./event-order');
+const { orderPatchJsonSchema, sanitizeOrderPatch, draftTool, orderInstructions, applyAccountProfile, aiOrderContext, orderFromContext, futureEventPatch, preserveMusicLanguages } = require('./event-order');
 
 const voiceLanguageInstructions=language=>language?'\nVoice-call language: The client explicitly selected '+(language==='ar-SA'?'Arabic':'English')+'. Use that language for your opening greeting, questions, acknowledgements and spoken replies. Do not infer a language switch from names, addresses, accents or isolated foreign words. Switch only when the client explicitly requests another language. Background noise, speaker echo, unclear sounds and old transcripts are not language requests. Never restart your greeting after unclear input; briefly ask the client to repeat their answer to the current booking question.':'';
 const claimsDraftChange=reply=>typeof reply==='string'&&(/\bI(?:['’]ve| have)?\s+(?:added|queued|proposed|prepared|updated|set|selected|saved|changed|included)\b/iu.test(reply)||/^\s*(?:added|queued|proposed|updated|selected|saved)\b/iu.test(reply)||/(?:أضفت|اقترحت|جهزت|تمت إضافة|تم تحديث|تم حفظ)/u.test(reply));
@@ -179,6 +179,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
       }
       stage = 'draft_validation';
       parsed=withGuestCount(parsed,input.data.messages.at(-1).content,input.data.order);
+      parsed.orderPatch=preserveMusicLanguages(proposalContext.order,parsed.orderPatch,input.data.messages.at(-1).content);
       // A summary may contain a useful draft but no conversational text.
       // Preserve the review-only draft; the fallback makes no booking claims.
       const reply = typeof parsed.reply === 'string' && !parsed.reply.trim()

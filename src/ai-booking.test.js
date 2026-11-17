@@ -58,6 +58,38 @@ test('malformed provider JSON fails closed without leaking content',async t=>{
   const request=await fixture(t,{fetchImpl:async()=>Response.json({output:[{content:[{type:'output_text',text:'sensitive invalid JSON'}]}]})});
   const r=await request('chat',{consent:true,messages:[{role:'user',content:'Wedding'}]});assert.equal(r.status,502);assert.doesNotMatch(await r.text(),/sensitive/);
 });
+test('four suggested songs with escaped YouTube links recover from missing phases without losing order',async t=>{
+ const songs=[
+  {song:'Fairuz - Nassam Alayna El Hawa',link:'https://www.youtube.com/watch?v=iIYV7CyYdxU'},
+  {song:'Najwa Karam - Shou Hal Hala',link:'https://www.youtube.com/watch?v=faLLKMdiEHs'},
+  {song:'Wael Kfoury - El Bint El Awiye',link:'https://www.youtube.com/watch?v=QqiqISFT15w'},
+  {song:'Amr Diab - Nour El Ein',link:'https://www.youtube.com/watch?v=KLJA-srM_yM'},
+ ];
+ const expected=songs.map(song=>({...song,phase:''}));
+ let calls=0;
+ const request=await fixture(t,{fetchImpl:async(url,options)=>{
+  calls++;const sent=JSON.parse(options.body);
+  assert.match(sent.instructions,/never omit phase/);
+  assert.match(sent.instructions,/Decode Markdown punctuation escapes/);
+  if(calls===2){assert.equal(sent.stream,false);assert.match(sent.input.at(-1).content,/Correct the structured JSON/);}
+  return Response.json({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({reply:'I have added your suggested songs. Would you like to add any special requests?',orderPatch:[{path:'music.suggestedSongs',value:JSON.stringify(calls===1?songs:expected)}]})}]}]});
+ }});
+ const content='Suggested songs: '+songs.map(({song,link})=>`${song} ${link.replaceAll(':','\\:').replaceAll('.','\\.')}`).join(' ; ');
+ const response=await request('chat',{consent:true,order:{},messages:[{role:'user',content}]},true,{Accept:'application/x-ndjson'});
+ assert.equal(response.status,200);
+ const events=(await response.text()).trim().split('\n').map(JSON.parse);
+ assert.equal(events.at(-1).type,'complete');
+ assert.equal(calls,2);
+ assert.deepEqual(JSON.parse(events.at(-1).orderPatch[0].value),expected);
+});
+test('unreadable structured replies get one repair attempt before returning a validated patch',async t=>{
+ let calls=0;
+ const patch=[{path:'music.suggestedSongs',value:JSON.stringify([{song:'Fairuz - Nassam Alayna El Hawa',phase:''}])}];
+ const request=await fixture(t,{fetchImpl:async()=>Response.json({output:[{content:[{type:'output_text',text:++calls===1?'```json\n{"reply":"truncated':JSON.stringify({reply:'Please review your suggested songs.',orderPatch:patch})}]}]})});
+ const response=await request('chat',{consent:true,messages:[{role:'user',content:'Suggested songs: Fairuz - Nassam Alayna El Hawa'}]});
+ assert.equal(response.status,200);assert.equal(calls,2);
+ assert.deepEqual((await response.json()).orderPatch,patch);
+});
 test('voice sessions have server-owned settings and an ownership-checked end',async t=>{
   let hangups=0;
   const request=await fixture(t,{fetchImpl:async(url,options)=>{

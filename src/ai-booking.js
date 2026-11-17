@@ -152,23 +152,22 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
       const text = content.filter(item => item.type === 'output_text').map(item => item.text).join('');
       stage = 'reply_json';
       let parsed = parseModelReply(text);
-      if (!parsed) throw new Error('Unreadable AI reply');
       // Every field uses the same receipt: a claim about a proposed change must
       // contain valid structured values. Repair once instead of silently
       // dropping malformed patches or showing a task that was never queued.
       const proposalContext={order:orderFromContext(input.data.order||{})};
-      const scheduleGuard=futureEventPatch(proposalContext.order,Array.isArray(parsed.orderPatch)?parsed.orderPatch:[]);
+      const scheduleGuard=futureEventPatch(proposalContext.order,Array.isArray(parsed?.orderPatch)?parsed.orderPatch:[]);
       if(scheduleGuard.rejectedFields.length){
         const ar=/[\u0600-\u06ff]/u.test(input.data.messages.at(-1).content);
         parsed={reply:ar?'التاريخ أو وقت البدء الذي طلبته قد مضى بتوقيت تورونتو. لم أغيّر موعد الفعالية. ما التاريخ ووقت البدء المستقبليان اللذان تريدهما؟':'That event date or start time has already passed in Toronto. I haven’t changed the event schedule. What future date and start time would you like?',orderPatch:[],section:'availability',face:'calendar'};
       }
 
       const unusableProposal=value=>Array.isArray(value?.orderPatch)&&(sanitizeOrderPatch(value.orderPatch,proposalContext).length!==value.orderPatch.length||(!value.orderPatch.length&&claimsDraftChange(value.reply)));
-      if(!Array.isArray(parsed.orderPatch)||unusableProposal(parsed)){
+      if(!parsed||!Array.isArray(parsed.orderPatch)||unusableProposal(parsed)){
         stage='proposal_repair';
         const repair=JSON.parse(requestOptions.body);repair.stream=false;
         repair.instructions+='\nYour previous structured reply did not contain usable proposals matching its acknowledgement. Return the actual requested changes in orderPatch using the exact field guide and active catalog IDs. This applies to ALL sections, including equipment, services, venue, contact, music, references and notes. Never claim a task was added with an empty patch. Preserve existing equipment when adding items and return its complete proposed list. If the client did not request a change or the item is ambiguous, ask one clarification and make no action claim. Do not invent values.';
-        repair.input.push({role:'assistant',content:JSON.stringify(parsed)},{role:'user',content:'Correct the structured proposals for my preceding message. Your reply must agree with the returned orderPatch.'});
+        repair.input.push({role:'assistant',content:parsed?JSON.stringify(parsed):text},{role:'user',content:'Correct the structured JSON reply and proposals for my preceding message. Your reply must agree with the returned orderPatch.'});
         const repaired=(config.chat.provider||'openai')!=='openai'?await openrouter.request({...repair,config:config.chat},{signal:requestOptions.signal}):await fetchImpl('https://api.openai.com/v1/responses',{...requestOptions,body:JSON.stringify(repair)});
         if(!repaired.ok)throw new Error('Could not repair AI proposals');
         const repairedData=await repaired.json();

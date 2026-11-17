@@ -23,6 +23,13 @@ async function fixture(t, storeOverride) {
   return (path='',body,owner='alice')=>fetch(`http://127.0.0.1:${server.address().port}/api/ai-booking/conversations${path}`,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',...(owner?{Authorization:owner}:{})},body:body?JSON.stringify(body):undefined});
 }
 const body = () => ({id:randomUUID(),consent:true,messages:[{id:randomUUID(),role:'user',mode:'chat',content:'A wedding with a DJ.'},{id:randomUUID(),role:'assistant',mode:'chat',content:'What date are you considering?'}]});
+test('manual correction links persist when the conversation is reopened',async t=>{
+ const request=await fixture(t),input=body();
+ input.messages[1].actions=[{label:'Edit manually',goto:'event.date'}];
+ assert.equal((await request('',input)).status,200);
+ const loaded=await(await request('/'+input.id)).json();
+ assert.deepEqual(loaded.item.messages[1].actions,input.messages[1].actions);
+});
 
 test('venue cards survive conversation history reloads and reject invalid coordinates',async t=>{
  const request=await fixture(t),input=body();

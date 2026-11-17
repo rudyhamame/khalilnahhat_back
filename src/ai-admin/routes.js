@@ -23,6 +23,11 @@ function registerAiAdministrator(app,{requireAdmin,authorize,configService,env=p
  adminServices.register(app,requireAdmin,guard);
  app.get(base,requireAdmin,guard(async(req,res)=>{const settings=await adminServices.load();return res.json({tasks:(await store.list(owner(req))).map(publicTask),control:await store.control(),capabilities:registry.list(),inventory:registry.inventory(),model:{...settings.text,configured:adminServices.configured(settings.text.provider)},services:settings,worker:{mode:env.ECHO_ADMIN_WORKER_MODE==='external'?'external':'api-process',sleepWarning:env.RENDER==='true',androidPush:push.configured()},context:{scope:'conversation',...tokenPolicy(env)},permissions:{identity:owner(req),role:'administrator',permanentDeletion:false,privilegeChanges:false,customerMessages:false}});}));
  app.get(`${base}/conversations`,requireAdmin,guard(async(req,res)=>res.json({items:redact(await store.conversations(owner(req)))})));
+ app.get(`${base}/changes`,requireAdmin,guard(async(req,res)=>{
+  const before=z.uuid().optional().parse(req.query.before);
+  const result=await store.verifiedChanges(owner(req),before);if(!result)throw failure(404,'Change-history page not found.');
+  res.json(result);
+ }));
  app.get(`${base}/conversations/:sessionId/messages`,requireAdmin,guard(async(req,res)=>{
   const sessionId=z.string().min(1).max(160).parse(req.params.sessionId);const before=z.uuid().optional().parse(req.query.before);
   const result=await store.messages(owner(req),sessionId,before);if(!result)throw failure(404,'Conversation page not found.');

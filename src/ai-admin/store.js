@@ -7,6 +7,13 @@ const taskSchema=new mongoose.Schema({_id:String,owner:{type:String,required:tru
 const Task=mongoose.models.EchoAdminTask||mongoose.model('EchoAdminTask',taskSchema);
 const Control=mongoose.models.EchoAdminControl||mongoose.model('EchoAdminControl',new mongoose.Schema({_id:String,paused:{type:Boolean,default:false},updatedBy:String,leaseToken:String,leaseUntil:Date},{timestamps:true}));
 function createStore(){const auditCounts=new WeakMap();return {
+ async verifiedChanges(owner,before){
+  const query={owner,actions:{$elemMatch:{state:'VERIFIED','result.verified':true,'result.after':{$exists:true}}}};
+  if(before){const anchor=await Task.findOne({_id:before,owner}).select('createdAt').lean();if(!anchor)return null;query.$or=[{createdAt:{$lt:anchor.createdAt}},{createdAt:anchor.createdAt,_id:{$lt:before}}];}
+  const rows=await Task.find(query).sort({createdAt:-1,_id:-1}).limit(21).select('command actions audit createdAt updatedAt').lean();
+  const page=rows.slice(0,20),hasMore=rows.length>20;
+  return {items:page.flatMap(require('./change-history').taskChanges),hasMore,nextBefore:hasMore?page.at(-1)._id:null};
+ },
  async init(){await Promise.all([Task.init(),Control.init()]);},
  async create(value){try{return (await Task.create(value)).toObject();}catch(e){if(e.code!==11000)throw e;return Task.findOne({owner:value.owner,requestId:value.requestId}).lean();}},
  get:id=>Task.findById(id).lean(),

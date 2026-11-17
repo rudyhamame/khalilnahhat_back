@@ -24,6 +24,16 @@ async function fixture(t, storeOverride) {
 }
 const body = () => ({id:randomUUID(),consent:true,messages:[{id:randomUUID(),role:'user',mode:'chat',content:'A wedding with a DJ.'},{id:randomUUID(),role:'assistant',mode:'chat',content:'What date are you considering?'}]});
 
+test('venue cards survive conversation history reloads and reject invalid coordinates',async t=>{
+ const request=await fixture(t),input=body();
+ input.messages[1].venueResults=[{name:'Grand Hall',address:'1 Main St, Toronto, ON, Canada',city:'Toronto',country:'Canada',latitude:43.65,longitude:-79.38,source:'geoapify',sourceId:'venue-1',sourceAttribution:'© OpenStreetMap contributors'}];
+ assert.equal((await request('',input)).status,200);
+ const loaded=await(await request('/'+input.id)).json();
+ assert.deepEqual(loaded.item.messages[1].venueResults,input.messages[1].venueResults);
+ const invalid=body();invalid.messages[1].venueResults=[{...input.messages[1].venueResults[0],latitude:100}];
+ assert.equal((await request('',invalid)).status,400);
+});
+
 test('chat and voice transcripts are retrievable only by their owner',async t=>{
   const request=await fixture(t),input=body();input.messages[1].mode='voice';
   assert.equal((await request('',input)).status,200);

@@ -4,12 +4,14 @@ const deletedDrafts=require('./deleted-event-drafts');
 const {aiFields,validValue}=require('./eventOrderCore.mjs');
 const musicFieldsSchema=z.array(z.object({path:z.string(),value:z.unknown()}).refine(change=>{const field=aiFields.find(field=>field.key===change.path&&field.key.startsWith('music.'));return Boolean(field&&validValue(field,change.value));})).max(25).optional();
 
-const messageSchema = z.object({ id: z.uuid(), role: z.enum(['user', 'assistant']), content: z.string().trim().min(1).max(4000), musicFields:musicFieldsSchema, mode: z.enum(['chat', 'voice']), segmentId: z.uuid().nullish().transform(value=>value??undefined), fieldPath:z.string().max(120).nullish().transform(value=>value??undefined), section:z.enum(['none','home','tree','work','availability','music','setup','simulation','booking','live','about']).nullish().transform(value=>value??undefined), face:z.enum(['none','calendar','venue']).nullish().transform(value=>value??undefined) });
+const venueResultsSchema=z.array(z.object({name:z.string().max(240),address:z.string().max(500),city:z.string().max(160).optional(),postalCode:z.string().max(12).optional(),country:z.string().max(80).optional(),latitude:z.number().min(-90).max(90),longitude:z.number().min(-180).max(180),source:z.string().max(80).optional(),sourceId:z.string().max(500).optional(),sourceAttribution:z.string().max(1200).optional()})).max(10).optional();
+
+const messageSchema = z.object({ id: z.uuid(), role: z.enum(['user', 'assistant']), content: z.string().trim().min(1).max(4000), musicFields:musicFieldsSchema, venueResults:venueResultsSchema, mode: z.enum(['chat', 'voice']), segmentId: z.uuid().nullish().transform(value=>value??undefined), fieldPath:z.string().max(120).nullish().transform(value=>value??undefined), section:z.enum(['none','home','tree','work','availability','music','setup','simulation','booking','live','about']).nullish().transform(value=>value??undefined), face:z.enum(['none','calendar','venue']).nullish().transform(value=>value??undefined) });
 const appendSchema = z.object({ consent: z.literal(true), id: z.uuid(), messages: z.array(messageSchema).min(1).max(8) });
 const schema = new mongoose.Schema({
   _id: String,
   owner: { type: String, required: true, index: true },
-  messages: [{ _id: false, id: String, role: String, content: String, mode: String, segmentId: String, fieldPath:String, musicFields:mongoose.Schema.Types.Mixed, section:String, face:String, createdAt: Date }],
+  messages: [{ _id: false, id: String, role: String, content: String, mode: String, segmentId: String, fieldPath:String, musicFields:mongoose.Schema.Types.Mixed, venueResults:mongoose.Schema.Types.Mixed, section:String, face:String, createdAt: Date }],
 }, { timestamps: true });
 schema.index({ owner: 1, updatedAt: -1 });
 const Conversation = mongoose.models.BookingConversation || mongoose.model('BookingConversation', schema);

@@ -301,3 +301,15 @@ test('language-only model patches retain the current language list by default',a
  assert.equal(response.status,200);const patch=(await response.json()).orderPatch;
  assert.deepEqual(JSON.parse(patch[0].value),[{language:'Arabic',dialect:'Lebanese'},{language:'English',dialect:''}]);
 });
+
+test('a visitor without an account gets their Personal info and venue saved by the chat, and one bad field never fails the reply',async t=>{
+  const patch=[{path:'customer.fullName',value:'Mark Tamer'},{path:'customer.email',value:'mark@example.invalid'},{path:'customer.phone',value:'4165550123'},{path:'event.venue.address',value:'123 Example Street'},{path:'event.venue.city',value:'Toronto'},{path:'event.venue.postalCode',value:'M1B 2K3'}];
+  let calls=0;
+  const request=await fixture(t,{fetchImpl:async(_url,options)=>{calls++;const sent=JSON.parse(options.body);
+    assert.ok(sent.text.format.schema.properties.orderPatch.items.properties.path.enum.includes('customer.email'));assert.match(sent.instructions,/no account yet/);
+    return Response.json({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({reply:'Thank you, Mark. I saved your details. What is the date?',section:'none',face:'none',orderPatch:[...patch,{path:'customer.notAField',value:'x'}]})}]}]});}});
+  const response=await request('chat',{consent:true,order:{},messages:[{role:'user',content:'I am Mark Tamer, mark@example.invalid, 416 555 0123. Venue 123 Example Street, Toronto M1B 2K3.'}]},false);
+  assert.equal(response.status,200);const body=await response.json();
+  assert.deepEqual(body.orderPatch.map(change=>change.path),patch.map(change=>change.path));
+  assert.ok(calls<=2);
+});

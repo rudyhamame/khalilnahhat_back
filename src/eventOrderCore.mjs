@@ -63,16 +63,16 @@ export function validValue(field, value) {
 function safeLink(value){try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password&&!!u.hostname;}catch{return false;}}
 // Text and voice use additive language edits unless the client explicitly replaces or removes them.
 export function preserveMusicLanguages(order,patch,message=''){
- const paths=['music.styles','music.languagePairs','music.dialects'];
- const names=[...(order.music?.styles||[]),...(order.music?.languagePairs||[]).map(row=>row.language),...patch.filter(row=>paths.includes(row.path)).flatMap(row=>{const field=aiFields.find(field=>field.key===row.path),value=field?decodePatchValue(field,row.value):null;return Array.isArray(value)?value.map(item=>typeof item==='string'?item:item.language):[];})].filter(value=>typeof value==='string'&&value.trim());
- const escape=value=>value.replace(/[.*+?^${}()|[\]\]/g,'\$&');
+ const paths=['music.languagePairs'];
+ const names=[...(order.music?.languagePairs||[]).map(row=>row.language),...patch.filter(row=>paths.includes(row.path)).flatMap(row=>{const field=aiFields.find(field=>field.key===row.path),value=field?decodePatchValue(field,row.value):null;return Array.isArray(value)?value.map(item=>typeof item==='string'?item:item.language):[];})].filter(value=>typeof value==='string'&&value.trim());
+ const escape=value=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
  const terms=['languages?','dialects?',...names.map(escape)].join('|');
- const replace=new RegExp(`\b(?:replace|reset|clear|remove|drop|only|instead of|switch to|change to)\b.{0,40}\b(?:${terms})\b|\b(?:${terms})\b.{0,25}\b(?:only|instead)\b`,'iu').test(message)||/^\s*(?:clear|remove|reset)\s+(?:it|them|all)\b/iu.test(message)||/فقط|استبدل|احذف|امسح/u.test(message);
+ const replace=new RegExp(String.raw`\b(?:replace|reset|clear)\b.{0,40}\b(?:${terms})\b|\b(?:remove|drop|only|instead of|switch to|change to)\s+(?:${terms})\b|\b(?:${terms})\b.{0,25}\b(?:only|instead)\b`,'iu').test(message)||/^\s*(?:clear|remove|reset)\s+(?:it|them|all)\b/iu.test(message)||/فقط|استبدل|احذف|امسح/u.test(message);
  if(replace)return patch;
  return patch.map(change=>{
   if(!paths.includes(change.path))return change;
   const field=aiFields.find(field=>field.key===change.path),incoming=decodePatchValue(field,change.value),previous=getPath(order,change.path)||[];
-  if(!Array.isArray(incoming)||!incoming.length)return change;
+  if(!Array.isArray(incoming))return change;
   const key=value=>typeof value==='string'?value.trim().toLowerCase():`${value.language?.trim().toLowerCase()}|${value.dialect?.trim().toLowerCase()}`;
   let combined=[...previous,...incoming].filter((value,index,all)=>all.findIndex(item=>key(item)===key(value))===index);
   if(change.path==='music.languagePairs')combined=combined.filter(row=>row.dialect||!combined.some(item=>item.language.toLowerCase()===row.language.toLowerCase()&&item.dialect));
@@ -80,16 +80,15 @@ export function preserveMusicLanguages(order,patch,message=''){
   return {...change,value:typeof change.value==='string'?JSON.stringify(combined):combined};
  });
 }
-export function entranceFromSongs(rows=[]){
- return rows.filter(row=>row&&typeof row==='object'&&/^(?:(?:grand|bridal|couple|wedding party|party)\s+)?entrance$|^(?:دخول|الدخول|دخول العروسين|الزفة)$/iu.test(String(row.phase||'').trim())).map(row=>[row.song,row.artist].filter(Boolean).join(' — ')+(row.link?' ('+row.link+')':'')).join('\n').slice(0,3000);
-}
 export function normalizeEventOrder(input) {
   const order=createEventOrder();
   for(const field of fields){const value=getPath(input,field.key);if(value!==undefined&&validValue(field,value))put(order,field.key,Array.isArray(value)?[...new Set(value)]:value);}
   for(const field of planningFields){const value=getPath(input,field.key);if(value!==undefined&&validValue(field,value))put(order,field.key,value);}
+  // Special requests is no longer a data atom: what a client already wrote there becomes the Additional notes.
+  const oldSpecial=getPath(input,'additional.specialRequests');
+  if(typeof oldSpecial==='string'&&oldSpecial.trim()&&!order.additional.notes){const notes=oldSpecial.trim().slice(0,3000),field=fields.find(item=>item.key==='additional.notes');if(field&&validValue(field,notes))order.additional.notes=notes;}
   if(['manual','ai'].includes(input?.source))order.source=input.source;
   if(Array.isArray(input?.equipment))order.equipment=input.equipment.filter(item=>item&&typeof item.id==='string'&&item.id.length<=160&&Number.isInteger(item.quantity)&&item.quantity>0&&item.quantity<=10000).slice(0,100).map(item=>({id:item.id,name:String(item.name||'').slice(0,240),quantity:item.quantity}));
-  if(!order.music.entrance)order.music.entrance=entranceFromSongs(order.music.suggestedSongs)||null;
   return order;
 }
 // Contract fields marked locked:"account" belong to the signed-in account (name, email, phone, company). A booking shows them but never edits them:
@@ -126,7 +125,6 @@ export function updateOrderField(order,path,value,{ai=false}={}) {
   const field=(ai?aiFields:fields).find(item=>item.key===path);
   if(!field||!validValue(field,value))return order;
   const next=structuredClone(order);put(next,path,value);
-  if(path==='music.suggestedSongs'&&(!order.music?.entrance||order.music.entrance===entranceFromSongs(order.music.suggestedSongs)))next.music.entrance=entranceFromSongs(value)||null;
   // Explicit service decisions stay in sync with the canonical booking selections.
   if(path==='music.djRequested'&&typeof value==='boolean')next.services=value?[...new Set([...(next.services||[]),'dj'])]:(next.services||[]).filter(id=>id!=='dj');
   if(path==='services'&&Array.isArray(value)){
@@ -194,14 +192,15 @@ export function validateEventOrder(input,{submission=false,today=new Date().toLo
 }
 export function legacyToOrder(order, draft) {
   let next=order;
-  const map={eventType:'event.type',eventDate:'event.date',startTime:'event.startTime',endTime:'event.endTime',guests:'event.guestCount',venueName:'event.venue.name',venueAddress:'event.venue.address',city:'event.venue.city',postalCode:'event.venue.postalCode',notes:'additional.notes',setupRequirements:'event.setup.requirements',otherMusic:'music.otherPreferences',djMc:'music.djMc',entrance:'music.entrance',customMix:'music.customMix',announcements:'music.announcements',phone:'customer.phone',contactMethod:'customer.contactMethod',company:'customer.company',services:'services'};
+  const map={eventType:'event.type',eventDate:'event.date',startTime:'event.startTime',endTime:'event.endTime',guests:'event.guestCount',venueName:'event.venue.name',venueAddress:'event.venue.address',city:'event.venue.city',postalCode:'event.venue.postalCode',notes:'additional.notes',setupRequirements:'event.setup.requirements',djMc:'music.djMc',phone:'customer.phone',contactMethod:'customer.contactMethod',company:'customer.company',services:'services'};
   for(const [key,path] of Object.entries(map))if(draft?.[key]!==undefined&&draft[key]!==null&&draft[key]!=='')next=updateOrderField(next,path,key==='guests'?Number(draft[key]):draft[key]);
-  if(draft?.musicStyle)next=updateOrderField(next,'music.styles',[draft.musicStyle]);
   return next;
 }
+// The old single music-language choice of the service request, worked out from the chosen languages.
+function legacyMusicStyle(pairs){const names=[...new Set((pairs||[]).map(pair=>String(pair.language||'').toLowerCase()))];const arabic=names.includes('arabic'),english=names.includes('english');return arabic&&english?'mixed':arabic&&names.length===1?'arabic':english&&names.length===1?'english':'other';}
 export function orderToLegacy(order) {
   const e=order.event,m=order.music,c=order.customer;
-  const legacy={eventType:e.type||'other',eventDate:e.date||'',startTime:e.startTime||'',endTime:e.endTime||'',phone:c.phone||'',contactMethod:c.contactMethod||'email',company:c.company||'',venueName:e.venue.name||'',venueAddress:e.venue.address||'',city:e.venue.city||'',postalCode:e.venue.postalCode||'',indoor:e.venue.setting!=='outdoor',guests:e.guestCount??0,services:order.services,musicStyle:m.styles.find(value=>['arabic','english','mixed','other'].includes(value))||'other',notes:order.additional.notes||'',setupRequirements:e.setup.requirements||'',otherMusic:m.otherPreferences||'',djMc:m.djMc||'',entrance:m.entrance||'',customMix:m.customMix||'',announcements:m.announcements||''};
+  const legacy={eventType:e.type||'other',eventDate:e.date||'',startTime:e.startTime||'',endTime:e.endTime||'',phone:c.phone||'',contactMethod:c.contactMethod||'email',company:c.company||'',venueName:e.venue.name||'',venueAddress:e.venue.address||'',city:e.venue.city||'',postalCode:e.venue.postalCode||'',indoor:e.venue.setting!=='outdoor',guests:e.guestCount??0,services:order.services,musicStyle:legacyMusicStyle(m.languagePairs),notes:order.additional.notes||'',setupRequirements:e.setup.requirements||'',otherMusic:'',djMc:m.djMc||'',entrance:'',customMix:'',announcements:''};// the old free-text booking fields are no longer data atoms: they stay empty
   for(const key of ['setupRequirements','otherMusic','djMc','entrance','customMix','announcements'])legacy[key]=legacy[key].slice(0,2000);
   return legacy;
 }

@@ -67,7 +67,7 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
       const value=configService?await configService.load():defaultAiConfig(env);
       if(mode&&!value[mode].enabled){res.status(503).json({message:`AI ${mode} is disabled. Please use the booking form.`});return null;}
       return value;
-    }catch{res.status(503).json({message:'AI settings are temporarily unavailable. Please retry.'});return null;}
+    }catch{res.status(503).json({code:'ai_settings_unavailable',message:'AI settings are temporarily unavailable. Please retry.'});return null;}
   };
   const identity = req => String(req.authUser?._id || req.authUser?.id || '');
   const safety = req => crypto.createHash('sha256').update(identity(req)).digest('hex');
@@ -116,7 +116,9 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
     const emit=event=>{if(!res.destroyed){if(!res.headersSent){res.set({'Content-Type':'application/x-ndjson; charset=utf-8','Cache-Control':'no-cache, no-transform','X-Accel-Buffering':'no'});res.flushHeaders();}res.write(JSON.stringify(event)+'\n');}};
     const model=config.chat.model;
     try {
+      stage='usage_reservation';
       if(configService)ticket=await configService.reserve({owner:identity(req),mode:'chat',requestId:input.data.requestId,pricingConsentRevision:input.data.pricingConsentRevision,config});
+      stage='booking_data';
       const currentYear=new Date().getUTCFullYear();
       const requestedYears=[...new Set([Number(input.data.order?.['event.date']?.slice(0,4))||currentYear,...input.data.messages.flatMap(message=>[...message.content.matchAll(/\b(20\d{2})\b/g)].map(match=>Number(match[1]))),currentYear,currentYear+1])].filter(year=>year>=currentYear-5&&year<=currentYear+15).slice(0,3);
       const liveBookingData=await Promise.all(requestedYears.map((year,index)=>loadBookingData(year,{calendarOnly:index>0,owner:identity(req)})));
@@ -131,11 +133,15 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
           } } } },
         }),
       };
-      const upstream=(config.chat.provider||'openai')!=='openai'
-        ?await openrouter.request({...JSON.parse(requestOptions.body),config:config.chat},{signal:requestOptions.signal})
-        :await fetchImpl('https://api.openai.com/v1/responses',requestOptions);
+      stage='provider_request';
+      const requestProvider=()=> (config.chat.provider||'openai')!=='openai'
+        ?openrouter.request({...JSON.parse(requestOptions.body),config:config.chat},{signal:requestOptions.signal})
+        :fetchImpl('https://api.openai.com/v1/responses',requestOptions);
+      let upstream=await requestProvider();
+      // Retry one transient rejection before any response has been streamed.
+      if([502,503,504].includes(upstream.status)&&!requestOptions.signal.aborted){await upstream.body?.cancel().catch(()=>{});upstream=await requestProvider();}
       if (!upstream.ok) console.warn('AI chat upstream failure', JSON.stringify({provider:config.chat.provider,model,status:upstream.status,body:(await upstream.clone().text().catch(()=>'')).slice(0,400)}));
-      if (!upstream.ok) return res.status(upstream.status === 429 ? 429 : 502).json({ message: 'The AI service is unavailable or its usage limit was reached. Please try personal booking.' });
+      if (!upstream.ok) return res.status(upstream.status === 429 ? 429 : [503,504].includes(upstream.status)?503:502).json({code:'ai_provider_unavailable',failureStage:'provider_request',message: 'The AI service is unavailable or its usage limit was reached. Please try personal booking.' });
       stage = 'provider_json';
       const data = streaming&&upstream.headers.get('content-type')?.includes('text/event-stream')
         ?await consumeResponseStream(upstream.body,delta=>{firstReplyMs??=Math.round(performance.now()-started);emit({type:'reply.delta',delta});})
@@ -189,13 +195,14 @@ function registerAiBooking(app, { requireAuth, fetchImpl = fetch, env = process.
       if(typeof parsed.reply==='string'&&parsed.reply.trim()&&parsed.reply.trim().length<2)throw new Error('AI reply too short');
       if(!Array.isArray(parsed.orderPatch))throw new Error('Missing order patch');
       const result={reply,...(['home','work','availability','music','setup','simulation','booking','live','about'].includes(parsed.section)?{section:parsed.section}:{}),...(parsed.section==='availability'&&['calendar','venue'].includes(parsed.face)?{face:parsed.face}:{}),...(input.data.order||parsed.orderPatch?{orderPatch:sanitizeOrderPatch(parsed.orderPatch,proposalContext)}:{})};
+      stage='usage_recording';
       if(ticket)await configService.complete(ticket,{durationMs:Math.round(performance.now()-started),firstReplyMs:firstReplyMs??Math.round(performance.now()-started),inputTokens:usage?.input_tokens??null,outputTokens:usage?.output_tokens??null,cachedInputTokens:usage?.input_tokens_details?.cached_tokens??null});
       metricStatus='completed';firstReplyMs??=Math.round(performance.now()-started);
       if(streaming){emit({type:'complete',...result});return res.end();}return res.json(result);
     } catch (error) {
-      console.warn('AI booking reply failed', JSON.stringify({ stage, error: error.name, fields: error.issues?.map(issue => ({ path: issue.path.join('.'), code: issue.code })) }));
+      console.warn('AI booking reply failed', JSON.stringify({ stage, error: error.name, requestId:input.data.requestId, provider:config.chat.provider, model, fields: error.issues?.map(issue => ({ path: issue.path.join('.'), code: issue.code })) }));
       const poeFormatFailure=config.chat.provider==='poe'&&['provider_json','reply_json','draft_validation'].includes(stage);
-      const failure={code:'ai_reply_incomplete',message:poeFormatFailure?`Poe model ${model} could not return a usable booking reply. Your request has not been submitted. Choose another Poe model and try again.`:'Could not complete the AI reply. Your request has not been submitted.'};
+      const failure={code:'ai_reply_incomplete',failureStage:stage,...(error.status?{status:error.status}:{}),message:poeFormatFailure?`Poe model ${model} could not return a usable booking reply. Your request has not been submitted. Choose another Poe model and try again.`:'Could not complete the AI reply. Your request has not been submitted.'};
       if(res.headersSent){emit({type:'error',...failure});return res.end();}
       if(!res.destroyed)return res.status([400,402,409,503].includes(error.status)?error.status:502).json({...failure,...(error.status?{message:error.message}:{})});
     }

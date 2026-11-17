@@ -36,24 +36,27 @@ test('server retains full brief, enforces identity and selections, and cannot re
   assert.throws(()=>core.prepareSubmittedOrder(order,user,[{serviceId:'svc-lighting',name:'Lighting',category:'service',quantity:1}],[]),/selections changed/);
 });
 test('reference links are metadata, not fetched, and non-HTTPS references are rejected',()=>{
-  const field=core.fields.find(field=>field.key==='references.documents');assert.equal(core.validValue(field,['https://example.invalid/brief.pdf']),true);assert.equal(core.validValue(field,['javascript:alert(1)']),false);
+  const field=core.fields.find(field=>field.key==='references.images');assert.equal(core.validValue(field,['https://example.invalid/inspiration.jpg']),true);assert.equal(core.validValue(field,['javascript:alert(1)']),false);
 });
 
 test('quote questionnaire asks only what the brief lists plus language and dialect',()=>{
   const keys=core.fields.filter(field=>!field.hidden).map(field=>field.key).sort();
-  const brief=['customer.fullName','customer.email','customer.phone','customer.contactMethod','customer.company','event.type','event.date','event.startTime','event.endTime','event.guestCount','event.venue.name','event.venue.address','event.venue.city','event.venue.postalCode','event.venue.country','event.venue.addressDetails','event.venue.setting','event.setup.requirements','services','music.djRequested','music.mcRequested','rental.requested','music.styles','music.otherLanguage','music.dialects','music.otherPreferences','music.djMc','music.entrance','music.customMix','music.announcements','references.images','references.documents','additional.specialRequests','additional.notes'].sort();
+  const brief=['customer.fullName','customer.email','customer.phone','customer.contactMethod','customer.company','event.type','event.date','event.startTime','event.endTime','event.guestCount','event.venue.name','event.venue.address','event.venue.city','event.venue.postalCode','event.venue.country','event.venue.addressDetails','event.venue.setting','event.setup.requirements','services','music.djRequested','music.mcRequested','rental.requested','music.djMc','references.images','additional.notes'].sort();
   assert.deepEqual(keys,brief);
 });
 
-test('dialect catalog has unique ids matching the contract, with English and Arabic names',()=>{
+test('dialect catalog has unique ids with English and Arabic names',()=>{
   const catalog=JSON.parse(require('node:fs').readFileSync(__dirname+'/dialectCatalog.json','utf8')).items;
   const ids=catalog.map(item=>item.id);
   assert.equal(new Set(ids).size,ids.length);
-  assert.deepEqual([...ids].sort(),[...core.fields.find(field=>field.key==='music.dialects').options].sort());
   assert.ok(catalog.every(item=>item.display_name&&item.display_name_ar));
-  const order=core.updateOrderField(core.createEventOrder(),'music.dialects',['levantine-syrian-aleppine','unknown']);
-  assert.deepEqual(order.music.dialects,['levantine-syrian-aleppine','unknown']);
-  assert.deepEqual(core.updateOrderField(core.createEventOrder(),'music.dialects',['made-up']).music.dialects,[]);
+});
+test('the retired free-text music fields are not data atoms and cannot be set, by the form or by the AI',()=>{
+  for(const key of ['music.styles','music.otherLanguage','music.dialects','music.otherPreferences','music.entrance','music.customMix','music.announcements']){
+    assert.equal(core.fields.some(field=>field.key===key),false,key);
+    assert.equal(core.aiFields.some(field=>field.key===key),false,key);
+    assert.equal(core.sanitizeOrderPatch([{path:key,value:'"anything"'}]).length,0,key);
+  }
 });
 
 test('client draft edits preserve account contacts while editing venue, planning and equipment',()=>{

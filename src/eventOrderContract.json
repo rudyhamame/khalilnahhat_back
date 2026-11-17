@@ -386,22 +386,6 @@
      "shortAr": "التأجير"
     },
     {
-     "key": "music.styles",
-     "label": "Which language is your music in?",
-     "ar": "بأي لغة تريد الموسيقى؟",
-     "type": "multi",
-     "options": [
-      "arabic",
-      "english",
-      "kurdish",
-      "armenian",
-      "other",
-      "mixed"
-     ],
-     "short": "Music language",
-     "shortAr": "لغة الموسيقى"
-    },
-    {
      "key": "music.genres",
      "label": "Which music genres do you like?",
      "ar": "ما الأنواع الموسيقية التي تفضلها؟",
@@ -429,102 +413,6 @@
      "shortAr": "أغاني لحظات الفعالية"
     },
     {
-     "key": "music.otherLanguage",
-     "label": "If you chose \"Other\" (language or dialect), tell us which (optional)",
-     "ar": "إذا اخترت \"أخرى\" (لغة أو لهجة)، فأخبرنا بها (اختياري)",
-     "maxLength": 80,
-     "short": "Other language",
-     "shortAr": "لغة أخرى"
-    },
-    {
-     "key": "music.dialects",
-     "label": "Which dialect are the songs in? (optional)",
-     "ar": "ما لهجة الأغاني؟ (اختياري)",
-     "type": "multi",
-     "picker": "dialects",
-     "manualOnly": true,
-     "options": [
-      "levantine-syrian-general",
-      "levantine-syrian-damascene",
-      "levantine-syrian-aleppine",
-      "levantine-syrian-coastal",
-      "levantine-lebanese-general",
-      "levantine-lebanese-beiruti",
-      "levantine-lebanese-mount-lebanon",
-      "levantine-lebanese-southern",
-      "levantine-jordanian-general",
-      "levantine-jordanian-ammani",
-      "levantine-jordanian-northern",
-      "levantine-jordanian-bedouin",
-      "levantine-palestinian-general",
-      "levantine-palestinian-jerusalem",
-      "levantine-palestinian-gazan",
-      "levantine-palestinian-rural",
-      "mesopotamian-iraqi-general",
-      "mesopotamian-iraqi-baghdadi",
-      "mesopotamian-iraqi-basrawi",
-      "mesopotamian-iraqi-mosuli",
-      "mesopotamian-iraqi-southern",
-      "nile-valley-egyptian-general",
-      "nile-valley-egyptian-cairene",
-      "nile-valley-egyptian-alexandrian",
-      "nile-valley-egyptian-delta",
-      "nile-valley-egyptian-saidi",
-      "nile-valley-sudanese-general",
-      "nile-valley-sudanese-khartoumi",
-      "nile-valley-sudanese-darfur",
-      "maghrebi-moroccan-general-darija",
-      "maghrebi-moroccan-casablanca",
-      "maghrebi-moroccan-fassi",
-      "maghrebi-moroccan-marrakchi",
-      "maghrebi-algerian-general",
-      "maghrebi-algerian-algiers",
-      "maghrebi-algerian-oran",
-      "maghrebi-algerian-constantine",
-      "maghrebi-tunisian-general",
-      "maghrebi-tunisian-tunis",
-      "maghrebi-tunisian-sfax",
-      "maghrebi-libyan-general",
-      "maghrebi-libyan-tripolitanian",
-      "maghrebi-libyan-benghazi",
-      "maghrebi-mauritanian-hassaniya",
-      "arabian-peninsula-gulf-saudi-general",
-      "arabian-peninsula-gulf-saudi-najdi",
-      "arabian-peninsula-gulf-saudi-hijazi",
-      "arabian-peninsula-gulf-saudi-eastern-gulf",
-      "arabian-peninsula-gulf-kuwaiti-general",
-      "arabian-peninsula-gulf-emirati-general",
-      "arabian-peninsula-gulf-emirati-abu-dhabi",
-      "arabian-peninsula-gulf-emirati-dubai",
-      "arabian-peninsula-gulf-qatari-general",
-      "arabian-peninsula-gulf-bahraini-general",
-      "arabian-peninsula-gulf-bahraini-baharna",
-      "arabian-peninsula-gulf-omani-general",
-      "arabian-peninsula-gulf-omani-muscat",
-      "arabian-peninsula-gulf-omani-dhofari-arabic",
-      "arabian-peninsula-gulf-yemeni-general",
-      "arabian-peninsula-gulf-yemeni-sanaani",
-      "arabian-peninsula-gulf-yemeni-adeni",
-      "arabian-peninsula-gulf-yemeni-hadhrami",
-      "other-arabic-varieties-modern-standard-arabic",
-      "other-arabic-varieties-classical-arabic",
-      "other-regional-languages-assyrian-neo-aramaic-sureth",
-      "other-regional-languages-kurdish-kurmanji",
-      "other-regional-languages-kurdish-sorani",
-      "other-regional-languages-kurdish-southern-kurdish",
-      "other-regional-languages-amazigh-tarifit",
-      "other-regional-languages-amazigh-tashelhit",
-      "other-regional-languages-amazigh-kabyle",
-      "other-regional-languages-armenian-eastern",
-      "other-regional-languages-armenian-western",
-      "other-regional-languages-turkish-general",
-      "other",
-      "unknown"
-     ],
-     "short": "Dialect",
-     "shortAr": "اللهجة"
-    },
-    {
      "key": "music.favouriteSongs",
      "label": "Favourite songs (optional)",
      "ar": "الأغاني المفضلة (اختياري)",
@@ -543,44 +431,12 @@
      "shortAr": "الفنانون المفضلون"
     },
     {
-     "key": "music.otherPreferences",
-     "label": "Any favourite songs or artists? (optional)",
-     "ar": "أغانٍ أو فنانون مفضلون؟ (اختياري)",
-     "type": "textarea",
-     "short": "Music preferences",
-     "shortAr": "تفضيلات الموسيقى"
-    },
-    {
      "key": "music.djMc",
      "label": "MC hosting and announcement notes (optional)",
      "ar": "ملاحظات تقديم الحفل والإعلانات (اختياري)",
      "type": "textarea",
      "short": "Hosting notes",
      "shortAr": "ملاحظات التقديم"
-    },
-    {
-     "key": "music.entrance",
-     "label": "Is there a special entrance, like the couple or bridal party? (optional)",
-     "ar": "هل هناك دخول خاص مثل العروسين أو المرافقين؟ (اختياري)",
-     "type": "textarea",
-     "short": "Entrance",
-     "shortAr": "الدخول"
-    },
-    {
-     "key": "music.customMix",
-     "label": "Do you want a custom song mix made for you? (optional)",
-     "ar": "هل تريد ميكس مخصصاً لك؟ (اختياري)",
-     "type": "textarea",
-     "short": "Custom mix",
-     "shortAr": "الميكس المخصص"
-    },
-    {
-     "key": "music.announcements",
-     "label": "Any special announcements to make? (optional)",
-     "ar": "هل هناك إعلانات خاصة؟ (اختياري)",
-     "type": "textarea",
-     "short": "Announcements",
-     "shortAr": "الإعلانات"
     }
    ]
   },
@@ -591,21 +447,11 @@
    "fields": [
     {
      "key": "references.images",
-     "label": "Links to inspiration photos (optional, one link per line)",
-     "ar": "روابط صور ملهمة (اختياري، رابط في كل سطر)",
+     "label": "Links to inspiration photos (optional, an alternative to uploading photos)",
+     "ar": "روابط صور ملهمة (اختياري، بديل لرفع الصور)",
      "type": "links",
-     "private": true,
      "short": "Inspiration photo links",
      "shortAr": "روابط صور ملهمة"
-    },
-    {
-     "key": "references.documents",
-     "label": "Links to event documents (optional, one link per line)",
-     "ar": "روابط مستندات الفعالية (اختياري، رابط في كل سطر)",
-     "type": "links",
-     "private": true,
-     "short": "Event document links",
-     "shortAr": "روابط مستندات الفعالية"
     },
     {
      "key": "references.photos",
@@ -613,9 +459,9 @@
      "ar": "صور ملهمة مع تعليقات (اختياري)",
      "type": "attachments",
      "hidden": true,
-     "private": true,
      "short": "Inspiration photos",
-     "shortAr": "صور مُلهمة"
+     "shortAr": "صور مُلهمة",
+     "manualOnly": true
     },
     {
      "key": "references.files",
@@ -623,17 +469,9 @@
      "ar": "مستندات الفعالية مع ملاحظات (اختياري)",
      "type": "attachments",
      "hidden": true,
-     "private": true,
      "short": "Event documents",
-     "shortAr": "مستندات الفعالية"
-    },
-    {
-     "key": "additional.specialRequests",
-     "label": "Any special requests? (optional)",
-     "ar": "طلبات خاصة؟ (اختياري)",
-     "type": "textarea",
-     "short": "Special requests",
-     "shortAr": "طلبات خاصة"
+     "shortAr": "مستندات الفعالية",
+     "manualOnly": true
     },
     {
      "key": "additional.notes",

@@ -271,3 +271,22 @@ test('a model cannot set a past event or claim that its rejected schedule was sa
  const response=await request('chat',{consent:true,responseFormat:'patch',messages:[{role:'user',content:'Set my event to January 1, 2020 at 6 pm'}]});
  assert.equal(response.status,200);const data=await response.json();assert.deepEqual(data.orderPatch,[]);assert.match(data.reply,/already passed in Toronto/);assert.equal(calls,1);
 });
+
+test('one transient provider 503 is retried before any reply or draft changes are sent',async t=>{
+ let calls=0;
+ const request=await fixture(t,{fetchImpl:async()=>++calls===1?new Response('temporarily unavailable',{status:503}):Response.json({output:[{content:[{type:'output_text',text:JSON.stringify({reply:'What music would you like?',orderPatch:[]})}]}]})});
+ const response=await request('chat',{consent:true,messages:[{role:'user',content:'Add a song without a URL.'}]});
+ assert.equal(response.status,200);assert.equal(calls,2);assert.equal((await response.json()).reply,'What music would you like?');
+});
+test('persistent provider 503 remains a failure with no success reply or patch',async t=>{
+ let calls=0;const request=await fixture(t,{fetchImpl:async()=>{calls++;return new Response('upstream private text',{status:503});}});
+ const response=await request('chat',{consent:true,messages:[{role:'user',content:'Add Fairuz.'}]});const body=await response.json();
+ assert.equal(response.status,503);assert.equal(calls,2);assert.equal(body.code,'ai_provider_unavailable');
+ assert.equal(body.failureStage,'provider_request');assert.equal(body.reply,undefined);assert.equal(body.orderPatch,undefined);assert.doesNotMatch(JSON.stringify(body),/private/);
+});
+test('language-only model patches retain the current language list by default',async t=>{
+ const request=await fixture(t,{fetchImpl:async()=>Response.json({output:[{content:[{type:'output_text',text:JSON.stringify({reply:'I added English. What genres do you like?',orderPatch:[{path:'music.languagePairs',value:'[{"language":"English","dialect":""}]'}]})}]}]})});
+ const response=await request('chat',{consent:true,order:{'music.languagePairs':[{language:'Arabic',dialect:'Lebanese'}]},messages:[{role:'user',content:'Add English too.'}]});
+ assert.equal(response.status,200);const patch=(await response.json()).orderPatch;
+ assert.deepEqual(JSON.parse(patch[0].value),[{language:'Arabic',dialect:'Lebanese'},{language:'English',dialect:''}]);
+});

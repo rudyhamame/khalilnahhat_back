@@ -5,8 +5,8 @@ const path=require('node:path');
 const core=require('./event-order');
 function completed(){
   let order=core.createEventOrder();
-  for(const [key,value] of Object.entries({'customer.fullName':'Example Client','customer.email':'example@example.invalid','customer.phone':'4165550123','customer.contactMethod':'email','event.type':'wedding','event.date':'2099-06-20','event.startTime':'18:00','event.endTime':'01:00','event.guestCount':150,'event.venue.name':'Example venue','event.venue.address':'1 Example Street','event.venue.city':'Toronto','event.venue.postalCode':'M1A 1A1','event.venue.setting':'indoor',services:['dj']}))order=core.updateOrderField(order,key,value);
-  return core.applyAccountProfile(order,{firstName:'Example',lastName:'Client',email:'example@example.invalid',phoneNumber:'4165550123'});
+  for(const [key,value] of Object.entries({'customer.fullName':'Example Client','customer.email':'example@example.invalid','customer.phone':'4165550123','customer.contactMethod':'email','customer.phoneContact':'sms','event.type':'wedding','event.date':'2099-06-20','event.startTime':'18:00','event.endTime':'01:00','event.guestCount':150,'event.venue.name':'Example venue','event.venue.address':'1 Example Street','event.venue.city':'Toronto','event.venue.postalCode':'M1A 1A1','event.venue.setting':'indoor',services:['dj']}))order=core.updateOrderField(order,key,value);
+  return core.applyAccountProfile(order,{firstName:'Example',lastName:'Client',email:'example@example.invalid',phoneNumber:'4165550123',phoneContact:'sms'});
 }
 test('new order has unknown answers, explicit Toronto time and separate post-booking planning',()=>{
   const order=core.createEventOrder();assert.equal(order.event.guestCount,null);assert.equal(order.event.venue.setting,null);assert.deepEqual(order.services,[]);assert.equal(order.event.timezone,'America/Toronto');assert.equal(order.planning.phase,'after_confirmation');assert.equal(order.planning.firstDance,null);
@@ -30,7 +30,7 @@ test('submission validates required details; overnight times are valid',()=>{
 });
 test('server retains full brief, enforces identity and selections, and cannot receive client pricing/status',()=>{
   const order=completed();order.status='confirmed';order.price=1;order.event.setup.requirements='x'.repeat(2800);
-  const user={firstName:'Verified',lastName:'Client',email:'verified@example.invalid',phoneNumber:'4165550123',company:'Verified Company'};
+  const user={firstName:'Verified',lastName:'Client',email:'verified@example.invalid',phoneNumber:'4165550123',phoneContact:'call',company:'Verified Company'};
   const result=core.prepareSubmittedOrder(order,user,[{serviceId:'svc-dj',name:'DJ',category:'service',quantity:1}],[]);
   assert.equal(result.order.customer.fullName,'Verified Client');assert.equal(result.order.event.setup.requirements.length,2800);assert.equal(result.event.setupRequirements.length,2000);assert.equal(result.order.status,undefined);assert.equal(result.order.price,undefined);
   assert.throws(()=>core.prepareSubmittedOrder(order,user,[{serviceId:'svc-lighting',name:'Lighting',category:'service',quantity:1}],[]),/selections changed/);
@@ -41,7 +41,7 @@ test('reference links are metadata, not fetched, and non-HTTPS references are re
 
 test('quote questionnaire asks only what the brief lists plus language and dialect',()=>{
   const keys=core.fields.filter(field=>!field.hidden).map(field=>field.key).sort();
-  const brief=['customer.fullName','customer.email','customer.phone','customer.contactMethod','customer.company','event.type','event.date','event.startTime','event.endTime','event.guestCount','event.venue.name','event.venue.address','event.venue.city','event.venue.postalCode','event.venue.country','event.venue.addressDetails','event.venue.setting','event.setup.requirements','services','music.djRequested','music.mcRequested','rental.requested','music.djMc','references.images','additional.notes'].sort();
+  const brief=['customer.fullName','customer.email','customer.phone','customer.contactMethod','customer.phoneContact','customer.company','event.type','event.date','event.startTime','event.endTime','event.guestCount','event.venue.name','event.venue.address','event.venue.city','event.venue.postalCode','event.venue.country','event.venue.addressDetails','event.venue.setting','event.setup.requirements','services','music.djRequested','music.mcRequested','rental.requested','music.djMc','references.images','additional.notes'].sort();
   assert.deepEqual(keys,brief);
 });
 
@@ -68,7 +68,7 @@ test('client draft edits preserve account contacts while editing venue, planning
 });
 
  test('account identity resists manual, AI and clear patches; submission replaces forged contacts',()=>{
- const user={firstName:'Original',lastName:'Client',email:'original@example.invalid',phoneNumber:'4165550199',company:'Original Company'};
+ const user={firstName:'Original',lastName:'Client',email:'original@example.invalid',phoneNumber:'4165550199',phoneContact:'call',company:'Original Company'};
  const order=core.applyAccountProfile(completed(),user);
  for(const field of core.lockedFields){
   assert.strictEqual(core.updateOrderField(order,field.key,'Changed'),order);
@@ -93,7 +93,9 @@ test('every field has one short name in both languages, and no two form fields s
 });
 test('option names come from the contract in both languages',()=>{
   assert.equal(core.optionName('customer.contactMethod','phone'),'Phone only');
-  assert.equal(core.optionName('customer.contactMethod','whatsapp',true),'واتساب فقط');
+  assert.equal(core.optionName('customer.phoneContact','whatsapp-text',true),'رسالة واتساب');
+  assert.equal(core.optionName('customer.phoneContact','call'),'Phone call');
+  assert.equal(core.fields.find(field=>field.key==='customer.contactMethod').options.includes('whatsapp'),false); // WhatsApp is a phone option, not a contact method
   assert.equal(core.optionName('customer.contactMethod','other'),'other');
 });
 
@@ -116,4 +118,14 @@ test('Special requests is not a data atom any more: old text becomes the Additio
   assert.equal(core.normalizeEventOrder({additional:{notes:'Keep me',specialRequests:'Old'}}).additional.notes,'Keep me');
   for(const key of ['references.photos','references.files'])assert.equal(core.isAiEditableField(key),false,key); // uploads come from the client, never from the AI
   assert.equal(core.isAiEditableField('references.images'),true);
+});
+
+test('a phone number needs one phone contact option; without a phone it is not asked',()=>{
+  const base=()=>{const order=core.createEventOrder();order.customer.fullName='A B';order.customer.email='a@example.invalid';order.customer.contactMethod='email';return order;};
+  assert.equal(core.missingOrderFields(base()).some(field=>field.key==='customer.phoneContact'),false);
+  const withPhone=base();withPhone.customer.phone='4165550123';
+  assert.equal(core.missingOrderFields(withPhone).some(field=>field.key==='customer.phoneContact'),true);
+  withPhone.customer.phoneContact='whatsapp-call';
+  assert.equal(core.missingOrderFields(withPhone).some(field=>field.key==='customer.phoneContact'),false);
+  assert.equal(core.accountProfile({preferredContact:'whatsapp'})['customer.contactMethod'],'phone'); // old accounts
 });

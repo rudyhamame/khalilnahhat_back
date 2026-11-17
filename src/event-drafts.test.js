@@ -5,7 +5,7 @@ const {registerEventDrafts}=require('./event-drafts');
 const {createEventOrder}=require('./event-order');
 async function fixture(t){
   const records=new Map();const store={get:async owner=>records.get(owner)||null,put:async(owner,version,order)=>{const old=records.get(owner);if((old?.version||0)!==version)return null;const item={order,version:version+1,updatedAt:new Date()};records.set(owner,item);return item;},remove:async(owner,version)=>{if(records.get(owner)?.version!==version)return false;return records.delete(owner);}};
-  const app=express();app.use(express.json());registerEventDrafts(app,{store,requireAuth:(req,res,next)=>{if(!req.headers.authorization)return res.sendStatus(401);req.authUser={id:req.headers.authorization,firstName:'Account',lastName:'Client',email:'account@example.invalid',phoneNumber:'4165550199',company:'Account Company'};next();}});
+  const app=express();app.use(express.json());registerEventDrafts(app,{store,requireAuth:(req,res,next)=>{if(!req.headers.authorization)return res.sendStatus(401);req.authUser={id:req.headers.authorization,firstName:'Account',lastName:'Client',email:'account@example.invalid',phoneNumber:'4165550199',phoneContact:'call',company:'Account Company'};next();}});
   const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});t.after(()=>new Promise(resolve=>server.close(resolve)));
   return (method='GET',body,owner='alice',query='')=>fetch(`http://127.0.0.1:${server.address().port}/api/ai-booking/event-draft${query}`,{method,headers:{'Content-Type':'application/json',...(owner?{Authorization:owner}:{})},body:body?JSON.stringify(body):undefined});
 }
@@ -53,6 +53,6 @@ test('draft saves and resumes use account contacts instead of supplied values',a
  Object.assign(order.customer,{fullName:'Forged Name',email:'forged@example.invalid',phone:'9999999999',company:'Forged Company'});
  const response=await request('PUT',{version:0,order});assert.equal(response.status,200);
  const saved=(await response.json()).item.order.customer;
- assert.deepEqual(saved,{fullName:'Account Client',email:'account@example.invalid',phone:'4165550199',company:'Account Company',contactMethod:null});
+ assert.deepEqual(saved,{fullName:'Account Client',email:'account@example.invalid',phone:'4165550199',company:'Account Company',contactMethod:'email',phoneContact:'call'});
  assert.deepEqual((await(await request()).json()).item.order.customer,saved);
 });

@@ -47,8 +47,7 @@
      "options": [
       "any",
       "email",
-      "phone",
-      "whatsapp"
+      "phone"
      ],
      "required": true,
      "private": true,
@@ -57,8 +56,8 @@
      "shortAr": "طريقة التواصل المفضلة",
      "optionNames": {
       "any": [
-       "Any (email, phone or WhatsApp)",
-       "أي طريقة (بريد أو هاتف أو واتساب)"
+       "Any (email or phone)",
+       "أي طريقة (بريد أو هاتف)"
       ],
       "email": [
        "Email only",
@@ -67,10 +66,39 @@
       "phone": [
        "Phone only",
        "الهاتف فقط"
+      ]
+     }
+    },
+    {
+     "key": "customer.phoneContact",
+     "label": "How may we reach you on your phone?",
+     "ar": "كيف نتواصل معك على هاتفك؟",
+     "options": [
+      "whatsapp-text",
+      "whatsapp-call",
+      "sms",
+      "call"
+     ],
+     "private": true,
+     "locked": "account",
+     "short": "Phone contact",
+     "shortAr": "التواصل عبر الهاتف",
+     "optionNames": {
+      "whatsapp-text": [
+       "WhatsApp text",
+       "رسالة واتساب"
       ],
-      "whatsapp": [
-       "WhatsApp only",
-       "واتساب فقط"
+      "whatsapp-call": [
+       "WhatsApp call",
+       "اتصال واتساب"
+      ],
+      "sms": [
+       "Text message",
+       "رسالة نصية"
+      ],
+      "call": [
+       "Phone call",
+       "اتصال هاتفي"
       ]
      }
     },

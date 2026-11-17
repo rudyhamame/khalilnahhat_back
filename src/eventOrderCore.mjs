@@ -105,7 +105,9 @@ export function accountProfile(user){
     'customer.email':user.email||null,
     'customer.phone':user.phoneNumber||user.phone||null,
     'customer.company':user.company||null,
-    'customer.contactMethod':['any','email','phone','whatsapp'].includes(user.preferredContact)?user.preferredContact:'email',
+    // WhatsApp is no longer a contact method of its own: an older "WhatsApp only" account becomes phone + WhatsApp text.
+    'customer.contactMethod':user.preferredContact==='whatsapp'?'phone':['any','email','phone'].includes(user.preferredContact)?user.preferredContact:'email',
+    'customer.phoneContact':['whatsapp-text','whatsapp-call','sms','call'].includes(user.phoneContact)?user.phoneContact:user.preferredContact==='whatsapp'?'whatsapp-text':null,
   };
 }
 export function applyAccountProfile(order,user){
@@ -171,7 +173,7 @@ export function applyOrderPatch(order,patch,{now=new Date()}={}) {
   },order);
 }
 export function missingOrderFields(order) {
-  return fields.filter(field=>field.required&&(!field.gate||getPath(order,field.gate)===true)&&(!isAnswered(getPath(order,field.key))||(field.key==='studio.rights.confirmed'&&getPath(order,field.key)!==true)));
+  return fields.filter(field=>(field.required||(field.key==='customer.phoneContact'&&isAnswered(getPath(order,'customer.phone'))))&&(!field.gate||getPath(order,field.gate)===true)&&(!isAnswered(getPath(order,field.key))||(field.key==='studio.rights.confirmed'&&getPath(order,field.key)!==true)));
 }
 export function validateEventOrder(input,{submission=false,today=new Date().toLocaleDateString('en-CA',{timeZone:contract.timezone})}={}) {
   const errors=[];
@@ -185,7 +187,7 @@ export function validateEventOrder(input,{submission=false,today=new Date().toLo
     errors.push(...pastEventScheduleFields(input));
     if(input?.event?.startTime&&input.event.startTime===input.event.endTime)errors.push('event.endTime');
     if(input?.customer?.phone&&input.customer.phone.trim().length<5)errors.push('customer.phone');
-    if(['phone','whatsapp'].includes(input?.customer?.contactMethod)&&!input?.customer?.phone?.trim())errors.push('customer.contactMethod'); // phone or WhatsApp needs a number
+    if(input?.customer?.contactMethod==='phone'&&!input?.customer?.phone?.trim())errors.push('customer.contactMethod'); // phone needs a number
     if(input?.studio?.requested&&input.studio.delivery?.requestedDate<today)errors.push('studio.delivery.requestedDate');
   }
   return [...new Set(errors)];

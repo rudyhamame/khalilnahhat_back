@@ -323,8 +323,8 @@ test('failed guest replies are refunded, so retries after an error do not use up
 
 test('the booking stage chosen by the app is passed to the model as an explicit instruction',async t=>{
   const seen=[];
-  const request=await fixture(t,{fetchImpl:async(_url,options)=>{seen.push(JSON.parse(options.body).instructions);return Response.json({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({reply:'Your booking is complete and ready to be submitted. Press Review & send.',orderPatch:[],section:'none',face:'none'})}]}]});}});
+  const request=await fixture(t,{fetchImpl:async(_url,options)=>{seen.push(JSON.parse(options.body).instructions);return Response.json({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({reply:'Your booking is complete and ready to be submitted. Press Submit booking.',orderPatch:[],section:'none',face:'none'})}]}]});}});
   for(const stage of ['required','optional','ready'])assert.equal((await request('chat',{consent:true,bookingStage:stage,messages:[{role:'user',content:`Stage ${stage}`}]})).status,200);
-  assert.match(seen[0],/Booking stage: REQUIRED/);assert.match(seen[1],/Booking stage: OPTIONAL[^]*Do not say the booking is ready yet/);assert.match(seen[2],/Booking stage: READY[^]*ready to be submitted\. Press Review & send/);
+  assert.match(seen[0],/Booking stage: REQUIRED/);assert.match(seen[1],/Booking stage: OPTIONAL[^]*Do not say the booking is ready yet/);assert.match(seen[2],/Booking stage: READY[^]*ready to be submitted\. Press Submit booking/);
   assert.equal((await request('chat',{consent:true,bookingStage:'bogus',messages:[{role:'user',content:'x'}]})).status,400);
 });

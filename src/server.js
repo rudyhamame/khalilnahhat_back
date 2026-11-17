@@ -1484,6 +1484,7 @@ const aiBooking=require('./ai-booking'),aiBookingRoutes=aiBooking.registerAiBook
   configService:aiConfiguration,
   loadServiceCatalog:()=>require('./setup-catalog').list(),
   requireAuth: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest }),
+  optionalAuth: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, optional: true }), // the text conversation is open to visitors without an account
   loadJourney: require('./booking-journey-summary').createJourneyLoader({ Model: ServiceRequest, serialize: serializeServiceRequest }),
 });
 require('./venue-map/routes').registerVenueMap(app, { requireAuth });

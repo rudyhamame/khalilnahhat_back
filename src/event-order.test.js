@@ -129,3 +129,14 @@ test('a phone number needs one phone contact option; without a phone it is not a
   assert.equal(core.missingOrderFields(withPhone).some(field=>field.key==='customer.phoneContact'),false);
   assert.equal(core.accountProfile({preferredContact:'whatsapp'})['customer.contactMethod'],'phone'); // old accounts
 });
+
+test('the AI instructions follow the booking data atoms bible: no retired atoms, no planning or upload writes',()=>{
+  const text=require('./event-order').orderInstructions()+require('./ai-booking').instructions();
+  for(const phrase of ['music.styles','music links','Special requests (optional','planning fields','music.entrance','music.dialects'])assert.equal(text.includes(phrase),false,phrase);
+  assert.match(text,/song, artist and phase/);
+  // Every atom named in the instructions' field guide is a real contract atom, and the read-only ones are exactly the atoms the AI cannot write.
+  const guide=JSON.parse(text.slice(text.indexOf('Field guide: ')+13).split('\n')[0].replace(/\.$/,'').match(/^\[.*\]/s)?.[0]||'[]');
+  assert.ok(guide.length>30,'the field guide is part of the instructions');
+  for(const item of guide)assert.equal(item.readOnly,!core.isAiEditableField(item.path),item.path);
+  assert.equal(core.isAiEditableField('planning.mustPlay'),false);
+});

@@ -1,7 +1,9 @@
 // All application routes use the same local account/session authority.
 // Never send bearer tokens to a former hosting provider for fallback verification.
-function createAiBookingAuth({ localAuth, adminCheck = null }) {
+// optional: a visitor with no sign-in at all continues as a guest (req.authUser stays null); a sign-in that is sent but invalid is still refused.
+function createAiBookingAuth({ localAuth, adminCheck = null, optional = false }) {
   return async (req, res, next) => {
+    if (optional && !req.headers.authorization) { req.authUser = null; return next(); }
     if (!/^Bearer [a-f0-9]{64}$/.test(req.headers.authorization || '')) return res.status(401).json({ message: 'Sign in is required.' });
     try {
       const user = await localAuth(req);

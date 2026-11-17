@@ -3,8 +3,9 @@ import contract from './eventOrderContract.json' with { type: 'json' };
 export { contract };
 export const fields = contract.sections.flatMap(section => section.fields.map(field => ({ ...field, gate: section.gate })));
 const planningNames={brideName:['Bride','العروس'],groomName:['Groom','العريس'],timeline:['Timeline','الجدول الزمني'],partyEntrances:['Party entrances','دخول المدعوين'],entranceSongs:['Entrance songs','أغاني الدخول'],firstDance:['First dance','الرقصة الأولى'],parentDances:['Parent dances','رقصات الأهل'],dinnerMusic:['Dinner music','موسيقى العشاء'],cakeCutting:['Cake cutting','تقطيع الكعكة'],announcements:['Announcements','الإعلانات'],mustPlay:['Must play','أغانٍ مطلوبة'],doNotPlay:['Do not play','أغانٍ ممنوعة'],specialRequests:['Special requests','طلبات خاصة']};
-const planningFields=Object.entries(planningNames).map(([key,[short,shortAr]])=>({key:'planning.'+key,label:key,short,shortAr,type:'textarea'}));
-planningFields.push({key:'planning.musicUploads',label:'Planning music references',short:'Music references',shortAr:'مراجع موسيقية',type:'links'});
+// The after-confirmation planning worksheet is filled by the client in the dashboard only: the booking conversation (text or voice) can read it but never creates these atoms.
+const planningFields=Object.entries(planningNames).map(([key,[short,shortAr]])=>({key:'planning.'+key,label:key,short,shortAr,type:'textarea',manualOnly:true}));
+planningFields.push({key:'planning.musicUploads',label:'Planning music references',short:'Music references',shortAr:'مراجع موسيقية',type:'links',manualOnly:true});
 export const aiFields = [...fields,...planningFields,{key:'equipment',label:'Equipment and complete sets',short:'Equipment',shortAr:'المعدات',type:'equipment'}];
 // The short name people see in summaries, reviews and task lists (the long `label` is the form prompt). One place, both languages.
 // The shown name of one option of a field (for example the "phone" contact method), from the same contract.

@@ -321,7 +321,41 @@
      ],
      "required": true,
      "short": "Services",
-     "shortAr": "الخدمات"
+     "shortAr": "الخدمات",
+     "optionNames": {
+      "dj": [
+       "DJ Khalil",
+       "دي جي خليل"
+      ],
+      "mc": [
+       "MC hosting",
+       "تقديم الحفل"
+      ],
+      "sound": [
+       "Sound systems",
+       "أنظمة الصوت"
+      ],
+      "lighting": [
+       "Lighting",
+       "الإضاءة"
+      ],
+      "led": [
+       "LED walls",
+       "شاشات LED"
+      ],
+      "fx": [
+       "Special effects",
+       "المؤثرات الخاصة"
+      ],
+      "rental": [
+       "Equipment rental",
+       "تأجير المعدات"
+      ],
+      "corporate": [
+       "Corporate production",
+       "إنتاج فعاليات الشركات"
+      ]
+     }
     },
     {
      "key": "event.venue.latitude",

@@ -59,9 +59,9 @@ test('the retired free-text music fields are not data atoms and cannot be set, b
   }
 });
 
-test('client draft edits preserve account contacts while editing venue, planning and equipment',()=>{
+test('conversation edits preserve account contacts while editing venue and equipment, and never touch the planning worksheet',()=>{
  let order=core.applyOrderPatch(core.createEventOrder(),[{path:'customer.phone',value:'4165550123'},{path:'event.venue.address',value:'Client supplied address'},{path:'planning.mustPlay',value:'Requested song'},{path:'equipment',value:'[{"id":"speaker","quantity":2}]'}]);
- assert.equal(order.customer.phone,null);assert.equal(order.event.venue.address,'Client supplied address');assert.equal(order.equipment[0].quantity,2);assert.equal(core.normalizeEventOrder(order).planning.mustPlay,'Requested song');
+ assert.equal(order.customer.phone,null);assert.equal(order.event.venue.address,'Client supplied address');assert.equal(order.equipment[0].quantity,2);assert.equal(core.normalizeEventOrder(order).planning.mustPlay,null); // the conversation never creates planning worksheet atoms
  assert.equal(core.aiOrderContext(order)['equipment'][0].id,'speaker');
  order=core.applyOrderPatch(order,[{path:'customer.phone',value:'null'},{path:'equipment',value:'[]'}]);assert.equal(order.customer.phone,null);assert.deepEqual(order.equipment,[]);
  assert.equal(core.applyOrderPatch(order,[{path:'status',value:'confirmed'}]).status,undefined);

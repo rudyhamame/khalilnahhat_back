@@ -100,7 +100,7 @@ function registerAiBooking(app, { requireAuth, optionalAuth = requireAuth, fetch
   const venueContext=require('./venue-context').createVenueContext({fetchImpl});
   require('./venue-context').registerVenueContext(app,{requireAuth,identity,service:venueContext});
   require('./event-images').registerEventImages(app,{requireAuth,policy,admitted,headers,fetchImpl,env});
-  require('./event-files').registerEventFiles(app,{requireAuth});
+  require('./event-files').registerEventFiles(app,{requireAuth,optionalAuth});
   require('./setup-advice').registerSetupAdvice(app,{venueContext,requireAuth,policy,admitted,identity,headers,openrouter,configService,fetchImpl,pending,loadCatalog:loadSetupCatalog});
   app.post('/api/ai-booking/chat', optionalAuth, async (req, res) => {
     const input = inputSchema.safeParse(req.body);

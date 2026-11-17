@@ -34,6 +34,13 @@ function deliveryUrl(value) {
   if (!match || match[1] !== process.env.CLOUDINARY_CLOUD_NAME) return value;
   return cloudinary.url(match[3], { resource_type: match[2], type: 'authenticated', secure: true, sign_url: true });
 }
+// A small streaming copy (128 kbps MP3) of a lossless channel file. Cloudinary makes it on first request and serves it from cache after that;
+// the stored original is never changed. Returns '' when the URL is not one of ours, so callers keep using the original.
+function lightweightUrl(value) {
+  const match = String(value || '').match(/^https:\/\/res\.cloudinary\.com\/([^/]+)\/video\/authenticated\/(?:s--[^/]+--\/)?(?:v\d+\/)?(.+?)(?:\.[a-z0-9]+)?$/);
+  if (!match || match[1] !== process.env.CLOUDINARY_CLOUD_NAME) return '';
+  try { return cloudinary.url(match[2], { resource_type: 'video', type: 'authenticated', secure: true, sign_url: true, format: 'mp3', transformation: [{ audio_codec: 'mp3', bit_rate: '128k' }] }); } catch { return ''; }
+}
 function serialize(row) {
   const r = row.toObject ? row.toObject() : row;
   return { id: r.externalId, title: r.title, description: r.description || '', published: r.published !== false,
@@ -50,7 +57,7 @@ async function publicSongs(ArchiveModel = ArchiveItem) {
 
 function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, CollectionModel = Collection, cloudinaryClient = cloudinary, uploadAssetImpl = require('./cloudinary-assets').createAssetStore({client:cloudinaryClient}).upload, requireCloudinary = process.env.RENDER === 'true' || process.env.MUSIC_ARCHIVE_STORAGE_PROVIDER === 'cloudinary', useCloudinary = Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) } = {}) {
   const models = { collections: CollectionModel, songs: ArchiveModel };
-  const ontology = ArchiveModel === ArchiveItem ? require('./music-ontology/routes').registerMusicOntology(app, { requireAdmin, service: require('./music-ontology/service').createService({ deliveryUrl, previewUrl: archiveFiles.previewUrl, ownedAsset }) }) : null;
+  const ontology = ArchiveModel === ArchiveItem ? require('./music-ontology/routes').registerMusicOntology(app, { requireAdmin, service: require('./music-ontology/service').createService({ deliveryUrl, lightUrl: lightweightUrl, previewUrl: archiveFiles.previewUrl, ownedAsset }) }) : null;
   async function catalog(admin, { includeOntology = true } = {}) {
     const [collections, songs] = await Promise.all(Object.values(models).map(model => model.find().sort({ sortOrder: 1, createdAt: -1 })));
     const visible = admin ? songs : visibleSongs(songs).filter(song => song.audioUrl);

@@ -18,6 +18,29 @@ function tidyEquipment(list){
  for(const row of list){if(!row||typeof row!=='object'){return list;}const quantity=typeof row.quantity==='string'&&/^\d+$/.test(row.quantity.trim())?Number(row.quantity):row.quantity;merged.set(row.id,{...row,quantity});}
  return [...merged.values()];
 }
+// A reply is only an acknowledgement; draft mutations require an exact saved patch.
+export const claimsDraftChange=reply=>typeof reply==='string'&&(
+ /\bI(?:['’]ve| have)?\s+(?:added|queued|proposed|prepared|updated|set|selected|saved|changed|included)\b/iu.test(reply)||
+ /\b(?:has|have|is|are|was|were)\s+(?:(?:now|already|successfully)\s+)*(?:been\s+)?(?:(?:now|already|successfully)\s+)*(?:added|saved|updated|changed|recorded|included|queued|stored)\b/iu.test(reply)||
+ /\b(?:quantity|qty)\b[^.]{0,40}\b(?:set|updated|changed)\b|\b(?:set|updated|changed) to \d+/iu.test(reply)||
+ /^\s*(?:added|queued|proposed|updated|selected|saved)\b/iu.test(reply)||/(?:أضفت|اقترحت|جهزت|تمت إضافة|تم تحديث|تم حفظ|أُضيف|تمت إضاف)/u.test(reply));
+
+// Extract metadata only: opening an external URL is never needed to save a reference.
+export function referenceLinkRequest(order,message,{context=''}={}){
+ const text=String(message||'').replace(/\\([:./?=&_-])/g,'$1');
+ const links=[...new Set((text.match(/https?:\/\/[^\s<>]+/giu)||[]).map(value=>value.replace(/[),.;!?]+$/u,'')))];
+ const wantsLink=/\b(?:add|attach|include|share|send|paste)\b.{0,50}\b(?:a |an |some |another )?links?\b|(?:أضيف|اضيف|إضافة|اضافة|ارفق|أرفق).{0,30}رابط/iu.test(text);
+ if(!links.length)return wantsLink?{kind:'ask',links:[]}:null;
+ const safe=links.filter(link=>safeLink(link));
+ if(safe.length!==links.length)return {kind:'unsafe',links};
+ const inspiration=/\b(?:inspiration|pinterest|reference (?:photo|image)|photo links?)\b|صور.{0,12}(?:ملهم|إلهام)|روابط صور/iu.test(text+' '+context);
+ const images=safe.filter(link=>{const host=new URL(link).hostname.toLowerCase();return inspiration||host==='pin.it'||host==='pinterest.com'||host.endsWith('.pinterest.com')||host==='pinterest.ca'||host.endsWith('.pinterest.ca');});
+ if(!images.length)return {kind:'clarify',links:safe};
+ const current=order?.references?.images||[],value=[...new Set([...current,...images])];
+ const patch=images.some(link=>!current.includes(link))?[{path:'references.images',value}]:[];
+ return {kind:'images',links:images,patch,pending:safe.filter(link=>!images.includes(link))};
+}
+
 export function decodePatchValue(field,value){
  if(typeof value==='string'&&(value==='null'||['number','coordinate','boolean','multi','links','songs','tags','pairs','attachments','equipment'].includes(field.type))){try{const parsed=JSON.parse(value);return field.type==='equipment'?tidyEquipment(parsed):parsed;}catch{return undefined;}}
  return field.type==='equipment'?tidyEquipment(value):value;
@@ -184,7 +207,7 @@ export function applyOrderPatch(order,patch,{now=new Date()}={}) {
   },order);
 }
 export function missingOrderFields(order) {
-  return fields.filter(field=>(field.required||(field.key==='customer.phoneContact'&&isAnswered(getPath(order,'customer.phone'))))&&(!field.gate||getPath(order,field.gate)===true)&&(!isAnswered(getPath(order,field.key))||(field.key==='studio.rights.confirmed'&&getPath(order,field.key)!==true)));
+  return fields.filter(field=>(field.required||(field.key==='customer.phoneContact'&&isAnswered(getPath(order,'customer.phone')))||(field.key==='event.title'&&getPath(order,'event.type')==='other'))&&(!field.gate||getPath(order,field.gate)===true)&&(!isAnswered(getPath(order,field.key))||(field.key==='studio.rights.confirmed'&&getPath(order,field.key)!==true)));
 }
 export function validateEventOrder(input,{submission=false,today=new Date().toLocaleDateString('en-CA',{timeZone:contract.timezone})}={}) {
   const errors=[];

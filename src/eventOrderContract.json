@@ -168,14 +168,13 @@
     },
     {
      "key": "event.title",
-     "label": "Other event type",
-     "ar": "نوع الفعالية الآخر",
+     "label": "Your event type",
+     "ar": "نوع فعاليتك",
      "maxLength": 120,
      "required": false,
      "hidden": true,
-     "manualOnly": true,
-     "short": "Other event type",
-     "shortAr": "نوع الفعالية الآخر"
+     "short": "Your event type",
+     "shortAr": "نوع فعاليتك"
     },
     {
      "key": "event.date",

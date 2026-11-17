@@ -153,3 +153,12 @@ test('a guest can have Personal info saved by the AI; a signed-in client cannot 
   assert.ok(guestOrderPatchJsonSchema.items.properties.path.enum.includes('customer.email'));
   assert.ok(!orderPatchJsonSchema.items.properties.path.enum.includes('customer.email'));
 });
+
+test('"Other" is an event type: the client\'s own type is required for Other, never asked otherwise, and the AI may save it',()=>{
+  const missing=order=>core.missingOrderFields(order).map(field=>field.key);
+  const order=core.createEventOrder();order.event.type='other';
+  assert.ok(missing(order).includes('event.title'));
+  order.event.title='Quinceañera';assert.ok(!missing(order).includes('event.title'));
+  const wedding=core.createEventOrder();wedding.event.type='wedding';assert.ok(!missing(wedding).includes('event.title'));
+  assert.equal(core.sanitizeOrderPatch([{path:'event.title',value:'Quinceañera'}]).length,1);
+});

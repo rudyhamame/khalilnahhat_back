@@ -869,6 +869,16 @@ app.patch('/api/auth/profile', async (request, response) => {
 });
 
 require('./account-avatar').register(app, { authFromRequest, User });
+require('./account-deletion').registerAccountDeletion(app,{
+  requireAuth,
+  deleteAccount:require('./account-deletion').createAccountDeletion({
+    User,EventDraft:require('./event-drafts').EventDraft,
+    Conversation:require('./booking-conversations').Conversation,
+    SimulationDraft:require('./simulation-drafts').Model,
+    retire:require('./deleted-event-drafts').retire,
+    assets:require('./permanent-deletion'),
+  }),
+});
 
 require('./google-auth').registerGoogleAuth(app, {
   User, serializeUser, isAdminUser,

@@ -187,7 +187,9 @@ function registerAiBooking(app, { requireAuth, optionalAuth = requireAuth, fetch
         const extra=repairedData.usage||{};
         usage={input_tokens:(usage?.input_tokens||0)+(extra.input_tokens||0),output_tokens:(usage?.output_tokens||0)+(extra.output_tokens||0),input_tokens_details:{cached_tokens:(usage?.input_tokens_details?.cached_tokens||0)+(extra.input_tokens_details?.cached_tokens||0)}};
         parsed=parseModelReply((repairedData.output||[]).flatMap(item=>item.content||[]).filter(item=>item.type==='output_text').map(item=>item.text).join(''));
-        if(!parsed||!Array.isArray(parsed.orderPatch)||unusableProposal(parsed))throw new Error('AI did not provide reviewable proposals');
+        if(!parsed||!Array.isArray(parsed.orderPatch))throw new Error('AI did not provide reviewable proposals');
+        // One rejected field must not lose the whole reply: the valid fields are kept and the rest dropped. Only a claimed change with nothing valid to back it fails.
+        if(unusableProposal(parsed)&&!sanitizeOrderPatch(parsed.orderPatch,proposalContext).length&&claimsDraftChange(parsed.reply))throw new Error('AI did not provide reviewable proposals');
       }
       stage = 'draft_validation';
       parsed=withGuestCount(parsed,input.data.messages.at(-1).content,input.data.order);

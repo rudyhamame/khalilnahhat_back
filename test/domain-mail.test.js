@@ -69,10 +69,10 @@ test('lossless JSON parsing keeps numeric provider IDs beyond safe integer preci
 test('controlled activation replaces stale Gmail recipients and forces the noreply automated sender',async()=>{
  const {notificationAddress,senderAddress}=require('../src/business-mail-identity');
  const {sendBrevoEmail}=require('../src/brevo');
- const settings={DOMAIN_EMAIL_ACTIVE:'true',EMAIL_FROM_ADDRESS:'old@example.test',SERVICE_REQUEST_NOTIFICATION_EMAIL:'old@example.test',BREVO_API_KEY:'private-brevo'};
+ const settings={DOMAIN_EMAIL_ACTIVE:'true',EMAIL_FROM_NAME:'Khalil Nahhat',EMAIL_FROM_ADDRESS:'old@example.test',SERVICE_REQUEST_NOTIFICATION_EMAIL:'old@example.test',BREVO_API_KEY:'private-brevo'};
  assert.equal(notificationAddress(settings),BOOKINGS);assert.equal(senderAddress(settings),'noreply@djkhalilnahhat.ca');
  let body;await sendBrevoEmail({to:[{email:'customer@example.test'}],subject:'Booking',htmlContent:'Your booking',sender:{email:'wrong@example.test'}},{env:settings,notifications:{apply:async value=>value},fetchImpl:async(_url,options)=>{body=JSON.parse(options.body);return new Response(JSON.stringify({messageId:'confirmed'}));}});
- assert.equal(body.sender.email,'noreply@djkhalilnahhat.ca');
+ assert.equal(body.sender.email,'noreply@djkhalilnahhat.ca');assert.equal(body.sender.name,'Echo Website');
 });
 test('every mailbox route is admin-only, rejects unsafe paths, and sends no credentials',async t=>{
  const app=express();app.use(express.json());const f=fixture();

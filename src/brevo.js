@@ -1,5 +1,5 @@
 const BREVO_TRANSACTIONAL_EMAIL_URL = 'https://api.brevo.com/v3/smtp/email';
-const {notificationAddress,senderAddress} = require('./business-mail-identity');
+const {notificationAddress,senderAddress,senderName} = require('./business-mail-identity');
 const { notificationEmails } = require('./notification-emails');
 
 function escapeHtml(value) {
@@ -44,7 +44,7 @@ async function sendBrevoEmail(payload, {notifications=notificationEmails,fetchIm
       body: JSON.stringify({
         ...payload,
         sender: {
-          name: env.EMAIL_FROM_NAME?.trim() || 'Khalil Nahhat Website',
+          name: senderName(env),
           email: senderEmail,
         },
       }),

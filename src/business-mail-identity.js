@@ -7,10 +7,15 @@ const notificationAddress = (env = process.env) =>
     : env.SERVICE_REQUEST_NOTIFICATION_EMAIL?.trim() || BOOKINGS;
 const senderAddress = (env = process.env) =>
   active(env) ? NOREPLY : env.EMAIL_FROM_ADDRESS?.trim() || NOREPLY;
+const senderName = (env = process.env) =>
+  senderAddress(env).toLowerCase() === NOREPLY
+    ? "Echo Website"
+    : env.EMAIL_FROM_NAME?.trim() || "Echo Website";
 module.exports = {
   BOOKINGS,
   NOREPLY,
   active,
   notificationAddress,
   senderAddress,
+  senderName,
 };

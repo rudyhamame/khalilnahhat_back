@@ -32,6 +32,22 @@ test('invalid values and supplied account identifiers are rejected',async t=>{
   assert.equal((await request('PUT',{version:0,order:createEventOrder(),owner:'bob'})).status,400);
 });
 
+test('cleared optional venue details remain empty after saving and reloading',async t=>{
+ const request=await fixture(t),order=createEventOrder();
+ Object.assign(order.event.venue,{name:'Test Banquet Hall',city:'Toronto',addressDetails:'Toronto'});
+ assert.equal((await request('PUT',{version:0,order})).status,200);
+ for(const [index,value] of [null,''].entries()){
+  order.event.venue.addressDetails=value;
+  const response=await request('PUT',{version:index+1,order});
+  assert.equal(response.status,200);
+  assert.equal((await response.json()).item.order.event.venue.addressDetails,value);
+  const resumed=(await(await request()).json()).item.order;
+  assert.equal(resumed.event.venue.addressDetails,value);
+  assert.equal(resumed.event.venue.city,'Toronto');
+  assert.equal(resumed.event.venue.name,'Test Banquet Hall');
+ }
+});
+
 test('draft saves and resumes use account contacts instead of supplied values',async t=>{
  const request=await fixture(t),order=createEventOrder();
  Object.assign(order.customer,{fullName:'Forged Name',email:'forged@example.invalid',phone:'9999999999',company:'Forged Company'});

@@ -30,7 +30,7 @@ const schema=new mongoose.Schema({
  deletedAt:{type:Date,default:null},
  // Saved editions of this live session: named trim + look + goal, kept so they can be reopened in the editor.
  // Rendered reframes (free ffmpeg crops) of this live: one stored file each.
- renders:[{name:String,part:Number,start:Number,end:Number,goal:String,status:String,error:String,publicId:String,delivery:String,bytes:Number,duration:Number,width:Number,height:Number,createdAt:{type:Date,default:Date.now}}],
+ renders:[{echoPublished:{type:Boolean,default:false},echoPublishedAt:Date,name:String,part:Number,start:Number,end:Number,goal:String,status:String,error:String,publicId:String,delivery:String,bytes:Number,duration:Number,width:Number,height:Number,createdAt:{type:Date,default:Date.now}}],
  editions:[{name:String,whole:Boolean,part:Number,start:Number,end:Number,look:{type:Object},goal:String,createdAt:{type:Date,default:Date.now}}],
  provider:{type:String,default:'livekit'},relaySegments:[String],
  direct:{ownerId:String,mime:String,count:{type:Number,default:0},bytes:{type:Number,default:0},state:String,complete:Boolean,lastChunkAt:Date},
@@ -93,7 +93,7 @@ function wholeTransformation(row,parts,{full=false,look=true}={}){
  return steps.length?{transformation:steps}:{};
 }
 const {postingGoalRatio}=require('./posting-formats');
-function renderView(row){return Array.from(row.renders||[],item=>({id:String(item._id),name:item.name,part:item.part||0,start:item.start,end:item.end,goal:item.goal||'',
+function renderView(row){return Array.from(row.renders||[],item=>({id:String(item._id),echoPublished:item.echoPublished===true,name:item.name,part:item.part||0,start:item.start,end:item.end,goal:item.goal||'',
  // A job that was running when the server restarted never finishes: show it as failed instead of spinning forever.
  status:item.status==='processing'&&Date.now()-new Date(item.createdAt)>2*3600*1000?'failed':item.status,error:item.status==='processing'&&Date.now()-new Date(item.createdAt)>2*3600*1000?'The render was interrupted. Start it again.':item.error||'',bytes:item.bytes||0,duration:item.duration||0,width:item.width||null,height:item.height||null,createdAt:item.createdAt}));}
 function editionView(row){return Array.from(row.editions||[],edition=>({id:String(edition._id),name:edition.name,whole:Boolean(edition.whole),part:edition.part||0,start:edition.start,end:edition.end,goal:edition.goal||'',...(normalizeLook(edition.look)?{look:normalizeLook(edition.look)}:{}),createdAt:edition.createdAt}));}
@@ -183,6 +183,8 @@ async function ensureRecording(roomName){
 async function sweepRecordings(){return pipeline.sweep();}
 let workerTimer;
 function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWorker=true}={}){
+ require('./echo-reels').registerEchoReels(app,{requireAdmin,Recording:LiveRecording,serialize:view,videoUrl:item=>cloudinary.utils.private_download_url(item.publicId,'mp4',{resource_type:'video',type:item.delivery||'authenticated',expires_at:Math.floor(Date.now()/1000)+7200,attachment:false})});
+
  require('./recording-session-metadata').registerRecordingSessionMetadata(app,requireAdmin,{
   Recording:LiveRecording,...require('./models'),LiveComment:require('./live-comments').LiveComment,isValidId:mongoose.isValidObjectId,
  });

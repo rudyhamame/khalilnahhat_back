@@ -15,7 +15,7 @@ test('private multipart view exposes count/size but no asset identifiers',()=>{
 });
 test('preview and download routes require admin and reject missing or invalid parts',async()=>{
  const {registerLiveRecordings,LiveRecording}=require('../src/live-recordings');const routes={};const admin=()=>{};
- registerLiveRecordings({get:(p,a,h)=>{assert.equal(a,admin);routes[p]=h;},post:(_p,a)=>assert.equal(a,admin),delete:(_p,a)=>assert.equal(a,admin)},admin);
+ registerLiveRecordings({get:(p,a,h)=>{if(p==='/api/reels'){assert.equal(typeof a,'function');routes[p]=a;return;}assert.equal(a,admin);routes[p]=h;},post:(_p,a)=>assert.equal(a,admin),delete:(_p,a)=>assert.equal(a,admin)},admin);
  assert.ok(routes['/api/admin/live-recordings/:id/preview']);
  const original=LiveRecording.findOne;LiveRecording.findOne=async()=>({status:'ready',publicId:'private-id',delivery:'authenticated'});
  const response=()=>({code:200,set(){},status(n){this.code=n;return this;},json(body){this.body=body;return this;}});
@@ -46,7 +46,7 @@ test('missing Cloudinary asset in nested SDK 404 proceeds to private upload; oth
 });
 test('delete stays admin-only and the restore route no longer exists',()=>{
  const {registerLiveRecordings}=require('../src/live-recordings');const routes={};const admin=()=>{};
- const register=(p,a,h)=>{assert.equal(a,admin);routes[p]=h;};
+ const register=(p,a,h)=>{if(p==='/api/reels'){assert.equal(typeof a,'function');routes[p]=a;return;}assert.equal(a,admin);routes[p]=h;};
  registerLiveRecordings({get:register,post:register,delete:register},admin,{startWorker:false});
  assert.equal(typeof routes['/api/admin/live-recordings/:id'],'function');
  assert.equal(routes['/api/admin/live-recordings/:id/restore'],undefined);

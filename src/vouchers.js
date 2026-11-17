@@ -45,6 +45,22 @@ async function evaluate(code,userId,now=new Date()){
  if(userId&&await Redemption.countDocuments({voucherId:voucher._id,userId})>=voucher.perClientLimit)return {error:'You have already used this voucher.'};
  return {voucher};
 }
+// Only announced codes may be suggested. A private code is readable only when
+// the client already supplied it in their own draft.
+async function bookingVoucherData(owner,code='',now=new Date()){
+ const userId=mongoose.Types.ObjectId.isValid(owner)?owner:null;
+ const rows=await Voucher.find({active:true,announce:true}).sort({updatedAt:-1}).limit(100);
+ const eligible=await Promise.all(rows.filter(v=>v.active&&v.announce&&currentWindow(v,now)&&!used(v)).map(async voucher=>{
+  if(userId&&await Redemption.countDocuments({voucherId:voucher._id,userId})>=voucher.perClientLimit)return null;
+  return {...publicVoucher(voucher),currency:'CAD'};
+ }));
+ let selected=null;
+ if(normalizeCode(code)){
+  const checked=await evaluate(code,userId,now);
+  selected={code:normalizeCode(code),valid:!checked.error,...(checked.error?{message:checked.error}:{voucher:{...publicVoucher(checked.voucher),currency:'CAD'}})};
+ }
+ return {available:eligible.filter(Boolean),selected,clientEligibilityChecked:Boolean(userId)};
+}
 // Claim one use atomically; release() undoes it when the booking could not be saved.
 async function reserve(code,user){
  const checked=await evaluate(code,user._id);
@@ -116,4 +132,4 @@ function registerVouchers(app,{requireAdmin,requireAuth}){
   catch{res.status(503).json({message:'Could not load redemptions.'});}
  });
 }
-module.exports={registerVouchers,reserve,release,record,snapshot,evaluate,Voucher,Redemption};
+module.exports={registerVouchers,reserve,release,record,snapshot,evaluate,bookingVoucherData,Voucher,Redemption};

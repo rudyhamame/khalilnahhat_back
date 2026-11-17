@@ -50,7 +50,7 @@ test('the loader can only ask for the signed-in owner’s requests', async () =>
 
 test('booking data includes the owner’s journey and passes the owner through; failure is reported, not guessed', async () => {
   const seen = [];
-  const base = { loadAvailability: async () => ({}), loadCatalog: async () => [], loadEquipment: async () => [], loadPrices: async () => [] };
+  const base = { loadVouchers:async()=>({available:[],selected:null}), loadAvailability: async () => ({}), loadCatalog: async () => [], loadEquipment: async () => [], loadPrices: async () => [] };
   const year = new Date().getUTCFullYear();
   const ok = await createBookingData({ ...base, loadJourney: async owner => { seen.push(owner); return [{ id: 'req-1' }]; } })(year, { owner: 'user-7' });
   assert.deepEqual(seen, ['user-7']);

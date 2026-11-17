@@ -10,6 +10,22 @@ async function fixture(t,options={}){
   return (path,body,auth=true,extraHeaders={})=>fetch(`http://127.0.0.1:${server.address().port}/api/ai-booking/${path}`,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',...(auth?{Authorization:'Bearer unit-test'}:{}),...extraHeaders},body:body?JSON.stringify(body):undefined});
 }
 test('status exposes availability, never credentials',async t=>{const request=await fixture(t,{env:{}});const r=await request('status');assert.deepEqual(await r.json(),{configured:false,voiceConfigured:false,requiresSignIn:true,maxCallSeconds:300});});
+test('voucher questions receive live offers and selected-code validation in the model context',async t=>{
+ const optionsSeen=[];let provider;
+ const request=await fixture(t,{loadBookingData:async(year,options)=>{optionsSeen.push(options);return {year,vouchers:{status:'ready',data:{available:[{code:'ECHO10',kind:'percent',percent:10}],selected:{code:options.voucherCode,valid:true}}}};},fetchImpl:async(_url,options)=>{provider=JSON.parse(options.body);return Response.json({output:[{content:[{type:'output_text',text:JSON.stringify({reply:'ECHO10 offers 10% off. Would you like to use it?',orderPatch:[]})}]}]});}});
+ const response=await request('chat',{consent:true,order:{'additional.voucherCode':'ECHO10'},messages:[{role:'user',content:'Are there any active voucher codes?'}]});
+ assert.equal(response.status,200);
+ assert.equal(optionsSeen[0].voucherCode,'ECHO10');
+ assert.match(JSON.stringify(provider.input),/ECHO10/);
+ assert.match(provider.instructions,/Never say you have no information about vouchers/);
+ assert.match(provider.instructions,/Answer voucher questions before moving to another topic/);
+});
+test('address presentation rules require postal blocks and forbid invented address components',()=>{
+ const text=instructions();
+ assert.match(text,/separate multiline postal block/);
+ assert.match(text,/Never guess an address, province, postal code or country/);
+ assert.match(text,/Keep the surrounding question outside that block/);
+});
 test('chat language follows the interface even when the message uses the other language',async t=>{
  const seen=[];
  const request=await fixture(t,{fetchImpl:async(_url,options)=>{seen.push(JSON.parse(options.body));return Response.json({output:[{content:[{type:'output_text',text:JSON.stringify({reply:'What venue?',orderPatch:[]})}]}]});}});

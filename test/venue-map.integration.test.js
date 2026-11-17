@@ -77,3 +77,12 @@ test('searching a city name lists that city\'s venues, never the city itself',as
   items=await run({});assert.deepEqual(items.map(item=>item.name),['Banquet Palace']);assert.match(calls.at(-1).categories,/catering/,'no type chosen searches every venue category');
  }finally{await new Promise(r=>server.close(r));}
 });
+
+test('a visitor without an account can search venues, with the per-IP rate limit still applied',async()=>{
+ const express=require('express'),app=express();let calls=0;
+ const requireAuth=(req,res)=>res.status(401).end(),optionalAuth=(req,res,next)=>next();
+ require('../src/venue-map/routes').registerVenueMap(app,{requireAuth,optionalAuth,env:{VENUE_SEARCH_API_KEY:'fixture'},fetchImpl:async()=>{calls++;return new Response(JSON.stringify({results:[]}));}});
+ const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const url=`http://127.0.0.1:${server.address().port}/api/venue-map/search?q=Toronto&bounds=-180,-85,180,85`;
+ try{for(let i=0;i<11;i++)assert.equal((await fetch(url)).status,i<10?200:429);assert.equal(calls,10);
+ }finally{await new Promise(r=>server.close(r));}
+});

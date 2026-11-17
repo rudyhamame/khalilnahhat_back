@@ -15,7 +15,8 @@ test('visitors can upload photos and documents without an account; the file must
   const {send,uploads}=await fixture(t);
   const photo=await send(JPEG,'image/jpeg','photo');assert.equal(photo.status,200);
   assert.match((await photo.json()).sha256,/^[a-f0-9]{64}$/);
-  assert.equal((await send(PDF,'application/pdf','file')).status,200);
+  const document=await send(PDF,'application/pdf','file');assert.equal(document.status,200);
+  assert.match((await document.json()).sha256,/^[a-f0-9]{64}$/);
   assert.equal((await send(Buffer.from('#!/bin/sh\nrm -rf /'),'image/jpeg','photo')).status,400); // a script renamed as a photo
   assert.equal((await send(JPEG,'image/jpeg','file')).status,400); // a photo is not a document
   assert.equal(uploads.length,2);

@@ -44,6 +44,11 @@ test('uploaded photo hashes are retained only when they are valid SHA-256 values
   assert.equal(core.validValue(field,[{...base,sha256:'not-a-hash'}]),false);
   assert.equal(core.normalizeEventOrder({references:{photos:[{...base,sha256:'b'.repeat(64)}]}}).references.photos[0].sha256,'b'.repeat(64));
 });
+test('uploaded event document hashes use the same validated SHA-256 field',()=>{
+  const field=core.fields.find(field=>field.key==='references.files'),base={url:'https://res.cloudinary.com/demo/raw/upload/plan.pdf',name:'plan.pdf',comment:''};
+  assert.equal(core.validValue(field,[{...base,sha256:'c'.repeat(64)}]),true);
+  assert.equal(core.validValue(field,[{...base,sha256:'sha256'}]),false);
+});
 
 test('quote questionnaire asks only what the brief lists plus language and dialect',()=>{
   const keys=core.fields.filter(field=>!field.hidden).map(field=>field.key).sort();

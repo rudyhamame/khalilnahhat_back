@@ -56,3 +56,13 @@ test('missing field or viewport metadata from completed chapters accepts null an
  assert.equal((await request('',next)).status,200);
  const {item}=await(await request('/'+input.id)).json();assert.equal(item.messages.length,3);assert.equal(item.messages[1].fieldPath,undefined);
 });
+
+test('structured music records persist in the conversation and reject unrelated fields',async t=>{
+ const request=await fixture(t),input=body();
+ input.messages[1].musicFields=[{path:'music.suggestedSongs',value:[{song:'Perfect',artist:'Ed Sheeran',phase:'First dance',link:'https://youtu.be/example'}]},{path:'music.languagePairs',value:[{language:'Arabic',dialect:'Lebanese'}]}];
+ assert.equal((await request('',input)).status,200);
+ const loaded=await(await request('/'+input.id)).json();
+ assert.deepEqual(loaded.item.messages[1].musicFields,input.messages[1].musicFields);
+ const invalid=body();invalid.messages[1].musicFields=[{path:'customer.email',value:'test@example.invalid'}];
+ assert.equal((await request('',invalid)).status,400);
+});

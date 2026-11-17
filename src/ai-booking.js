@@ -11,7 +11,7 @@ const {defaults:defaultAiConfig,publicPolicy}=require('./ai-configuration');
 const { orderPatchJsonSchema, guestOrderPatchJsonSchema, sanitizeOrderPatch, draftTool, orderInstructions, applyAccountProfile, aiOrderContext, orderFromContext, futureEventPatch, preserveMusicLanguages } = require('./event-order');
 
 const voiceLanguageInstructions=language=>language?'\nVoice-call language: The client explicitly selected '+(language==='ar-SA'?'Arabic':'English')+'. Use that language for your opening greeting, questions, acknowledgements and spoken replies. Do not infer a language switch from names, addresses, accents or isolated foreign words. Switch only when the client explicitly requests another language. Background noise, speaker echo, unclear sounds and old transcripts are not language requests. Never restart your greeting after unclear input; briefly ask the client to repeat their answer to the current booking question.':'';
-const claimsDraftChange=reply=>typeof reply==='string'&&(/\bI(?:['’]ve| have)?\s+(?:added|queued|proposed|prepared|updated|set|selected|saved|changed|included)\b/iu.test(reply)||/^\s*(?:added|queued|proposed|updated|selected|saved)\b/iu.test(reply)||/(?:أضفت|اقترحت|جهزت|تمت إضافة|تم تحديث|تم حفظ)/u.test(reply));
+const claimsDraftChange=reply=>typeof reply==='string'&&(/\bI(?:['’]ve| have)?\s+(?:added|queued|proposed|prepared|updated|set|selected|saved|changed|included)\b/iu.test(reply)||/\b(?:quantity|qty)\b[^.]{0,40}\b(?:set|updated|changed)\b|\b(?:has|have) been (?:added|set|updated|changed|saved)\b|\b(?:set|updated|changed) to \d+/iu.test(reply)||/^\s*(?:added|queued|proposed|updated|selected|saved)\b/iu.test(reply)||/(?:أضفت|اقترحت|جهزت|تمت إضافة|تم تحديث|تم حفظ)/u.test(reply));
 const replySchema = z.string().trim().min(1).max(4000);
 // The conversation must survive an uncertain optional form value. Never guess
 // a concrete guest count from a range or accept malformed dates/times.
@@ -190,7 +190,11 @@ function registerAiBooking(app, { requireAuth, optionalAuth = requireAuth, fetch
         parsed=parseModelReply((repairedData.output||[]).flatMap(item=>item.content||[]).filter(item=>item.type==='output_text').map(item=>item.text).join(''));
         if(!parsed||!Array.isArray(parsed.orderPatch))throw new Error('AI did not provide reviewable proposals');
         // One rejected field must not lose the whole reply: the valid fields are kept and the rest dropped. Only a claimed change with nothing valid to back it fails.
-        if(unusableProposal(parsed)&&!sanitizeOrderPatch(parsed.orderPatch,proposalContext).length&&claimsDraftChange(parsed.reply))throw new Error('AI did not provide reviewable proposals');
+        if(unusableProposal(parsed)&&!sanitizeOrderPatch(parsed.orderPatch,proposalContext).length&&claimsDraftChange(parsed.reply)){
+          // Nothing valid to save: say so honestly instead of failing the whole reply, and keep the conversation moving.
+          const arabic=/[\u0600-\u06ff]/u.test(input.data.messages.at(-1).content);
+          parsed={...parsed,orderPatch:[],reply:arabic?'لم أستطع إضافة ذلك إلى مسودتك، لذلك لم يتغيّر شيء. هل تخبرني باسم المعدة بدقة والكمية المطلوبة، أو نتابع بتفصيل آخر؟':'I couldn’t add that to your draft, so nothing was changed. Could you tell me the exact item and how many you need, or shall we move on to another detail?'};
+        }
       }
       stage = 'draft_validation';
       parsed=withGuestCount(parsed,input.data.messages.at(-1).content,input.data.order);

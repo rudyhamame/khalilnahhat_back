@@ -11,9 +11,16 @@ export const aiFields = [...fields,...planningFields,{key:'equipment',label:'Equ
 // The shown name of one option of a field (for example the "phone" contact method), from the same contract.
 export const optionName=(key,option,ar=false)=>{const names=aiFields.find(item=>item.key===key)?.optionNames?.[option];return names?names[ar?1:0]:String(option??'');};
 export const fieldName=(key,ar=false)=>{const field=aiFields.find(item=>item.key===key);return field?(ar?field.shortAr:field.short)||field.label:'';};
+// An equipment list from a model may repeat an item or give a quantity as text ("2"): merge repeats (the last wins) and read whole-number text, so one slip does not reject the whole selection.
+function tidyEquipment(list){
+ if(!Array.isArray(list))return list;
+ const merged=new Map();
+ for(const row of list){if(!row||typeof row!=='object'){return list;}const quantity=typeof row.quantity==='string'&&/^\d+$/.test(row.quantity.trim())?Number(row.quantity):row.quantity;merged.set(row.id,{...row,quantity});}
+ return [...merged.values()];
+}
 export function decodePatchValue(field,value){
- if(typeof value==='string'&&(value==='null'||['number','coordinate','boolean','multi','links','songs','tags','pairs','attachments','equipment'].includes(field.type))){try{return JSON.parse(value);}catch{return undefined;}}
- return value;
+ if(typeof value==='string'&&(value==='null'||['number','coordinate','boolean','multi','links','songs','tags','pairs','attachments','equipment'].includes(field.type))){try{const parsed=JSON.parse(value);return field.type==='equipment'?tidyEquipment(parsed):parsed;}catch{return undefined;}}
+ return field.type==='equipment'?tidyEquipment(value):value;
 }
 export const getPath = (object, path) => path.split('.').reduce((value, key) => value?.[key], object);
 function put(object, path, value) {

@@ -344,6 +344,7 @@ function serializeUser(user) {
     preferredContact: user.preferredContact === 'whatsapp' ? 'phone' : user.preferredContact || 'email',
     phoneContact: user.phoneContact || (user.preferredContact === 'whatsapp' ? 'whatsapp-text' : user.phoneNumber ? 'call' : ''),
     emailNotifications: user.emailNotifications !== false,
+    avatarVersion: user.avatarVersion || 0,
     emailVerified: Boolean(user.emailVerified),
     isAdmin: isAdminUser(user),
   };
@@ -866,6 +867,8 @@ app.patch('/api/auth/profile', async (request, response) => {
   await user.save();
   return response.json({ user: serializeUser(user) });
 });
+
+require('./account-avatar').register(app, { authFromRequest, User });
 
 require('./google-auth').registerGoogleAuth(app, {
   User, serializeUser, isAdminUser,
@@ -1542,7 +1545,7 @@ const aiAdministrator=require('./ai-admin/routes').registerAiAdministrator(app,{
  authorize:async (owner,token,binding)=>{if(!require('mongoose').isValidObjectId(owner))return null;const user=await User.findById(owner).select('+sessionTokenEncrypted +androidSessionTokenEncrypted');const active=accountSessions.selectSession(user,token,binding);return isAdminUser(user)&&active?accountSessions.sessionActor(user,active):null;},
 });
 
-require('./admin-alerts').register(app, { requireAdmin });
+require('./admin-alerts').register(app, { requireAdmin, authFromRequest });
 
 app.use(require('./security-controls').securityError);
 

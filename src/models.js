@@ -13,6 +13,10 @@ const userSchema = new mongoose.Schema(
     preferredContact: { type: String, enum: ['any', 'email', 'phone', 'whatsapp'], default: 'email' }, // 'whatsapp' is kept only for accounts saved before WhatsApp became a phone option
     phoneContact: { type: String, enum: ['', 'whatsapp-text', 'whatsapp-call', 'sms', 'call'], default: '' },
     emailNotifications: { type: Boolean, default: true },
+    // Profile photo: one small cropped image (<=150 KB) kept off normal reads; avatarVersion changes with every upload.
+    avatar: { type: Buffer, select: false },
+    avatarType: { type: String, default: '' },
+    avatarVersion: { type: Number, default: 0 },
     isAdmin: { type: Boolean, default: false },
     adminGrantedAt: { type: Date, default: null },
     adminGrantedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },

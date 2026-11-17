@@ -34,11 +34,11 @@ const clientFields = {
 };
 const clientUpdate = z.object(clientFields).partial().strict();
 const clientCreate = z.object({ ...clientFields, username: z.string().trim().toLowerCase().regex(/^[a-z0-9_.-]{3,60}$/) }).partial({ phoneNumber: true, adminNotes: true }).strict();
-const CLIENT_FIELDS = '_id username firstName lastName email phoneNumber emailVerified isAdmin isBlocked createdAt adminNotes';
+const CLIENT_FIELDS = '_id username firstName lastName email phoneNumber emailVerified isAdmin isBlocked createdAt adminNotes avatarVersion';
 function clientView(u) {
   return { id: String(u._id), username: u.username, firstName: u.firstName, lastName: u.lastName,
     name: `${u.firstName} ${u.lastName}`.trim(), email: u.email, phoneNumber: u.phoneNumber || '',
-    isAdmin: Boolean(u.isAdmin || ADMIN_USERNAMES.has(String(u.username||'').toLowerCase())), isBlocked: Boolean(u.isBlocked), emailVerified: Boolean(u.emailVerified), createdAt: u.createdAt, adminNotes: u.get?.('adminNotes') || u.adminNotes || '' };
+    isAdmin: Boolean(u.isAdmin || ADMIN_USERNAMES.has(String(u.username||'').toLowerCase())), isBlocked: Boolean(u.isBlocked), emailVerified: Boolean(u.emailVerified), avatarVersion: u.avatarVersion || 0, createdAt: u.createdAt, adminNotes: u.get?.('adminNotes') || u.adminNotes || '' };
 }
 const fileView = d => ({ id: String(d._id), name: d.name, bytes: d.bytes, mime: d.mime, clientId: d.clientId ? String(d.clientId) : '', requestId: d.requestId, note: d.note, archived: d.archived, createdAt: d.createdAt });
 const validId = value => mongoose.isValidObjectId(value);
@@ -65,6 +65,13 @@ function registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest 
     ]);
     return res.json({ counts:{clients,requests,pending,confirmed,media,archive,vault,queue,meetings,equipment},
       integrations:{cloudinary:Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET),livekit:Boolean(process.env.LIVEKIT_URL && process.env.LIVEKIT_API_KEY && process.env.LIVEKIT_API_SECRET)} });
+  });
+  // A client's profile photo (bytes). Admin-only; clients read their own through /api/account/avatar.
+  app.get('/api/admin/clients/:id/avatar', requireAdmin, async (req,res) => {
+    if(!validId(req.params.id)) return fail(res,400,'Invalid client.');
+    const u=await User.findById(req.params.id).select('+avatar avatarType');
+    if(!u?.avatar?.length) return fail(res,404,'No photo.');
+    res.set({'Content-Type':u.avatarType||'image/jpeg','Cache-Control':'private, max-age=86400'}).send(u.avatar);
   });
   app.get('/api/admin/clients', requireAdmin, async (req,res) => {
     const q=String(req.query.q || '').trim().slice(0,100);

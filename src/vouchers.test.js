@@ -18,6 +18,24 @@ function fake(){
  Redemption.create=async data=>{redemptions.push(data);return data;};
  return {docs,redemptions};
 }
+test('Echo booking data knows live announced vouchers and checks the client’s own supplied code',async()=>{
+ const state=fake(),alice={_id:new mongoose.Types.ObjectId()};
+ await vouchers.Voucher.create({code:'PUBLIC10',kind:'percent',percent:10,announce:true});
+ await vouchers.Voucher.create({code:'EXPIRED',kind:'percent',percent:5,announce:true,endsAt:new Date('2020-01-01')});
+ await vouchers.Voucher.create({code:'USED-UP',kind:'percent',percent:5,announce:true,redeemed:1,maxRedemptions:1});
+ const used=await vouchers.Voucher.create({code:'ALREADY',kind:'percent',percent:5,announce:true});
+ state.redemptions.push({voucherId:used._id,userId:alice._id});
+ await vouchers.Voucher.create({code:'PRIVATE20',kind:'percent',percent:20,announce:false});
+ const data=await vouchers.bookingVoucherData(String(alice._id),'private20');
+ assert.deepEqual(data.available.map(row=>row.code),['PUBLIC10']);
+ assert.equal(data.available[0].percent,10);assert.equal(data.available[0].currency,'CAD');
+ assert.equal(data.selected.valid,true);assert.equal(data.selected.voucher.code,'PRIVATE20');
+ assert.equal(data.clientEligibilityChecked,true);
+ assert.equal((await vouchers.bookingVoucherData(String(alice._id),'EXPIRED')).selected.valid,false);
+ const guest=await vouchers.bookingVoucherData(null);
+ assert.equal(guest.clientEligibilityChecked,false);assert.equal(guest.selected,null);
+ assert.equal(guest.available.some(row=>row.code==='PRIVATE20'),false);
+});
 
 test('voucher is claimed once per client, respects the cap, and releases on failure',async()=>{
  const state=fake();

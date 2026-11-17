@@ -19,3 +19,13 @@ test('live-data instructions agree with automatic task saving and distinguish bu
  assert.match(bookingDataInstructions,/Never ask for task checkmarks/);
  assert.match(bookingDataInstructions,/never a reservation/);
 });
+test('live booking snapshots include current voucher eligibility and distinguish failed lookup from no offers',async()=>{
+ let fail=false;const seen=[];
+ const load=createBookingData({loadAvailability:async()=>({}),loadCatalog:async()=>[],loadEquipment:async()=>[],loadPrices:async()=>[],loadVouchers:async(owner,code)=>{seen.push([owner,code]);if(fail)throw Error('private DB issue');return {available:[{code:'ECHO10',kind:'percent',percent:10}],selected:null};}});
+ const year=new Date().getUTCFullYear();
+ const ready=await load(year,{owner:'client',voucherCode:'ECHO10'});
+ assert.deepEqual(seen,[['client','ECHO10']]);assert.equal(ready.vouchers.status,'ready');assert.equal(ready.vouchers.data.available[0].code,'ECHO10');
+ fail=true;const unavailable=await load(year);
+ assert.deepEqual(unavailable.vouchers,{status:'unavailable',data:null});assert.doesNotMatch(JSON.stringify(unavailable),/private DB/);
+ const {bookingDataInstructions}=require('./ai-booking-data');assert.match(bookingDataInstructions,/show those real available codes/);
+});

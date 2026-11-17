@@ -328,3 +328,17 @@ test('the booking stage chosen by the app is passed to the model as an explicit 
   assert.match(seen[0],/Booking stage: REQUIRED/);assert.match(seen[1],/Booking stage: OPTIONAL[^]*Do not say the booking is ready yet/);assert.match(seen[2],/Booking stage: READY[^]*ready to be submitted\. Press Submit booking/);
   assert.equal((await request('chat',{consent:true,bookingStage:'bogus',messages:[{role:'user',content:'x'}]})).status,400);
 });
+
+test('reference intent without a URL asks for the missing link instead of manufacturing a patch',async t=>{
+ let calls=0;const request=await fixture(t,{fetchImpl:async()=>{calls++;throw Error('No model needed');}});
+ const response=await request('chat',{consent:true,messages:[{role:'user',content:'I want to add a link'}]});
+ assert.equal(response.status,200);const data=await response.json();assert.match(data.reply,/Please paste the link/);assert.deepEqual(data.orderPatch,[]);assert.equal(calls,0);
+});
+test('reference links embedded in a message are extracted into the exact inspiration field',async t=>{
+ let calls=0;const request=await fixture(t,{fetchImpl:async()=>{calls++;throw Error('No model needed');}});
+ const url='https://ca.pinterest.com/pin/585327282866256601/';
+ const response=await request('chat',{consent:true,order:{'references.images':['https://www.pinterest.com/pin/old/']},messages:[{role:'user',content:`Here is my inspiration: ${url}`} ]});
+ assert.equal(response.status,200);const data=await response.json();assert.equal(calls,0);assert.equal(data.orderPatch[0].path,'references.images');
+ assert.deepEqual(JSON.parse(data.orderPatch[0].value),['https://www.pinterest.com/pin/old/',url]);
+ assert.doesNotMatch(data.reply,/successfully added|draft is updated/,'the server proposes values; the client confirms the actual save');
+});

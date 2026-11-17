@@ -19,11 +19,14 @@ function tidyEquipment(list){
  return [...merged.values()];
 }
 // A reply is only an acknowledgement; draft mutations require an exact saved patch.
-export const claimsDraftChange=reply=>typeof reply==='string'&&(
- /\bI(?:['’]ve| have)?\s+(?:added|queued|proposed|prepared|updated|set|selected|saved|changed|included)\b/iu.test(reply)||
- /\b(?:has|have|is|are|was|were)\s+(?:(?:now|already|successfully)\s+)*(?:been\s+)?(?:(?:now|already|successfully)\s+)*(?:added|saved|updated|changed|recorded|included|queued|stored)\b/iu.test(reply)||
- /\b(?:quantity|qty)\b[^.]{0,40}\b(?:set|updated|changed)\b|\b(?:set|updated|changed) to \d+/iu.test(reply)||
- /^\s*(?:added|queued|proposed|updated|selected|saved)\b/iu.test(reply)||/(?:أضفت|اقترحت|جهزت|تمت إضافة|تم تحديث|تم حفظ|أُضيف|تمت إضاف)/u.test(reply));
+export function claimsDraftChange(reply){
+ if(typeof reply!=='string')return false;
+ const text=reply.replace(/\b(?:nothing|no (?:draft )?(?:changes?|links?|updates?))\s+(?:was|were|has been|have been)\s+(?:successfully\s+)?(?:added|saved|updated|changed|recorded|included|queued|stored)\b/giu,'').replace(/لم\s+(?:يتم|تتم)\s+(?:حفظ|إضافة|تحديث|تغيير)/gu,'');
+ return /\bI(?:['’]ve| have)?\s+(?:added|queued|proposed|prepared|updated|set|selected|saved|changed|included)\b/iu.test(text)||
+ /\b(?:has|have|is|are|was|were)\s+(?:(?:now|already|successfully)\s+)*(?:been\s+)?(?:(?:now|already|successfully)\s+)*(?:added|saved|updated|changed|recorded|included|queued|stored)\b/iu.test(text)||
+ /\b(?:quantity|qty)\b[^.]{0,40}\b(?:set|updated|changed)\b|\b(?:set|updated|changed) to \d+/iu.test(text)||
+ /^\s*(?:added|queued|proposed|updated|selected|saved)\b/iu.test(text)||/(?:أضفت|اقترحت|جهزت|تمت إضافة|تم تحديث|تم حفظ|أُضيف|تمت إضاف)/u.test(text);
+}
 
 // Extract metadata only: opening an external URL is never needed to save a reference.
 export function referenceLinkRequest(order,message,{context=''}={}){
@@ -33,9 +36,12 @@ export function referenceLinkRequest(order,message,{context=''}={}){
  if(!links.length)return wantsLink?{kind:'ask',links:[]}:null;
  const safe=links.filter(link=>safeLink(link));
  if(safe.length!==links.length)return {kind:'unsafe',links};
- const inspiration=/\b(?:inspiration|pinterest|reference (?:photo|image)|photo links?)\b|صور.{0,12}(?:ملهم|إلهام)|روابط صور/iu.test(text+' '+context);
+ const inspiration=/\b(?:inspiration|pinterest|reference (?:photo|image|links?)|photo links?)\b|صور.{0,12}(?:ملهم|إلهام)|روابط صور/iu.test(text+' '+context);
  const images=safe.filter(link=>{const host=new URL(link).hostname.toLowerCase();return inspiration||host==='pin.it'||host==='pinterest.com'||host.endsWith('.pinterest.com')||host==='pinterest.ca'||host.endsWith('.pinterest.ca');});
- if(!images.length)return {kind:'clarify',links:safe};
+ if(!images.length){
+  if(/\b(?:songs?|music|playlist|first dance|entrance|documents?|run[- ]of[- ]show)\b|أغني|أغاني|موسيقى|مستند/iu.test(text+' '+context))return null;
+  return {kind:'clarify',links:safe};
+ }
  const current=order?.references?.images||[],value=[...new Set([...current,...images])];
  const patch=images.some(link=>!current.includes(link))?[{path:'references.images',value}]:[];
  return {kind:'images',links:images,patch,pending:safe.filter(link=>!images.includes(link))};

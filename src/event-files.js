@@ -6,6 +6,8 @@ const TYPES = {
   'application/pdf': ['raw', 'pdf'], 'application/msword': ['raw', 'doc'], 'text/plain': ['raw', 'txt'],
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['raw', 'docx'],
 };
+// Documents up to 10 MB, photos up to 8 MB (checked below once the kind is known), one file per request.
+const PHOTO_MAX_BYTES = 8 * 1024 * 1024;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
 // ponytail: stored under an unguessable content-hash URL (public delivery), referenced only from the owner's draft; use type:'authenticated' + signed URLs if files become sensitive.
 // The file's first bytes must match its declared type: a renamed script or executable is refused whatever the browser claims.
@@ -39,6 +41,7 @@ function registerEventFiles(app, { requireAuth, optionalAuth = requireAuth, uplo
   }, (req, res, next) => upload.single('file')(req, res, error => error ? res.status(error.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ message: error.code === 'LIMIT_FILE_SIZE' ? 'Files can be up to 10 MB.' : 'Upload one file.' }) : next()), async (req, res) => {
     const kind = req.body?.kind === 'photo' ? 'photo' : 'file', type = TYPES[req.file?.mimetype];
     if (!req.file || !type || !matchesType(req.file.buffer, req.file.mimetype)) return res.status(400).json({ message: 'Upload a JPG, PNG or WebP photo, or a PDF, Word or text document.' });
+    if (kind === 'photo' && req.file.size > PHOTO_MAX_BYTES) return res.status(413).json({ message: 'Photos can be up to 8 MB.' });
     if (kind === 'photo' && type[0] !== 'image') return res.status(400).json({ message: 'Photos must be JPG, PNG or WebP.' });
     if (kind === 'file' && type[0] === 'image') return res.status(400).json({ message: 'Documents must be PDF, Word or text files.' });
     try {

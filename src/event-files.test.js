@@ -26,3 +26,13 @@ test('a visitor has a small upload allowance, signed-in clients a larger one',as
   assert.equal(last.status,429);
   assert.equal((await send(JPEG,'image/jpeg','photo',true)).status,200);
 });
+test('size limits: photos up to 8 MB, documents up to 10 MB, nothing above 10 MB',async t=>{
+  const {send,uploads}=await fixture(t);
+  const sized=(head,size)=>{const bytes=Buffer.alloc(size);Buffer.from(head).copy(bytes);return bytes;};
+  assert.equal((await send(sized(JPEG,8*1024*1024),'image/jpeg','photo')).status,200);
+  const bigPhoto=await send(sized(JPEG,8*1024*1024+1),'image/jpeg','photo');
+  assert.equal(bigPhoto.status,413);assert.match((await bigPhoto.json()).message,/Photos can be up to 8 MB/);
+  assert.equal((await send(sized(PDF,10*1024*1024),'application/pdf','file')).status,200);
+  assert.equal((await send(sized(PDF,10*1024*1024+1),'application/pdf','file')).status,413);
+  assert.equal(uploads.length,2);
+});

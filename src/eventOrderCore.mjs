@@ -47,13 +47,15 @@ export function createEventOrder() {
   order.planning={phase:'after_confirmation',brideName:null,groomName:null,timeline:null,partyEntrances:null,entranceSongs:null,firstDance:null,parentDances:null,dinnerMusic:null,cakeCutting:null,announcements:null,mustPlay:null,doNotPlay:null,musicUploads:[],specialRequests:null};
   return order;
 }
+// The most a client may attach to one booking: 10 inspiration photos and 5 event documents.
+const ATTACHMENT_LIMITS={'references.photos':10,'references.files':5};
 export function validValue(field, value) {
   if(field.key==='music.favouriteSongs')return validFavouriteSongs(value);
   if(field.type==='equipment')return Array.isArray(value)&&value.length<=100&&new Set(value.map(item=>item?.id)).size===value.length&&value.every(item=>item&&typeof item.id==='string'&&/^[a-z0-9-]+$/.test(item.id)&&item.id.length<=160&&Number.isSafeInteger(item.quantity)&&item.quantity>0&&item.quantity<=10000);
   // Ordered suggested songs: [{phase,song}], e.g. an intro song, then an outro song.
   if(field.type==='songs')return Array.isArray(value)&&value.length<=30&&value.every(item=>item&&typeof item==='object'&&typeof item.song==='string'&&item.song.trim().length>0&&item.song.length<=200&&typeof item.phase==='string'&&item.phase.length<=80&&(item.artist===undefined||(typeof item.artist==='string'&&item.artist.length<=200))&&(item.link===undefined||(typeof item.link==='string'&&item.link.length<=2048&&/^https:\/\/\S+$/i.test(item.link)))&&(!field.phases||item.phase===''||field.phases.includes(item.phase)));
   // Lists chosen from the Work Elements (genres) are free text names; language pairs are {language, dialect}.
-  if(field.type==='attachments')return Array.isArray(value)&&value.length<=12&&value.every(item=>item&&typeof item==='object'&&typeof item.url==='string'&&item.url.length<=2048&&/^https:\/\//i.test(item.url)&&safeLink(item.url)&&new URL(item.url).hostname==='res.cloudinary.com'&&typeof item.name==='string'&&item.name.length>0&&item.name.length<=160&&(item.comment===undefined||(typeof item.comment==='string'&&item.comment.length<=500)));
+  if(field.type==='attachments')return Array.isArray(value)&&value.length<=(ATTACHMENT_LIMITS[field.key]||12)&&value.every(item=>item&&typeof item==='object'&&typeof item.url==='string'&&item.url.length<=2048&&/^https:\/\//i.test(item.url)&&safeLink(item.url)&&new URL(item.url).hostname==='res.cloudinary.com'&&typeof item.name==='string'&&item.name.length>0&&item.name.length<=160&&(item.comment===undefined||(typeof item.comment==='string'&&item.comment.length<=500)));
   if(field.type==='tags')return Array.isArray(value)&&value.length<=40&&value.every(item=>typeof item==='string'&&item.trim().length>0&&item.length<=80);
   if(field.type==='pairs')return Array.isArray(value)&&value.length<=40&&value.every(item=>item&&typeof item==='object'&&typeof item.language==='string'&&item.language.trim().length>0&&item.language.length<=80&&typeof item.dialect==='string'&&item.dialect.length<=80);
   if(value===null)return !['multi','links','songs','tags','pairs','attachments'].includes(field.type);

@@ -23,14 +23,14 @@ const view = call => ({id:String(call._id),callerId:call.callerId,calleeId:call.
 const failure = (status,message) => Object.assign(Error(message),{status});
 const roomName = call => `echo-admin-call-${call._id}`;
 
-function registerEchoProjectChatCalls(app,{requireAdmin,getConfig}) {
+function registerEchoProjectChatCalls(app,{requireAdmin,getConfig,publish=()=>{}}) {
   const closeRoom = async call => {
     try { const {wsUrl,apiKey,apiSecret} = getConfig(); await new RoomServiceClient(wsUrl.replace(/^wss:/,'https:'),apiKey,apiSecret).deleteRoom(roomName(call)); }
     catch { /* Clients also disconnect on the next call-status poll. No credentials are logged. */ }
   };
   const finish = async (filter) => {
     const call = await Call.findOneAndUpdate({...filter,state:{$in:['ringing','active']}},{$set:{state:'ended',endedAt:new Date()}},{new:true}).lean();
-    if (call) { await Lock.deleteMany({callId:String(call._id)}); await closeRoom(call); }
+    if (call) { await Lock.deleteMany({callId:String(call._id)}); await closeRoom(call); publish('call'); }
     return call;
   };
   const expire = async id => {
@@ -74,7 +74,7 @@ function registerEchoProjectChatCalls(app,{requireAdmin,getConfig}) {
         catch (error) { if (error.code===11000) throw failure(409,'One of you is already in a call.'); throw error; }
       }
       const call=await Call.create({_id:callId,callerId:id,calleeId:other,callerName:name(actor(req)),calleeName:name(user),callerClient:parsed.data.clientId,callerAt:now,calleeAt:now,ringUntil:new Date(Date.now()+60000)});
-      res.status(201).json({call:view(call)});
+      publish('call'); res.status(201).json({call:view(call)});
     } catch (error) { await Lock.deleteMany({callId:String(callId)}); throw error; }
   }));
   app.post(root+'/:id/accept',requireAdmin,route(async(req,res) => {
@@ -84,7 +84,7 @@ function registerEchoProjectChatCalls(app,{requireAdmin,getConfig}) {
     const id=identity(req); await expire(id);
     const call=await Call.findOneAndUpdate({_id:req.params.id,calleeId:id,state:'ringing',ringUntil:{$gt:new Date()}},{$set:{state:'active',acceptedAt:new Date(),calleeAt:new Date(),calleeClient:client.data.clientId}},{new:true}).lean();
     if (!call) throw failure(409,'This call is no longer ringing.');
-    res.json({call:view(call)});
+    publish('call'); res.json({call:view(call)});
   }));
   app.post(root+'/:id/end',requireAdmin,route(async(req,res) => {
     if (!mongoose.isValidObjectId(req.params.id)) throw failure(400,'Invalid call.');

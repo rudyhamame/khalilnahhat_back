@@ -1505,6 +1505,7 @@ app.post('/api/bookings', async (request, response) => {
 
 
 require('./mobile-admin').registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest: serializeServiceRequest });
+require('./client-push').registerClientPush(app, { requireAuth });
 const {createAiConfiguration,registerAiConfiguration}=require('./ai-configuration');
 const aiConfiguration=createAiConfiguration();
 registerAiConfiguration(app,{

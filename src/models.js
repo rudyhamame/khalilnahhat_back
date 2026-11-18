@@ -360,6 +360,7 @@ const LiveRequest = mongoose.model('LiveRequest', liveRequestSchema);
 const ArchiveItem = mongoose.model('ArchiveItem', archiveItemSchema);
 const Booking = mongoose.model('Booking', bookingSchema);
 const LiveStreamConfig = mongoose.model('LiveStreamConfig', liveStreamConfigSchema);
+require('./client-push').watchSchema(serviceRequestSchema);
 const ServiceRequest = mongoose.model('ServiceRequest', serviceRequestSchema);
 const ServicePrice = mongoose.model('ServicePrice', servicePriceSchema);
 

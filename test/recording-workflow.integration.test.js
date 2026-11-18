@@ -5,7 +5,7 @@ test('recording archive and publication lifecycle',{timeout:120000},async t=>{
  const req=async(path,method='GET',body)=>{const response=await fetch(db.origin+'/api'+path,{method,headers:{Authorization:'Bearer qa-admin','Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});return {status:response.status,body:await response.json()};};
  const write=async(kind,body,id)=>{const result=await req(`/admin/music-ontology/${kind}${id?'/'+id:''}`,id?'PUT':'POST',body);assert.equal(result.status,id?200:201,JSON.stringify(result.body));return result.body.item;};
  const existing=(await req('/admin/music-ontology/recordings/'+db.ids[0])).body.item;
- const make=(type,workId)=>({title:type,recordingType:type,workId,audioUrl:existing.storedAudioUrl,durationSeconds:60,status:'PUBLISHED'});
+ const make=(type,workId)=>({title:type,recordingType:type,workId,audioUrl:existing.storedAudioUrl,durationMinutes:60/60,status:'PUBLISHED'});
  const music={id:db.music};
  await t.test('archive privately with a prepared sample, then publish and activate it atomically',async()=>{
   const type=await write('work-types',{name:'Workflow sample'});

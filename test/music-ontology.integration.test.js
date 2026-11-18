@@ -29,7 +29,7 @@ test('ontology HTTP, transactions, references, legacy compatibility and reversib
  const instrument=await write('vocabulary',{kind:'instrument',name:'Piano'});
  const music=await write('works',{title:'Instrumental',type:'MUSIC',melody:{bpm:120,key:'A minor',instrumentIds:[instrument.id],musicianCredits:[{artistId:artist.id,role:'PERFORMER',detail:'Piano part'}]}});
  const reused=await write('works',{title:'Alternate work attribution',type:'SONG',melodyId:work.melody.id,lyricsId:work.lyrics.id});assert.equal(reused.melody.id,work.melody.id);assert.equal(reused.lyrics.id,work.lyrics.id);
- const make=(type,workId=work.id)=>({title:type,recordingType:type,workId,audioUrl:'https://res.cloudinary.com/qa/video/upload/recording.wav',durationSeconds:60,status:'PUBLISHED',credits:[{artistId:artist.id,role:'PRODUCER'}]});
+ const make=(type,workId=work.id)=>({title:type,recordingType:type,workId,audioUrl:'https://res.cloudinary.com/qa/video/upload/recording.wav',durationMinutes:60/60,status:'PUBLISHED',credits:[{artistId:artist.id,role:'PRODUCER'}]});
  let mix=await write('recordings',make('MIX',music.id));
  const remix=await write('recordings',{...make('REMIX'),sourceRecordingIds:[mix.id],sourceWorkIds:[music.id],recordingMetadata:{bpm:130,key:'D minor'}});
  const cover=await write('recordings',make('COVER'));

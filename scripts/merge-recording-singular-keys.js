@@ -42,12 +42,14 @@ if(require.main===module)(async()=>{
  const parents=new Map((await mongoose.connection.collection('musicvocabularies').find({kind:'dialect'},{projection:{externalId:1,parentId:1}}).toArray()).map(row=>[row.externalId,row.parentId]));
  const parentOf=id=>parents.get(id)||null;
  let found=0,changed=0;
- for await(const row of ArchiveItem.collection.find({$or:[{musical:{$type:'object'}},{'items.0':{$exists:true}},...REMOVED.map(k=>({[k]:{$exists:true}}))]},{projection:{musical:1,items:1,atomCount:1,status:1,published:1,publicationStatus:1,archivalStatus:1,...Object.fromEntries(REMOVED.map(k=>[k,1]))}})){
+ for await(const row of ArchiveItem.collection.find({$or:[{musical:{$type:'object'}},{'items.0':{$exists:true}},{duration:{$exists:true},items:{$exists:true}},...REMOVED.map(k=>({[k]:{$exists:true}}))]},{projection:{duration:1,durationMinutes:1,musical:1,items:1,atomCount:1,status:1,published:1,publicationStatus:1,archivalStatus:1,...Object.fromEntries(REMOVED.map(k=>[k,1]))}})){
   const set={};
   if(merge(row.musical))set.musical=row.musical;
   if(Array.isArray(row.items)&&row.items.map(item=>[merge(item.sound),fixItem(item,parentOf)].includes(true)).includes(true))set.items=row.items;
   // recordingAmount is no longer stored: the atom count replaces it and is counted from the items.
   const unset={};const lifecycle=row.status||(row.publicationStatus?(row.publicationStatus==='PUBLISHED'&&row.archivalStatus!=='ARCHIVED'?'PUBLISHED':row.publicationStatus==='DRAFT'?'DRAFT':'ARCHIVED'):null);if(lifecycle&&row.status!==lifecycle)set.status=lifecycle;for(const key of REMOVED)if(key in row)unset[key]='';if(Array.isArray(row.items)&&row.items.length!==row.atomCount)set.atomCount=row.items.length;
+  // Recording length is stored in minutes (durationMinutes) instead of the m:ss text in duration.
+  if((row.status||row.publicationStatus||row.items?.length)&&row.duration!==undefined){const secs=String(row.duration).split(':').reduce((t,n)=>t*60+Number(n),0);if(row.durationMinutes==null&&row.duration&&Number.isFinite(secs))set.durationMinutes=Math.round(secs/60*10000)/10000;unset.duration='';}
   if(!Object.keys(set).length&&!Object.keys(unset).length)continue;
   found++;
   if(apply){await ArchiveItem.collection.updateOne({_id:row._id},{...(Object.keys(set).length?{$set:set}:{}),...(Object.keys(unset).length?{$unset:unset}:{})});changed++;}

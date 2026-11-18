@@ -46,7 +46,7 @@ function serialize(row) {
   return { id: r.externalId, title: r.title, description: r.description || '', published: r.published !== false,
     sortOrder: r.sortOrder || 0, recordingIds: r.recordingIds || [], workTypeId: r.workTypeId || '',
     artist: r.artist || 'DJ Khalil', date: r.date || (r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 10) : ''),
-    audioUrl: deliveryUrl(r.audioUrl), coverImage: deliveryUrl(r.coverImage || r.image), duration: r.duration || '', createdAt: r.createdAt };
+    audioUrl: deliveryUrl(r.audioUrl), coverImage: deliveryUrl(r.coverImage || r.image), duration: r.durationMinutes != null ? `${Math.floor(r.durationMinutes)}:${String(Math.round((r.durationMinutes % 1) * 60) % 60).padStart(2, '0')}` : (r.duration || ''), createdAt: r.createdAt };
 }
 function visibleSongs(songs) {
   return songs.filter(s => s.published !== false && s.status !== 'ARCHIVED' && (!s.workId || s.status === 'PUBLISHED'));

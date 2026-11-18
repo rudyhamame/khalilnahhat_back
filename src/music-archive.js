@@ -49,7 +49,7 @@ function serialize(row) {
     audioUrl: deliveryUrl(r.audioUrl), coverImage: deliveryUrl(r.coverImage || r.image), duration: r.duration || '', createdAt: r.createdAt };
 }
 function visibleSongs(songs) {
-  return songs.filter(s => s.published !== false && s.archivalStatus !== 'ARCHIVED' && (!s.workId || s.publicationStatus === 'PUBLISHED'));
+  return songs.filter(s => s.published !== false && s.status !== 'ARCHIVED' && (!s.workId || s.status === 'PUBLISHED'));
 }
 async function publicSongs(ArchiveModel = ArchiveItem) {
   return visibleSongs(await ArchiveModel.find().sort({ sortOrder: 1, createdAt: -1 }));
@@ -85,7 +85,7 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, C
       const workTypeId = data.workTypeId ?? existing.workTypeId ?? '';
       if (data.recordingIds) data.recordingIds = [...new Set(data.recordingIds)];
       const ids = data.recordingIds ?? existing.recordingIds ?? [];
-      if (data.recordingIds && await ArchiveModel.countDocuments({ externalId: { $in: ids }, $or:[{archivalStatus:{$ne:'ARCHIVED'}},{publicationStatus:'DRAFT'}] }) !== ids.length) return 'Choose existing active recordings. Deleted recordings cannot be added to a collection.';
+      if (data.recordingIds && await ArchiveModel.countDocuments({ externalId: { $in: ids }, status:{$ne:'ARCHIVED'} }) !== ids.length) return 'Choose existing active recordings. Deleted recordings cannot be added to a collection.';
       if (workTypeId && ids.length && (data.recordingIds || data.workTypeId !== undefined) && await ArchiveModel.countDocuments({ externalId: { $in: ids }, recordingType: workTypeId }) !== ids.length) return 'A collection only holds recordings of its work type. Move or remove the recordings of other work types first.';
       return '';
     };

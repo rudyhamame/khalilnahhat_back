@@ -1,6 +1,6 @@
 const {redact}=require('./redact');
 const {tokenPolicy}=require('./token-policy');
-const identityKeys=['id','externalId','title','name','revision','verified','ok','published','publicationStatus','data','after','item','items','collections','songs','recordings','workId','recordingIds'];
+const identityKeys=['id','externalId','title','name','revision','verified','ok','published','status','data','after','item','items','collections','songs','recordings','workId','recordingIds'];
 const priority=key=>{const index=identityKeys.indexOf(key);return index<0?identityKeys.length:index;};
 // Compact existing receipts locally; no additional model call or replayed authorization.
 function compact(value,depth=0){

@@ -29,7 +29,7 @@ function createLiveSetPlans({getLiveStreamConfig,BookingModel,ArchiveModel,LiveS
   if(!entries.length)throw failure('This set list is empty or no longer available. Refresh the set lists.');
   if(entries.length>1000)throw failure('This set list has too many tracks for one live session. Choose a shorter set.');
   const ids=[...new Set(entries.filter(row=>row.type==='recording').map(row=>row.id))];
-  const recordings=ids.length?await ArchiveModel.find({externalId:{$in:ids},published:true,archivalStatus:{$ne:'ARCHIVED'},$or:[{workId:{$exists:false}},{workId:''},{publicationStatus:'PUBLISHED'}]}).lean():[];
+  const recordings=ids.length?await ArchiveModel.find({externalId:{$in:ids},published:true,status:{$ne:'ARCHIVED'}}).lean():[];
   const byId=new Map(recordings.map(row=>[row.externalId,row]));
   const rows=entries.map((entry,index)=>{
    const track=entry.type==='manual'?entry.track:byId.get(entry.id);

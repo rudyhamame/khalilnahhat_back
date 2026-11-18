@@ -5,8 +5,8 @@ const {migrationInput}=require('../src/music-ontology/migration');
 test('controlled classifications, positive BPM, key notation and credit roles',()=>{
  const base={title:'Recording',recordingType:'MIX',workId:'work'};
  for(const type of ['MIX','REMIX','COVER','PRODUCTION'])assert.equal(V.recording.parse({...base,recordingType:type}).recordingType,type);
- for(const metadata of [{bpm:0},{bpm:-1},{key:'Camelot 8A'},{key:'H minor'}])assert.equal(V.recording.safeParse({...base,recordingMetadata:metadata}).success,false);
- assert.equal(V.recording.safeParse({...base,credits:[{artistId:'a'}]}).success,false);
+ for(const metadata of [{bpms:[0]},{bpms:[-1]},{keys:['Camelot 8A']},{keys:['H minor']}])assert.equal(V.recording.safeParse({...base,musical:metadata}).success,false);
+ assert.equal(V.recording.safeParse({...base,recordingCredits:{vocalists:[{detail:'x'}],musicians:[]}}).success,false);
  assert.equal(V.work.safeParse({title:'Music',type:'MUSIC',lyrics:{text:'No'}}).success,false);
  assert.equal(V.work.parse({title:'Song in progress',type:'SONG'}).type,'SONG');
 });
@@ -31,7 +31,7 @@ test('canonical filters preserve scope, Song-only lyrics and combined unique res
 });
 test('legacy mapping never invents work identity or canonical work BPM',()=>{
  const input=migrationInput({title:'Legacy',bpm:'120',musicalKey:'8A',lyricsLanguage:'Arabic',published:true,audioUrl:'uploaded'}, {workId:'reviewed',recordingType:'COVER'});
- assert.equal(input.workId,'reviewed');assert.equal(input.recordingMetadata.bpm,120);assert.equal(input.recordingMetadata.key,null);assert.equal(input.recordingMetadata.states.key,'UNKNOWN');assert.equal('lyrics' in input,false);
+ assert.equal(input.workId,'reviewed');assert.equal('recordingMetadata' in input,false);assert.equal('lyrics' in input,false);
  assert.equal(norm('  A\u00a0  Name  '),'a name');
 });
 

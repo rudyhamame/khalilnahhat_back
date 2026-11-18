@@ -12,13 +12,9 @@
     "SONG",
     "MUSIC"
   ],
-  "publicationStatuses": [
+  "recordingStatuses": [
     "DRAFT",
     "PUBLISHED",
-    "WITHDRAWN"
-  ],
-  "archivalStatuses": [
-    "ACTIVE",
     "ARCHIVED"
   ],
   "metadataStates": [
@@ -62,8 +58,7 @@
     "rhythm",
     "genre",
     "bpmScope",
-    "publicationStatus",
-    "archivalStatus",
+    "status",
     "instrument",
     "musician",
     "recordingAmount"

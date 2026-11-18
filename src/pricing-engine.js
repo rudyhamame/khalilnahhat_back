@@ -170,10 +170,10 @@ function calculateBookingPrice(booking, ctx) {
   };
 }
 
-// Physical equipment a booking needs (included package members count, charges do not): used for availability checks.
+// Equipment and staffed services a booking needs (included package members count, charges do not): input for availability checks.
 function reservationDemand(result) {
   const demand = new Map();
-  for (const i of result.items) if (i.type === 'equipment' || i.type === 'addon') demand.set(i.offeringId, (demand.get(i.offeringId) || 0) + i.quantity);
+  for (const i of result.items) if (i.type === 'equipment' || i.type === 'addon' || i.type === 'service') demand.set(i.offeringId, (demand.get(i.offeringId) || 0) + i.quantity);
   return demand;
 }
 
@@ -201,4 +201,27 @@ function validatePolicy(p, existing = []) {
   return errors;
 }
 
-module.exports = { calculateBookingPrice, reservationDemand, validatePolicy, MODES, OPERATORS, ADJUSTMENTS };
+// Hours between "HH:MM" start and end; an end earlier than the start means the event runs past midnight. null when either is missing/invalid.
+function eventHours(event = {}) {
+  const t = (v) => { const m = /^(\d{1,2}):(\d{2})/.exec(String(v || '')); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+  const a = t(event.startTime), b = t(event.endTime);
+  if (a == null || b == null) return null;
+  return ((b - a + 1440) % 1440 || 1440) / 60;
+}
+
+// One suggested unit price per selected line (package/derived lines include their descendants). null = needs a human quote or is not a whole number of cents.
+function suggestUnitPrices(result, selections) {
+  const tops = result.items.map((item, i) => ({ item, i })).filter(({ item }) => !item.parent);
+  return selections.map((sel) => {
+    const at = tops.findIndex(({ item }) => item.offeringId === sel.offeringId);
+    if (at < 0) return { serviceId: sel.offeringId, unitPrice: null, note: 'Not priced by the engine.' };
+    const end = tops[at + 1] ? tops[at + 1].i : result.items.length;
+    const group = result.items.slice(tops[at].i, end);
+    if (group.some((g) => g.status === 'quote_required')) return { serviceId: sel.offeringId, unitPrice: null, note: 'Needs a manual quote.' };
+    const total = group.reduce((s, g) => s + g.total, 0);
+    if (total % sel.quantity) return { serviceId: sel.offeringId, unitPrice: null, note: 'Total does not divide into whole cents per unit.' };
+    return { serviceId: sel.offeringId, unitPrice: total / sel.quantity / 100, note: '' };
+  });
+}
+
+module.exports = { eventHours, suggestUnitPrices, calculateBookingPrice, reservationDemand, validatePolicy, MODES, OPERATORS, ADJUSTMENTS };

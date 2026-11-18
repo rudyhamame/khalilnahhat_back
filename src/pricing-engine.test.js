@@ -1,5 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict');
-const {calculateBookingPrice:calc,validatePolicy,reservationDemand}=require('./pricing-engine');
+const {eventHours,suggestUnitPrices,calculateBookingPrice:calc,validatePolicy,reservationDemand}=require('./pricing-engine');
 const O=(id,type='equipment',extra={})=>({id,name:id,type,...extra});
 const P=(offeringId,pricingMode,baseAmountCents,extra={})=>({id:`p-${offeringId}-${pricingMode}${extra.priority||0}`,offeringId,name:'p',pricingMode,baseAmountCents,status:'active',priority:0,version:1,...extra});
 const run=(offerings,policies,selections,event={},extra={})=>calc({selections,event,...extra},{offerings,policies,today:'2026-06-01',taxes:extra.taxes||[]});
@@ -86,4 +86,20 @@ test('reservation demand counts included package equipment',()=>{
  const offs=[O('pkg','package',{components:[{offeringId:'spk',quantity:2,inclusion:'included'}]}),O('spk')];
  const r=run(offs,[P('pkg','fixed',1000)],[q('pkg',2)]);
  assert.equal(reservationDemand(r).get('spk'),4);
+});
+
+test('eventHours handles overnight and missing times',()=>{
+ assert.equal(eventHours({startTime:'18:00',endTime:'23:30'}),5.5);
+ assert.equal(eventHours({startTime:'20:00',endTime:'02:00'}),6);
+ assert.equal(eventHours({startTime:'20:00'}),null);
+});
+test('suggested unit prices: per unit, derived package, quote required, indivisible',()=>{
+ const offs=[O('dj','service'),O('spk'),O('p','package',{components:[{offeringId:'spk',quantity:2,inclusion:'included'}]}),O('x'),O('y')];
+ const pol=[P('dj','hourly',10000),P('spk','per_unit',5000),P('y','fixed',1000)];
+ const sel=[q('dj'),q('p',2),q('x'),q('y',3)];
+ const r=run(offs,pol,sel,{hours:4});
+ const s=Object.fromEntries(suggestUnitPrices(r,sel).map(x=>[x.serviceId,x.unitPrice]));
+ assert.equal(s.dj,400);assert.equal(s.p,100);assert.equal(s.x,null);assert.equal(s.y,10);
+ const odd=run([O('z')],[P('z','fixed',1000)],[q('z',3)]);
+ assert.equal(suggestUnitPrices(odd,[q('z',3)])[0].unitPrice,10); // 3 × fixed 1000 = 3000 → 10.00 each
 });

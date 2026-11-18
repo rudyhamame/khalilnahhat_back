@@ -67,7 +67,7 @@ function registerDomainMail(
       );
       items = items.filter((m) => known.has(email(m.sender)));
     }
-    res.json({ items });
+    res.json({ items, ...(req.query.clients === "1" ? { clients: true } : {}) });
   });
   router.get("/folders/:folderId/messages/:messageId", async (req, res) => {
     const { folderId, messageId } = checked(

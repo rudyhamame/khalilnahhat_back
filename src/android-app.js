@@ -1,7 +1,11 @@
 const crypto=require('crypto');
 const {Readable}=require('stream');
+const fs=require('fs');
 const {sendBrevoEmail}=require('./brevo');
 // Admin-only Android app delivery: an admin asks for a link, sent to the email on their own account; the link carries a signed 24 h token and streams the APK from ANDROID_APK_URL.
+// The APK lives on the persistent music-archive volume (no extra mount); ANDROID_APK_URL is an alternative source.
+const apkPath=()=>process.env.ANDROID_APK_PATH||'/app/data/music-archive/android/EchoDJ.apk';
+const hasApk=()=>Boolean(process.env.ANDROID_APK_URL)||fs.existsSync(apkPath());
 const secret=()=>process.env.ANDROID_LINK_SECRET||process.env.CLOUDINARY_API_SECRET||'';
 const sign=p=>crypto.createHmac('sha256',secret()).update(p).digest('base64url');
 const make=email=>{const p=Buffer.from(JSON.stringify({e:email,x:Date.now()+864e5})).toString('base64url');return p+'.'+sign(p);};
@@ -13,7 +17,7 @@ function register(app,{requireAdmin}){
  app.post('/api/admin/android/send-link',requireAdmin,async(req,res)=>{
   const email=String(req.user.email||'').trim().toLowerCase();
   if(!email)return res.status(400).json({error:'Your administrator account has no email address.'});
-  if(!process.env.ANDROID_APK_URL||!secret())return res.status(503).json({error:'The Android app is not published yet.'});
+  if(!hasApk()||!secret())return res.status(503).json({error:'The Android app is not published yet.'});
   const k=String(req.user._id||req.user.id),n=(rate.get(k)||[]).filter(t=>Date.now()-t<36e5);if(n.length>=5)return res.status(429).json({error:'Too many requests. Try again later.'});rate.set(k,[...n,Date.now()]);
   const base=process.env.API_PUBLIC_URL||`${req.get('x-forwarded-proto')||req.protocol}://${req.get('host')}`;
   const link=`${base.replace(/\/+$/,'')}/api/android/download?t=${make(email)}`;
@@ -23,12 +27,13 @@ function register(app,{requireAdmin}){
  });
  app.get('/api/android/download',async(req,res)=>{
   if(!check(req.query.t))return res.status(403).send('This link is invalid or has expired.');
-  const r=await fetch(process.env.ANDROID_APK_URL).catch(()=>null);
-  if(!r?.ok||!r.body)return res.status(502).send('The app is unavailable right now.');
+  const head={'Content-Type':'application/vnd.android.package-archive','Content-Disposition':'attachment; filename="EchoDJ.apk"','Cache-Control':'private, no-store'};
+  let stream,len;
+  if(fs.existsSync(apkPath())){len=fs.statSync(apkPath()).size;stream=fs.createReadStream(apkPath());}
+  else{const r=await fetch(process.env.ANDROID_APK_URL||'http://invalid.local').catch(()=>null);if(!r?.ok||!r.body)return res.status(502).send('The app is unavailable right now.');len=r.headers.get('content-length');stream=Readable.fromWeb(r.body);}
   require('./admin-alerts').alert('download',`${who(req.query.t)} downloaded the Android app.`);
-  res.set({'Content-Type':'application/vnd.android.package-archive','Content-Disposition':'attachment; filename="EchoDJ.apk"','Cache-Control':'private, no-store'});
-  const len=r.headers.get('content-length');if(len)res.set('Content-Length',len);
-  Readable.fromWeb(r.body).pipe(res);
+  res.set(head);if(len)res.set('Content-Length',String(len));
+  stream.pipe(res);
  });
 }
 module.exports={register,make,check};

@@ -58,9 +58,16 @@ function registerDomainMail(
       }),
       req.query,
     );
-    res.json({
-      items: await service.messages(query.folderId, query.start, query.q),
-    });
+    let items = await service.messages(query.folderId, query.start, query.q);
+    // Clients tab: only mail from registered client accounts (not administrators).
+    if (req.query.clients === "1") {
+      const email = (v) => (String(v || "").match(/<([^>]+)>/)?.[1] || String(v || "")).trim().toLowerCase();
+      const known = new Set(
+        (await require("../models").User.find({ email: { $in: items.map((m) => email(m.sender)) }, isAdmin: { $ne: true } }).select("email").lean()).map((u) => String(u.email).toLowerCase()),
+      );
+      items = items.filter((m) => known.has(email(m.sender)));
+    }
+    res.json({ items });
   });
   router.get("/folders/:folderId/messages/:messageId", async (req, res) => {
     const { folderId, messageId } = checked(

@@ -25,7 +25,7 @@ Message.schema.index({topicId:1,createdAt:-1,_id:-1});
 const ReadState=mongoose.models.EchoProjectChatReadState||mongoose.model('EchoProjectChatReadState',new mongoose.Schema({
   _id:String,readAt:{type:Date,default:()=>new Date(0)},readId:{type:mongoose.Schema.Types.ObjectId,default:()=>new mongoose.Types.ObjectId('000000000000000000000000')},
 }));
-const presenceSchema=new mongoose.Schema({_id:String,userId:{type:String,required:true},lastSeenAt:{type:Date,required:true}});
+const presenceSchema=new mongoose.Schema({_id:String,userId:{type:String,required:true},lastSeenAt:{type:Date,required:true},client:String});
 presenceSchema.index({lastSeenAt:1},{expireAfterSeconds:90});
 const cameOnline=new Map();
 const Presence=mongoose.models.EchoProjectChatPresence||mongoose.model('EchoProjectChatPresence',presenceSchema);
@@ -57,8 +57,10 @@ function registerEchoProjectChat(app, { requireAdmin,authenticate,allowedOrigins
     const topicUnreadCounts=Object.fromEntries(topics.map(topic=>[topic.id,0]));
     for(const row of counts)if(Object.hasOwn(topicUnreadCounts,row._id))topicUnreadCounts[row._id]=row.count;
     const ids=[...new Set(present.map(item=>item.userId))];
+    const clientOf=new Map(present.sort((a,b)=>a.lastSeenAt-b.lastSeenAt).map(item=>[item.userId,item.client||'browser']));
+    const downloaded=new Set((await require('./android-app').downloadedIds().catch(()=>[])).map(String));
     const [users,envelopes]=await Promise.all([User.find({isBlocked:{$ne:true},$or:[{username:{$in:[...ADMIN_USERNAMES]}},{isAdmin:true,adminGrantedAt:{$ne:null},adminGrantedBy:{$ne:null}}]}).select('_id username firstName lastName email isAdmin adminGrantedAt adminGrantedBy lastLoginAt').lean(),Message.find({senderId:{$ne:id}}).select('_id senderId').sort({createdAt:-1,_id:-1}).limit(200).lean()]);
-    const admins=users.filter(isAdminUser).map(user=>({id:String(user._id),name:[user.firstName,user.lastName].filter(Boolean).join(' ')||user.username||user.email||'Admin',lastLoginAt:user.lastLoginAt||null,online:ids.includes(String(user._id))})).sort((a,b)=>a.name.localeCompare(b.name));
+    const admins=users.filter(isAdminUser).map(user=>({id:String(user._id),name:[user.firstName,user.lastName].filter(Boolean).join(' ')||user.username||user.email||'Admin',lastLoginAt:user.lastLoginAt||null,online:ids.includes(String(user._id)),client:clientOf.get(String(user._id))||null,androidApp:downloaded.has(String(user._id))})).sort((a,b)=>a.name.localeCompare(b.name));
     return {unreadCount:Object.values(topicUnreadCounts).reduce((sum,count)=>sum+count,0),topicUnreadCounts,deliveryItems:envelopes.map(item=>({id:String(item._id),senderId:item.senderId})),admins,onlineAdmins:admins.filter(user=>user.online)};
   };
   app.get('/api/echo-project-chat/topics',requireAdmin,async(req,res)=>{
@@ -86,7 +88,7 @@ function registerEchoProjectChat(app, { requireAdmin,authenticate,allowedOrigins
       if(!parsed.data.online){await Presence.deleteOne({_id:key,userId:id});return res.json({online:false});}
       // Coming online (no heartbeat in the last minute) alerts the other administrators, at most once per 10 minutes per person.
       const wasOnline=await Presence.exists({userId:id,lastSeenAt:{$gt:new Date(Date.now()-60000)}});
-      await Presence.updateOne({_id:key},{$set:{userId:id,lastSeenAt:new Date()}},{upsert:true});
+      await Presence.updateOne({_id:key},{$set:{userId:id,lastSeenAt:new Date(),client:String(req.get('x-echo-client')||'').toLowerCase()==='android'?'android':'browser'}},{upsert:true});
       if(!wasOnline&&!(cameOnline.get(id)>Date.now()-6e5)){cameOnline.set(id,Date.now());const u=actor(req)||{};
         require('./admin-alerts').alert('online',`${u.firstName||u.displayName||u.name||u.username||'An administrator'} is online now.`,id);}
       res.set('Cache-Control','no-store').json(await status(req));

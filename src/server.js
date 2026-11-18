@@ -1575,6 +1575,7 @@ const aiAdministrator=require('./ai-admin/routes').registerAiAdministrator(app,{
 });
 
 require('./admin-alerts').register(app, { requireAdmin, authFromRequest });
+require('./android-app').register(app, { requireAdmin });
 
 app.use(require('./security-controls').securityError);
 

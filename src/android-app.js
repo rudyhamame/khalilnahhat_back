@@ -5,6 +5,8 @@ const {sendBrevoEmail}=require('./brevo');
 // Admin-only Android app delivery: an admin asks for a link, sent to the email on their own account; the link carries a signed 24 h token and streams the APK from ANDROID_APK_URL.
 // The APK lives on the persistent music-archive volume (no extra mount); ANDROID_APK_URL is an alternative source.
 const apkPath=()=>process.env.ANDROID_APK_PATH||'/app/data/music-archive/android/EchoDJ.apk';
+// Latest build info: version.txt sits next to the APK (written when a new build is uploaded).
+const info=()=>{try{const st=fs.statSync(apkPath());let v='';try{v=fs.readFileSync(require('path').join(require('path').dirname(apkPath()),'version.txt'),'utf8').trim();}catch{}return{version:v,size:st.size,updatedAt:st.mtime};}catch{return null;}};
 const hasApk=()=>Boolean(process.env.ANDROID_APK_URL)||fs.existsSync(apkPath());
 const secret=()=>process.env.ANDROID_LINK_SECRET||process.env.CLOUDINARY_API_SECRET||'';
 const sign=p=>crypto.createHmac('sha256',secret()).update(p).digest('base64url');
@@ -14,6 +16,7 @@ const check=t=>{const[p,s]=String(t||'').split('.');if(!p||!s||!secret())return 
  if(a.length!==b.length||!crypto.timingSafeEqual(a,b))return false;try{return JSON.parse(Buffer.from(p,'base64url')).x>Date.now();}catch{return false;}};
 function register(app,{requireAdmin}){
  const rate=new Map();
+ app.get('/api/admin/android/info',requireAdmin,(req,res)=>res.json(info()||{}));
  app.post('/api/admin/android/send-link',requireAdmin,async(req,res)=>{
   const email=String(req.user.email||'').trim().toLowerCase();
   if(!email)return res.status(400).json({error:'Your administrator account has no email address.'});
@@ -21,7 +24,7 @@ function register(app,{requireAdmin}){
   const k=String(req.user._id||req.user.id),n=(rate.get(k)||[]).filter(t=>Date.now()-t<36e5);if(n.length>=5)return res.status(429).json({error:'Too many requests. Try again later.'});rate.set(k,[...n,Date.now()]);
   const base=process.env.API_PUBLIC_URL||`${req.get('x-forwarded-proto')||req.protocol}://${req.get('host')}`;
   const link=`${base.replace(/\/+$/,'')}/api/android/download?t=${make(email)}`;
-  try{await sendBrevoEmail({to:[{email}],subject:'Echo DJ for Android — your download link',tags:['android-app'],htmlContent:`<p>Here is your Echo DJ administrator app for Android.</p><p><a href="${link}">Download the app</a></p><p>The link works for 24 hours. On your phone, allow installing from your browser when asked.</p>`},{env:{...process.env,DOMAIN_EMAIL_ACTIVE:'true'}});}// forces the noreply sender
+  try{await sendBrevoEmail({to:[{email}],subject:'Echo DJ for Android — your download link',tags:['android-app'],htmlContent:`<p>Here is your Echo DJ administrator app for Android${info()?.version?' (version '+info().version+')':''}.</p><p><a href="${link}">Download the app</a></p><p>The link works for 24 hours. On your phone, allow installing from your browser when asked.</p>`},{env:{...process.env,DOMAIN_EMAIL_ACTIVE:'true'}});}// forces the noreply sender
   catch{return res.status(502).json({error:'The email could not be sent.'});}
   res.json({ok:true});
  });

@@ -369,7 +369,8 @@ function serializeServiceRequest(serviceRequest, includeQuote = true) {
   });
 
   return {
-    requestNumber: serviceRequest.requestNumber || '',
+    requestNumber: serviceRequest.confirmationCode || serviceRequest.requestNumber || '',
+    confirmationCode: serviceRequest.confirmationCode || serviceRequest.requestNumber || '',
     voucher: serviceRequest.voucher || null,
     event: serviceRequest.event || null,
     order: serviceRequest.order || null,

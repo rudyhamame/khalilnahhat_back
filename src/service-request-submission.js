@@ -2,6 +2,7 @@ const { z } = require('zod');
 const { eventSchema, normalizeQuoteItems } = require('./quote-validation');
 const eventOrder = require('./event-order');
 const { STATUS } = require('./booking-journey');
+const {createBookingCode,bookingCodeCollision}=require('./booking-code');
 const { evaluateSubmissionReplay, fingerprintSubmission, isSubmissionDuplicateKey } = require('./service-request-idempotency');
 
 const serviceRequestCreateSchema = z.object({
@@ -19,7 +20,7 @@ const serviceRequestCreateSchema = z.object({
   voucherCode: z.string().trim().max(40).optional(),
 });
 
-function registerServiceRequestSubmission(app, { requireAuth, ServiceRequest, Equipment, vouchers, serializeServiceRequest, sendServiceRequestNotification, loadConversation=(owner,id)=>require('./booking-conversations').mongoStore.get(owner,id) }) {
+function registerServiceRequestSubmission(app, { requireAuth, ServiceRequest, Equipment, vouchers, serializeServiceRequest, sendServiceRequestNotification, createConfirmationCode=createBookingCode, loadConversation=(owner,id)=>require('./booking-conversations').mongoStore.get(owner,id) }) {
   app.post('/api/service-requests', requireAuth, async (request, response) => {
     const parsed = serviceRequestCreateSchema.safeParse(request.body);
 
@@ -43,9 +44,10 @@ function registerServiceRequestSubmission(app, { requireAuth, ServiceRequest, Eq
       if (replay.kind === 'conflict') return response.status(409).json({ message: 'This submission ID was already used for different booking details. Review the request and submit the updated details again.' });
       return response.status(200).json({ item: serializeServiceRequest(existing, false), notificationSent: false, replayed: true });
     };
+    // Both the public confirmation code and submission-retry identity are indexed before writing.
+    await ServiceRequest.init();
     if (parsed.data.clientSubmissionId) {
       // Wait for the compound unique index before accepting protected submissions.
-      await ServiceRequest.init();
       const existing = await findExistingSubmission();
       if (existing) return sendReplay(existing);
     }
@@ -77,7 +79,10 @@ function registerServiceRequestSubmission(app, { requireAuth, ServiceRequest, Eq
       voucher = claimed.voucher;
     }
     let serviceRequest;
-    try { serviceRequest = await ServiceRequest.create({
+    try {
+     for(let attempt=0;attempt<4;attempt++){
+      const confirmationCode=createConfirmationCode();
+      try{serviceRequest = await ServiceRequest.create({
       externalId: `service-request-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       userId: user._id,
       customerName: `${user.firstName} ${user.lastName}`.trim(),
@@ -87,11 +92,14 @@ function registerServiceRequestSubmission(app, { requireAuth, ServiceRequest, Eq
       event: parsed.data.event || null,
       order: parsed.data.order || null,
       conversation,
-      requestNumber: `ECHO-${Date.now().toString(36).toUpperCase()}`,
+      requestNumber: confirmationCode,
+      confirmationCode,
       status: STATUS.PENDING,
       voucher: voucher ? vouchers.snapshot(voucher) : null,
       ...(parsed.data.clientSubmissionId ? { clientSubmissionId: parsed.data.clientSubmissionId, submissionHash } : {}),
-    }); } catch (error) {
+      });break;}catch(error){if(!bookingCodeCollision(error)||attempt===3)throw error;}
+     }
+    } catch (error) {
       if (voucher) await vouchers.release(voucher).catch(() => {});
       if (parsed.data.clientSubmissionId && isSubmissionDuplicateKey(error)) {
         const existing = await findExistingSubmission();

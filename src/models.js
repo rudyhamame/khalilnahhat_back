@@ -322,6 +322,7 @@ const serviceRequestSchema = new mongoose.Schema(
       default: [],
     },
     requestNumber: { type: String, default: '', trim: true },
+    confirmationCode: { type: String, default: undefined, trim: true, immutable: true },
     event: { type: mongoose.Schema.Types.Mixed, default: null },
     order: { type: mongoose.Schema.Types.Mixed, default: null },
     adminNote: { type: String, default: '', trim: true },
@@ -333,6 +334,7 @@ serviceRequestSchema.index(
   { userId: 1, clientSubmissionId: 1 },
   { unique: true, partialFilterExpression: { clientSubmissionId: { $type: 'string' } } },
 );
+serviceRequestSchema.index({confirmationCode:1},{unique:true,partialFilterExpression:{confirmationCode:{$type:'string'}}});
 
 const servicePriceSchema = new mongoose.Schema(
   {

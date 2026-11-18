@@ -43,6 +43,7 @@ function registerLiveBroadcastRoutes(app, deps) {
       // A reservation that never went on air is dead once its 60s expiry is past, even if the timer died with a server restart.
       const stale = !current.isLive && current.webrtcRoomName && !current.obsRoomName && current.updatedAt && Date.now() - new Date(current.updatedAt) > STALE_RESERVATION_MS;
       if ((current.isLive || current.webrtcRoomName || current.obsRoomName) && !stale) return response.status(409).json({ message: 'A live stream is already active. End it before starting another.' });
+      const setList=await deps.prepareSetList?.(request.body?.setListId);
       if (stale) await new RoomServiceClient(getConfig().wsUrl, getConfig().apiKey, getConfig().apiSecret).deleteRoom(current.webrtcRoomName).catch(() => {});
       const roomName = `khalil-live-${randomUUID()}`;
       const config = getConfig();
@@ -54,10 +55,14 @@ function registerLiveBroadcastRoutes(app, deps) {
       const updated = await LiveStreamConfig.findOneAndUpdate(
         { key: defaults.key, isLive: { $ne: true }, webrtcRoomName: stale ? current.webrtcRoomName : { $in: ['', null] }, obsRoomName: { $in: ['', null] } },
         { isLive: false, title: title || current.title || defaults.title, streamUrl: '',
-          statusLabel: 'Connecting browser…', broadcastMode: 'webrtc', broadcastSource: source, webrtcRoomName: roomName },
+          statusLabel: 'Connecting browser…', broadcastMode: 'webrtc', broadcastSource: source, webrtcRoomName: roomName, liveSetListId:setList?.id||'none' },
         { new: true },
       );
       if (!updated) return response.status(409).json({ message: 'Another source started first. Refresh your live status.' });
+      try{await setList?.install(roomName);}catch(error){
+        await LiveStreamConfig.findOneAndUpdate({key:defaults.key,webrtcRoomName:roomName},{isLive:false,webrtcRoomName:'',statusLabel:defaults.statusLabel},{new:true});
+        throw Object.assign(new Error('Could not prepare the selected set list. No live was started.'),{status:503});
+      }
       let recording;
       const saveRecording = request.body?.saveRecording !== false;
       if (prepareRecording && saveRecording) {
@@ -77,7 +82,7 @@ function registerLiveBroadcastRoutes(app, deps) {
     } catch (error) {
       console.error('WebRTC go-live failed:', error.message);
       const status = error.status || 500;
-      const actionable = status === 503 || status === 507;
+      const actionable = [400,409,503,507].includes(status);
       return response.status(status).json({ message: actionable ? error.message : 'Could not start the live stream.' });
     }
   });

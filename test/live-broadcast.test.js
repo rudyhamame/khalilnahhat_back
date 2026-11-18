@@ -14,6 +14,17 @@ function setup(overrides = {}) {
   const call = async (name, body = {}) => { const res = { statusCode: 200, status(n) { this.statusCode = n; return this; }, json(value) { this.body = value; return this; } }; await routes[name]({ body, rawBody: JSON.stringify(body), headers: {} }, res); return res; };
   return { call, writes, deleted, current, reconcile: api.reconcile };
 }
+test('selected set list is installed into the reserved offline room before publishing credentials return',async()=>{
+ const calls=[];
+ const ctx=setup({prepareSetList:async id=>{calls.push(id);return {id,install:async room=>calls.push(room)};}});
+ const response=await ctx.call('go-live',{setListId:'livestream'});
+ assert.equal(response.statusCode,201);assert.deepEqual(calls,['livestream','khalil-live-new']);
+ assert.equal(response.body.item.isLive,false);assert.equal(response.body.item.liveSetListId,'livestream');
+});
+test('unavailable selected set does not reserve a room or issue credentials',async()=>{
+ const ctx=setup({prepareSetList:async()=>{throw Object.assign(Error('Set list unavailable'),{status:409});}});
+ const response=await ctx.call('go-live',{setListId:'missing'});assert.equal(response.statusCode,409);assert.equal(ctx.writes.length,0);assert.equal(response.body.token,undefined);
+});
 test('missing media configuration does not publish a false live status', async () => {
   const ctx = setup({ getConfig: () => { throw Object.assign(new Error('Not configured'), { status:503 }); } });
   assert.equal((await ctx.call('go-live')).statusCode, 503); assert.equal(ctx.writes.length, 0);

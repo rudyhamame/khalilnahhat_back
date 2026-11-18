@@ -569,6 +569,7 @@ function buildMuxPlaybackUrl(playbackId) {
 function serializeAdminLiveStreamConfig(config) {
   return {
     ...serializeLiveStreamConfig(config),
+    liveSetListId: config?.liveSetListId || 'none',
     studio:{transport:process.env.ECHO_BROWSER_TRANSPORT==='ovh'&&require('./obs-relay-client').configured()?'ovh':'livekit'},
     streamUrl: config?.streamUrl || '',
     obs: { roomName: config?.obsRoomName || '', state: config?.obsState || '',
@@ -1379,7 +1380,10 @@ app.post('/api/live-stream/mux', requireAdmin, async (request, response) => {
   }
 });
 
+const liveSetPlans=require('./live-set-plans').createLiveSetPlans({getLiveStreamConfig,BookingModel:ServiceRequest,ArchiveModel:ArchiveItem,LiveSession});
+require('./live-set-plans').registerLiveSetPlans(app,{requireAdmin,plans:liveSetPlans});
 require('./live-broadcast').registerLiveBroadcastRoutes(app, {
+  prepareSetList:liveSetPlans.prepare,
   requireAdmin, getLiveStreamConfig, LiveStreamConfig, defaults: defaultLiveStreamConfig, notifyLiveTransition,
   createToken: createLiveKitToken, getConfig: getLiveKitConfig,
   serialize: serializeAdminLiveStreamConfig, serializePublic: serializeLiveStreamConfig,

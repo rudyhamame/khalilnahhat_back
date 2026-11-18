@@ -272,6 +272,7 @@ const liveStreamConfigSchema = new mongoose.Schema(
     obsExpiresAt: { type: Date, default: null },
     obsSaveRecording: { type: Boolean, default: true },
     djSetPlan: { type: mongoose.Schema.Types.Mixed, default: null },
+    liveSetListId: { type: String, default: 'none' },
   },
   { timestamps: true },
 );

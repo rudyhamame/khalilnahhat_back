@@ -552,7 +552,8 @@ function serializeLiveStreamConfig(config) {
     streamUrl: '',
     requiresSignIn: true,
     posterImage: config?.posterImage || '',
-    statusLabel: config?.statusLabel || defaultLiveStreamConfig.statusLabel,
+    // OBS broadcasting is discontinued: a label saved before that ("…next OBS stream") falls back to the current default.
+    statusLabel: (config?.statusLabel && !/\bOBS\b/i.test(config.statusLabel)) ? config.statusLabel : defaultLiveStreamConfig.statusLabel,
     activeSessionId: config?.activeSessionId || '',
     webrtcRoomName: config?.webrtcRoomName || '',
     broadcastMode: config?.broadcastMode || defaultLiveStreamConfig.broadcastMode,

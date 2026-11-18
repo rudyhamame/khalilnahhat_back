@@ -173,7 +173,7 @@ function createService({ArchiveModel=MusicRecording,models=M,deliveryUrl=value=>
  async function checkRecordingItems(items,audioUrl,durationSeconds,session=null){
   for(const item of items||[]){
    const l=item.lyrics;
-   if(durationSeconds!=null&&item.audioRange?.endSec>durationSeconds)fail('Atom audio ranges must stay inside the recording duration.');
+   if(durationSeconds!=null&&item.audioRange?.endSec>durationSeconds+.01)fail('Atom audio ranges must stay inside the recording duration.');
    const rhythmIds=item.sound?.rhythmIds??[];
    if(rhythmIds.length)await references(rhythmIds,'rhythm',session);
    if(item.sound?.genreIds?.length)await references(item.sound.genreIds,'genre',session);

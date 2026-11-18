@@ -10,7 +10,8 @@
   "awaitingClient": "a quote is out and the client must accept or ask for changes (reminders go out here)",
   "canRecordDeposit": "manual payments are recorded by administrators only; the deposit confirms the booking",
   "isBooked": "a confirmed booking: its date is blocked, balance/refunds can be recorded, planning and the DJ set open",
-  "cancellable": "an administrator may cancel the request"
+  "cancellable": "an administrator may cancel the request",
+  "canNegotiate": "client may propose prices or change services/equipment before acceptance or closure"
  },
  "path": [
   "pending",
@@ -20,14 +21,15 @@
  ],
  "statuses": {
   "pending": {
-   "label": "Quote requested",
+   "label": "Submitted",
    "labelAr": "تم طلب عرض السعر",
    "step": 0,
    "facts": [
     "cancellable",
     "holdsStock",
     "needsAdmin",
-    "repriceable"
+    "repriceable",
+    "canNegotiate"
    ],
    "clientNext": "wait_for_quote",
    "adminNext": "publish_quote",
@@ -35,8 +37,8 @@
    "whoActsNext": "Administrator reviews and prepares a quote."
   },
   "quoted": {
-   "label": "Quote ready",
-   "labelAr": "عرض السعر جاهز",
+   "label": "Waiting for client's decision",
+   "labelAr": "بانتظار قرار العميل",
    "step": 1,
    "facts": [
     "awaitingClient",
@@ -45,7 +47,8 @@
     "extendable",
     "holdsStock",
     "repriceable",
-    "showsPrices"
+    "showsPrices",
+    "canNegotiate"
    ],
    "clientNext": "accept_or_request_changes",
    "adminNext": "wait_for_client",
@@ -70,15 +73,17 @@
    "whoActsNext": "Administrator records the deposit."
   },
   "changes_requested": {
-   "label": "Changes requested",
-   "labelAr": "طُلبت تعديلات",
+   "label": "Negotiation in progress",
+   "labelAr": "التفاوض جارٍ",
    "step": 1,
    "facts": [
     "cancellable",
     "extendable",
     "holdsStock",
     "needsAdmin",
-    "repriceable"
+    "repriceable",
+    "canNegotiate",
+    "showsPrices"
    ],
    "clientNext": "wait_for_revised_quote",
    "adminNext": "publish_revised_quote",

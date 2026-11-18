@@ -292,6 +292,9 @@ const liveStreamConfigSchema = z.object({
 
 
 const serviceRequestQuoteSchema = z.object({
+  negotiationRevision:z.number().int().min(0).optional(),
+  proposalRevision:z.number().int().min(1).optional(),
+  quoteRevision:z.number().int().min(0).optional(),
   items: z.array(z.object({
     serviceId: z.string().trim().min(1),
     unitPrice: z.coerce.number().min(0),
@@ -381,7 +384,13 @@ function serializeServiceRequest(serviceRequest, includeQuote = true) {
     customerEmail: serviceRequest.customerEmail,
     items,
     status: serviceRequest.status,
-    journey: journey.describe(serviceRequest.status),
+    quoteRevision: serviceRequest.quoteRevision || 0,
+    negotiationRevision: serviceRequest.negotiationRevision || 0,
+    negotiation: serviceRequest.negotiation || null,
+    negotiationHistory: serviceRequest.negotiationHistory || [],
+    availabilityAcceptedAt: serviceRequest.availabilityAcceptedAt || null,
+    declinedBy: serviceRequest.declinedBy || '',
+    journey: {...journey.describe(serviceRequest.status), ...(serviceRequest.declinedBy ? {label:'Declined',labelAr:'مرفوض'} : {})},
     currency: serviceRequest.currency || 'CAD',
     adminNote: isQuoted || includeQuote ? serviceRequest.adminNote || '' : '',
     total: isQuoted || includeQuote
@@ -1018,10 +1027,14 @@ app.patch('/api/service-requests/:id/quote', requireAdmin, async (request, respo
     return response.status(409).json({ message: 'A cancelled or paid booking cannot be repriced through the quote editor.' });
   }
 
+  if(parsed.data.quoteRevision!==undefined && parsed.data.quoteRevision!==(serviceRequest.quoteRevision||0))return response.status(409).json({message:'The quote changed. Reload before publishing.'});
+  if(serviceRequest.negotiation && !serviceRequest.negotiation.resolvedAt && parsed.data.negotiationRevision!==(serviceRequest.negotiationRevision||0))return response.status(409).json({message:'The client offer changed. Reload and review it before publishing.'});
+  let selectedItems;
+  try{selectedItems=require('./booking-negotiation').quoteSelection(serviceRequest,parsed.data);}catch(error){return response.status(409).json({message:error.message});}
   const quoteByServiceId = new Map(parsed.data.items.map((item) => [item.serviceId, item.unitPrice]));
-  const hasEveryItem = serviceRequest.items.every((item) => quoteByServiceId.has(item.serviceId));
+  const hasEveryItem = selectedItems.every((item) => quoteByServiceId.has(item.serviceId));
 
-  if (!hasEveryItem || quoteByServiceId.size !== serviceRequest.items.length) {
+  if (!hasEveryItem || quoteByServiceId.size !== selectedItems.length || parsed.data.items.length !== selectedItems.length) {
     return response.status(400).json({
       message: 'Enter an amount for every requested service before publishing.',
     });
@@ -1029,14 +1042,18 @@ app.patch('/api/service-requests/:id/quote', requireAdmin, async (request, respo
 
   const discountType=parsed.data.discountType||serviceRequest.discountType||'amount';
   const discountValue=parsed.data.discountValue??serviceRequest.discountValue??0;
-  const subtotal=serviceRequest.items.reduce((sum,item)=>sum+Math.round(quoteByServiceId.get(item.serviceId)*100)*item.quantity,0)/100;
+  const subtotal=selectedItems.reduce((sum,item)=>sum+Math.round(quoteByServiceId.get(item.serviceId)*100)*item.quantity,0)/100;
   if((discountType==='percent'&&discountValue>100)||(discountType==='amount'&&discountValue>subtotal))return response.status(400).json({message:'Discount cannot exceed 100% or the services subtotal.'});
   serviceRequest.discountType=discountType;serviceRequest.discountValue=discountValue;
+  serviceRequest.items=selectedItems.map(item=>({serviceId:item.serviceId,name:item.name,category:item.category,quantity:item.quantity,unitPrice:quoteByServiceId.get(item.serviceId)}));
+  require('./booking-negotiation').syncOrderSelection(serviceRequest);
   serviceRequest.items.forEach((item) => {
     item.unitPrice = quoteByServiceId.get(item.serviceId);
   });
   serviceRequest.adminNote = parsed.data.adminNote;
   serviceRequest.status = journey.STATUS.QUOTED;
+  serviceRequest.quoteRevision=(serviceRequest.quoteRevision||0)+1;
+  if(serviceRequest.negotiation && !serviceRequest.negotiation.resolvedAt){serviceRequest.negotiation={...serviceRequest.negotiation,resolvedAt:new Date()};serviceRequest.negotiationHistory=(serviceRequest.negotiationHistory||[]).map(entry=>entry.revision===serviceRequest.negotiation.revision?serviceRequest.negotiation:entry);}
   serviceRequest.quotedAt = new Date();
   if (parsed.data.validDays) serviceRequest.validDays = parsed.data.validDays;
   if (parsed.data.taxPercent !== undefined) serviceRequest.taxPercent = parsed.data.taxPercent;
@@ -1044,7 +1061,7 @@ app.patch('/api/service-requests/:id/quote', requireAdmin, async (request, respo
   if (parsed.data.paymentInstructions !== undefined) serviceRequest.paymentInstructions = parsed.data.paymentInstructions;
   serviceRequest.expiresAt = new Date(Date.now() + serviceRequest.validDays * DAY_MS);
   serviceRequest.reminderSentAt = null;
-  await serviceRequest.save();
+  try{await serviceRequest.save();}catch(error){if(error.name==='VersionError')return response.status(409).json({message:'The booking changed. Reload before publishing.'});throw error;}
 
   let notificationSent = false;
 
@@ -1549,6 +1566,7 @@ require('./booking-signup').registerBookingSignup(app, { User, serializeUser, is
 require('./instagram-profile').registerInstagramProfile(app, { requireAdmin });
 require('./youtube-channel').registerYouTubeChannel(app, { requireAdmin });
 registerPayments(app, { requireAuth, requireAdmin, serialize: serializeServiceRequest });
+require('./booking-negotiation').registerBookingNegotiation(app,{requireAuth,serialize:serializeServiceRequest});
 registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize: serializeServiceRequest });
 
 const aiAdministrator=require('./ai-admin/routes').registerAiAdministrator(app,{

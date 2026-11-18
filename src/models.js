@@ -315,6 +315,12 @@ const serviceRequestSchema = new mongoose.Schema(
     reminderSentAt: { type: Date, default: null },
     acceptedAt: { type: Date, default: null },
     changeRequest: { type: String, default: '' },
+    quoteRevision: {type:Number, default:0},
+    negotiationRevision: {type:Number, default:0},
+    negotiation: {type:mongoose.Schema.Types.Mixed,default:null},
+    negotiationHistory: {type:[mongoose.Schema.Types.Mixed],default:[]},
+    availabilityAcceptedAt: { type: Date, default: null },
+    declinedBy: { type: String, enum: ['', 'admin', 'client'], default: '' },
     paymentInstructions: { type: String, default: '' },
     planning: { type: mongoose.Schema.Types.Mixed, default: null },
     payments: {
@@ -328,7 +334,7 @@ const serviceRequestSchema = new mongoose.Schema(
     adminNote: { type: String, default: '', trim: true },
     quotedAt: { type: Date, default: null },
   },
-  { timestamps: true },
+  { timestamps: true, optimisticConcurrency:true },
 );
 serviceRequestSchema.index(
   { userId: 1, clientSubmissionId: 1 },

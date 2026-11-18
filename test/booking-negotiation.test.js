@@ -1,0 +1,43 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const express=require('express');
+const {registerBookingNegotiation,normalizeOffer,quoteSelection,syncOrderSelection}=require('../src/booking-negotiation');
+const {registerQuoteLifecycle}=require('../src/quote-lifecycle');
+const {registerMeetings}=require('../src/meetings');
+const {ServiceRequest}=require('../src/models');
+const catalog={items:[{serviceId:'svc-dj',name:'DJ service',category:'service',minQuantity:1},{serviceId:'speaker',name:'Speaker',category:'sound',minQuantity:2}],equipment:[{slug:'speaker',name:'Speaker',isActive:true,minQuantity:2}]};
+const lines=[{serviceId:'speaker',quantity:2,unitPrice:45.50}];
+async function fixture(t){
+ const sr={externalId:'r1',userId:'client',status:'quoted',quoteRevision:2,negotiationRevision:0,quotedAt:new Date(),expiresAt:new Date(Date.now()+86400000),items:[{serviceId:'svc-dj',name:'DJ service',category:'service',quantity:1,unitPrice:100}],save:async()=>{}};
+ let slotAvailable=false;
+ const Model={findOne:async query=>query.externalId===sr.externalId&&(!query.userId||query.userId===sr.userId)&&(!query.status||query.status.$in.includes(sr.status))?sr:null};
+ const app=express();app.use(express.json());
+ const auth=(req,res,next)=>{if(!req.headers.authorization)return res.sendStatus(401);req.authUser={_id:req.headers.authorization,isAdmin:req.headers.authorization==='admin'};next();};
+ const admin=(req,res,next)=>auth(req,res,()=>req.authUser.isAdmin?next():res.sendStatus(403));
+ const serialize=value=>JSON.parse(JSON.stringify(value));let emails=0;
+ registerBookingNegotiation(app,{requireAuth:auth,Model,serialize,loadCatalog:async()=>catalog});
+ registerQuoteLifecycle(app,{requireAuth:auth,requireAdmin:admin,Model,serialize,sendDecision:async()=>{emails++;return {sent:true};}});
+ registerMeetings(app,{requireAuth:auth,requireAdmin:admin,BookingModel:Model,MeetingModel:{init:async()=>{},findById:async()=>slotAvailable?{mode:'phone'}:null},sendMail:async()=>{},reserveSlot:async(id,user,topic,details)=>({id,start:new Date(Date.now()+86400000),durationMin:30,mode:'phone',topic,...details})});
+ app.use((err,req,res,next)=>res.status(500).json({message:err.message}));
+ const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
+ const post=async(action,body,user='client')=>{const response=await fetch(`http://127.0.0.1:${server.address().port}/api/${action}`,{method:'POST',headers:{'Content-Type':'application/json',...(user?{Authorization:user}:{})},body:JSON.stringify(body)});return {status:response.status,body:await response.json().catch(()=>null)};};
+ const offer=(overrides={})=>post('service-requests/r1/negotiation',{items:lines,quoteRevision:2,negotiationRevision:sr.negotiationRevision,message:'Drop DJ and add speakers',...overrides});
+ return {sr,post,offer,set slotAvailable(value){slotAvailable=value;},get emails(){return emails;}};
+}
+test('offers snapshot additions, removals and prices without changing the official quote',async t=>{
+ const f=await fixture(t);const result=await f.offer();assert.equal(result.status,200);assert.equal(f.sr.status,'changes_requested');assert.equal(f.sr.items[0].serviceId,'svc-dj');assert.equal(f.sr.items[0].unitPrice,100);assert.equal(f.sr.negotiation.items[0].name,'Speaker');assert.equal(f.sr.negotiation.quotedItems[0].unitPrice,100);assert.equal(f.sr.negotiation.items[0].unitPrice,45.50);
+ const next=await f.offer({items:[{serviceId:'svc-dj',quantity:1,unitPrice:80}]});assert.equal(next.status,200);assert.equal(f.sr.negotiationRevision,2);assert.equal(f.sr.negotiationHistory.length,2);assert.equal(f.sr.negotiationHistory[0].items[0].serviceId,'speaker');
+});
+test('submitted bookings can change selections before their first quote',async t=>{const f=await fixture(t);f.sr.status='pending';f.sr.quotedAt=null;assert.equal((await f.offer()).status,200);assert.equal(f.sr.status,'pending');});
+test('ownership and authentication protect offers and accepted/closed requests cannot change',async t=>{const f=await fixture(t);const body={items:lines,quoteRevision:2,negotiationRevision:0};assert.equal((await f.post('service-requests/r1/negotiation',body,null)).status,401);assert.equal((await f.post('service-requests/r1/negotiation',body,'other')).status,404);for(const status of ['accepted','confirmed','cancelled','expired']){f.sr.status=status;assert.equal((await f.offer()).status,409);}});
+test('stale quote, stale offer, expired quote and concurrent persistence fail with conflict',async t=>{const f=await fixture(t);assert.equal((await f.offer({quoteRevision:1})).status,409);await f.offer();assert.equal((await f.offer({negotiationRevision:0})).status,409);f.sr.status='quoted';f.sr.expiresAt=new Date(0);assert.equal((await f.offer()).status,409);f.sr.expiresAt=new Date(Date.now()+86400000);f.sr.save=async()=>{throw Object.assign(new Error(),{name:'VersionError'});};assert.equal((await f.offer()).status,409);});
+test('unknown, repeated, below-minimum, empty, negative and fractional-quantity offers are rejected',async t=>{const f=await fixture(t);for(const items of [[],[{serviceId:'x',quantity:1,unitPrice:2}],[...lines,...lines],[{...lines[0],quantity:1}],[{...lines[0],unitPrice:-1}],[{...lines[0],unitPrice:1.005}],[{...lines[0],quantity:2.2}]])assert.equal((await f.offer({items})).status,400,JSON.stringify(items));assert.throws(()=>normalizeOffer([{serviceId:'svc-dj',quantity:2,unitPrice:2}],catalog),/quantity must be one/);});
+test('admin adopts only the exact open offer revision; publishing syncs order selections',async()=>{const sr={items:[{serviceId:'svc-dj',quantity:1}],negotiation:{revision:3,items:normalizeOffer(lines,catalog)},order:{services:['dj'],equipment:[],music:{djRequested:true,mcRequested:false}},event:{services:['dj']}};assert.throws(()=>quoteSelection(sr,{proposalRevision:2}),/changed/);sr.items=quoteSelection(sr,{proposalRevision:3});syncOrderSelection(sr);assert.deepEqual(sr.order.services,[]);assert.equal(sr.order.music.djRequested,false);assert.equal(sr.order.equipment[0].id,'speaker');sr.negotiation.resolvedAt=new Date();assert.throws(()=>quoteSelection(sr,{proposalRevision:3}),/reviewed/);});
+test('negotiation never permits acceptance or a meeting; only accepting an official quote unlocks meeting eligibility',async t=>{const f=await fixture(t);await f.offer();assert.equal((await f.post('service-requests/r1/accept',{})).status,409);const booking={bookingRequestId:'r1',callMethod:'phone',contactPhone:'4165551234'};assert.equal((await f.post('meetings/slot/book',booking)).status,409);f.sr.status='quoted';assert.equal((await f.post('service-requests/r1/accept',{quoteRevision:1})).status,409);assert.equal((await f.post('service-requests/r1/accept',{quoteRevision:2})).status,200);assert.equal((await f.post('meetings/slot/book',booking)).status,404);});
+test('client can decline during negotiation and gets a thank-you email',async t=>{const f=await fixture(t);await f.offer();assert.equal((await f.post('service-requests/r1/decline',{})).status,200);assert.equal(f.sr.status,'cancelled');assert.equal(f.sr.declinedBy,'client');assert.equal(f.emails,1);assert.equal((await f.offer()).status,409);});
+test('service request writes use optimistic concurrency to prevent overwriting another decision',()=>assert.equal(ServiceRequest.schema.options.optimisticConcurrency,true));
+
+test('accepted booking schedules its selected call type and contact details',async t=>{const f=await fixture(t);await f.post('service-requests/r1/accept',{quoteRevision:2});f.slotAvailable=true;const result=await f.post('meetings/slot/book',{bookingRequestId:'r1',callMethod:'phone',contactPhone:'4165551234'});assert.equal(result.status,201);assert.equal(result.body.item.bookingRequestId,'r1');assert.equal(result.body.item.callMethod,'phone');assert.equal(result.body.item.contactPhone,'4165551234');});
+test('meeting rejects an expired accepted quote or a mismatched call method',async t=>{const f=await fixture(t);f.sr.status='accepted';f.slotAvailable=true;f.sr.expiresAt=new Date(0);assert.equal((await f.post('meetings/slot/book',{bookingRequestId:'r1',callMethod:'phone',contactPhone:'4165551234'})).status,409);f.sr.expiresAt=new Date(Date.now()+86400000);assert.equal((await f.post('meetings/slot/book',{bookingRequestId:'r1',callMethod:'whatsapp-video',contactPhone:'4165551234'})).status,400);});
+
+test('call slots cannot bypass acceptance by omitting the booking ID',async t=>{const f=await fixture(t);f.slotAvailable=true;assert.equal((await f.post('meetings/slot/book',{callMethod:'phone',contactPhone:'4165551234'})).status,400);});

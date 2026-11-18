@@ -99,7 +99,7 @@ async function sendServiceRequestNotification(serviceRequest) {
               <p style="margin:0 0 8px;"><strong>Customer:</strong> ${escapeHtml(serviceRequest.customerName)}</p>
               <p style="margin:0 0 8px;"><strong>Username:</strong> ${escapeHtml(serviceRequest.customerUsername)}</p>
               <p style="margin:0 0 8px;"><strong>Email:</strong> ${escapeHtml(serviceRequest.customerEmail)}</p>
-              <p style="margin:0;"><strong>Request:</strong> ${escapeHtml(serviceRequest.externalId)}</p>
+              <p style="margin:0;"><strong>Request:</strong> ${escapeHtml(serviceRequest.confirmationCode || serviceRequest.requestNumber || serviceRequest.externalId)}</p>
             </div>
             <table style="width:100%;margin-top:18px;border-collapse:collapse;background:#121212;border:1px solid #292929;">
               <thead>
@@ -120,10 +120,10 @@ async function sendServiceRequestNotification(serviceRequest) {
 
 async function sendServiceQuoteNotification(serviceRequest) {
   const khalilEmail = notificationAddress();
-  const customerServicesUrl = process.env.CUSTOMER_SERVICES_URL?.trim();
+  const customerServicesUrl = process.env.CUSTOMER_SERVICES_URL?.trim() || 'https://djkhalilnahhat.ca/dashboard/bookings?tab=quotes';
   const totals=require('./quote-totals').quoteTotals(serviceRequest);
   const total=totals.total;
-  const pricingSummary=[`Subtotal: ${formatCad(totals.subtotal)}`, ...(totals.discount>0?[`Discount: −${formatCad(totals.discount)}`]:[]), `Tax (${totals.taxPercent}%): ${formatCad(totals.tax)}`];
+  const pricingSummary=[`Subtotal: ${formatCad(totals.subtotal)}`, ...(totals.discount>0?[`Discount: −${formatCad(totals.discount)}`]:[]), `Tax (${totals.taxPercent}%): ${formatCad(totals.tax)}`, `Deposit: ${formatCad(totals.deposit)}`];
   const itemRows = serviceRequest.items.map((item) => {
     const lineTotal = Number(item.unitPrice || 0) * item.quantity;
 
@@ -157,10 +157,10 @@ async function sendServiceQuoteNotification(serviceRequest) {
         <body style="margin:0;background:#080808;color:#f4f1ed;font-family:Arial,sans-serif;">
           <div style="max-width:680px;margin:0 auto;padding:32px 20px;">
             <p style="margin:0 0 8px;color:#ef3939;font-size:12px;letter-spacing:2px;">KN// REQUESTED SERVICES</p>
-            <h1 style="margin:0 0 12px;font-size:30px;">Your quote is ready</h1>
-            <p style="margin:0 0 24px;color:#b8b3ad;line-height:1.6;">Hello ${escapeHtml(serviceRequest.customerName)}, Khalil has reviewed your service request and prepared the quote below.</p>
+            <h1 style="margin:0 0 12px;font-size:30px;">Availability confirmed &amp; your quote is ready</h1>
+            <p style="margin:0 0 24px;color:#b8b3ad;line-height:1.6;">Hello ${escapeHtml(serviceRequest.customerName)}, We are available for your event and have prepared the quote below. Please log in to accept, decline, or negotiate. After accepting your quote, choose a meeting time to discuss your event by phone or WhatsApp. Your date is reserved only after final confirmation and the required deposit.</p>
             <div style="padding:14px 18px;background:#121212;border:1px solid #292929;">
-              <p style="margin:0;"><strong>Request:</strong> ${escapeHtml(serviceRequest.externalId)}</p>
+              <p style="margin:0;"><strong>Request:</strong> ${escapeHtml(serviceRequest.confirmationCode || serviceRequest.requestNumber || serviceRequest.externalId)}</p>
             </div>
             <table style="width:100%;margin-top:18px;border-collapse:collapse;background:#121212;border:1px solid #292929;">
               <thead>
@@ -179,8 +179,8 @@ async function sendServiceQuoteNotification(serviceRequest) {
               <strong style="font-size:28px;color:#ef3939;">${formatCad(total)}</strong>
             </div>
             ${adminNote}
-            ${customerServicesUrl ? `<p style="margin:24px 0 0;"><a href="${escapeHtml(customerServicesUrl)}" style="display:inline-block;padding:12px 18px;background:#c12a32;color:#fff;text-decoration:none;">View Requested Services</a></p>` : ''}
-            <p style="margin:24px 0 0;color:#777;font-size:12px;line-height:1.6;">Reply directly to this email if you have questions about your quote.</p>
+            ${customerServicesUrl ? `<p style="margin:24px 0 0;"><a href="${escapeHtml(customerServicesUrl)}" style="display:inline-block;padding:12px 18px;background:#c12a32;color:#fff;text-decoration:none;">Log in to review and respond</a></p>` : ''}
+            <p style="margin:24px 0 0;color:#777;font-size:12px;line-height:1.6;">Please log in to accept, decline, or negotiate your quote and, after accepting, choose a meeting time.</p>
           </div>
         </body>
       </html>`,

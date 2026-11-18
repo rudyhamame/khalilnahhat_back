@@ -38,9 +38,11 @@ async function rankLanguages(clip){
  const row=logits.data,scores=ids.map(id=>row[id]),top=Math.max(...scores),exp=scores.map(value=>Math.exp(value-top)),sum=exp.reduce((a,b)=>a+b,0);
  return WHISPER_LANGUAGES.map((code,index)=>({code,probability:exp[index]/sum})).sort((a,b)=>b.probability-a.probability).slice(0,5);
 }
-async function transcribeArabic(clip){
- const pipe=await loadAsr(),result=await pipe(clip,{language:'arabic',task:'transcribe'});
- return {text:String(result?.text||'')};
+// Dictation languages (a fixed list: the value is passed to Whisper, so nothing else is accepted). Arabic stays the default for older callers.
+const DICTATION={english:'english',arabic:'arabic'};
+async function transcribe(clip,language='arabic'){
+ const pipe=await loadAsr(),result=await pipe(clip,{language:DICTATION[language]||'arabic',task:'transcribe'});
+ return {text:String(result?.text||'').trim(),language:DICTATION[language]||'arabic'};
 }
 // Raw little-endian 16-bit mono PCM -> Float32Array in [-1, 1].
 const toFloat=buffer=>{const view=new DataView(buffer.buffer,buffer.byteOffset,buffer.byteLength-buffer.byteLength%2),out=new Float32Array(view.byteLength/2);for(let i=0;i<out.length;i++)out[i]=view.getInt16(i*2,true)/32768;return out;};
@@ -49,11 +51,12 @@ const inOrder=job=>{const run=tail.then(job);tail=run.catch(()=>{});return run;}
 function registerSpeech(app){
  const body=express.raw({type:'application/octet-stream',limit:MAX_BYTES});
  const handle=work=>async(req,res)=>{
+  const language=String(req.query?.language||'arabic').toLowerCase();
   if(!Buffer.isBuffer(req.body)||req.body.length<3200)return res.status(400).json({message:'Send 16 kHz mono 16-bit audio.'});
-  try{res.set('Cache-Control','no-store').json(await inOrder(()=>work(toFloat(req.body))));}
+  try{res.set('Cache-Control','no-store').json(await inOrder(()=>work(toFloat(req.body),language)));}
   catch(error){console.error('Speech worker:',error.message);res.status(503).json({message:'The speech model is unavailable right now.'});}
  };
  app.post('/api/admin/speech/language',body,handle(async clip=>({ranked:await rankLanguages(clip)})));
- app.post('/api/admin/speech/transcribe',body,handle(transcribeArabic));
+ app.post('/api/admin/speech/transcribe',body,handle(transcribe));
 }
-module.exports={registerSpeech,toFloat};
+module.exports={registerSpeech,toFloat,transcribe};

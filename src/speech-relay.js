@@ -7,7 +7,8 @@ function registerSpeechRelay(app,{requireAdmin,env=process.env,fetchImpl=fetch})
   if(!env.STEM_WORKER_URL)return res.status(503).json({message:'The speech service is not configured.'});
   if(!Buffer.isBuffer(req.body)||req.body.length<3200)return res.status(400).json({message:'Send 16 kHz mono 16-bit audio.'});
   try{
-   const response=await fetchImpl(new URL(`/api/admin/speech/${task}`,env.STEM_WORKER_URL),{method:'POST',headers:{'Content-Type':'application/octet-stream',Authorization:`Bearer ${env.STEM_WORKER_TOKEN||''}`},body:req.body,redirect:'error',signal:AbortSignal.timeout(90000)});
+   const target=new URL(`/api/admin/speech/${task}`,env.STEM_WORKER_URL);const language=String(req.query?.language||'');if(/^(english|arabic)$/i.test(language))target.searchParams.set('language',language.toLowerCase());
+   const response=await fetchImpl(target,{method:'POST',headers:{'Content-Type':'application/octet-stream',Authorization:`Bearer ${env.STEM_WORKER_TOKEN||''}`},body:req.body,redirect:'error',signal:AbortSignal.timeout(90000)});
    res.status(response.status).set('Cache-Control','no-store').json(await response.json());
   }catch(error){console.error('Speech relay:',error.name);res.status(503).json({message:'The speech service is unavailable right now.'});}
  };

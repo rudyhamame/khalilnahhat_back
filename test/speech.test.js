@@ -29,6 +29,18 @@ test('the relay forwards one clip to the worker with the token and refuses bad u
   } finally { server.close(); }
 });
 
+test('transcribe forwards only english or arabic as the dictation language', async () => {
+  const urls = [];
+  const app = express();
+  registerSpeechRelay(app, { requireAdmin: (_q, _r, next) => next(), env: { STEM_WORKER_URL: 'https://worker.test', STEM_WORKER_TOKEN: 't'.repeat(32) },
+    fetchImpl: async (url) => { urls.push(String(url)); return new Response(JSON.stringify({ text: 'ok' }), { status: 200 }); } });
+  const server = app.listen(0), base = `http://127.0.0.1:${server.address().port}/api/admin/music-archive/speech/transcribe`;
+  try {
+    for (const q of ['?language=english', '?language=ARABIC', '?language=klingon', '']) await fetch(base + q, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: Buffer.alloc(4000) });
+    assert.deepEqual(urls, ['https://worker.test/api/admin/speech/transcribe?language=english', 'https://worker.test/api/admin/speech/transcribe?language=arabic', 'https://worker.test/api/admin/speech/transcribe', 'https://worker.test/api/admin/speech/transcribe']);
+  } finally { server.close(); }
+});
+
 test('worker load: idle is fine, busy CPU, low memory or a running split asks to retry later', () => {
   const { snapshot } = require('../src/worker-load');
   assert.equal(snapshot({ load: 0.3, cpus: 2, free: 2000 }).busy, false);

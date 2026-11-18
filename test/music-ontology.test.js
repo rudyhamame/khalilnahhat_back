@@ -4,7 +4,7 @@ const V=require('../src/music-ontology/validation');
 test('controlled classifications, positive BPM, key notation and credit roles',()=>{
  const base={name:'Recording',workType:'MIX',atoms:[{id:'a0',name:'A'}]};
  for(const type of ['MIX','REMIX','COVER','PRODUCTION'])assert.equal(V.recording.parse({...base,workType:type}).workType,type);
- for(const metadata of [{bpms:[0]},{bpms:[-1]},{keys:['Camelot 8A']},{keys:['H minor']}])assert.equal(V.recording.safeParse({...base,atoms:[{id:'a',name:'A',sound:metadata}]}).success,false);
+ for(const metadata of [{bpm:0},{bpm:-1},{key:'Camelot 8A'},{key:'H minor'}])assert.equal(V.recording.safeParse({...base,atoms:[{id:'a',name:'A',sound:metadata}]}).success,false);
  assert.equal(V.recording.safeParse({...base,atoms:[{id:'a',name:'A',sound:{musicianCredits:[{instrumentId:'x'}]}}]}).success,false);
  assert.equal(V.work.safeParse({title:'Music',type:'MUSIC',lyrics:{text:'No'}}).success,false);
  assert.equal(V.work.parse({title:'Song in progress',type:'SONG'}).type,'SONG');

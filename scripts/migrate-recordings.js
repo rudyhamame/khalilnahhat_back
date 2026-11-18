@@ -7,6 +7,8 @@
 require('dotenv').config({quiet:true});
 const mongoose=require('mongoose');
 const text=v=>typeof v==='string'?v:'';
+// An atom holds one tempo and one key: the single value if there is one, otherwise the first of the old list.
+const oneOf=(single,list)=>single??(Array.isArray(list)&&list.length?list[0]:null);
 const uniq=list=>[...new Set(list.filter(Boolean))];
 const minutes=row=>row.durationMinutes??(row.duration?(()=>{const s=String(row.duration).split(':').reduce((t,n)=>t*60+Number(n),0);return Number.isFinite(s)?Math.round(s/60*10000)/10000:null;})():null);
 const statusOf=row=>row.status||(row.publicationStatus?(row.publicationStatus==='PUBLISHED'&&row.archivalStatus!=='ARCHIVED'?'PUBLISHED':row.publicationStatus==='DRAFT'?'DRAFT':'ARCHIVED'):(row.published===false?'DRAFT':'PUBLISHED'));
@@ -14,7 +16,7 @@ const credit=c=>({artistId:c.artistId,...(c.instrumentId?{instrumentId:c.instrum
 // An atom in the new shape (credits inside sound; language entries carry their own dialects; no hasLyrics, releaseDate, detail or lyrics times).
 function atom(item,parentOf){
  const sound=item.sound||{},musicians=[...(sound.musicianCredits||[]),...(item.musicianCredits||[])].map(credit);
- const out={id:item.id,name:item.name,sound:{musicianCredits:musicians,bpms:uniq([...(sound.bpms||[]),sound.bpm]),keys:uniq([...(sound.keys||[]),sound.key]),rhythmIds:uniq([...(sound.rhythmIds||[]),sound.rhythmId]),genreIds:sound.genreIds||[]},lyrics:null};
+ const out={id:item.id,name:item.name,sound:{musicianCredits:musicians,bpm:oneOf(sound.bpm,sound.bpms),key:oneOf(sound.key,sound.keys),rhythmIds:uniq([...(sound.rhythmIds||[]),sound.rhythmId]),genreIds:sound.genreIds||[]},lyrics:null};
  const year=item.releaseYear??(/^\d{4}/.test(item.releaseDate||'')?Number(item.releaseDate.slice(0,4)):null);
  if(year!=null)out.releaseYear=year;
  if(item.audioRange)out.audioRange={startSec:item.audioRange.startSec,endSec:item.audioRange.endSec};
@@ -47,9 +49,14 @@ if(require.main===module)(async()=>{
   copied++;
   if(await target.countDocuments({externalId:doc.externalId})===1)removed+=(await archive.deleteOne({_id:row._id})).deletedCount;
  }
+ // Recordings already in musicrecordings: atoms keep one tempo (bpm) and one key (key) instead of lists.
+ const stored=await target.find({'atoms.sound':{$exists:true}}).toArray();
+ let atomsFixed=0;
+ for(const row of stored){let changed=false;for(const item of row.atoms||[]){const sound=item.sound;if(!sound||!('bpms' in sound||'keys' in sound))continue;sound.bpm=oneOf(sound.bpm,sound.bpms);sound.key=oneOf(sound.key,sound.keys);delete sound.bpms;delete sound.keys;changed=true;}
+  if(changed){atomsFixed++;if(apply)await target.updateOne({_id:row._id},{$set:{atoms:row.atoms}});}}
  // Work types no longer hold an Individual / Multiple amount or a 1-minute sample.
  const types=await db.collection('djworktypes').countDocuments({$or:[{amount:{$exists:true}},{sample:{$exists:true}}]});
  if(apply&&types)await db.collection('djworktypes').updateMany({},{$unset:{amount:'',sample:''}});
- console.log(JSON.stringify({apply,recordingsFound:found.length,toMove:convertible.length,copied,removedFromArchive:removed,leftInPlace:skipped.map(row=>({externalId:row.externalId,reason:'no atoms (old work-based recording)'})),workTypesWithAmount:types},null,1));
+ console.log(JSON.stringify({apply,recordingsFound:found.length,toMove:convertible.length,copied,removedFromArchive:removed,leftInPlace:skipped.map(row=>({externalId:row.externalId,reason:'no atoms (old work-based recording)'})),workTypesToClean:types,recordingsWithListTempoOrKey:atomsFixed},null,1));
  await mongoose.disconnect();
 })().catch(error=>{console.error(error.message);process.exit(1)});

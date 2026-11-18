@@ -7,7 +7,7 @@ const id='60b34139-905f-4493-88e9-952f82459e76';
 const payload=()=>({clientSubmissionId:id,event:{eventType:'wedding',eventDate:'2099-10-12',phone:'4165550100'},items:[{serviceId:'svc-dj',name:'DJ',category:'service',quantity:1}]});
 
 async function fixture(t,options={}) {
- const saved=[];const counters={notify:0,reserve:0,release:0};
+ const saved=[];const counters={notify:0,reserve:0,release:0,codeAttempts:0};
  const app=express();app.use(express.json());
  registerServiceRequestSubmission(app,{
   requireAuth:(req,res,next)=>{if(!req.headers.authorization)return res.status(401).json({message:'Sign in.'});req.authUser={_id:req.headers.authorization,firstName:'Test',lastName:'Client',username:'test',email:'test@example.invalid',phoneNumber:'4165550100',phoneContact:'call'};next();},
@@ -15,13 +15,15 @@ async function fixture(t,options={}) {
    init:async()=>{if(options.failIndex)throw new Error('Index creation failed');},
    findOne:query=>({select:async()=>saved.find(item=>item.userId===query.userId&&item.clientSubmissionId===query.clientSubmissionId)}),
    create:async data=>{
+    counters.codeAttempts++;
+    if(counters.codeAttempts<=(options.codeCollisions||0))throw Object.assign(new Error('Code collision'),{code:11000,keyPattern:{confirmationCode:1}});
     if(options.failSave)throw new Error('Database unavailable');
     if(saved.some(item=>item.userId===data.userId&&item.clientSubmissionId===data.clientSubmissionId))throw Object.assign(new Error('Duplicate'),{code:11000,keyPattern:{clientSubmissionId:1}});
     saved.push({...data});return saved.at(-1);
    },
   },Equipment:{find:async()=>options.catalog||[]},
   vouchers:{reserve:async()=>{counters.reserve++;return {voucher:{code:'TEST'}};},release:async()=>{counters.release++;},snapshot:v=>v,record:async()=>{}},
-  serializeServiceRequest:item=>({id:item.externalId,status:item.status,customerEmail:item.customerEmail}),
+  serializeServiceRequest:item=>({id:item.externalId,requestNumber:item.requestNumber,confirmationCode:item.confirmationCode,status:item.status,customerEmail:item.customerEmail}),
   loadConversation:options.loadConversation,
   sendServiceRequestNotification:async()=>{counters.notify++;if(options.failEmail)throw new Error('Mail unavailable');return {sent:true};},
  });
@@ -30,6 +32,27 @@ async function fixture(t,options={}) {
  const post=async(body=payload(),user='client-1')=>{const response=await fetch(`http://127.0.0.1:${server.address().port}/api/service-requests`,{method:'POST',headers:{'Content-Type':'application/json',...(user?{Authorization:user}:{})},body:JSON.stringify(body)});return {status:response.status,body:await response.json()};};
  return {post,saved,counters};
 }
+test('each booking gets one persistent public ID, including when submission is retried',async t=>{
+ const f=await fixture(t);
+ const first=await f.post(),retry=await f.post();
+ assert.equal(first.status,201);assert.equal(retry.status,200);
+ assert.match(first.body.item.confirmationCode,/^ECHO-(?:[2-9A-HJ-NP-Z]{4}-){2}[2-9A-HJ-NP-Z]{4}$/);
+ assert.equal(first.body.item.confirmationCode,first.body.item.requestNumber);
+ assert.equal(retry.body.item.confirmationCode,first.body.item.confirmationCode);
+ assert.equal(f.saved.length,1);
+});
+test('code collisions retry without double claiming a voucher or creating duplicate bookings',async t=>{
+ const f=await fixture(t,{codeCollisions:1});
+ const result=await f.post({...payload(),voucherCode:'TEST'});
+ assert.equal(result.status,201);assert.equal(f.saved.length,1);
+ assert.equal(f.counters.codeAttempts,2);assert.equal(f.counters.reserve,1);assert.equal(f.counters.release,0);assert.equal(f.counters.notify,1);
+});
+test('exhausted code allocation leaves no booking and releases a claimed voucher',async t=>{
+ const f=await fixture(t,{codeCollisions:4});
+ const result=await f.post({...payload(),voucherCode:'TEST'});
+ assert.equal(result.status,500);assert.equal(f.saved.length,0);
+ assert.equal(f.counters.codeAttempts,4);assert.equal(f.counters.release,1);assert.equal(f.counters.notify,0);
+});
 
 test('submission requires authentication and validates details before persistence',async t=>{
  const f=await fixture(t);assert.equal((await f.post(payload(),null)).status,401);

@@ -83,9 +83,9 @@ test('a collection holds recordings of one work type only', async t => {
   const app = express(); app.use(express.json());
   const collections = memoryModel();
   const songs = memoryModel([
-    { externalId: 'mix1', title: 'Mix 1', recordingType: 'MIX', audioUrl: 'https://example.com/1.mp3' },
-    { externalId: 'mix2', title: 'Mix 2', recordingType: 'MIX', audioUrl: 'https://example.com/2.mp3' },
-    { externalId: 'rmx1', title: 'Remix 1', recordingType: 'REMIX', audioUrl: 'https://example.com/3.mp3' },
+    { externalId: 'mix1', title: 'Mix 1', workType: 'MIX', audioUrl: 'https://example.com/1.mp3' },
+    { externalId: 'mix2', title: 'Mix 2', workType: 'MIX', audioUrl: 'https://example.com/2.mp3' },
+    { externalId: 'rmx1', title: 'Remix 1', workType: 'REMIX', audioUrl: 'https://example.com/3.mp3' },
   ]);
   registerMusicArchive(app, { requireAdmin: (req, res, next) => next(), CollectionModel: collections, ArchiveModel: songs });
   const server = app.listen(0, '127.0.0.1');

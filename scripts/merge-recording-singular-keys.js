@@ -4,7 +4,7 @@
 // Applies to recording.musical and each item.sound. Dry run by default: node scripts/merge-recording-singular-keys.js [--apply]
 require('dotenv').config({quiet:true});
 const mongoose=require('mongoose');
-const REMOVED=['recordingCredits','recordingAmount','publicationStatus','archivalStatus','sourceRecordingIds','sourceWorkIds','componentWorkIds','versionLabel','productionNotes','provenance'];
+const REMOVED=['musical','languages','recordingCredits','recordingAmount','publicationStatus','archivalStatus','sourceRecordingIds','sourceWorkIds','componentWorkIds','versionLabel','productionNotes','provenance'];
 const PAIRS=[['bpm','bpms'],['key','keys'],['rhythmId','rhythmIds']];
 function merge(obj){
  let changed=false;
@@ -41,22 +41,29 @@ if(require.main===module)(async()=>{
  const {ArchiveItem}=require('../src/models');
  const parents=new Map((await mongoose.connection.collection('musicvocabularies').find({kind:'dialect'},{projection:{externalId:1,parentId:1}}).toArray()).map(row=>[row.externalId,row.parentId]));
  const parentOf=id=>parents.get(id)||null;
+ // The recording's items are renamed atoms (done first so the rest of this script sees the new key).
+ if(apply)await ArchiveItem.collection.updateMany({'items.0':{$exists:true},atoms:{$exists:false}},{$rename:{items:'atoms'}});
+ const itemsToRename=await ArchiveItem.collection.countDocuments({'items.0':{$exists:true}});
  let found=0,changed=0;
- for await(const row of ArchiveItem.collection.find({$or:[{musical:{$type:'object'}},{'items.0':{$exists:true}},{duration:{$exists:true},items:{$exists:true}},...REMOVED.map(k=>({[k]:{$exists:true}}))]},{projection:{duration:1,durationMinutes:1,musical:1,items:1,atomCount:1,status:1,published:1,publicationStatus:1,archivalStatus:1,...Object.fromEntries(REMOVED.map(k=>[k,1]))}})){
+ for await(const row of ArchiveItem.collection.find({$or:[{'atoms.0':{$exists:true}},{duration:{$exists:true},atoms:{$exists:true}},...REMOVED.map(k=>({[k]:{$exists:true}}))]},{projection:{duration:1,durationMinutes:1,musical:1,atoms:1,atomCount:1,status:1,published:1,publicationStatus:1,archivalStatus:1,...Object.fromEntries(REMOVED.map(k=>[k,1]))}})){
   const set={};
-  if(merge(row.musical))set.musical=row.musical;
-  if(Array.isArray(row.items)&&row.items.map(item=>[merge(item.sound),fixItem(item,parentOf)].includes(true)).includes(true))set.items=row.items;
+  if(Array.isArray(row.atoms)&&row.atoms.map(item=>[merge(item.sound),fixItem(item,parentOf)].includes(true)).includes(true))set.atoms=row.atoms;
   // recordingAmount is no longer stored: the atom count replaces it and is counted from the items.
-  const unset={};const lifecycle=row.status||(row.publicationStatus?(row.publicationStatus==='PUBLISHED'&&row.archivalStatus!=='ARCHIVED'?'PUBLISHED':row.publicationStatus==='DRAFT'?'DRAFT':'ARCHIVED'):null);if(lifecycle&&row.status!==lifecycle)set.status=lifecycle;for(const key of REMOVED)if(key in row)unset[key]='';if(Array.isArray(row.items)&&row.items.length!==row.atomCount)set.atomCount=row.items.length;
+  const unset={};const lifecycle=row.status||(row.publicationStatus?(row.publicationStatus==='PUBLISHED'&&row.archivalStatus!=='ARCHIVED'?'PUBLISHED':row.publicationStatus==='DRAFT'?'DRAFT':'ARCHIVED'):null);if(lifecycle&&row.status!==lifecycle)set.status=lifecycle;for(const key of REMOVED)if(key in row)unset[key]='';if(Array.isArray(row.atoms)&&row.atoms.length!==row.atomCount)set.atomCount=row.atoms.length;
   // Recording length is stored in minutes (durationMinutes) instead of the m:ss text in duration.
-  if((row.status||row.publicationStatus||row.items?.length)&&row.duration!==undefined){const secs=String(row.duration).split(':').reduce((t,n)=>t*60+Number(n),0);if(row.durationMinutes==null&&row.duration&&Number.isFinite(secs))set.durationMinutes=Math.round(secs/60*10000)/10000;unset.duration='';}
+  if((row.status||row.publicationStatus||row.atoms?.length)&&row.duration!==undefined){const secs=String(row.duration).split(':').reduce((t,n)=>t*60+Number(n),0);if(row.durationMinutes==null&&row.duration&&Number.isFinite(secs))set.durationMinutes=Math.round(secs/60*10000)/10000;unset.duration='';}
   if(!Object.keys(set).length&&!Object.keys(unset).length)continue;
   found++;
   if(apply){await ArchiveItem.collection.updateOne({_id:row._id},{...(Object.keys(set).length?{$set:set}:{}),...(Object.keys(unset).length?{$unset:unset}:{})});changed++;}
  }
+ // recordingType is renamed workType on stored recordings.
+ if(apply)await ArchiveItem.collection.updateMany({recordingType:{$exists:true},workType:{$exists:false}},{$rename:{recordingType:'workType'}});
+ const typeRenames=await ArchiveItem.collection.countDocuments({recordingType:{$exists:true}});
+ // audioMetadata.trimmed is dropped: the saved audio is the trimmed file itself.
+ if(apply)await ArchiveItem.collection.updateMany({'audioMetadata.trimmed':{$exists:true}},{$unset:{'audioMetadata.trimmed':''}});
  // The DJ work type no longer holds an Individual / Multiple amount.
  const types=await mongoose.connection.collection('djworktypes').countDocuments({amount:{$exists:true}});
  if(apply&&types)await mongoose.connection.collection('djworktypes').updateMany({},{$unset:{amount:''}});
- console.log(JSON.stringify({apply,found,changed,workTypesWithAmount:types}));
+ console.log(JSON.stringify({apply,found,changed,workTypesWithAmount:types,recordingTypeToRename:typeRenames,itemsToRename}));
  await mongoose.disconnect();
 })().catch(e=>{console.error(e.message);process.exit(1)});

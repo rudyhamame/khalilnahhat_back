@@ -86,7 +86,7 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, C
       if (data.recordingIds) data.recordingIds = [...new Set(data.recordingIds)];
       const ids = data.recordingIds ?? existing.recordingIds ?? [];
       if (data.recordingIds && await ArchiveModel.countDocuments({ externalId: { $in: ids }, status:{$ne:'ARCHIVED'} }) !== ids.length) return 'Choose existing active recordings. Deleted recordings cannot be added to a collection.';
-      if (workTypeId && ids.length && (data.recordingIds || data.workTypeId !== undefined) && await ArchiveModel.countDocuments({ externalId: { $in: ids }, recordingType: workTypeId }) !== ids.length) return 'A collection only holds recordings of its work type. Move or remove the recordings of other work types first.';
+      if (workTypeId && ids.length && (data.recordingIds || data.workTypeId !== undefined) && await ArchiveModel.countDocuments({ externalId: { $in: ids }, workType: workTypeId }) !== ids.length) return 'A collection only holds recordings of its work type. Move or remove the recordings of other work types first.';
       return '';
     };
     app.post(`/api/admin/music-archive/${kind}`, requireAdmin, async (req, res) => {
@@ -100,7 +100,7 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, C
       res.status(201).json({ item: serialize(row) });
     });
     app.patch(`/api/admin/music-archive/${kind}/:id`, requireAdmin, async (req, res) => {
-      if (kind === 'songs' && await model.exists({externalId:req.params.id,$or:[{workId:{$exists:true,$ne:''}},{'items.0':{$exists:true}}]})) return res.status(409).json({message:'Edit this recording through the ontology editor.'});
+      if (kind === 'songs' && await model.exists({externalId:req.params.id,$or:[{workId:{$exists:true,$ne:''}},{'atoms.0':{$exists:true}}]})) return res.status(409).json({message:'Edit this recording through the ontology editor.'});
       // PATCH must preserve omitted fields; creation defaults must not detach songs.
       const patchInput = z.object(Object.fromEntries(Object.entries(inputs[kind].shape).map(([key, field]) => [key, (field instanceof z.ZodDefault ? field.removeDefault() : field).optional()]))).strict();
       const parsed = patchInput.safeParse(req.body);
@@ -113,7 +113,7 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, C
       res.json({ item: serialize(row) });
     });
     app.delete(`/api/admin/music-archive/${kind}/:id`, requireAdmin, async (req, res) => {
-      if (kind === 'songs' && await model.exists({externalId:req.params.id,$or:[{workId:{$exists:true,$ne:''}},{'items.0':{$exists:true}}]})) return res.status(409).json({message:'Archive this recording through the ontology editor; its references and files are preserved.'});
+      if (kind === 'songs' && await model.exists({externalId:req.params.id,$or:[{workId:{$exists:true,$ne:''}},{'atoms.0':{$exists:true}}]})) return res.status(409).json({message:'Archive this recording through the ontology editor; its references and files are preserved.'});
       const row = kind === 'songs' && ontology ? await ontology.deleteLegacy(req.params.id) : await permanentDeletion.remove(model,{externalId:req.params.id});
       if (!row) return res.status(404).json({ message: 'This item no longer exists.' });
       // The final owner deletion also requests permanent Cloudinary cleanup.
@@ -140,11 +140,10 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, C
     if (image && file.size > 10 * 1024 * 1024) return res.status(400).json({ message: 'Cover images must be under 10 MB.' });
     if (requireCloudinary && !useCloudinary) return res.status(503).json({ message: 'Cloudinary storage is not configured. Contact the administrator; your file has not been saved.' });
     const exportFormat=req.body?.exportFormat;
-    if(req.body?.trimmed!==undefined&&req.body.trimmed!=='true')return res.status(400).json({message:'Invalid trim marker.'});
     if(exportFormat!==undefined&&(!audio||!['mp3','aac'].includes(exportFormat)||!/^audio\/(wav|x-wav|wave)$/.test(file.mimetype)))return res.status(400).json({message:'Compressed trim export requires WAV audio and an MP3 or AAC format.'});
     try {
       if(exportFormat)file=await require('./compress-trimmed-audio').compressTrimmedAudio(file,exportFormat);
-      const audioMetadata=audio?{format:require('node:path').extname(file.originalname||'').slice(1).toLowerCase(),sizeBytes:file.buffer.length,trimmed:req.body?.trimmed==='true'}:null;
+      const audioMetadata=audio?{format:require('node:path').extname(file.originalname||'').slice(1).toLowerCase(),sizeBytes:file.buffer.length}:null;
       if (!useCloudinary) return res.status(201).json({...await archiveFiles.saveLocalFile(file),...(audio?{audioMetadata}:{}),...(exportFormat?{exportFormat,sizeBytes:file.size}:{})});
       const result = await uploadAssetImpl(file.buffer,{folder:'khalil/music-archive',resource_type:audio?'video':'image',type:'authenticated',...(image?{transformation:[{width:1600,height:1600,crop:'limit',quality:'auto'}]}:{})});
       res.status(201).json({ ...(audio?{audioMetadata}:{}),...(exportFormat?{exportFormat,sizeBytes:file.size}:{}),url: result.secure_url, previewUrl: deliveryUrl(result.secure_url), duration: result.duration ? `${Math.floor(result.duration / 60)}:${String(Math.floor(result.duration % 60)).padStart(2, '0')}` : '' });

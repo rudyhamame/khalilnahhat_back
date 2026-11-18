@@ -80,11 +80,11 @@ function createWorkElements(service){
   const def=definition(key);if(['fixed','recording','work'].includes(def.source))fail('Manage these identities in their recording or content editor.');
   if(def.source==='workType'){const row=(await service.listWorkTypes()).find(item=>item.id===id);if(!row||row.revision!==revision)fail('This option changed. Reload before deleting.',409);return service.deleteWorkType(id);}
   if(def.source==='vocabulary'){
-   const paths={language:['items.lyrics.languages.languageId'],dialect:['items.lyrics.languages.dialectIds'],genre:['items.sound.genreIds'],rhythm:['items.sound.rhythmId','items.sound.rhythmIds'],artist:['items.lyrics.vocalistCredits.artistId','items.sound.musicianCredits.artistId'],musician:['items.sound.musicianCredits.artistId'],instrument:['items.sound.musicianCredits.instrumentId']}[key]||[];
+   const paths={language:['atoms.lyrics.languages.languageId'],dialect:['atoms.lyrics.languages.dialectIds'],genre:['atoms.sound.genreIds'],rhythm:['atoms.sound.rhythmId','atoms.sound.rhythmIds'],artist:['atoms.lyrics.vocalistCredits.artistId','atoms.sound.musicianCredits.artistId'],musician:['atoms.sound.musicianCredits.artistId'],instrument:['atoms.sound.musicianCredits.instrumentId']}[key]||[];
    if(paths.length&&await ArchiveItem.exists({$or:paths.map(path=>({[path]:id}))}))fail('This option is used by a recording. Remove its assignments first.',409);
   }
   if(['language','dialect'].includes(key)&&await Vocabulary.exists({kind:'artist',[key==='language'?'languageIds':'dialectIds']:id,archived:{$ne:true}}))fail('This term is assigned to a vocalist. Remove its assignments first.',409);
-  if(key==='instrument'&&(await Vocabulary.exists({kind:'musician',instrumentId:id,archived:{$ne:true}})||await ArchiveItem.exists({'items.sound.musicianCredits.instrumentId':id})))fail('This instrument is assigned to a musician. Remove its assignments first.',409);
+  if(key==='instrument'&&(await Vocabulary.exists({kind:'musician',instrumentId:id,archived:{$ne:true}})||await ArchiveItem.exists({'atoms.sound.musicianCredits.instrumentId':id})))fail('This instrument is assigned to a musician. Remove its assignments first.',409);
   if(def.source==='vocabulary'&&await Vocabulary.exists({parentId:id,archived:{$ne:true}}))fail('Remove this option’s child entries first.',409);
   if(def.source!=='vocabulary'&&!mongoose.isValidObjectId(id))fail('Option not found.',404);
   const Model=def.source==='vocabulary'?Vocabulary:Option,query=def.source==='vocabulary'?{externalId:id,kind:def.kind}:{_id:id,key};

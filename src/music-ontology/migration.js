@@ -6,7 +6,7 @@ const duration=value=>{const n=String(value||'').split(':').reduce((s,p)=>s*60+N
 function migrationInput(row,mapping){
  const bpm=row.bpm&&Number(row.bpm)>0&&Number(row.bpm)<=1000?Number(row.bpm):null;
  const key=/^[A-G](?:#|b)? (?:major|minor)$/.test(row.musicalKey||'')?row.musicalKey:null;
- return {title:row.title,recordingType:mapping.recordingType,workId:mapping.workId,audioUrl:row.audioUrl||'',coverImage:row.coverImage||row.image||'',durationMinutes:duration(row.duration)==null?null:duration(row.duration)/60,description:row.description||'',releaseDate:/^\d{4}-\d{2}-\d{2}$/.test(row.date||'')?row.date:'',status:row.published!==false&&row.audioUrl?'PUBLISHED':'DRAFT',versionLabel:'',productionNotes:'Legacy fields retained verbatim on the existing recording. Unmapped metadata requires review.',provenance:{source:'Legacy archive',note:`Reviewed mapping ${mapping.note||''}`},revision:row.ontologyRevision||0};
+ return {title:row.title,workType:mapping.workType,workId:mapping.workId,audioUrl:row.audioUrl||'',coverImage:row.coverImage||row.image||'',durationMinutes:duration(row.duration)==null?null:duration(row.duration)/60,description:row.description||'',releaseDate:/^\d{4}-\d{2}-\d{2}$/.test(row.date||'')?row.date:'',status:row.published!==false&&row.audioUrl?'PUBLISHED':'DRAFT',versionLabel:'',productionNotes:'Legacy fields retained verbatim on the existing recording. Unmapped metadata requires review.',provenance:{source:'Legacy archive',note:`Reviewed mapping ${mapping.note||''}`},revision:row.ontologyRevision||0};
 }
 async function audit(){
  const rows=await ArchiveItem.find().lean();

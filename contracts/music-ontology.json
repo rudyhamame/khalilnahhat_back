@@ -46,8 +46,8 @@
   "keyPattern": "^[A-G](?:#|b)? (?:major|minor|dorian|phrygian|lydian|mixolydian|locrian|harmonic minor|melodic minor)$",
   "filters": [
     "q",
-    "recordingType",
     "workType",
+    "contentType",
     "language",
     "dialect",
     "region",

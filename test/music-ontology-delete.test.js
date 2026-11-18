@@ -20,6 +20,6 @@ test('recording deletion accepts legacy revision zero and rejects invalid or sta
  for(const body of [{},{revision:-1},{revision:0.5}])assert.equal((await request(body)).status,400);
  assert.equal((await request({revision:1})).status,409);
  assert.equal((await request({revision:0})).status,200);
- assert.equal(row.ontologyRevision,1);assert.equal(row.archivalStatus,'ARCHIVED');assert.equal(row.publicationStatus,'WITHDRAWN');assert.equal(row.published,false);assert.equal(row.audioUrl,'/retained.mp3');assert.equal(versions.length,1);
+ assert.equal(row.ontologyRevision,1);assert.equal(row.status,'ARCHIVED');assert.equal(row.published,false);assert.equal(row.audioUrl,'/retained.mp3');assert.equal(versions.length,1);
  assert.equal((await request({revision:0})).status,409);assert.equal(versions.length,1);
 });

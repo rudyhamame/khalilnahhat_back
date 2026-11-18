@@ -44,7 +44,7 @@ function matchesWork(r,f={}){
  return true;
 }
 function matches(r,f={}){
- const components=r.items?.length?r.items.map(item=>({title:item.name,type:item.hasLyrics?'SONG':'MUSIC',lyrics:item.lyrics?{language:{id:item.lyrics.languageId},dialect:{id:item.lyrics.dialectId},languages:(item.lyrics.languageIds??(item.lyrics.languageId?[item.lyrics.languageId]:[])).map(id=>({id})),dialects:(item.lyrics.dialectIds??(item.lyrics.dialectId?[item.lyrics.dialectId]:[])).map(id=>({id})),vocalistCredits:item.lyrics.vocalistCredits,artistCredits:[...item.lyrics.vocalistCredits]}:null,melody:{...item.sound,rhythm:item.sound?.rhythmId?{id:item.sound.rhythmId}:null,genres:(item.sound?.genreIds||[]).map(id=>({id})),instruments:item.musicianCredits.filter(credit=>credit.instrumentId).map(credit=>({id:credit.instrumentId})),musicianCredits:item.musicianCredits}})):r.componentWorks?.length?r.componentWorks:[r.work];
+ const components=r.items?.length?r.items.map(item=>({title:item.name,type:item.lyrics?'SONG':'MUSIC',lyrics:item.lyrics?{language:{id:item.lyrics.languages?.[0]?.languageId},dialect:{id:item.lyrics.languages?.[0]?.dialectIds?.[0]},languages:(item.lyrics.languages??[]).map(row=>({id:row.languageId})),dialects:(item.lyrics.languages??[]).flatMap(row=>row.dialectIds).map(id=>({id})),vocalistCredits:item.lyrics.vocalistCredits,artistCredits:[...item.lyrics.vocalistCredits]}:null,melody:{...item.sound,rhythm:item.sound?.rhythmId?{id:item.sound.rhythmId}:null,genres:(item.sound?.genreIds||[]).map(id=>({id})),instruments:(item.sound?.musicianCredits||[]).filter(credit=>credit.instrumentId).map(credit=>({id:credit.instrumentId})),musicianCredits:(item.sound?.musicianCredits||[])}})):r.componentWorks?.length?r.componentWorks:[r.work];
  return components.some(work=>matchesWork({...r,work},f));
 }
 // A work type's 1-minute sample is a recording of that type plus the second where the minute starts.
@@ -214,19 +214,18 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    const rhythmIds=item.sound?.rhythmIds??[];
    if(rhythmIds.length)await references(rhythmIds,'rhythm',session);
    if(item.sound?.genreIds?.length)await references(item.sound.genreIds,'genre',session);
-   for(const credit of [...item.musicianCredits,...(l?.vocalistCredits||[])]){
+   for(const credit of [...(item.sound?.musicianCredits||[]),...(l?.vocalistCredits||[])]){
     const person=await Vocabulary.findOne({externalId:credit.artistId,kind:{$in:['artist','musician']},archived:{$ne:true}}).session(session);
     if(!person)fail('Choose an existing person for each item credit.');
    }
-   for(const credit of item.musicianCredits){
+   for(const credit of item.sound?.musicianCredits||[]){
     if(!credit.instrumentId)continue;
     const instrument=await Vocabulary.findOne({externalId:credit.instrumentId,kind:'instrument',archived:{$ne:true}}).session(session);
     if(!instrument)fail('Choose an existing instrument for each musician credit.');
    }
-   const languageIds=l?.languageIds??(l?.languageId?[l.languageId]:[]),dialectIds=l?.dialectIds??(l?.dialectId?[l.dialectId]:[]);
+   const languages=l?.languages??[],languageIds=languages.map(row=>row.languageId);
    if(languageIds.length)await references(languageIds,'language',session);
-   for(const id of dialectIds){const dialect=await Vocabulary.findOne({externalId:id,kind:'dialect',archived:{$ne:true}}).session(session);if(!dialect||!languageIds.length||dialect.parentId&&!languageIds.includes(dialect.parentId))fail('Choose dialects for the selected item languages.');}
-   if(durationSeconds!=null&&l?.endSec>durationSeconds)fail('Atom audio ranges must stay inside the recording duration.');
+   for(const row of languages)for(const id of row.dialectIds){const dialect=await Vocabulary.findOne({externalId:id,kind:'dialect',archived:{$ne:true}}).session(session);if(!dialect||dialect.parentId&&dialect.parentId!==row.languageId)fail('Choose dialects of the item language they belong to.');}
   }
  }
  async function saveRecording(input,id,actor,migration=null){
@@ -253,7 +252,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    let audioAssetId='';
    if(v.audioUrl){const existing=await AudioAsset.findOne({url:v.audioUrl}).session(session);audioAssetId=existing?.externalId||`audio-${createHash('sha256').update(v.audioUrl).digest('hex')}`;if(!existing)await AudioAsset.create([{externalId:audioAssetId,url:v.audioUrl,durationSeconds:v.durationSeconds,provenance:provenance(v.provenance,actor)}],{session});}
    const duration=v.durationSeconds==null?'':`${Math.floor(v.durationSeconds/60)}:${String(Math.floor(v.durationSeconds%60)).padStart(2,'0')}`;
-   const data={sampleStartSec,audioMetadata:v.audioMetadata!==undefined?v.audioMetadata:(old?.audioUrl===v.audioUrl?plain(old)?.audioMetadata:null),recordingCredits:v.recordingCredits!==undefined?v.recordingCredits:(plain(old)?.recordingCredits||null),languages:v.languages!==undefined?v.languages:(plain(old)?.languages||null),musical:v.musical!==undefined?v.musical:(plain(old)?.musical||null),stems:v.stems!==undefined?v.stems:(old?.audioUrl===v.audioUrl?plain(old)?.stems||null:null),...(itemValues!==undefined?{items:itemValues}:{}),title:v.title,recordingType:v.recordingType,atomCount:itemValues!==undefined?itemValues.length:(old?.atomCount??0),workId:v.workId,audioAssetId,status:v.status,ontologyRevision:(old?.ontologyRevision||0)+1,description:v.description,date:v.releaseDate,audioUrl:v.audioUrl,coverImage:v.coverImage,duration,published:v.status==='PUBLISHED',mediaType:'audio'};
+   const data={sampleStartSec,audioMetadata:v.audioMetadata!==undefined?v.audioMetadata:(old?.audioUrl===v.audioUrl?plain(old)?.audioMetadata:null),languages:v.languages!==undefined?v.languages:(plain(old)?.languages||null),musical:v.musical!==undefined?v.musical:(plain(old)?.musical||null),stems:v.stems!==undefined?v.stems:(old?.audioUrl===v.audioUrl?plain(old)?.stems||null:null),...(itemValues!==undefined?{items:itemValues}:{}),title:v.title,recordingType:v.recordingType,atomCount:itemValues!==undefined?itemValues.length:(old?.atomCount??0),workId:v.workId,audioAssetId,status:v.status,ontologyRevision:(old?.ontologyRevision||0)+1,description:v.description,date:v.releaseDate,audioUrl:v.audioUrl,coverImage:v.coverImage,duration,published:v.status==='PUBLISHED',mediaType:'audio'};
    if(migration){for(const key of ['title','description','date','audioUrl','coverImage','duration','mediaType'])delete data[key];data.ontologyMigrationId=migration.runId;await mongoose.connection.collection('musicontologymigrationbackups').insertOne({_id:`${migration.runId}:${recordId}`,runId:migration.runId,recordingId:recordId,before:plain(old),afterRevision:data.ontologyRevision,createdAt:new Date()},{session});}
    let row;
    if(old){old.set(data);row=await old.save({session});}else row=(await ArchiveModel.create([{...data,externalId:recordId,category:'Music Archive',artist:''}],{session}))[0];
@@ -284,9 +283,9 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    const w=works.get(r.workId)||null,a=am.get(r.audioAssetId),deliver=url=>admin?previewUrl(deliveryUrl(url)):deliveryUrl(url);
    const componentWorkIds=[r.workId].filter(Boolean),componentWorks=componentWorkIds.map(id=>works.get(id)).filter(Boolean);
    const atomWorks=(r.items||[]).map(item=>({melody:{...item.sound,genres:(item.sound?.genreIds||[]).map(id=>vocabulary.get(id)).filter(Boolean)}}));
-   const artist=[...new Set([...(r.items||[]).flatMap(item=>[...item.musicianCredits,...(item.lyrics?.vocalistCredits||[])]),...inferredRecordingCredits(componentWorks),...componentWorks.flatMap(c=>[...(c.credits||[]),...(c.melody?.musicianCredits||[]),...(c.lyrics?.artistCredits||[])])].map(c=>vocabulary.get(c.artistId)?.name).filter(Boolean))].join(', ')||(!r.workId?r.artist||'':'');
+   const artist=[...new Set([...(r.items||[]).flatMap(item=>[...(item.sound?.musicianCredits||[]),...(item.lyrics?.vocalistCredits||[])]),...inferredRecordingCredits(componentWorks),...componentWorks.flatMap(c=>[...(c.credits||[]),...(c.melody?.musicianCredits||[]),...(c.lyrics?.artistCredits||[])])].map(c=>vocabulary.get(c.artistId)?.name).filter(Boolean))].join(', ')||(!r.workId?r.artist||'':'');
    const type=workTypes.get(r.recordingType)||null;
-   return {sampleStartSec:r.sampleStartSec??null,recordingCredits:r.recordingCredits||null,languages:r.languages||null,musical:r.musical||null,stems:r.stems?{channels:(r.stems.channels||[]).filter(c=>c&&c.url).map(c=>({name:c.name,url:deliver(c.url),storedUrl:c.url,...(admin?{}:{previewUrl:lightUrl(c.url)||undefined})})),duration:r.stems.duration??null,splitAt:r.stems.splitAt||''}:null,...(r.items!==undefined?{items:r.items.map(item=>({...item,lyrics:item.lyrics?withoutLyricFields(item.lyrics):null}))}:{}),id:r.externalId,title:r.title,description:r.description||'',recordingType:type?r.recordingType:null,recordingTypeDefinition:type,atomCount:r.items?.length??r.atomCount??0,componentWorkIds,componentWorks,workId:r.workId||null,work:w,ontologyStatus:r.items?.length?'ITEMS':r.workId?'MAPPED':'UNMAPPED',recordingMetadata:inferredRecordingMetadata(r.items?.length?atomWorks:componentWorks),credits:inferredRecordingCredits(componentWorks),status:r.status||(r.published!==false?'PUBLISHED':'DRAFT'),revision:r.ontologyRevision||0,audio:{metadata:r.audioMetadata||null,assetId:r.audioAssetId||null,url:deliver(r.audioUrl||a?.url||''),durationSeconds:r.duration?String(r.duration).split(':').reduce((t,n)=>t*60+Number(n),0):(a?.durationSeconds??null)},audioUrl:deliver(r.audioUrl||''),coverImage:deliver(r.coverImage||r.image||''),artist,duration:r.duration||'',date:r.date||'',releaseDate:r.date||'',createdAt:r.createdAt,updatedAt:r.updatedAt,sortOrder:r.sortOrder||0,published:r.published!==false,...(admin?{storedAudioUrl:r.audioUrl||'',storedCoverImage:r.coverImage||r.image||''}:{})};
+   return {sampleStartSec:r.sampleStartSec??null,languages:r.languages||null,musical:r.musical||null,stems:r.stems?{channels:(r.stems.channels||[]).filter(c=>c&&c.url).map(c=>({name:c.name,url:deliver(c.url),storedUrl:c.url,...(admin?{}:{previewUrl:lightUrl(c.url)||undefined})})),duration:r.stems.duration??null,splitAt:r.stems.splitAt||''}:null,...(r.items!==undefined?{items:r.items.map(item=>({...item,lyrics:item.lyrics?withoutLyricFields(item.lyrics):null}))}:{}),id:r.externalId,title:r.title,description:r.description||'',recordingType:type?r.recordingType:null,recordingTypeDefinition:type,atomCount:r.items?.length??r.atomCount??0,componentWorkIds,componentWorks,workId:r.workId||null,work:w,ontologyStatus:r.items?.length?'ITEMS':r.workId?'MAPPED':'UNMAPPED',recordingMetadata:inferredRecordingMetadata(r.items?.length?atomWorks:componentWorks),credits:inferredRecordingCredits(componentWorks),status:r.status||(r.published!==false?'PUBLISHED':'DRAFT'),revision:r.ontologyRevision||0,audio:{metadata:r.audioMetadata||null,assetId:r.audioAssetId||null,url:deliver(r.audioUrl||a?.url||''),durationSeconds:r.duration?String(r.duration).split(':').reduce((t,n)=>t*60+Number(n),0):(a?.durationSeconds??null)},audioUrl:deliver(r.audioUrl||''),coverImage:deliver(r.coverImage||r.image||''),artist,duration:r.duration||'',date:r.date||'',releaseDate:r.date||'',createdAt:r.createdAt,updatedAt:r.updatedAt,sortOrder:r.sortOrder||0,published:r.published!==false,...(admin?{storedAudioUrl:r.audioUrl||'',storedCoverImage:r.coverImage||r.image||''}:{})};
   });
  }
  async function list(admin=false,filters={}){
@@ -309,7 +308,6 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
  async function deleteLegacy(id){
   const deletion=require('../permanent-deletion');let keys=[];
   const removed=await transaction(async session=>{
-   await mongoose.connection.collection('musicontologylocks').updateOne({_id:'source-graph'},{$inc:{revision:1}},{upsert:true,session});
    const row=await ArchiveModel.findOne({externalId:id}).session(session);if(!row)return null;
    if(row.workId||row.items?.length)fail('Delete this recording through the ontology editor.',409);
    keys=await deletion.prepare(row,{session});

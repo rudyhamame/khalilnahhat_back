@@ -48,7 +48,6 @@ function registerMusicOntology(app,{requireAdmin,service=createService()}={}){
   const {revision}=schema.parse(req.body);
   let deletionKeys=[];
   await service.transaction(async session=>{
-   await require('mongoose').connection.collection('musicontologylocks').updateOne({_id:'source-graph'},{$inc:{revision:1}},{upsert:true,session});
    const row=await ArchiveItem.findOne({externalId:req.params.id}).session(session);
    if(!row)throw Object.assign(new Error('Recording not found.'),{status:404});
    if((row.ontologyRevision??0)!==revision)throw Object.assign(new Error('Recording changed. Reload before deleting.'),{status:409});

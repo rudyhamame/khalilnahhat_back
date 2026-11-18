@@ -1,7 +1,7 @@
 const mongoose=require('mongoose');
 // Admin phone alerts. Each kind is a per-admin toggle; payloads are generic (no customer data).
-const KINDS={booking:['New booking','A client sent a booking request.'],signup:['New account','A new guest created an account.'],visit:['Website visit','Someone is visiting the website.'],email:['New email','A new email arrived.']};
-const DEFAULTS={booking:true,signup:true,visit:false,email:true};
+const KINDS={booking:['New booking','A client sent a booking request.'],signup:['New account','A new guest created an account.'],visit:['Website visit','Someone is visiting the website.'],email:['New email','A new email arrived.'],download:['Android app downloaded','An administrator downloaded the Android app.'],online:['Administrator online','An administrator came online.']};
+const DEFAULTS={booking:true,signup:true,visit:false,email:true,download:true,online:true};
 // Visit History: one row per website visit (no IP address stored). Rows expire after 90 days.
 const Visit=mongoose.models.EchoVisit||mongoose.model('EchoVisit',new mongoose.Schema({
  time:{type:Date,default:Date.now,expires:90*86400},device:String,os:String,browser:String,kind:String,userId:String,name:String,path:String,referrer:String,country:String,lang:String,visitor:String,
@@ -16,7 +16,7 @@ const setSender=fn=>{sender=fn;};
 const prefs=async owner=>({...DEFAULTS,...((await Pref.findById(owner).lean())?.kinds||{})});
 const enabled=async(owner,kind)=>(await prefs(owner))[kind]===true;
 // Fire-and-forget: an alert failure must never break the business request that triggered it.
-const alert=kind=>{if(!sender||!KINDS[kind])return;Promise.resolve(sender(kind,...KINDS[kind])).catch(()=>{});};
+const alert=(kind,body,exceptOwner)=>{if(!sender||!KINDS[kind])return;Promise.resolve(sender(kind,KINDS[kind][0],body||KINDS[kind][1],exceptOwner)).catch(()=>{});};
 function register(app,{requireAdmin,authFromRequest,base='/api/admin/alerts'}){
  const seen=new Map();// per-IP flood guard: at most 20 visit rows a minute
  app.get(base,requireAdmin,async(req,res)=>res.json({kinds:await prefs(String(req.user._id||req.user.id))}));

@@ -27,6 +27,7 @@ const ReadState=mongoose.models.EchoProjectChatReadState||mongoose.model('EchoPr
 }));
 const presenceSchema=new mongoose.Schema({_id:String,userId:{type:String,required:true},lastSeenAt:{type:Date,required:true}});
 presenceSchema.index({lastSeenAt:1},{expireAfterSeconds:90});
+const cameOnline=new Map();
 const Presence=mongoose.models.EchoProjectChatPresence||mongoose.model('EchoProjectChatPresence',presenceSchema);
 const ONLINE_WINDOW_MS=45000;
 const afterCursor=read=>read?{$or:[{createdAt:{$gt:read.readAt}},{createdAt:read.readAt,_id:{$gt:read.readId}}]}:{};
@@ -83,7 +84,11 @@ function registerEchoProjectChat(app, { requireAdmin,authenticate,allowedOrigins
     try{
       const id=userId(req),key=id+':'+parsed.data.clientId;
       if(!parsed.data.online){await Presence.deleteOne({_id:key,userId:id});return res.json({online:false});}
+      // Coming online (no heartbeat in the last minute) alerts the other administrators, at most once per 10 minutes per person.
+      const wasOnline=await Presence.exists({userId:id,lastSeenAt:{$gt:new Date(Date.now()-60000)}});
       await Presence.updateOne({_id:key},{$set:{userId:id,lastSeenAt:new Date()}},{upsert:true});
+      if(!wasOnline&&!(cameOnline.get(id)>Date.now()-6e5)){cameOnline.set(id,Date.now());const u=actor(req)||{};
+        require('./admin-alerts').alert('online',`${u.firstName||u.displayName||u.name||u.username||'An administrator'} is online now.`,id);}
       res.set('Cache-Control','no-store').json(await status(req));
     }catch{res.status(503).json({message:'Online status is temporarily unavailable.'});}
   });

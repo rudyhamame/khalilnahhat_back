@@ -5,6 +5,7 @@ const {sendBrevoEmail}=require('./brevo');
 const secret=()=>process.env.ANDROID_LINK_SECRET||process.env.CLOUDINARY_API_SECRET||'';
 const sign=p=>crypto.createHmac('sha256',secret()).update(p).digest('base64url');
 const make=email=>{const p=Buffer.from(JSON.stringify({e:email,x:Date.now()+864e5})).toString('base64url');return p+'.'+sign(p);};
+const who=t=>{try{return JSON.parse(Buffer.from(String(t).split('.')[0],'base64url')).e;}catch{return '';}};
 const check=t=>{const[p,s]=String(t||'').split('.');if(!p||!s||!secret())return false;const a=Buffer.from(sign(p)),b=Buffer.from(s);
  if(a.length!==b.length||!crypto.timingSafeEqual(a,b))return false;try{return JSON.parse(Buffer.from(p,'base64url')).x>Date.now();}catch{return false;}};
 function register(app,{requireAdmin}){
@@ -24,6 +25,7 @@ function register(app,{requireAdmin}){
   if(!check(req.query.t))return res.status(403).send('This link is invalid or has expired.');
   const r=await fetch(process.env.ANDROID_APK_URL).catch(()=>null);
   if(!r?.ok||!r.body)return res.status(502).send('The app is unavailable right now.');
+  require('./admin-alerts').alert('download',`${who(req.query.t)} downloaded the Android app.`);
   res.set({'Content-Type':'application/vnd.android.package-archive','Content-Disposition':'attachment; filename="EchoDJ.apk"','Cache-Control':'private, no-store'});
   const len=r.headers.get('content-length');if(len)res.set('Content-Length',len);
   Readable.fromWeb(r.body).pipe(res);

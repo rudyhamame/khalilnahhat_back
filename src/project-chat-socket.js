@@ -13,8 +13,8 @@ function createProjectChatSocket({authenticate,allowedOrigins=[],onHeartbeat=asy
    const origin=req.headers.origin;
    if(origin&&!allowedOrigins.includes(origin.replace(/\/+$/,''))){socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');return;}
    wss.handleUpgrade(req,socket,head,client=>{
-    client.on('error',()=>{});client.alive=true;client.connectionId=randomUUID();
-    const touch=()=>{client.presenceWrite=(client.presenceWrite||Promise.resolve()).then(()=>onHeartbeat(client.user,client.connectionId));return client.presenceWrite;};
+    client.on('error',()=>{});client.alive=true;client.connectionId=randomUUID();client.kind=String(req.headers['x-echo-client']||'').toLowerCase()==='android'?'android':'browser';
+    const touch=()=>{client.presenceWrite=(client.presenceWrite||Promise.resolve()).then(()=>onHeartbeat(client.user,client.connectionId,client.kind));return client.presenceWrite;};
     client.on('pong',()=>{client.alive=true;if(client.authorized)touch().catch(()=>client.close(1011,'Presence unavailable'));});
     client.once('close',()=>{if(client.user)(client.presenceWrite||Promise.resolve()).catch(()=>{}).then(()=>onOffline(client.user,client.connectionId)).then(()=>publish('presence')).catch(()=>{});});
     const deadline=setTimeout(()=>client.close(4401,'Authentication required'),5000);deadline.unref?.();

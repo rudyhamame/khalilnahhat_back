@@ -42,7 +42,7 @@ function deliveryTimes(item,receipts=[]){
 
 function registerEchoProjectChat(app, { requireAdmin,authenticate,allowedOrigins }) {
   const realtime=require('./project-chat-socket').createProjectChatSocket({authenticate,allowedOrigins,
-    onHeartbeat:(user,connectionId)=>Presence.updateOne({_id:'socket:'+connectionId},{$set:{userId:String(user._id||user.id),lastSeenAt:new Date()}},{upsert:true}),
+    onHeartbeat:(user,connectionId,client)=>Presence.updateOne({_id:'socket:'+connectionId},{$set:{userId:String(user._id||user.id),lastSeenAt:new Date(),client:client==='android'?'android':'browser'}},{upsert:true}),
     onOffline:(_user,connectionId)=>Presence.deleteOne({_id:'socket:'+connectionId}),
   });
   const actor = req => req.user || req.authUser;

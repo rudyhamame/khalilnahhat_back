@@ -52,7 +52,6 @@ function registerMusicOntology(app,{requireAdmin,service=createService()}={}){
    const row=await ArchiveItem.findOne({externalId:req.params.id}).session(session);
    if(!row)throw Object.assign(new Error('Recording not found.'),{status:404});
    if((row.ontologyRevision??0)!==revision)throw Object.assign(new Error('Recording changed. Reload before deleting.'),{status:409});
-   if(await ArchiveItem.exists({externalId:{$ne:row.externalId},sourceRecordingIds:row.externalId}).session(session))throw Object.assign(new Error('This recording is used as a source. Remove its source reference from other recordings before deleting it.'),{status:409});
    await require('../music-archive').Collection.updateMany({recordingIds:row.externalId},{$pull:{recordingIds:row.externalId}},{session});
    const versions=await service.models.Version.find({recordingId:row.externalId}).session(session);
    deletionKeys=await permanentDeletion.prepare([row.toObject(),...versions.map(item=>item.toObject())],{session});

@@ -359,7 +359,6 @@ function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWor
    const prefix=`live-${row._id}`,ownedIds=new RegExp('^'+prefix+'(?:-part-[0-9]+)?$');
    const published=await ArchiveItem.find({externalId:ownedIds}).session(session);
    const ids=published.map(item=>item.externalId);
-   if(ids.length&&await ArchiveItem.exists({externalId:{$nin:ids},sourceRecordingIds:{$in:ids}}).session(session))throw Object.assign(new Error('This live recording is used as a source. Remove its source links before deleting it.'),{status:409});
    const versions=ids.length?await require('./music-ontology/models').Version.find({recordingId:{$in:ids}}).session(session):[];
    keys.push(...await permanentDeletion.prepare([row.toObject(),...published.map(item=>item.toObject()),...versions.map(item=>item.toObject())],{session}));
    if(ids.length){

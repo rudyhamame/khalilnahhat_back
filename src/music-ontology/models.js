@@ -25,9 +25,9 @@ const RecordingFields={
  recordingCredits:{type:{_id:false,vocalists:[{_id:false,artistId:String,detail:String}],musicians:[{_id:false,artistId:String,instrumentId:String,detail:String}]},default:null},
  stems:{type:{_id:false,channels:[{_id:false,name:String,url:String}],duration:Number,splitAt:String},default:null},
  items:{type:[{_id:false,id:{type:String,required:true},audioRange:{type:{_id:false,startSec:Number,endSec:Number},default:undefined},name:{type:String,required:true},releaseYear:Number,releaseDate:String,hasLyrics:{type:Boolean,required:true},sound:{type:{_id:false,bpms:{type:[Number],default:undefined},keys:{type:[String],default:undefined},rhythmIds:{type:[String],default:undefined},genreIds:[String],influences:[String]},default:undefined},musicianCredits:[{...itemCredit,instrumentId:String}],lyrics:{type:{_id:false,languageId:String,dialectId:String,languageIds:{type:[String],default:undefined},dialectIds:{type:[String],default:undefined},startSec:Number,endSec:Number,vocalistCredits:[itemCredit]},default:null}}],default:undefined},
- sampleStartSec:{type:Number,default:null},recordingType:{type:String,index:true},workId:{type:String,index:true},atomCount:{type:Number,default:0},componentWorkIds:{type:[String],index:true},audioAssetId:String,
- sourceRecordingIds:{type:[String],index:true},sourceWorkIds:{type:[String],index:true},
+ sampleStartSec:{type:Number,default:null},recordingType:{type:String,index:true},workId:{type:String,index:true},atomCount:{type:Number,default:0},audioAssetId:String,
+ 
  status:{type:String,enum:contract.recordingStatuses,index:true},
- ontologyRevision:Number,versionLabel:String,productionNotes:String,provenance,ontologyMigrationId:String,
+ ontologyRevision:Number,ontologyMigrationId:String,
 };
 module.exports={Melody,Lyrics,Work,Vocabulary,DjWorkType,DjWorkTypeSeed,AudioAsset,Version,RecordingFields};

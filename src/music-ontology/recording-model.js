@@ -14,7 +14,6 @@ const schema=new Schema({
  durationMinutes:Number,
  audioUrl:{type:String,default:''},
  coverImage:{type:String,default:''},
- sampleStartSec:{type:Number,default:null},
  audioMetadata:{type:{_id:false,format:String,sizeBytes:Number},default:null},
  stems:{type:{_id:false,channels:[{_id:false,name:String,url:String}],duration:Number,splitAt:String},default:null},
  atoms:{type:[{_id:false,id:{type:String,required:true},name:{type:String,required:true},releaseYear:Number,

@@ -28,8 +28,7 @@ function atom(item,parentOf){
 }
 function recording(row,parentOf){
  const atoms=(row.atoms||row.items||[]).map(item=>atom(item,parentOf));
- return {externalId:row.externalId,name:row.name||row.title,description:text(row.description),workType:row.workType||row.recordingType,status:statusOf(row),atomCount:atoms.length,releaseDate:text(row.releaseDate||row.date),durationMinutes:minutes(row),audioUrl:text(row.audioUrl),coverImage:text(row.coverImage),sampleStartSec:row.sampleStartSec??null,
-  audioMetadata:row.audioMetadata?{format:row.audioMetadata.format,sizeBytes:row.audioMetadata.sizeBytes}:null,stems:row.stems||null,atoms,revision:Math.max(1,row.ontologyRevision||row.revision||1),createdAt:row.createdAt,updatedAt:row.updatedAt};
+ return {externalId:row.externalId,name:row.name||row.title,description:text(row.description),workType:row.workType||row.recordingType,status:statusOf(row),atomCount:atoms.length,releaseDate:text(row.releaseDate||row.date).slice(0,10),durationMinutes:minutes(row),audioUrl:text(row.audioUrl),coverImage:text(row.coverImage),  audioMetadata:row.audioMetadata?{format:row.audioMetadata.format,sizeBytes:row.audioMetadata.sizeBytes}:null,stems:row.stems||null,atoms,revision:Math.max(1,row.ontologyRevision||row.revision||1),createdAt:row.createdAt,updatedAt:row.updatedAt};
 }
 module.exports={recording,atom};
 if(require.main===module)(async()=>{
@@ -48,9 +47,9 @@ if(require.main===module)(async()=>{
   copied++;
   if(await target.countDocuments({externalId:doc.externalId})===1)removed+=(await archive.deleteOne({_id:row._id})).deletedCount;
  }
- // The DJ work type no longer holds an Individual / Multiple amount.
- const types=await db.collection('djworktypes').countDocuments({amount:{$exists:true}});
- if(apply&&types)await db.collection('djworktypes').updateMany({},{$unset:{amount:''}});
+ // Work types no longer hold an Individual / Multiple amount or a 1-minute sample.
+ const types=await db.collection('djworktypes').countDocuments({$or:[{amount:{$exists:true}},{sample:{$exists:true}}]});
+ if(apply&&types)await db.collection('djworktypes').updateMany({},{$unset:{amount:'',sample:''}});
  console.log(JSON.stringify({apply,recordingsFound:found.length,toMove:convertible.length,copied,removedFromArchive:removed,leftInPlace:skipped.map(row=>({externalId:row.externalId,reason:'no atoms (old work-based recording)'})),workTypesWithAmount:types},null,1));
  await mongoose.disconnect();
 })().catch(error=>{console.error(error.message);process.exit(1)});

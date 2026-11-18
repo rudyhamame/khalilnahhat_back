@@ -47,21 +47,6 @@ function matches(r,f={}){
  const components=r.atoms?.length?r.atoms.map(item=>({title:item.name,type:item.lyrics?'SONG':'MUSIC',lyrics:item.lyrics?{language:{id:item.lyrics.languages?.[0]?.languageId},dialect:{id:item.lyrics.languages?.[0]?.dialectIds?.[0]},languages:(item.lyrics.languages??[]).map(row=>({id:row.languageId})),dialects:(item.lyrics.languages??[]).flatMap(row=>row.dialectIds).map(id=>({id})),vocalistCredits:item.lyrics.vocalistCredits,artistCredits:[...item.lyrics.vocalistCredits]}:null,melody:{...item.sound,rhythm:item.sound?.rhythmId?{id:item.sound.rhythmId}:null,genres:(item.sound?.genreIds||[]).map(id=>({id})),instruments:(item.sound?.musicianCredits||[]).filter(credit=>credit.instrumentId).map(credit=>({id:credit.instrumentId})),musicianCredits:(item.sound?.musicianCredits||[])}})):(r.work?[r.work]:[]);
  return (components.length?components:[null]).some(work=>matchesWork({...r,work},f));
 }
-// A work type's 1-minute sample is a recording of that type plus the second where the minute starts.
-const SAMPLE_SECONDS=60;
-function sampleProblem(typeId,row,startSec){
-  if(row.workType!==typeId)return 'Choose a recording of this work type.';
-  if(!row.audioUrl)return 'This recording has no audio yet.';
-  const length=row.audio?.durationSeconds;
-  if(Number.isFinite(length)&&startSec>Math.max(0,length-1))return 'The sample starts after the end of the recording.';
-  return null;
-}
-// What visitors (or admins) get for a stored sample: null unless its recording is still of that type, has audio and, for visitors, is published and active.
-function sampleFor(type,row,admin=false){
-  if(!type.sample||!row||!row.audioUrl||row.workType!==type.id)return null;
-  if(!admin&&row.status!=='PUBLISHED')return null;
-  return {recordingId:row.id,name:row.name,startSec:type.sample.startSec,durationSec:SAMPLE_SECONDS,audioUrl:row.audioUrl};
-}
 function createService({ArchiveModel=MusicRecording,models=M,deliveryUrl=value=>value,lightUrl=()=>'',previewUrl=value=>value,ownedAsset=()=>false}={}){
  const {Work,Lyrics,Melody,Vocabulary,DjWorkType,DjWorkTypeSeed,Version}=models;
  async function transaction(fn){
@@ -90,29 +75,7 @@ function createService({ArchiveModel=MusicRecording,models=M,deliveryUrl=value=>
  }
  async function listWorkTypes(){
   await ensureWorkTypes();
-  return (await DjWorkType.find().sort({sortOrder:1,name:1}).lean()).map(row=>({id:row.externalId,name:row.name,nameArabic:row.nameArabic||'',details:row.details||'',detailsArabic:row.detailsArabic||'',languageIds:row.languageIds||[],artworkUrl:row.artworkUrl||'',revision:row.revision||1,sample:row.sample||null}));
- }
- // A work type's 1-minute sample: which recording, and where in it the minute starts. Public lists only show samples of published, active recordings.
- async function withSamples(types,admin=false){
-  if(!types.some(type=>type.sample))return types.map(type=>({...type,sample:null}));
-  const recordings=new Map((await list(admin)).map(row=>[row.id,row]));
-  return types.map(type=>{
-   return {...type,sample:sampleFor(type,type.sample&&recordings.get(type.sample.recordingId),admin)};
-  });
- }
- async function setWorkTypeSample(id,input){
-  const value=z.object({recordingId:z.string().trim().min(1).max(160),startSec:z.number().min(0).max(86400)}).strict().parse(input);
-  const type=await DjWorkType.findOne({externalId:id});if(!type)fail('DJ work type not found.',404);
-  const row=(await list(true)).find(item=>item.id===value.recordingId);
-  if(!row)fail('Recording not found.',404);
-  const problem=sampleProblem(id,row,value.startSec);if(problem)fail(problem);
-  await DjWorkType.updateOne({_id:type._id},{$set:{sample:{recordingId:row.id,startSec:Math.round(value.startSec*10)/10}}});
-  return (await withSamples(await listWorkTypes(),true)).find(item=>item.id===id);
- }
- async function clearWorkTypeSample(id){
-  const type=await DjWorkType.findOne({externalId:id});if(!type)fail('DJ work type not found.',404);
-  await DjWorkType.updateOne({_id:type._id},{$set:{sample:null}});
-  return true;
+  return (await DjWorkType.find().sort({sortOrder:1,name:1}).lean()).map(row=>({id:row.externalId,name:row.name,nameArabic:row.nameArabic||'',details:row.details||'',detailsArabic:row.detailsArabic||'',languageIds:row.languageIds||[],artworkUrl:row.artworkUrl||'',revision:row.revision||1}));
  }
  async function saveWorkType(input,id=null){
   const schema=z.object({languageIds:z.array(z.string().trim().min(1).max(160)).max(100).refine(values=>new Set(values).size===values.length,'Choose distinct languages.').optional(),artworkUrl:z.string().trim().max(2048).optional(),name:z.string().trim().min(1).max(120),nameArabic:z.string().trim().max(120).default(''),details:z.string().trim().max(2000).default(''),detailsArabic:z.string().trim().max(2000).default(''),revision:z.number().int().positive().optional()}).strict();
@@ -238,17 +201,13 @@ function createService({ArchiveModel=MusicRecording,models=M,deliveryUrl=value=>
    if(old&&v.revision!==(old.revision||0))fail('This recording changed. Reload before editing.',409);
    const atoms=v.atoms===undefined?plain(old)?.atoms:v.atoms;
    await checkRecordingItems(atoms,v.audioUrl,v.durationSeconds,session);
-   const sampleStartSec=v.sampleStartSec!==undefined?v.sampleStartSec:old?.sampleStartSec??null;
-   if(sampleStartSec!==null){const problem=sampleProblem(v.workType,{workType:v.workType,audioUrl:v.audioUrl,audio:{durationSeconds:v.durationSeconds}},sampleStartSec);if(problem)fail(problem);}
    if(v.audioUrl&&!ownedAsset(v.audioUrl)||v.coverImage&&!ownedAsset(v.coverImage)||v.stems?.channels?.some(c=>!ownedAsset(c.url)))fail('Choose media uploaded to this website.');
    if(v.audioUrl&&!require('../music-archive-files').localAssetPattern.test(v.audioUrl)&&!/\/video\/(upload|authenticated)\//.test(v.audioUrl))fail('Choose an uploaded audio asset.');
    if(v.status==='PUBLISHED'&&!v.audioUrl)fail('Published recordings require audio.');
    const recordId=id||makeId('recording');
-   const data={sampleStartSec,audioMetadata:v.audioMetadata!==undefined?v.audioMetadata:(old?.audioUrl===v.audioUrl?plain(old)?.audioMetadata:null),stems:v.stems!==undefined?v.stems:(old?.audioUrl===v.audioUrl?plain(old)?.stems||null:null),...(atoms!==undefined?{atoms}:{}),name:v.name,workType:v.workType,atomCount:atoms!==undefined?atoms.length:(old?.atomCount??0),status:v.status,revision:(old?.revision||0)+1,description:v.description,releaseDate:v.releaseDate,audioUrl:v.audioUrl,coverImage:v.coverImage,durationMinutes:v.durationMinutes};
+   const data={audioMetadata:v.audioMetadata!==undefined?v.audioMetadata:(old?.audioUrl===v.audioUrl?plain(old)?.audioMetadata:null),stems:v.stems!==undefined?v.stems:(old?.audioUrl===v.audioUrl?plain(old)?.stems||null:null),...(atoms!==undefined?{atoms}:{}),name:v.name,workType:v.workType,atomCount:atoms!==undefined?atoms.length:(old?.atomCount??0),status:v.status,revision:(old?.revision||0)+1,description:v.description,releaseDate:v.releaseDate,audioUrl:v.audioUrl,coverImage:v.coverImage,durationMinutes:v.durationMinutes};
    let row;
    if(old){old.set(data);row=await old.save({session});}else row=(await ArchiveModel.create([{...data,externalId:recordId}],{session}))[0];
-   // A prepared sample becomes the public work-type sample only on publication.
-   if(sampleStartSec!==null&&data.status==='PUBLISHED')await DjWorkType.updateOne({_id:type._id},{$set:{sample:{recordingId:recordId,startSec:Math.round(sampleStartSec*10)/10}}},{session});
    await Version.create([{externalId:makeId('version'),recordingId:recordId,number:data.revision,snapshot:plain(row),changedBy:actor||'admin'}],{session});
    return recordId;
   });
@@ -276,7 +235,7 @@ function createService({ArchiveModel=MusicRecording,models=M,deliveryUrl=value=>
    const artist=[...new Set(atoms.flatMap(item=>[...(item.sound?.musicianCredits||[]),...(item.lyrics?.vocalistCredits||[])]).map(c=>vocabulary.get(c.artistId)?.name).filter(Boolean))].join(', ');
    const type=workTypes.get(r.workType)||null;
    const minutes=r.durationMinutes??null;
-   return {id:r.externalId,name:r.name,description:r.description||'',workType:type?r.workType:null,workTypeDefinition:type,status:r.status||'DRAFT',atomCount:atoms.length,atoms:atoms.map(item=>({...item,lyrics:item.lyrics?withoutLyricFields(item.lyrics):null})),sampleStartSec:r.sampleStartSec??null,
+   return {id:r.externalId,name:r.name,description:r.description||'',workType:type?r.workType:null,workTypeDefinition:type,status:r.status||'DRAFT',atomCount:atoms.length,atoms:atoms.map(item=>({...item,lyrics:item.lyrics?withoutLyricFields(item.lyrics):null})),
     stems:r.stems?{channels:(r.stems.channels||[]).filter(c=>c&&c.url).map(c=>({name:c.name,url:deliver(c.url),storedUrl:c.url,...(admin?{}:{previewUrl:lightUrl(c.url)||undefined})})),duration:r.stems.duration??null,splitAt:r.stems.splitAt||''}:null,
     audio:{metadata:r.audioMetadata||null,url:deliver(r.audioUrl||''),durationSeconds:minutes!=null?Math.round(minutes*60):null},audioUrl:deliver(r.audioUrl||''),coverImage:deliver(r.coverImage||''),
     durationMinutes:minutes,releaseDate:r.releaseDate||'',artist,recordingMetadata:inferredRecordingMetadata(atomWorks),revision:r.revision||0,createdAt:r.createdAt,updatedAt:r.updatedAt,
@@ -309,6 +268,6 @@ function createService({ArchiveModel=MusicRecording,models=M,deliveryUrl=value=>
   if(removed)removed.cloudinaryCleanupPending=(await deletion.finish(keys)).pending;return removed;
  }
 
- return {transaction,saveVocabulary,saveWork,saveWorkType,deleteWorkType,listWorkTypes,withSamples,setWorkTypeSample,clearWorkTypeSample,saveRecording,hydrate,list,workMap,models,contract,deleteLegacy,preflightRecording};
+ return {transaction,saveVocabulary,saveWork,saveWorkType,deleteWorkType,listWorkTypes,saveRecording,hydrate,list,workMap,models,contract,deleteLegacy,preflightRecording};
 }
-module.exports={sampleFor,sampleProblem,SAMPLE_SECONDS,createService,assertAcyclic,matches,norm,fail};
+module.exports={createService,assertAcyclic,matches,norm,fail};

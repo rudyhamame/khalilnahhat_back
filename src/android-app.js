@@ -1,7 +1,7 @@
 const crypto=require('crypto');
 const {Readable}=require('stream');
 const {sendSimpleEmail}=require('./brevo');
-// Admin-only Android app delivery: an admin asks for a link by email; the link carries a signed 24 h token and streams the APK from ANDROID_APK_URL.
+// Admin-only Android app delivery: an admin asks for a link, sent to the email on their own account; the link carries a signed 24 h token and streams the APK from ANDROID_APK_URL.
 const secret=()=>process.env.ANDROID_LINK_SECRET||process.env.CLOUDINARY_API_SECRET||'';
 const sign=p=>crypto.createHmac('sha256',secret()).update(p).digest('base64url');
 const make=email=>{const p=Buffer.from(JSON.stringify({e:email,x:Date.now()+864e5})).toString('base64url');return p+'.'+sign(p);};
@@ -10,8 +10,8 @@ const check=t=>{const[p,s]=String(t||'').split('.');if(!p||!s||!secret())return 
 function register(app,{requireAdmin}){
  const rate=new Map();
  app.post('/api/admin/android/send-link',requireAdmin,async(req,res)=>{
-  const email=String(req.body?.email||'').trim().toLowerCase();
-  if(!/^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{2,}$/.test(email))return res.status(400).json({error:'Enter a valid email address.'});
+  const email=String(req.user.email||'').trim().toLowerCase();
+  if(!email)return res.status(400).json({error:'Your administrator account has no email address.'});
   if(!process.env.ANDROID_APK_URL||!secret())return res.status(503).json({error:'The Android app is not published yet.'});
   const k=String(req.user._id||req.user.id),n=(rate.get(k)||[]).filter(t=>Date.now()-t<36e5);if(n.length>=5)return res.status(429).json({error:'Too many requests. Try again later.'});rate.set(k,[...n,Date.now()]);
   const base=process.env.API_PUBLIC_URL||`${req.get('x-forwarded-proto')||req.protocol}://${req.get('host')}`;

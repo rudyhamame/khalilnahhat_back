@@ -19,7 +19,7 @@ test('musician instrument dependencies are accepted, validated and persisted thr
  assert.equal(stored.instrumentId,instrument.id);
  const invalid=await request('/work-elements/musician/options/'+musician.id,'PUT',{value:musician.value,revision:musician.revision,instrumentId:db.artist});
  assert.equal(invalid.status,400);assert.match(invalid.payload.message,/existing instrument/);
- const recording=await request('/recordings','POST',{title:'Instrument regression recording',recordingType:'MIX',recordingAmount:'INDIVIDUAL',items:[{id:'instrument-regression-atom',name:'Instrument regression atom',hasLyrics:false,musicianCredits:[{artistId:musician.id,instrumentId:instrument.id}]}]});
+ const recording=await request('/recordings','POST',{title:'Instrument regression recording',recordingType:'MIX',items:[{id:'instrument-regression-atom',name:'Instrument regression atom',hasLyrics:false,musicianCredits:[{artistId:musician.id,instrumentId:instrument.id}]}]});
  assert.equal(recording.status,201,JSON.stringify(recording.payload));
  const reloaded=(await request('/recordings/'+recording.payload.item.id)).payload.item;
  assert.equal(reloaded.items[0].musicianCredits[0].instrumentId,instrument.id);

@@ -55,7 +55,7 @@ function createWorkElements(service){
  }
  async function save(key,input,id,actor){
   const def=definition(key);if(['fixed','recording','work'].includes(def.source))fail('Manage these identities in their recording or content editor.');
-  const data=z.object({dialectIds:z.array(z.string().trim().min(1).max(160)).max(100).refine(values=>new Set(values).size===values.length,'Choose distinct dialects.').optional(),description:z.string().trim().max(2000).optional(),instrumentId:z.string().trim().min(1).max(160).nullable().optional(),languageIds:z.array(z.string().trim().min(1).max(160)).max(100).refine(values=>new Set(values).size===values.length,'Choose distinct languages.').optional(),value:z.string().trim().min(1).max(240),revision:z.number().int().positive().optional(),parentId:z.string().max(160).optional(),isoCode:z.string().max(20).optional(),amount:z.enum(['INDIVIDUAL','MULTIPLE']).optional()}).strict().parse(input);
+  const data=z.object({dialectIds:z.array(z.string().trim().min(1).max(160)).max(100).refine(values=>new Set(values).size===values.length,'Choose distinct dialects.').optional(),description:z.string().trim().max(2000).optional(),instrumentId:z.string().trim().min(1).max(160).nullable().optional(),languageIds:z.array(z.string().trim().min(1).max(160)).max(100).refine(values=>new Set(values).size===values.length,'Choose distinct languages.').optional(),value:z.string().trim().min(1).max(240),revision:z.number().int().positive().optional(),parentId:z.string().max(160).optional(),isoCode:z.string().max(20).optional()}).strict().parse(input);
   if(def.source==='vocabulary'){
    const old=id?await Vocabulary.findOne({externalId:id}).lean():await Vocabulary.findOne({kind:def.kind,normalizedName:norm(data.value),parentId:data.parentId||'',archived:true}).lean();
    if(id&&(!old||old.kind!==def.kind))fail('Option not found.',404);
@@ -66,7 +66,7 @@ function createWorkElements(service){
   }
   if(def.source==='workType'){
    const old=id?(await service.listWorkTypes()).find(row=>row.id===id):null;if(id&&!old)fail('Option not found.',404);
-   return service.saveWorkType({languageIds:data.languageIds??old?.languageIds??[],name:data.value,nameArabic:old?.nameArabic||'',amount:old?.amount||data.amount||'INDIVIDUAL',details:old?.details||'',detailsArabic:old?.detailsArabic||'',artworkUrl:old?.artworkUrl||'',...(old?{revision:data.revision}:{})},id);
+   return service.saveWorkType({languageIds:data.languageIds??old?.languageIds??[],name:data.value,nameArabic:old?.nameArabic||'',details:old?.details||'',detailsArabic:old?.detailsArabic||'',artworkUrl:old?.artworkUrl||'',...(old?{revision:data.revision}:{})},id);
   }
   validateValue(key,data.value);
   const descriptionSet={};

@@ -4,11 +4,11 @@ const {fixture}=require('./helpers/music-ontology-fixture.cjs');
 const V=require('../src/music-ontology/validation');
 test('recording item schema rejects invalid branches, duplicate ids and unordered timing',()=>{
  const item={id:'a',name:'A',hasLyrics:false};
- const base={title:'Mix',recordingType:'MIX',recordingAmount:'MULTIPLE',items:[item]};
+ const base={title:'Mix',recordingType:'MIX',items:[item]};
  assert.equal(V.recording.parse(base).items[0].lyrics,null);
  assert.equal(V.recording.safeParse({...base,items:[item,item]}).success,false);
  assert.equal(V.recording.safeParse({...base,items:[{...item,lyrics:{vocalistCredits:[]}}]}).success,false);
- assert.equal(V.recording.safeParse({...base,recordingAmount:'INDIVIDUAL',items:[item,{...item,id:'b'}]}).success,false);
+ assert.equal(V.recording.safeParse({...base,items:[item,{...item,id:'b'}]}).success,true);
  assert.equal(V.recording.safeParse({...base,items:[{...item,hasLyrics:true,lyrics:{startSec:20,endSec:10}}]}).success,false);
 });
 test('HTTP create, reload, edit and rollback preserve recording-owned items without shared-work writes',{timeout:120000},async t=>{
@@ -18,7 +18,7 @@ test('HTTP create, reload, edit and rollback preserve recording-owned items with
  const old=(await req('/admin/music-ontology/recordings/'+db.ids[0])).body.item;
  const person={artistId:db.artist,detail:'Fixture credit'};
  const items=[{id:'song-1',name:'Lyrical item',releaseYear:1998,hasLyrics:true,musicianCredits:[person,person],lyrics:{languageId:db.language,startSec:0,endSec:10,vocalistCredits:[person,person]}},{id:'music-2',name:'Instrumental item',releaseYear:2002,hasLyrics:false,musicianCredits:[person]}];
- const payload={title:'Independent multiple recording',recordingType:'MIX',recordingAmount:'MULTIPLE',audioUrl:old.storedAudioUrl,durationSeconds:20,publicationStatus:'DRAFT',items};
+ const payload={title:'Independent multiple recording',recordingType:'MIX',audioUrl:old.storedAudioUrl,durationSeconds:20,publicationStatus:'DRAFT',items};
  const created=await req('/admin/music-ontology/recordings','POST',payload);assert.equal(created.status,201,JSON.stringify(created.body));const row=created.body.item;
  assert.equal(row.ontologyStatus,'ITEMS');assert.equal(row.items.length,2);assert.equal(row.items[0].releaseYear,1998);assert.equal(row.items[1].releaseYear,2002);assert.equal(row.items[1].lyrics,null);assert.equal(row.items[0].lyrics.vocalistCredits.length,2);assert.equal(row.items[0].lyrics.text,undefined);
  assert.equal(await Work.countDocuments(),count);assert.equal(row.workId,null);assert.deepEqual(row.componentWorkIds,[]);

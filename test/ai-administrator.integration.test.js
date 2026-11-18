@@ -144,7 +144,7 @@ test('AI Administrator: real editor adapters, durable approvals, verification, a
   await approve(await run('availability_block_update',{dates:[date],blocked:true,note:'Native QA travel'}));
   const availability=await registry.executeRead('availability_read',{year:Number(date.slice(0,4))},admin);assert.ok(availability.blocked.some(row=>row.date===date&&row.note==='Native QA travel'));
   await approve(await run('availability_block_update',{dates:[date],blocked:false,note:''}));
-  const type=await approve(await run('work_type_create',{body:{name:'Native QA type',amount:'INDIVIDUAL',details:'Original supplied text'}}));
+  const type=await approve(await run('work_type_create',{body:{name:'Native QA type',details:'Original supplied text'}}));
   const typeAfter=await approve(await run('work_type_update',{id:type.id,body:{detailsArabic:'وصف'}}));assert.equal(typeAfter.name,type.name);assert.equal(typeAfter.details,'Original supplied text');assert.equal(typeAfter.detailsArabic,'وصف');
   for(const tool of ['work_elements_read','work_types_read','vouchers_search','ai_usage_read','youtube_session_status'])await registry.executeRead(tool,{},admin);
  });

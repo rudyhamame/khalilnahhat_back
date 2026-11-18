@@ -8,7 +8,7 @@ test('recording archive and publication lifecycle',{timeout:120000},async t=>{
  const make=(type,workId)=>({title:type,recordingType:type,workId,audioUrl:existing.storedAudioUrl,durationSeconds:60,publicationStatus:'PUBLISHED'});
  const music={id:db.music};
  await t.test('archive privately with a prepared sample, then publish and activate it atomically',async()=>{
-  const type=await write('work-types',{name:'Workflow sample',amount:'INDIVIDUAL'});
+  const type=await write('work-types',{name:'Workflow sample'});
   const original=await write('recordings',{...make(type.id,music.id),title:'Original public sample'});
   assert.equal((await req(`/admin/music-ontology/work-types/${type.id}/sample`,'PUT',{recordingId:original.id,startSec:0})).status,200);
   const fields={...make(type.id,music.id),title:'Prepared privately',publicationStatus:'DRAFT',archivalStatus:'ARCHIVED',sampleStartSec:10};

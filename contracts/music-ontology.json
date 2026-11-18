@@ -60,8 +60,7 @@
     "bpmScope",
     "status",
     "instrument",
-    "musician",
-    "recordingAmount"
+    "musician"
   ],
   "musicianRoles": [
     "PERFORMER",
@@ -69,22 +68,6 @@
     "ARRANGER",
     "OTHER"
   ],
-  "recordingAmounts": [
-    "INDIVIDUAL",
-    "MULTIPLE"
-  ],
-  "recordingTypeGroups": {
-    "INDIVIDUAL": [
-      "COVER",
-      "REMIX",
-      "MASHUP"
-    ],
-    "MULTIPLE": [
-      "MEDLEY",
-      "MIX",
-      "LIVE"
-    ]
-  },
   "workTypeLabels": {
     "SONG": "Vocal Music",
     "MUSIC": "Instrumental Music"

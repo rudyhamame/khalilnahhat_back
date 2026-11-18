@@ -33,6 +33,9 @@ if(require.main===module)(async()=>{
   found++;
   if(apply){await ArchiveItem.collection.updateOne({_id:row._id},{...(Object.keys(set).length?{$set:set}:{}),...(Object.keys(unset).length?{$unset:unset}:{})});changed++;}
  }
- console.log(JSON.stringify({apply,found,changed}));
+ // The DJ work type no longer holds an Individual / Multiple amount.
+ const types=await mongoose.connection.collection('djworktypes').countDocuments({amount:{$exists:true}});
+ if(apply&&types)await mongoose.connection.collection('djworktypes').updateMany({},{$unset:{amount:''}});
+ console.log(JSON.stringify({apply,found,changed,workTypesWithAmount:types}));
  await mongoose.disconnect();
 })().catch(e=>{console.error(e.message);process.exit(1)});

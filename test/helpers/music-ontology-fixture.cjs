@@ -14,7 +14,7 @@ async function fixture(){
  await Promise.all([...Object.values(M).filter(m=>m?.init),ArchiveItem].map(m=>m.init()));
  const service=archive.ontologyService();
  await service.listWorkTypes();
- const production=await service.saveWorkType({name:'Production',amount:'INDIVIDUAL'});
+ const production=await service.saveWorkType({name:'Production'});
  const language=await service.saveVocabulary({kind:'language',name:'Arabic',isoCode:'ar'},null,'qa');
  const genre=await service.saveVocabulary({kind:'genre',name:'Arabic Pop'},null,'qa');
  const artist=await service.saveVocabulary({kind:'artist',name:'Khalil'},null,'qa');

@@ -43,9 +43,7 @@ function matchesWork(r,f={}){
  if(f.q){const q=norm(f.q);const hay=[r.title,w?.title,r.artist,...(r.credits||[]).map(c=>c.artist?.name),...(w?.credits||[]).map(c=>c.artist?.name),...(m?.musicianCredits||[]).map(c=>c.artist?.name),...(m?.instruments||[]).map(i=>i.name),...(l?.artistCredits||[]).map(c=>c.artist?.name),...(m?.genres||[]).map(g=>g.name),...(r.recordingMetadata?.genres||[]).map(g=>g.name)].filter(Boolean).join(' ');if(!norm(hay).includes(q))return false;}
  return true;
 }
-const amountFor=type=>Object.keys(contract.recordingTypeGroups).find(key=>contract.recordingTypeGroups[key].includes(type))||null;
 function matches(r,f={}){
- if(f.recordingAmount&&r.recordingAmount!==f.recordingAmount)return false;
  const components=r.items?.length?r.items.map(item=>({title:item.name,type:item.hasLyrics?'SONG':'MUSIC',lyrics:item.lyrics?{language:{id:item.lyrics.languageId},dialect:{id:item.lyrics.dialectId},languages:(item.lyrics.languageIds??(item.lyrics.languageId?[item.lyrics.languageId]:[])).map(id=>({id})),dialects:(item.lyrics.dialectIds??(item.lyrics.dialectId?[item.lyrics.dialectId]:[])).map(id=>({id})),vocalistCredits:item.lyrics.vocalistCredits,artistCredits:[...item.lyrics.vocalistCredits]}:null,melody:{...item.sound,rhythm:item.sound?.rhythmId?{id:item.sound.rhythmId}:null,genres:(item.sound?.genreIds||[]).map(id=>({id})),instruments:item.musicianCredits.filter(credit=>credit.instrumentId).map(credit=>({id:credit.instrumentId})),musicianCredits:item.musicianCredits}})):r.componentWorks?.length?r.componentWorks:[r.work];
  return components.some(work=>matchesWork({...r,work},f));
 }
@@ -78,12 +76,12 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
  async function creditsCheck(credits,session,kind=['artist']){await references(credits.map(c=>c.artistId),kind,session);}
  const provenance=(p,actor)=>({...p,recordedBy:actor||'admin'});
  const defaultWorkTypes=[
-  {id:'MIX',name:'Mix',nameArabic:'ميكس',amount:'MULTIPLE',details:'A curated sequence of tracks blended into one continuous listening experience.',detailsArabic:'مجموعة مقطوعات مختارة ومنسّقة في تجربة استماع متصلة.'},
-  {id:'REMIX',name:'Remix',nameArabic:'ريميكس',amount:'INDIVIDUAL',details:'An existing recording reshaped with a new beat, arrangement or sound textures.',detailsArabic:'إعادة تشكيل تسجيل موجود بإيقاع أو توزيع أو ملامح صوتية جديدة.'},
-  {id:'MASHUP',name:'Mashup',nameArabic:'ماش أب',amount:'INDIVIDUAL',details:'Parts from separate recordings combined into one new musical arrangement.',detailsArabic:'جمع مقاطع من تسجيلات مختلفة في توزيع موسيقي جديد.'},
-  {id:'MEDLEY',name:'Medley',nameArabic:'ميدلي',amount:'MULTIPLE',details:'Selected passages from several works arranged into one connected performance.',detailsArabic:'مقاطع مختارة من عدة أعمال مرتّبة في أداء واحد متصل.'},
-  {id:'COVER',name:'Cover',nameArabic:'إعادة أداء',amount:'INDIVIDUAL',details:'A fresh interpretation of an existing work, with a different arrangement, sound or performance.',detailsArabic:'قراءة جديدة لعمل موجود، بتوزيع أو صوت أو إحساس أدائي مختلف.'},
-  {id:'LIVE',name:'Live',nameArabic:'أداء مباشر',amount:'MULTIPLE',details:'A real-time performance shaped by the room, the audience and the moment.',detailsArabic:'أداء في الوقت الفعلي يتفاعل مع المكان والجمهور واللحظة.'},
+  {id:'MIX',name:'Mix',nameArabic:'ميكس',details:'A curated sequence of tracks blended into one continuous listening experience.',detailsArabic:'مجموعة مقطوعات مختارة ومنسّقة في تجربة استماع متصلة.'},
+  {id:'REMIX',name:'Remix',nameArabic:'ريميكس',details:'An existing recording reshaped with a new beat, arrangement or sound textures.',detailsArabic:'إعادة تشكيل تسجيل موجود بإيقاع أو توزيع أو ملامح صوتية جديدة.'},
+  {id:'MASHUP',name:'Mashup',nameArabic:'ماش أب',details:'Parts from separate recordings combined into one new musical arrangement.',detailsArabic:'جمع مقاطع من تسجيلات مختلفة في توزيع موسيقي جديد.'},
+  {id:'MEDLEY',name:'Medley',nameArabic:'ميدلي',details:'Selected passages from several works arranged into one connected performance.',detailsArabic:'مقاطع مختارة من عدة أعمال مرتّبة في أداء واحد متصل.'},
+  {id:'COVER',name:'Cover',nameArabic:'إعادة أداء',details:'A fresh interpretation of an existing work, with a different arrangement, sound or performance.',detailsArabic:'قراءة جديدة لعمل موجود، بتوزيع أو صوت أو إحساس أدائي مختلف.'},
+  {id:'LIVE',name:'Live',nameArabic:'أداء مباشر',details:'A real-time performance shaped by the room, the audience and the moment.',detailsArabic:'أداء في الوقت الفعلي يتفاعل مع المكان والجمهور واللحظة.'},
  ];
  async function ensureWorkTypes(){
   const seed=await DjWorkTypeSeed.findOneAndUpdate({externalId:'defaults-v1'},{$setOnInsert:{externalId:'defaults-v1'}},{upsert:true,new:false}).lean();
@@ -92,7 +90,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
  }
  async function listWorkTypes(){
   await ensureWorkTypes();
-  return (await DjWorkType.find().sort({sortOrder:1,name:1}).lean()).map(row=>({id:row.externalId,name:row.name,nameArabic:row.nameArabic||'',amount:row.amount,details:row.details||'',detailsArabic:row.detailsArabic||'',languageIds:row.languageIds||[],artworkUrl:row.artworkUrl||'',revision:row.revision||1,sample:row.sample||null}));
+  return (await DjWorkType.find().sort({sortOrder:1,name:1}).lean()).map(row=>({id:row.externalId,name:row.name,nameArabic:row.nameArabic||'',details:row.details||'',detailsArabic:row.detailsArabic||'',languageIds:row.languageIds||[],artworkUrl:row.artworkUrl||'',revision:row.revision||1,sample:row.sample||null}));
  }
  // A work type's 1-minute sample: which recording, and where in it the minute starts. Public lists only show samples of published, active recordings.
  async function withSamples(types,admin=false){
@@ -117,7 +115,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
   return true;
  }
  async function saveWorkType(input,id=null){
-  const schema=z.object({languageIds:z.array(z.string().trim().min(1).max(160)).max(100).refine(values=>new Set(values).size===values.length,'Choose distinct languages.').optional(),artworkUrl:z.string().trim().max(2048).optional(),name:z.string().trim().min(1).max(120),nameArabic:z.string().trim().max(120).default(''),amount:z.enum(contract.recordingAmounts).optional(),details:z.string().trim().max(2000).default(''),detailsArabic:z.string().trim().max(2000).default(''),revision:z.number().int().positive().optional()}).strict();
+  const schema=z.object({languageIds:z.array(z.string().trim().min(1).max(160)).max(100).refine(values=>new Set(values).size===values.length,'Choose distinct languages.').optional(),artworkUrl:z.string().trim().max(2048).optional(),name:z.string().trim().min(1).max(120),nameArabic:z.string().trim().max(120).default(''),details:z.string().trim().max(2000).default(''),detailsArabic:z.string().trim().max(2000).default(''),revision:z.number().int().positive().optional()}).strict();
   const value=schema.parse(input), code=(id||value.name).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,120);
   if(!code)fail('Enter a work type name.');
   if(code==='ORIGINAL')fail('Original is reserved for work without a DJ treatment.');
@@ -129,9 +127,9 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
   const conflict=await DjWorkType.findOne({normalizedName:norm(value.name),externalId:{$ne:code}}).lean();
   if(conflict)fail('A DJ work type with this name already exists.',409);
   const sortOrder=old?.sortOrder??((await DjWorkType.findOne().sort({sortOrder:-1}).select('sortOrder').lean())?.sortOrder??-1)+1;
-  const data={languageIds:value.languageIds??old?.languageIds??[],artworkUrl:value.artworkUrl??old?.artworkUrl??'',name:value.name,nameArabic:value.nameArabic,normalizedName:norm(value.name),amount:value.amount||old?.amount||'INDIVIDUAL',details:value.details,detailsArabic:value.detailsArabic,sortOrder,revision:(old?.revision||0)+1};
+  const data={languageIds:value.languageIds??old?.languageIds??[],artworkUrl:value.artworkUrl??old?.artworkUrl??'',name:value.name,nameArabic:value.nameArabic,normalizedName:norm(value.name),details:value.details,detailsArabic:value.detailsArabic,sortOrder,revision:(old?.revision||0)+1};
   if(old){old.set(data);await old.save();return {id:old.externalId,...data};}
-  try{const row=await DjWorkType.create({externalId:code,...data});return {id:row.externalId,name:row.name,nameArabic:row.nameArabic,amount:row.amount,details:row.details,detailsArabic:row.detailsArabic,languageIds:row.languageIds||[],artworkUrl:row.artworkUrl||'',revision:row.revision};}
+  try{const row=await DjWorkType.create({externalId:code,...data});return {id:row.externalId,name:row.name,nameArabic:row.nameArabic,details:row.details,detailsArabic:row.detailsArabic,languageIds:row.languageIds||[],artworkUrl:row.artworkUrl||'',revision:row.revision};}
   catch(error){if(error.code===11000)fail('A DJ work type with this name already exists.',409);throw error;}
  }
  async function deleteWorkType(id){
@@ -242,7 +240,6 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    const work=v.workId?await Work.findOne({externalId:v.workId}).session(session):null;
    if(v.workId&&!work)fail('Choose an existing musical work.');
    const itemValues=v.items===undefined?plain(old)?.items:v.items;
-   if(type.amount==='INDIVIDUAL'&&itemValues?.length>1)fail('Individual recordings have one item.');
    await checkRecordingItems(itemValues,v.audioUrl,v.durationSeconds,session);
    const sampleStartSec=v.sampleStartSec!==undefined?v.sampleStartSec:old?.sampleStartSec??null;
    if(sampleStartSec!==null){const problem=sampleProblem(v.recordingType,{recordingType:v.recordingType,audioUrl:v.audioUrl,audio:{durationSeconds:v.durationSeconds}},sampleStartSec);if(problem)fail(problem);}
@@ -289,7 +286,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    const atomWorks=(r.items||[]).map(item=>({melody:{...item.sound,genres:(item.sound?.genreIds||[]).map(id=>vocabulary.get(id)).filter(Boolean)}}));
    const artist=[...new Set([...(r.items||[]).flatMap(item=>[...item.musicianCredits,...(item.lyrics?.vocalistCredits||[])]),...inferredRecordingCredits(componentWorks),...componentWorks.flatMap(c=>[...(c.credits||[]),...(c.melody?.musicianCredits||[]),...(c.lyrics?.artistCredits||[])])].map(c=>vocabulary.get(c.artistId)?.name).filter(Boolean))].join(', ')||(!r.workId?r.artist||'':'');
    const type=workTypes.get(r.recordingType)||null;
-   return {sampleStartSec:r.sampleStartSec??null,recordingCredits:r.recordingCredits||null,languages:r.languages||null,musical:r.musical||null,stems:r.stems?{channels:(r.stems.channels||[]).filter(c=>c&&c.url).map(c=>({name:c.name,url:deliver(c.url),storedUrl:c.url,...(admin?{}:{previewUrl:lightUrl(c.url)||undefined})})),duration:r.stems.duration??null,splitAt:r.stems.splitAt||''}:null,...(r.items!==undefined?{items:r.items.map(item=>({...item,lyrics:item.lyrics?withoutLyricFields(item.lyrics):null}))}:{}),id:r.externalId,title:r.title,description:r.description||'',recordingType:type?r.recordingType:null,recordingTypeDefinition:type,recordingAmount:type?.amount||amountFor(r.recordingType),atomCount:r.items?.length??r.atomCount??0,componentWorkIds,componentWorks,workId:r.workId||null,work:w,ontologyStatus:r.items?.length?'ITEMS':r.workId?'MAPPED':'UNMAPPED',recordingMetadata:inferredRecordingMetadata(r.items?.length?atomWorks:componentWorks),credits:inferredRecordingCredits(componentWorks),status:r.status||(r.published!==false?'PUBLISHED':'DRAFT'),revision:r.ontologyRevision||0,audio:{metadata:r.audioMetadata||null,assetId:r.audioAssetId||null,url:deliver(r.audioUrl||a?.url||''),durationSeconds:r.duration?String(r.duration).split(':').reduce((t,n)=>t*60+Number(n),0):(a?.durationSeconds??null)},audioUrl:deliver(r.audioUrl||''),coverImage:deliver(r.coverImage||r.image||''),artist,duration:r.duration||'',date:r.date||'',releaseDate:r.date||'',createdAt:r.createdAt,updatedAt:r.updatedAt,sortOrder:r.sortOrder||0,published:r.published!==false,...(admin?{storedAudioUrl:r.audioUrl||'',storedCoverImage:r.coverImage||r.image||''}:{})};
+   return {sampleStartSec:r.sampleStartSec??null,recordingCredits:r.recordingCredits||null,languages:r.languages||null,musical:r.musical||null,stems:r.stems?{channels:(r.stems.channels||[]).filter(c=>c&&c.url).map(c=>({name:c.name,url:deliver(c.url),storedUrl:c.url,...(admin?{}:{previewUrl:lightUrl(c.url)||undefined})})),duration:r.stems.duration??null,splitAt:r.stems.splitAt||''}:null,...(r.items!==undefined?{items:r.items.map(item=>({...item,lyrics:item.lyrics?withoutLyricFields(item.lyrics):null}))}:{}),id:r.externalId,title:r.title,description:r.description||'',recordingType:type?r.recordingType:null,recordingTypeDefinition:type,atomCount:r.items?.length??r.atomCount??0,componentWorkIds,componentWorks,workId:r.workId||null,work:w,ontologyStatus:r.items?.length?'ITEMS':r.workId?'MAPPED':'UNMAPPED',recordingMetadata:inferredRecordingMetadata(r.items?.length?atomWorks:componentWorks),credits:inferredRecordingCredits(componentWorks),status:r.status||(r.published!==false?'PUBLISHED':'DRAFT'),revision:r.ontologyRevision||0,audio:{metadata:r.audioMetadata||null,assetId:r.audioAssetId||null,url:deliver(r.audioUrl||a?.url||''),durationSeconds:r.duration?String(r.duration).split(':').reduce((t,n)=>t*60+Number(n),0):(a?.durationSeconds??null)},audioUrl:deliver(r.audioUrl||''),coverImage:deliver(r.coverImage||r.image||''),artist,duration:r.duration||'',date:r.date||'',releaseDate:r.date||'',createdAt:r.createdAt,updatedAt:r.updatedAt,sortOrder:r.sortOrder||0,published:r.published!==false,...(admin?{storedAudioUrl:r.audioUrl||'',storedCoverImage:r.coverImage||r.image||''}:{})};
   });
  }
  async function list(admin=false,filters={}){

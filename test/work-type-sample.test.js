@@ -1,6 +1,6 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');
 const {sampleFor,sampleProblem,SAMPLE_SECONDS}=require('../src/music-ontology/service');
-const row={id:'r1',title:'Summer Mix',recordingType:'MIX',audioUrl:'https://cdn/x.mp3',publicationStatus:'PUBLISHED',archivalStatus:'ACTIVE',audio:{durationSeconds:600}};
+const row={id:'r1',title:'Summer Mix',recordingType:'MIX',audioUrl:'https://cdn/x.mp3',status:'PUBLISHED',audio:{durationSeconds:600}};
 const type={id:'MIX',sample:{recordingId:'r1',startSec:120}};
 test('a work type sample is one minute of a recording of that type',()=>{
  assert.equal(SAMPLE_SECONDS,60);
@@ -11,9 +11,9 @@ test('a work type sample is one minute of a recording of that type',()=>{
  assert.equal(sampleFor(type,{...row,audioUrl:''}),null,'recording lost its audio');
 });
 test('visitors only get samples of published, active recordings; admins see every stored sample',()=>{
- assert.equal(sampleFor(type,{...row,publicationStatus:'DRAFT'}),null);
- assert.equal(sampleFor(type,{...row,archivalStatus:'ARCHIVED'}),null);
- assert.equal(sampleFor(type,{...row,publicationStatus:'DRAFT'},true).recordingId,'r1');
+ assert.equal(sampleFor(type,{...row,status:'DRAFT'}),null);
+ assert.equal(sampleFor(type,{...row,status:'ARCHIVED'}),null);
+ assert.equal(sampleFor(type,{...row,status:'DRAFT'},true).recordingId,'r1');
 });
 test('saving a sample checks the recording type, audio and start time',()=>{
  assert.equal(sampleProblem('MIX',row,120),null);

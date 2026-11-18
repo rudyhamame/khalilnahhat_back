@@ -4,7 +4,7 @@ const express = require('express');
 const { registerMusicArchive, visibleSongs, inputs } = require('../src/music-archive');
 const { memoryModel } = require('./helpers/archive-memory');
 test('only published, active recordings are visible; legacy tracks survive', () => {
-  const songs = [{ externalId: 'legacy' }, { externalId: 'ok', published: true }, { externalId: 'draft', published: false }, { externalId: 'gone', archivalStatus: 'ARCHIVED' }];
+  const songs = [{ externalId: 'legacy' }, { externalId: 'ok', published: true }, { externalId: 'draft', published: false }, { externalId: 'gone', status: 'ARCHIVED' }];
   assert.deepEqual(visibleSongs(songs).map(s => s.externalId), ['legacy', 'ok']);
 });
 test('archive input rejects arbitrary URLs, unknown fields and malformed values', () => {

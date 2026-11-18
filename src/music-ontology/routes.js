@@ -1,12 +1,12 @@
 const permanentDeletion=require('../permanent-deletion');
 const {z}=require('zod');
 const {createService}=require('./service');
-const {ArchiveItem}=require('../models');
+const MusicRecording=require('./recording-model');
 const contract=require('../../contracts/music-ontology.json');
 function registerMusicOntology(app,{requireAdmin,service=createService()}={}){
  const admin='/api/admin/music-ontology',pub='/api/music-ontology';
  const elements=require('./work-elements').createWorkElements(service);
- const wrap=fn=>async(req,res)=>{try{await fn(req,res);}catch(e){const status=e instanceof z.ZodError?400:e.code===11000?409:e.status||500;res.status(status).json({message:e instanceof z.ZodError?e.issues[0].message:e.code===11000?'This metadata identity already exists. Select the existing entity.':status<500?e.message:'The music archive could not complete this request.',...(e.status===503?{message:e.message}:{})});if(status>=500)console.error('Music ontology:',e.name,e.code||'');}};
+ const wrap=fn=>async(req,res)=>{try{await fn(req,res);}catch(e){const status=e instanceof z.ZodError?400:e.code===11000?409:e.status||500;res.status(status).json({message:e instanceof z.ZodError?e.issues[0].message:e.code===11000?'This metadata identity already exists. Select the existing entity.':status<500?e.message:'The music archive could not complete this request.',...(e.status===503?{message:e.message}:{})});if(status>=500)console.error('Music ontology:',e.name,e.code||'',e.stack?.split('\n')[1]||'');}};
  const entity=r=>({...r,id:r.externalId,_id:undefined});
  const actor=req=>String(req.user?.externalId||req.user?._id||req.user?.id||'admin');
  const filterSchema=z.object(Object.fromEntries(contract.filters.map(key=>[key,['bpmMin','bpmMax'].includes(key)?z.coerce.number().positive().max(1000).optional():z.string().max(240).optional()]))).strict().refine(f=>f.bpmMin==null||f.bpmMax==null||f.bpmMin<=f.bpmMax,'Minimum BPM cannot exceed maximum BPM.');
@@ -17,8 +17,8 @@ function registerMusicOntology(app,{requireAdmin,service=createService()}={}){
  for(const [prefix,guards,isAdmin] of [[pub,[],false],[admin,[requireAdmin],true]]){
   app.get(`${prefix}/recordings`,...guards,wrap(async(req,res)=>{const filters=readFilters(req);if(!isAdmin&&(filters.status&&filters.status!=='PUBLISHED'))return res.json({items:[]});res.set('Cache-Control','no-store').json({items:await service.list(isAdmin,filters)});}));
   app.get(`${prefix}/recordings/:id`,...guards,wrap(async(req,res)=>{const item=(await service.list(isAdmin)).find(r=>r.id===req.params.id);if(!item)return res.status(404).json({message:'Recording not found.'});res.set('Cache-Control','no-store').json({item});}));
-  app.get(`${prefix}/works`,...guards,wrap(async(_req,res)=>{const ids=isAdmin?(await service.models.Work.find().lean()).map(w=>w.externalId):[...new Set((await service.list(false)).flatMap(r=>r.componentWorkIds||[r.workId]).filter(Boolean))];res.set('Cache-Control','no-store').json({items:[...(await service.workMap(ids)).works.values()]});}));
-  app.get(`${prefix}/works/:id`,...guards,wrap(async(req,res)=>{if(!isAdmin&&!(await service.list(false)).some(r=>r.workId===req.params.id||r.componentWorkIds?.includes(req.params.id)))return res.status(404).json({message:'Work not found.'});const item=(await service.workMap([req.params.id])).works.get(req.params.id);if(!item)return res.status(404).json({message:'Work not found.'});res.json({item});}));
+  app.get(`${prefix}/works`,...guards,wrap(async(_req,res)=>{const ids=isAdmin?(await service.models.Work.find().lean()).map(w=>w.externalId):[];res.set('Cache-Control','no-store').json({items:[...(await service.workMap(ids)).works.values()]});}));
+  app.get(`${prefix}/works/:id`,...guards,wrap(async(req,res)=>{if(!isAdmin)return res.status(404).json({message:'Work not found.'});const item=(await service.workMap([req.params.id])).works.get(req.params.id);if(!item)return res.status(404).json({message:'Work not found.'});res.json({item});}));
   app.get(`${prefix}/vocabulary`,...guards,wrap(async(req,res)=>{const query={archived:{$ne:true},kind:{$nin:['concept','lyricist']}};if(req.query.kind){query.kind=z.enum(contract.vocabularyKinds).parse(req.query.kind);}let rows=await service.models.Vocabulary.find(query).sort({name:1}).lean();if(req.query.q){const q=String(req.query.q).toLowerCase().slice(0,240);rows=rows.filter(r=>r.name.toLowerCase().includes(q));}res.set('Cache-Control','no-store').json({items:rows.map(entity)});}));
   app.get(`${prefix}/work-types`,...guards,wrap(async(_req,res)=>res.set('Cache-Control','no-store').json({items:await service.withSamples(await service.listWorkTypes(),isAdmin)})));
   app.get(`${prefix}/vocabulary/:id`,...guards,wrap(async(req,res)=>{const item=await service.models.Vocabulary.findOne({externalId:req.params.id}).lean();if(!item)return res.status(404).json({message:'Metadata entity not found.'});res.json({item:entity(item)});}));
@@ -48,15 +48,15 @@ function registerMusicOntology(app,{requireAdmin,service=createService()}={}){
   const {revision}=schema.parse(req.body);
   let deletionKeys=[];
   await service.transaction(async session=>{
-   const row=await ArchiveItem.findOne({externalId:req.params.id}).session(session);
+   const row=await MusicRecording.findOne({externalId:req.params.id}).session(session);
    if(!row)throw Object.assign(new Error('Recording not found.'),{status:404});
-   if((row.ontologyRevision??0)!==revision)throw Object.assign(new Error('Recording changed. Reload before deleting.'),{status:409});
+   if((row.revision??0)!==revision)throw Object.assign(new Error('Recording changed. Reload before deleting.'),{status:409});
    await require('../music-archive').Collection.updateMany({recordingIds:row.externalId},{$pull:{recordingIds:row.externalId}},{session});
    const versions=await service.models.Version.find({recordingId:row.externalId}).session(session);
    deletionKeys=await permanentDeletion.prepare([row.toObject(),...versions.map(item=>item.toObject())],{session});
    await service.models.Version.deleteMany({recordingId:row.externalId}).session(session);
-   const deleted=await ArchiveItem.deleteOne({_id:row._id,externalId:row.externalId,ontologyRevision:row.ontologyRevision}).session(session);
-   if(deleted.deletedCount!==1||await ArchiveItem.exists({externalId:row.externalId}).session(session))throw Object.assign(new Error('Permanent deletion could not be confirmed.'),{status:409});
+   const deleted=await MusicRecording.deleteOne({_id:row._id,externalId:row.externalId,revision:row.revision}).session(session);
+   if(deleted.deletedCount!==1||await MusicRecording.exists({externalId:row.externalId}).session(session))throw Object.assign(new Error('Permanent deletion could not be confirmed.'),{status:409});
   });
   const cleanup=await permanentDeletion.finish(deletionKeys);
   res.json({ok:true,deleted:true,id:req.params.id,cloudinaryCleanupPending:cleanup.pending});

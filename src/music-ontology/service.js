@@ -3,10 +3,11 @@ const LEGACY_LYRIC_FIELDS=['text','notes','completeness','conceptLabel','concept
 const withoutLyricFields=l=>{const copy={...l};for(const key of LEGACY_LYRIC_FIELDS)delete copy[key];return copy;};
 const mongoose=require('mongoose');
 const {z}=require('zod');
-const {randomUUID,createHash}=require('crypto');
+const {randomUUID}=require('crypto');
 const M=require('./models');
 const V=require('./validation');
 const {ArchiveItem}=require('../models');
+const MusicRecording=require('./recording-model');
 const {MediaItem}=require('../content');
 const contract=require('../../contracts/music-ontology.json');
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
@@ -19,7 +20,6 @@ function inferredRecordingMetadata(contents){
  const genreIds=[...new Set(contents.flatMap(w=>w.melody?.genreIds||w.melody?.genres?.map(g=>g.id)||[]))];
  return {bpms,keys,genres,genreIds,bpm:bpms[0]??null,key:keys[0]??null,states:{bpm:bpms.length?'SPECIFIED':'MISSING',key:keys.length?'SPECIFIED':'MISSING',genreIds:genreIds.length?'SPECIFIED':'MISSING'}};
 }
-const inferredRecordingCredits=contents=>[...new Map(contents.flatMap(w=>w.credits||[]).map(c=>[JSON.stringify([c.artistId,c.role,c.detail||'']),c])).values()];
 const creditNames=(credits,vocabulary)=>credits.map(c=>({...c,artist:vocabulary.get(c.artistId)||null}));
 function assertAcyclic(id,sources,rows){
  const graph=new Map(rows.map(row=>[row.externalId,row.sourceRecordingIds||[]]));graph.set(id,sources);
@@ -34,18 +34,18 @@ function matchesWork(r,f={}){
  if(f.language&&l?.language?.id!==f.language&&!l?.languages?.some(item=>item.id===f.language)||f.dialect&&l?.dialect?.id!==f.dialect&&!l?.dialects?.some(item=>item.id===f.dialect))return false;
  if(!has(l?.regions,f.region)||(!has(m?.genres,f.genre)&&!has(r.recordingMetadata?.genreIds,f.genre)))return false;
  if(!has(m?.instruments,f.instrument)||!has(m?.musicianCredits,f.musician))return false;
- if(f.artist&&!has(l?.vocalistCredits??[...(r.credits||[]),...(w?.credits||[]),...(m?.musicianCredits||[]),...(l?.artistCredits||[])],f.artist))return false;
+ if(f.artist&&!has(l?.vocalistCredits??[...(m?.musicianCredits||[]),...(l?.artistCredits||[])],f.artist))return false;
  if(f.rhythm&&m?.rhythm?.id!==f.rhythm&&!m?.rhythmIds?.includes(f.rhythm))return false;
  const scoped=f.bpmScope==='recording'?r.recordingMetadata:m;
  const bpms=scoped?.bpms??(scoped?.bpm==null?[]:[scoped.bpm]),keys=scoped?.keys??(scoped?.key?[scoped.key]:[]);
  if((f.bpmMin!==undefined||f.bpmMax!==undefined)&&!bpms.some(bpm=>(f.bpmMin===undefined||bpm>=Number(f.bpmMin))&&(f.bpmMax===undefined||bpm<=Number(f.bpmMax))))return false;
  if(f.key&&!keys.includes(f.key))return false;
- if(f.q){const q=norm(f.q);const hay=[r.title,w?.title,r.artist,...(r.credits||[]).map(c=>c.artist?.name),...(w?.credits||[]).map(c=>c.artist?.name),...(m?.musicianCredits||[]).map(c=>c.artist?.name),...(m?.instruments||[]).map(i=>i.name),...(l?.artistCredits||[]).map(c=>c.artist?.name),...(m?.genres||[]).map(g=>g.name),...(r.recordingMetadata?.genres||[]).map(g=>g.name)].filter(Boolean).join(' ');if(!norm(hay).includes(q))return false;}
+ if(f.q){const q=norm(f.q);const hay=[r.name,w?.title,r.artist,...(m?.musicianCredits||[]).map(c=>c.artist?.name),...(m?.instruments||[]).map(i=>i.name),...(l?.artistCredits||[]).map(c=>c.artist?.name),...(m?.genres||[]).map(g=>g.name),...(r.recordingMetadata?.genres||[]).map(g=>g.name)].filter(Boolean).join(' ');if(!norm(hay).includes(q))return false;}
  return true;
 }
 function matches(r,f={}){
- const components=r.atoms?.length?r.atoms.map(item=>({title:item.name,type:item.lyrics?'SONG':'MUSIC',lyrics:item.lyrics?{language:{id:item.lyrics.languages?.[0]?.languageId},dialect:{id:item.lyrics.languages?.[0]?.dialectIds?.[0]},languages:(item.lyrics.languages??[]).map(row=>({id:row.languageId})),dialects:(item.lyrics.languages??[]).flatMap(row=>row.dialectIds).map(id=>({id})),vocalistCredits:item.lyrics.vocalistCredits,artistCredits:[...item.lyrics.vocalistCredits]}:null,melody:{...item.sound,rhythm:item.sound?.rhythmId?{id:item.sound.rhythmId}:null,genres:(item.sound?.genreIds||[]).map(id=>({id})),instruments:(item.sound?.musicianCredits||[]).filter(credit=>credit.instrumentId).map(credit=>({id:credit.instrumentId})),musicianCredits:(item.sound?.musicianCredits||[])}})):r.componentWorks?.length?r.componentWorks:[r.work];
- return components.some(work=>matchesWork({...r,work},f));
+ const components=r.atoms?.length?r.atoms.map(item=>({title:item.name,type:item.lyrics?'SONG':'MUSIC',lyrics:item.lyrics?{language:{id:item.lyrics.languages?.[0]?.languageId},dialect:{id:item.lyrics.languages?.[0]?.dialectIds?.[0]},languages:(item.lyrics.languages??[]).map(row=>({id:row.languageId})),dialects:(item.lyrics.languages??[]).flatMap(row=>row.dialectIds).map(id=>({id})),vocalistCredits:item.lyrics.vocalistCredits,artistCredits:[...item.lyrics.vocalistCredits]}:null,melody:{...item.sound,rhythm:item.sound?.rhythmId?{id:item.sound.rhythmId}:null,genres:(item.sound?.genreIds||[]).map(id=>({id})),instruments:(item.sound?.musicianCredits||[]).filter(credit=>credit.instrumentId).map(credit=>({id:credit.instrumentId})),musicianCredits:(item.sound?.musicianCredits||[])}})):(r.work?[r.work]:[]);
+ return (components.length?components:[null]).some(work=>matchesWork({...r,work},f));
 }
 // A work type's 1-minute sample is a recording of that type plus the second where the minute starts.
 const SAMPLE_SECONDS=60;
@@ -60,10 +60,10 @@ function sampleProblem(typeId,row,startSec){
 function sampleFor(type,row,admin=false){
   if(!type.sample||!row||!row.audioUrl||row.workType!==type.id)return null;
   if(!admin&&row.status!=='PUBLISHED')return null;
-  return {recordingId:row.id,title:row.title,startSec:type.sample.startSec,durationSec:SAMPLE_SECONDS,audioUrl:row.audioUrl};
+  return {recordingId:row.id,name:row.name,startSec:type.sample.startSec,durationSec:SAMPLE_SECONDS,audioUrl:row.audioUrl};
 }
-function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>value,lightUrl=()=>'',previewUrl=value=>value,ownedAsset=()=>false}={}){
- const {Work,Lyrics,Melody,Vocabulary,DjWorkType,DjWorkTypeSeed,AudioAsset,Version}=models;
+function createService({ArchiveModel=MusicRecording,models=M,deliveryUrl=value=>value,lightUrl=()=>'',previewUrl=value=>value,ownedAsset=()=>false}={}){
+ const {Work,Lyrics,Melody,Vocabulary,DjWorkType,DjWorkTypeSeed,Version}=models;
  async function transaction(fn){
   const session=await mongoose.startSession();
   try{return await session.withTransaction(()=>fn(session));}catch(e){if(/Transaction numbers are only allowed|replica set/.test(e.message))fail('Music ontology writes require MongoDB configured as a replica set (transactions).',503);throw e;}finally{await session.endSession();}
@@ -134,7 +134,7 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
  }
  async function deleteWorkType(id){
   const type=await DjWorkType.findOne({externalId:id});if(!type)fail('DJ work type not found.',404);
-  if(await Work.exists({workKind:id})||await ArchiveItem.exists({workType:id}))fail('This DJ work type is assigned to catalog content and cannot be deleted yet.',409);
+  if(await Work.exists({workKind:id})||await MusicRecording.exists({workType:id}))fail('This DJ work type is assigned to catalog content and cannot be deleted yet.',409);
   const deleted=await require('../permanent-deletion').remove(DjWorkType,{_id:type._id,revision:type.revision});if(!deleted)fail('This DJ work type changed. Reload before deleting.',409);
   return true;
  }
@@ -228,36 +228,28 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
    for(const row of languages)for(const id of row.dialectIds){const dialect=await Vocabulary.findOne({externalId:id,kind:'dialect',archived:{$ne:true}}).session(session);if(!dialect||dialect.parentId&&dialect.parentId!==row.languageId)fail('Choose dialects of the item language they belong to.');}
   }
  }
- async function saveRecording(input,id,actor,migration=null){
+ async function saveRecording(input,id,actor){
   const v=V.recording.parse(input);
   return transaction(async session=>{
    const type=await DjWorkType.findOne({externalId:v.workType}).session(session);
    if(!type)fail('Choose an existing DJ work type.');
    const old=id?await ArchiveModel.findOne({externalId:id}).session(session):null;
    if(id&&!old)fail('Recording not found.',404);
-   if(old&&v.revision!==(old.ontologyRevision||0))fail('This recording changed. Reload before editing.',409);
-   const work=v.workId?await Work.findOne({externalId:v.workId}).session(session):null;
-   if(v.workId&&!work)fail('Choose an existing musical work.');
-   const itemValues=v.atoms===undefined?plain(old)?.atoms:v.atoms;
-   await checkRecordingItems(itemValues,v.audioUrl,v.durationSeconds,session);
+   if(old&&v.revision!==(old.revision||0))fail('This recording changed. Reload before editing.',409);
+   const atoms=v.atoms===undefined?plain(old)?.atoms:v.atoms;
+   await checkRecordingItems(atoms,v.audioUrl,v.durationSeconds,session);
    const sampleStartSec=v.sampleStartSec!==undefined?v.sampleStartSec:old?.sampleStartSec??null;
    if(sampleStartSec!==null){const problem=sampleProblem(v.workType,{workType:v.workType,audioUrl:v.audioUrl,audio:{durationSeconds:v.durationSeconds}},sampleStartSec);if(problem)fail(problem);}
-   const componentWorkIds=[v.workId].filter(Boolean);
-   if(componentWorkIds.length>100)fail('Choose at most 100 component works.');
-   if(await Work.countDocuments({externalId:{$in:componentWorkIds}}).session(session)!==componentWorkIds.length)fail('Choose existing recording component works.');
    if(v.audioUrl&&!ownedAsset(v.audioUrl)||v.coverImage&&!ownedAsset(v.coverImage)||v.stems?.channels?.some(c=>!ownedAsset(c.url)))fail('Choose media uploaded to this website.');
    if(v.audioUrl&&!require('../music-archive-files').localAssetPattern.test(v.audioUrl)&&!/\/video\/(upload|authenticated)\//.test(v.audioUrl))fail('Choose an uploaded audio asset.');
    if(v.status==='PUBLISHED'&&!v.audioUrl)fail('Published recordings require audio.');
    const recordId=id||makeId('recording');
-   let audioAssetId='';
-   if(v.audioUrl){const existing=await AudioAsset.findOne({url:v.audioUrl}).session(session);audioAssetId=existing?.externalId||`audio-${createHash('sha256').update(v.audioUrl).digest('hex')}`;if(!existing)await AudioAsset.create([{externalId:audioAssetId,url:v.audioUrl,durationSeconds:v.durationSeconds,provenance:provenance(v.provenance,actor)}],{session});}
-   const data={sampleStartSec,audioMetadata:v.audioMetadata!==undefined?v.audioMetadata:(old?.audioUrl===v.audioUrl?plain(old)?.audioMetadata:null),stems:v.stems!==undefined?v.stems:(old?.audioUrl===v.audioUrl?plain(old)?.stems||null:null),...(itemValues!==undefined?{atoms:itemValues}:{}),title:v.title,workType:v.workType,atomCount:itemValues!==undefined?itemValues.length:(old?.atomCount??0),workId:v.workId,audioAssetId,status:v.status,ontologyRevision:(old?.ontologyRevision||0)+1,description:v.description,date:v.releaseDate,audioUrl:v.audioUrl,coverImage:v.coverImage,durationMinutes:v.durationMinutes,published:v.status==='PUBLISHED',mediaType:'audio'};
-   if(migration){for(const key of ['title','description','date','audioUrl','coverImage','duration','mediaType'])delete data[key];data.ontologyMigrationId=migration.runId;await mongoose.connection.collection('musicontologymigrationbackups').insertOne({_id:`${migration.runId}:${recordId}`,runId:migration.runId,recordingId:recordId,before:plain(old),afterRevision:data.ontologyRevision,createdAt:new Date()},{session});}
+   const data={sampleStartSec,audioMetadata:v.audioMetadata!==undefined?v.audioMetadata:(old?.audioUrl===v.audioUrl?plain(old)?.audioMetadata:null),stems:v.stems!==undefined?v.stems:(old?.audioUrl===v.audioUrl?plain(old)?.stems||null:null),...(atoms!==undefined?{atoms}:{}),name:v.name,workType:v.workType,atomCount:atoms!==undefined?atoms.length:(old?.atomCount??0),status:v.status,revision:(old?.revision||0)+1,description:v.description,releaseDate:v.releaseDate,audioUrl:v.audioUrl,coverImage:v.coverImage,durationMinutes:v.durationMinutes};
    let row;
-   if(old){old.set(data);row=await old.save({session});}else row=(await ArchiveModel.create([{...data,externalId:recordId,category:'Music Archive',artist:''}],{session}))[0];
+   if(old){old.set(data);row=await old.save({session});}else row=(await ArchiveModel.create([{...data,externalId:recordId}],{session}))[0];
    // A prepared sample becomes the public work-type sample only on publication.
-   if(sampleStartSec!==null&&data.published)await DjWorkType.updateOne({_id:type._id},{$set:{sample:{recordingId:recordId,startSec:Math.round(sampleStartSec*10)/10}}},{session});
-   await Version.create([{externalId:makeId('version'),recordingId:recordId,number:data.ontologyRevision,snapshot:plain(row),changedBy:actor||'admin'}],{session});
+   if(sampleStartSec!==null&&data.status==='PUBLISHED')await DjWorkType.updateOne({_id:type._id},{$set:{sample:{recordingId:recordId,startSec:Math.round(sampleStartSec*10)/10}}},{session});
+   await Version.create([{externalId:makeId('version'),recordingId:recordId,number:data.revision,snapshot:plain(row),changedBy:actor||'admin'}],{session});
    return recordId;
   });
  }
@@ -276,42 +268,43 @@ function createService({ArchiveModel=ArchiveItem,models=M,deliveryUrl=value=>val
   });return {works:new Map(mapped),vocabulary:vs,workTypes:workTypeMap};
  }
  async function hydrate(rows,{admin=false}={}){
-  rows=rows.map(plain);const {works,vocabulary,workTypes}=await workMap([...new Set(rows.map(r=>r.workId).filter(Boolean))]);
-  const assets=await AudioAsset.find({externalId:{$in:rows.map(r=>r.audioAssetId).filter(Boolean)}}).lean();const am=new Map(assets.map(a=>[a.externalId,a]));
+  rows=rows.map(plain);const {vocabulary,workTypes}=await workMap([]);
   return rows.map(r=>{
-   const w=works.get(r.workId)||null,a=am.get(r.audioAssetId),deliver=url=>admin?previewUrl(deliveryUrl(url)):deliveryUrl(url);
-   const componentWorkIds=[r.workId].filter(Boolean),componentWorks=componentWorkIds.map(id=>works.get(id)).filter(Boolean);
-   const atomWorks=(r.atoms||[]).map(item=>({melody:{...item.sound,genres:(item.sound?.genreIds||[]).map(id=>vocabulary.get(id)).filter(Boolean)}}));
-   const artist=[...new Set([...(r.atoms||[]).flatMap(item=>[...(item.sound?.musicianCredits||[]),...(item.lyrics?.vocalistCredits||[])]),...inferredRecordingCredits(componentWorks),...componentWorks.flatMap(c=>[...(c.credits||[]),...(c.melody?.musicianCredits||[]),...(c.lyrics?.artistCredits||[])])].map(c=>vocabulary.get(c.artistId)?.name).filter(Boolean))].join(', ')||(!r.workId?r.artist||'':'');
+   const deliver=url=>admin?previewUrl(deliveryUrl(url)):deliveryUrl(url);
+   const atoms=r.atoms||[];
+   const atomWorks=atoms.map(item=>({melody:{...item.sound,genres:(item.sound?.genreIds||[]).map(id=>vocabulary.get(id)).filter(Boolean)}}));
+   const artist=[...new Set(atoms.flatMap(item=>[...(item.sound?.musicianCredits||[]),...(item.lyrics?.vocalistCredits||[])]).map(c=>vocabulary.get(c.artistId)?.name).filter(Boolean))].join(', ');
    const type=workTypes.get(r.workType)||null;
-   return {sampleStartSec:r.sampleStartSec??null,stems:r.stems?{channels:(r.stems.channels||[]).filter(c=>c&&c.url).map(c=>({name:c.name,url:deliver(c.url),storedUrl:c.url,...(admin?{}:{previewUrl:lightUrl(c.url)||undefined})})),duration:r.stems.duration??null,splitAt:r.stems.splitAt||''}:null,...(r.atoms!==undefined?{atoms:r.atoms.map(item=>({...item,lyrics:item.lyrics?withoutLyricFields(item.lyrics):null}))}:{}),id:r.externalId,title:r.title,description:r.description||'',workType:type?r.workType:null,recordingTypeDefinition:type,atomCount:r.atoms?.length??r.atomCount??0,componentWorkIds,componentWorks,workId:r.workId||null,work:w,ontologyStatus:r.atoms?.length?'ITEMS':r.workId?'MAPPED':'UNMAPPED',recordingMetadata:inferredRecordingMetadata(r.atoms?.length?atomWorks:componentWorks),credits:inferredRecordingCredits(componentWorks),status:r.status||(r.published!==false?'PUBLISHED':'DRAFT'),revision:r.ontologyRevision||0,audio:{metadata:r.audioMetadata||null,assetId:r.audioAssetId||null,url:deliver(r.audioUrl||a?.url||''),durationSeconds:r.durationMinutes!=null?Math.round(r.durationMinutes*60):r.duration?String(r.duration).split(':').reduce((t,n)=>t*60+Number(n),0):(a?.durationSeconds??null)},audioUrl:deliver(r.audioUrl||''),coverImage:deliver(r.coverImage||r.image||''),artist,durationMinutes:r.durationMinutes??(r.duration?String(r.duration).split(':').reduce((t,n)=>t*60+Number(n),0)/60:null),duration:r.durationMinutes!=null?`${Math.floor(r.durationMinutes)}:${String(Math.round((r.durationMinutes%1)*60)%60).padStart(2,'0')}`:(r.duration||''),date:r.date||'',releaseDate:r.date||'',createdAt:r.createdAt,updatedAt:r.updatedAt,sortOrder:r.sortOrder||0,published:r.published!==false,...(admin?{storedAudioUrl:r.audioUrl||'',storedCoverImage:r.coverImage||r.image||''}:{})};
+   const minutes=r.durationMinutes??null;
+   return {id:r.externalId,name:r.name,description:r.description||'',workType:type?r.workType:null,workTypeDefinition:type,status:r.status||'DRAFT',atomCount:atoms.length,atoms:atoms.map(item=>({...item,lyrics:item.lyrics?withoutLyricFields(item.lyrics):null})),sampleStartSec:r.sampleStartSec??null,
+    stems:r.stems?{channels:(r.stems.channels||[]).filter(c=>c&&c.url).map(c=>({name:c.name,url:deliver(c.url),storedUrl:c.url,...(admin?{}:{previewUrl:lightUrl(c.url)||undefined})})),duration:r.stems.duration??null,splitAt:r.stems.splitAt||''}:null,
+    audio:{metadata:r.audioMetadata||null,url:deliver(r.audioUrl||''),durationSeconds:minutes!=null?Math.round(minutes*60):null},audioUrl:deliver(r.audioUrl||''),coverImage:deliver(r.coverImage||''),
+    durationMinutes:minutes,releaseDate:r.releaseDate||'',artist,recordingMetadata:inferredRecordingMetadata(atomWorks),revision:r.revision||0,createdAt:r.createdAt,updatedAt:r.updatedAt,
+    ...(admin?{storedAudioUrl:r.audioUrl||'',storedCoverImage:r.coverImage||''}:{})};
   });
  }
  async function list(admin=false,filters={}){
-  const rows=admin?await ArchiveModel.find().sort({sortOrder:1,createdAt:-1}):await require('../music-archive').publicSongs();
-  return (await hydrate(rows.filter(r=>admin||r.audioUrl),{admin})).filter(r=>matches(r,filters));
+  const rows=await ArchiveModel.find(admin?{}:{status:'PUBLISHED',audioUrl:{$ne:''}}).sort({createdAt:-1});
+  return (await hydrate(rows,{admin})).filter(r=>matches(r,filters));
  }
- async function preflightRecording(input,id){
+ async function preflightRecording(input){
   const v=V.recording.parse(input);
   await ensureWorkTypes();
   const type=await DjWorkType.findOne({externalId:v.workType}).lean();if(!type)fail('Choose an existing DJ work type.');
-  if(v.workId&&!await Work.exists({externalId:v.workId}))fail('Choose an existing musical work.');
   await checkRecordingItems(v.atoms,v.audioUrl,v.durationSeconds);
-  const componentIds=[v.workId].filter(Boolean);
-  if(componentIds.length>100||await Work.countDocuments({externalId:{$in:componentIds}})!==componentIds.length)fail('Choose up to 100 existing recording component works.');
   if(v.audioUrl&&!ownedAsset(v.audioUrl)||v.coverImage&&!ownedAsset(v.coverImage)||v.stems?.channels?.some(c=>!ownedAsset(c.url)))fail('Choose media uploaded to this website.');
   if(v.audioUrl&&!require('../music-archive-files').localAssetPattern.test(v.audioUrl)&&!/\/video\/(upload|authenticated)\//.test(v.audioUrl))fail('Choose an uploaded audio asset.');
   if(v.status==='PUBLISHED'&&!v.audioUrl)fail('Published recordings require audio.');
   return v;
  }
+ // Deletes an older archive song (not a recording) and its media.
  async function deleteLegacy(id){
   const deletion=require('../permanent-deletion');let keys=[];
   const removed=await transaction(async session=>{
-   const row=await ArchiveModel.findOne({externalId:id}).session(session);if(!row)return null;
-   if(row.workId||row.atoms?.length)fail('Delete this recording through the ontology editor.',409);
+   const row=await ArchiveItem.findOne({externalId:id}).session(session);if(!row)return null;
    keys=await deletion.prepare(row,{session});
    await require('../music-archive').Collection.updateMany({recordingIds:id},{$pull:{recordingIds:id}},{session});
-   return ArchiveModel.findOneAndDelete({externalId:id}).session(session);
+   return ArchiveItem.findOneAndDelete({externalId:id}).session(session);
   });
   if(removed)removed.cloudinaryCleanupPending=(await deletion.finish(keys)).pending;return removed;
  }

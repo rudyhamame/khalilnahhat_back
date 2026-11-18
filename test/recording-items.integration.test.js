@@ -4,7 +4,7 @@ const {fixture}=require('./helpers/music-ontology-fixture.cjs');
 const V=require('../src/music-ontology/validation');
 test('recording item schema rejects invalid branches, duplicate ids and unordered timing',()=>{
  const item={id:'a',name:'A'};
- const base={title:'Mix',workType:'MIX',atoms:[item]};
+ const base={name:'Mix',workType:'MIX',atoms:[item]};
  assert.equal(V.recording.parse(base).atoms[0].lyrics,null);
  assert.equal(V.recording.safeParse({...base,atoms:[item,item]}).success,false);
  assert.equal(V.recording.safeParse({...base,atoms:[item,{...item,id:'b'}]}).success,true);
@@ -17,7 +17,7 @@ test('HTTP create, reload, edit and rollback preserve recording-owned items with
  const old=(await req('/admin/music-ontology/recordings/'+db.ids[0])).body.item;
  const person={artistId:db.artist};
  const items=[{id:'song-1',name:'Lyrical item',releaseYear:1998,sound:{musicianCredits:[person,person]},lyrics:{languages:[{languageId:db.language,dialectIds:[]}],vocalistCredits:[person,person]}},{id:'music-2',name:'Instrumental item',releaseYear:2002,sound:{musicianCredits:[person]}}];
- const payload={title:'Independent multiple recording',workType:'MIX',audioUrl:old.storedAudioUrl,durationMinutes:20/60,status:'DRAFT',atoms:items};
+ const payload={name:'Independent multiple recording',workType:'MIX',audioUrl:old.storedAudioUrl,durationMinutes:20/60,status:'DRAFT',atoms:items};
  const created=await req('/admin/music-ontology/recordings','POST',payload);assert.equal(created.status,201,JSON.stringify(created.body));const row=created.body.item;
  assert.equal(row.ontologyStatus,'ITEMS');assert.equal(row.atoms.length,2);assert.equal(row.atoms[0].releaseYear,1998);assert.equal(row.atoms[1].releaseYear,2002);assert.equal(row.atoms[1].lyrics,null);assert.equal(row.atoms[0].lyrics.vocalistCredits.length,2);assert.equal(row.atoms[0].lyrics.text,undefined);
  assert.equal(await Work.countDocuments(),count);assert.equal(row.workId,null);assert.deepEqual(row.componentWorkIds,[]);

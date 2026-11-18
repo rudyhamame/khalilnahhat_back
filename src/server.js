@@ -1427,7 +1427,6 @@ registerYoutubeSessionRoutes(app, {
 app.post('/api/archive-items', requireAdmin, (_request, response) => response.status(409).json({message:'Create recordings through the Music Archive ontology editor.',code:'MUSIC_ONTOLOGY_REQUIRED'}));
 
 app.patch('/api/archive-items/:id', requireAdmin, async (request, response) => {
-  if (await ArchiveItem.exists({externalId:request.params.id,workId:{$exists:true,$ne:''}})) return response.status(409).json({message:'Edit this recording through the Music Archive ontology editor.'});
   const parsed = archiveItemSchema.partial().safeParse(request.body);
 
   if (!parsed.success) {
@@ -1455,7 +1454,6 @@ app.patch('/api/archive-items/:id', requireAdmin, async (request, response) => {
 });
 
 app.delete('/api/archive-items/:id', requireAdmin, async (request, response) => {
-  if (await ArchiveItem.exists({externalId:request.params.id,workId:{$exists:true,$ne:''}})) return response.status(409).json({message:'Archive this recording through the Music Archive ontology editor.'});
   const deleted = await require('./music-archive').ontologyService().deleteLegacy(request.params.id);
 
   if (!deleted) {

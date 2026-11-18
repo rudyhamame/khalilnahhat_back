@@ -82,11 +82,11 @@ test('permanent media deletion, cloud outages, shared files and live publication
  });
  await t.test('ontology deletion clears versions and resolves audio receipt identities',async()=>{
   const id='qa-ontology-delete';
-  await mongoose.connection.collection('musicaudioassets').insertOne({externalId:'qa-audio-receipt',url:'https://res.cloudinary.com/qa/video/authenticated/v1/khalil/assets/qa-audio.mp3'});
-  await ArchiveItem.collection.insertOne({externalId:id,title:'QA ontology',ontologyRevision:0,audioAssetId:'qa-audio-receipt'});
+  const MusicRecording=require('../src/music-ontology/recording-model');
+  await MusicRecording.collection.insertOne({externalId:id,name:'QA ontology',revision:0,audioUrl:'https://res.cloudinary.com/qa/video/authenticated/v1/khalil/assets/qa-audio.mp3'});
   await Version.collection.insertOne({recordingId:id,number:1,snapshot:{coverImage:url('old-version')}});
   const response=await fetch(`http://127.0.0.1:${server.address().port}/api/admin/music-ontology/recordings/${id}`,{method:'DELETE',headers:{Authorization:'qa-admin','Content-Type':'application/json'},body:JSON.stringify({revision:0,permanent:true})});
-  assert.equal(response.status,200,await response.text());assert.equal(await ArchiveItem.exists({externalId:id}),null);assert.equal(await Version.countDocuments({recordingId:id}),0);assert.ok(deleted.some(a=>a.id==='khalil/assets/qa-audio'));assert.ok(deleted.some(a=>a.id==='Gallery/old-version'));
+  assert.equal(response.status,200,await response.text());assert.equal(await MusicRecording.exists({externalId:id}),null);assert.equal(await Version.countDocuments({recordingId:id}),0);assert.ok(deleted.some(a=>a.id==='khalil/assets/qa-audio'));assert.ok(deleted.some(a=>a.id==='Gallery/old-version'));
  });
  await t.test('deleting a work type removes its artwork instead of leaving a soft-deleted entry',async()=>{
   const {DjWorkType}=require('../src/music-ontology/models');await DjWorkType.collection.insertOne({externalId:'qa-type',name:'QA type',revision:1,artworkUrl:url('type-artwork')});

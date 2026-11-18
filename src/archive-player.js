@@ -25,7 +25,7 @@ function registerArchivePlayer(app,{requireAdmin,PlaylistModel=FooterPlaylist,Ar
   app.put('/api/admin/player-playlist',requireAdmin,async(req,res)=>{
     const parsed=playlistInput.safeParse(req.body);
     if(!parsed.success)return res.status(400).json({message:'Choose up to 100 archive tracks.'});
-    const rows=await ArchiveModel.find({externalId:{$in:parsed.data.archiveIds}});
+    const rows=[...await ArchiveModel.find({externalId:{$in:parsed.data.archiveIds}}),...(ArchiveModel===ArchiveItem?(await require('./music-ontology/recording-model').find({externalId:{$in:parsed.data.archiveIds}})).map(r=>require('./music-archive').asSong(r.toObject())):[])];
     const error=validatePlaylistSelection(parsed.data.archiveIds,rows);
     if(error)return res.status(400).json({message:error});
     const saved=await PlaylistModel.findOneAndUpdate({key:'footer'},{$set:parsed.data},{upsert:true,new:true,setDefaultsOnInsert:true});

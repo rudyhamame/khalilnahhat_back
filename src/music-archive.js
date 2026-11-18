@@ -5,6 +5,7 @@ const { z } = require('zod');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { ArchiveItem } = require('./models');
+const MusicRecording = require('./music-ontology/recording-model');
 const archiveFiles = require('./music-archive-files');
 
 const common = { externalId: { type: String, unique: true, required: true }, title: String, description: String,
@@ -48,24 +49,35 @@ function serialize(row) {
     artist: r.artist || 'DJ Khalil', date: r.date || (r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 10) : ''),
     audioUrl: deliveryUrl(r.audioUrl), coverImage: deliveryUrl(r.coverImage || r.image), duration: r.durationMinutes != null ? `${Math.floor(r.durationMinutes)}:${String(Math.round((r.durationMinutes % 1) * 60) % 60).padStart(2, '0')}` : (r.duration || ''), createdAt: r.createdAt };
 }
+// A recording shown in the older archive song shape (the public player and collections read this).
+const minutesText = m => m == null ? '' : `${Math.floor(m)}:${String(Math.round((m % 1) * 60) % 60).padStart(2, '0')}`;
+const asSong = r => ({ externalId: r.externalId, title: r.name, description: r.description || '', audioUrl: r.audioUrl || '', coverImage: r.coverImage || '', duration: minutesText(r.durationMinutes), date: r.releaseDate || '', artist: '', category: 'Music Archive', published: r.status === 'PUBLISHED', status: r.status, sortOrder: 0, workType: r.workType, createdAt: r.createdAt });
 function visibleSongs(songs) {
-  return songs.filter(s => s.published !== false && s.status !== 'ARCHIVED' && (!s.workId || s.status === 'PUBLISHED'));
+  return songs.filter(s => s.published !== false && s.status !== 'ARCHIVED');
+}
+// Published recordings with these ids, in the song shape (only for the real archive model).
+async function recordingSongs(ArchiveModel, ids) {
+  return ArchiveModel === ArchiveItem ? (await MusicRecording.find({ externalId: { $in: ids }, status: 'PUBLISHED' }).lean()).map(asSong) : [];
 }
 async function publicSongs(ArchiveModel = ArchiveItem) {
-  return visibleSongs(await ArchiveModel.find().sort({ sortOrder: 1, createdAt: -1 }));
+  const recordings = ArchiveModel === ArchiveItem ? await MusicRecording.find({ status: 'PUBLISHED' }).sort({ createdAt: -1 }) : [];
+  return visibleSongs([...(await ArchiveModel.find().sort({ sortOrder: 1, createdAt: -1 })), ...recordings.map(r => asSong(r.toObject ? r.toObject() : r))]);
 }
 
 function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, CollectionModel = Collection, cloudinaryClient = cloudinary, uploadAssetImpl = require('./cloudinary-assets').createAssetStore({client:cloudinaryClient}).upload, requireCloudinary = process.env.RENDER === 'true' || process.env.MUSIC_ARCHIVE_STORAGE_PROVIDER === 'cloudinary', useCloudinary = Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) } = {}) {
   const models = { collections: CollectionModel, songs: ArchiveModel };
   const ontology = ArchiveModel === ArchiveItem ? require('./music-ontology/routes').registerMusicOntology(app, { requireAdmin, service: require('./music-ontology/service').createService({ deliveryUrl, lightUrl: lightweightUrl, previewUrl: archiveFiles.previewUrl, ownedAsset }) }) : null;
+  const countRecordings = async filter => (await ArchiveModel.countDocuments(filter)) + (ontology ? await MusicRecording.countDocuments(filter) : 0);
   async function catalog(admin, { includeOntology = true } = {}) {
-    const [collections, songs] = await Promise.all(Object.values(models).map(model => model.find().sort({ sortOrder: 1, createdAt: -1 })));
+    const [collections, legacySongs] = await Promise.all(Object.values(models).map(model => model.find().sort({ sortOrder: 1, createdAt: -1 })));
+    const recordings = ontology ? (await MusicRecording.find().sort({ createdAt: -1 })).map(r => r.toObject()) : [];
+    const songs = [...legacySongs, ...recordings.map(asSong)];
     const visible = admin ? songs : visibleSongs(songs).filter(song => song.audioUrl);
     const shown = admin ? collections : collections.filter(c => c.published !== false);
     const visibleIds = new Set(visible.map(s => s.externalId));
     const adminAssets = row => admin ? { storedAudioUrl: row.audioUrl || '', storedCoverImage: row.coverImage || row.image || '' } : {};
     const present = row => { const item = serialize(row); return admin ? {...item,audioUrl:archiveFiles.previewUrl(item.audioUrl),coverImage:archiveFiles.previewUrl(item.coverImage)} : item; };
-    const canonical = ontology && includeOntology ? await ontology.hydrate(visible, {admin}) : null;
+    const canonical = ontology && includeOntology ? await ontology.hydrate(recordings.filter(r => visibleIds.has(r.externalId)), {admin}) : null;
     const byId = new Map((canonical || []).map(r => [r.id, r]));
     return { ...(canonical ? { recordings: canonical, ontologyVersion: 1 } : {}), collections: shown.map(c => { const item = { ...present(c), ...adminAssets(c) }; return { ...item, recordingIds: admin ? item.recordingIds : item.recordingIds.filter(id => visibleIds.has(id)), songCount: item.recordingIds.filter(id => visibleIds.has(id)).length }; }), songs: visible.map(s => ({ ...present(s), ...adminAssets(s), ...(canonical ? byId.get(s.externalId) : {}) })) };
   }
@@ -85,8 +97,8 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, C
       const workTypeId = data.workTypeId ?? existing.workTypeId ?? '';
       if (data.recordingIds) data.recordingIds = [...new Set(data.recordingIds)];
       const ids = data.recordingIds ?? existing.recordingIds ?? [];
-      if (data.recordingIds && await ArchiveModel.countDocuments({ externalId: { $in: ids }, status:{$ne:'ARCHIVED'} }) !== ids.length) return 'Choose existing active recordings. Deleted recordings cannot be added to a collection.';
-      if (workTypeId && ids.length && (data.recordingIds || data.workTypeId !== undefined) && await ArchiveModel.countDocuments({ externalId: { $in: ids }, workType: workTypeId }) !== ids.length) return 'A collection only holds recordings of its work type. Move or remove the recordings of other work types first.';
+      if (data.recordingIds && await countRecordings({ externalId: { $in: ids }, status:{$ne:'ARCHIVED'} }) !== ids.length) return 'Choose existing active recordings. Deleted recordings cannot be added to a collection.';
+      if (workTypeId && ids.length && (data.recordingIds || data.workTypeId !== undefined) && await countRecordings({ externalId: { $in: ids }, workType: workTypeId }) !== ids.length) return 'A collection only holds recordings of its work type. Move or remove the recordings of other work types first.';
       return '';
     };
     app.post(`/api/admin/music-archive/${kind}`, requireAdmin, async (req, res) => {
@@ -100,7 +112,6 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, C
       res.status(201).json({ item: serialize(row) });
     });
     app.patch(`/api/admin/music-archive/${kind}/:id`, requireAdmin, async (req, res) => {
-      if (kind === 'songs' && await model.exists({externalId:req.params.id,$or:[{workId:{$exists:true,$ne:''}},{'atoms.0':{$exists:true}}]})) return res.status(409).json({message:'Edit this recording through the ontology editor.'});
       // PATCH must preserve omitted fields; creation defaults must not detach songs.
       const patchInput = z.object(Object.fromEntries(Object.entries(inputs[kind].shape).map(([key, field]) => [key, (field instanceof z.ZodDefault ? field.removeDefault() : field).optional()]))).strict();
       const parsed = patchInput.safeParse(req.body);
@@ -113,7 +124,6 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, C
       res.json({ item: serialize(row) });
     });
     app.delete(`/api/admin/music-archive/${kind}/:id`, requireAdmin, async (req, res) => {
-      if (kind === 'songs' && await model.exists({externalId:req.params.id,$or:[{workId:{$exists:true,$ne:''}},{'atoms.0':{$exists:true}}]})) return res.status(409).json({message:'Archive this recording through the ontology editor; its references and files are preserved.'});
       const row = kind === 'songs' && ontology ? await ontology.deleteLegacy(req.params.id) : await permanentDeletion.remove(model,{externalId:req.params.id});
       if (!row) return res.status(404).json({ message: 'This item no longer exists.' });
       // The final owner deletion also requests permanent Cloudinary cleanup.
@@ -151,4 +161,4 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, C
   });
   archiveFiles.registerArchiveFiles(app,{publicSongs:async()=>(await catalog(false,{includeOntology:false})).songs,Collection:CollectionModel});
 }
-module.exports = { registerMusicArchive, publicSongs, serialize, visibleSongs, deliveryUrl, inputs, Collection, ownedAsset, ontologyService: () => require('./music-ontology/service').createService({deliveryUrl,previewUrl:archiveFiles.previewUrl,ownedAsset}) };
+module.exports = { registerMusicArchive, publicSongs, asSong, recordingSongs, serialize, visibleSongs, deliveryUrl, inputs, Collection, ownedAsset, ontologyService: () => require('./music-ontology/service').createService({deliveryUrl,previewUrl:archiveFiles.previewUrl,ownedAsset}) };

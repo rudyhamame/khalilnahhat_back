@@ -17,14 +17,4 @@ const DjWorkType=model('DjWorkType',{languageIds:{type:[String],default:[]},artw
 const DjWorkTypeSeed=model('DjWorkTypeSeed',{});
 const AudioAsset=model('MusicAudioAsset',{url:{type:String,required:true,unique:true},mime:String,durationSeconds:Number,originalName:String,provenance});
 const Version=model('MusicRecordingVersion',{recordingId:{type:String,index:true,required:true},number:Number,snapshot:Schema.Types.Mixed,changedBy:String},[[{recordingId:1,number:1},{unique:true}]]);
-const itemCredit={_id:false,artistId:{type:String,required:true}};
-const RecordingFields={
- audioMetadata:{type:{_id:false,format:String,sizeBytes:Number},default:null},
- stems:{type:{_id:false,channels:[{_id:false,name:String,url:String}],duration:Number,splitAt:String},default:null},
- atoms:{type:[{_id:false,id:{type:String,required:true},audioRange:{type:{_id:false,startSec:Number,endSec:Number},default:undefined},name:{type:String,required:true},releaseYear:Number,sound:{type:{_id:false,musicianCredits:[{...itemCredit,instrumentId:String}],bpms:{type:[Number],default:undefined},keys:{type:[String],default:undefined},rhythmIds:{type:[String],default:undefined},genreIds:[String]},default:undefined},lyrics:{type:{_id:false,languages:[{_id:false,languageId:{type:String,required:true},dialectIds:[String]}],vocalistCredits:[itemCredit]},default:null}}],default:undefined},
- sampleStartSec:{type:Number,default:null},workType:{type:String,index:true},workId:{type:String,index:true},atomCount:{type:Number,default:0},audioAssetId:String,durationMinutes:Number,
- 
- status:{type:String,enum:contract.recordingStatuses,index:true},
- ontologyRevision:Number,ontologyMigrationId:String,
-};
-module.exports={Melody,Lyrics,Work,Vocabulary,DjWorkType,DjWorkTypeSeed,AudioAsset,Version,RecordingFields};
+module.exports={Melody,Lyrics,Work,Vocabulary,DjWorkType,DjWorkTypeSeed,AudioAsset,Version};

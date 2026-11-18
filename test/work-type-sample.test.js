@@ -1,10 +1,10 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');
 const {sampleFor,sampleProblem,SAMPLE_SECONDS}=require('../src/music-ontology/service');
-const row={id:'r1',title:'Summer Mix',workType:'MIX',audioUrl:'https://cdn/x.mp3',status:'PUBLISHED',audio:{durationSeconds:600}};
+const row={id:'r1',name:'Summer Mix',workType:'MIX',audioUrl:'https://cdn/x.mp3',status:'PUBLISHED',audio:{durationSeconds:600}};
 const type={id:'MIX',sample:{recordingId:'r1',startSec:120}};
 test('a work type sample is one minute of a recording of that type',()=>{
  assert.equal(SAMPLE_SECONDS,60);
- assert.deepEqual(sampleFor(type,row),{recordingId:'r1',title:'Summer Mix',startSec:120,durationSec:60,audioUrl:'https://cdn/x.mp3'});
+ assert.deepEqual(sampleFor(type,row),{recordingId:'r1',name:'Summer Mix',startSec:120,durationSec:60,audioUrl:'https://cdn/x.mp3'});
  assert.equal(sampleFor({id:'MIX',sample:null},row),null,'no stored sample');
  assert.equal(sampleFor(type,undefined),null,'recording was deleted');
  assert.equal(sampleFor(type,{...row,workType:'REMIX'}),null,'recording changed to another work type');

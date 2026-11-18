@@ -1,6 +1,6 @@
 const crypto=require('crypto');
 const {Readable}=require('stream');
-const {sendSimpleEmail}=require('./brevo');
+const {sendBrevoEmail}=require('./brevo');
 // Admin-only Android app delivery: an admin asks for a link, sent to the email on their own account; the link carries a signed 24 h token and streams the APK from ANDROID_APK_URL.
 const secret=()=>process.env.ANDROID_LINK_SECRET||process.env.CLOUDINARY_API_SECRET||'';
 const sign=p=>crypto.createHmac('sha256',secret()).update(p).digest('base64url');
@@ -16,7 +16,7 @@ function register(app,{requireAdmin}){
   const k=String(req.user._id||req.user.id),n=(rate.get(k)||[]).filter(t=>Date.now()-t<36e5);if(n.length>=5)return res.status(429).json({error:'Too many requests. Try again later.'});rate.set(k,[...n,Date.now()]);
   const base=process.env.API_PUBLIC_URL||`${req.get('x-forwarded-proto')||req.protocol}://${req.get('host')}`;
   const link=`${base.replace(/\/+$/,'')}/api/android/download?t=${make(email)}`;
-  try{await sendSimpleEmail({to:email,subject:'Echo DJ for Android — your download link',tags:['android-app'],html:`<p>Here is your Echo DJ administrator app for Android.</p><p><a href="${link}">Download the app</a></p><p>The link works for 24 hours. On your phone, allow installing from your browser when asked.</p>`});}
+  try{await sendBrevoEmail({to:[{email}],subject:'Echo DJ for Android — your download link',tags:['android-app'],htmlContent:`<p>Here is your Echo DJ administrator app for Android.</p><p><a href="${link}">Download the app</a></p><p>The link works for 24 hours. On your phone, allow installing from your browser when asked.</p>`},{env:{...process.env,DOMAIN_EMAIL_ACTIVE:'true'}});}// forces the noreply sender
   catch{return res.status(502).json({error:'The email could not be sent.'});}
   res.json({ok:true});
  });

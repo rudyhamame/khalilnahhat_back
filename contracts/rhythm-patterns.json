@@ -1,0 +1,472 @@
+[
+  {
+    "name": "Maqsum",
+    "meter": "4/4",
+    "subdivision": 2,
+    "steps": [
+      "D",
+      "T",
+      ".",
+      "T",
+      "D",
+      ".",
+      "T",
+      "."
+    ],
+    "aliases": [
+      "maqsum",
+      "maqsoum",
+      "maksum",
+      "maksoum",
+      "مقسوم"
+    ],
+    "source": "https://darbuka.org/study/technique/first-darbuka-rhythms/"
+  },
+  {
+    "name": "Baladi",
+    "meter": "4/4",
+    "subdivision": 2,
+    "steps": [
+      "D",
+      "D",
+      ".",
+      "T",
+      "D",
+      ".",
+      "T",
+      "."
+    ],
+    "aliases": [
+      "baladi",
+      "balady",
+      "beledi",
+      "بلدي",
+      "masmoudi saghir",
+      "masmudi saghir"
+    ],
+    "source": "https://darbuka.org/study/rhythms/maqsum-baladi-saidi/"
+  },
+  {
+    "name": "Saidi",
+    "meter": "4/4",
+    "subdivision": 2,
+    "steps": [
+      "D",
+      "T",
+      ".",
+      "D",
+      "D",
+      ".",
+      "T",
+      "."
+    ],
+    "aliases": [
+      "saidi",
+      "saeidi",
+      "sa’idi",
+      "sa'idi",
+      "صعيدي"
+    ],
+    "source": "https://darbuka.org/study/rhythms/maqsum-baladi-saidi/"
+  },
+  {
+    "name": "Malfuf",
+    "meter": "2/4",
+    "subdivision": 4,
+    "steps": [
+      "D",
+      ".",
+      ".",
+      "T",
+      ".",
+      ".",
+      "T",
+      "."
+    ],
+    "aliases": [
+      "malfuf",
+      "malfouf",
+      "laff",
+      "لف",
+      "ملفوف"
+    ],
+    "source": "https://darbuka.org/study/rhythms/two-four-rhythms/"
+  },
+  {
+    "name": "Ayyub",
+    "meter": "2/4",
+    "subdivision": 4,
+    "steps": [
+      "D",
+      ".",
+      ".",
+      "K",
+      "D",
+      ".",
+      "T",
+      "."
+    ],
+    "aliases": [
+      "ayyub",
+      "ayoub",
+      "ayub",
+      "أيوب",
+      "ايوب"
+    ],
+    "source": "https://darbuka.org/study/rhythms/two-four-rhythms/"
+  },
+  {
+    "name": "Karachi",
+    "meter": "2/4",
+    "subdivision": 4,
+    "steps": [
+      "T",
+      ".",
+      ".",
+      "K",
+      "T",
+      ".",
+      "D",
+      "."
+    ],
+    "aliases": [
+      "karachi",
+      "كراتشي"
+    ],
+    "source": "https://darbuka.org/study/rhythms/two-four-rhythms/"
+  },
+  {
+    "name": "Fox",
+    "meter": "2/4",
+    "subdivision": 4,
+    "steps": [
+      "D",
+      ".",
+      "T",
+      ".",
+      "D",
+      ".",
+      "T",
+      "."
+    ],
+    "aliases": [
+      "fox",
+      "vox",
+      "فوكس"
+    ],
+    "source": "https://darbuka.org/study/rhythms/two-four-rhythms/"
+  },
+  {
+    "name": "Khaleegi",
+    "meter": "2/4",
+    "subdivision": 4,
+    "steps": [
+      "D",
+      ".",
+      ".",
+      "D",
+      ".",
+      ".",
+      "T",
+      "."
+    ],
+    "aliases": [
+      "khaleegi",
+      "khaleeji",
+      "khaliji",
+      "khaligi",
+      "saudi",
+      "خليجي",
+      "سعودي"
+    ],
+    "source": "https://darbuka.org/study/rhythms/two-four-rhythms/"
+  },
+  {
+    "name": "Fallahi",
+    "meter": "2/4",
+    "subdivision": 4,
+    "steps": [
+      "D",
+      "T",
+      ".",
+      "T",
+      "D",
+      ".",
+      "T",
+      "."
+    ],
+    "aliases": [
+      "fallahi",
+      "falahi",
+      "fellahi",
+      "فلاحي"
+    ],
+    "source": "https://darbuka.org/study/rhythms/two-four-rhythms/"
+  },
+  {
+    "name": "Wahda",
+    "meter": "4/4",
+    "subdivision": 2,
+    "steps": [
+      "D",
+      ".",
+      ".",
+      ".",
+      "T",
+      ".",
+      ".",
+      "."
+    ],
+    "aliases": [
+      "wahda",
+      "wahde",
+      "وحدة"
+    ],
+    "source": "https://darbuka.org/study/rhythms/maqsum-baladi-saidi/"
+  },
+  {
+    "name": "Wahda w Nuss",
+    "meter": "4/4",
+    "subdivision": 4,
+    "steps": [
+      "D",
+      ".",
+      ".",
+      "T",
+      ".",
+      ".",
+      "T",
+      ".",
+      "D",
+      ".",
+      ".",
+      ".",
+      "T",
+      ".",
+      ".",
+      "."
+    ],
+    "aliases": [
+      "wahda w nuss",
+      "wahda wa nuss",
+      "wahda we noss",
+      "وحدة ونص"
+    ],
+    "source": "https://darbuka.org/study/rhythms/maqsum-baladi-saidi/"
+  },
+  {
+    "name": "Sombati",
+    "meter": "4/4",
+    "subdivision": 4,
+    "steps": [
+      "D",
+      ".",
+      ".",
+      "T",
+      ".",
+      ".",
+      "T",
+      ".",
+      "D",
+      ".",
+      ".",
+      ".",
+      "T",
+      ".",
+      ".",
+      "."
+    ],
+    "aliases": [
+      "sombati",
+      "sunbati",
+      "sumbati",
+      "سنباطي"
+    ],
+    "source": "https://darbuka.org/study/rhythms/maqsum-baladi-saidi/"
+  },
+  {
+    "name": "Zaffa",
+    "meter": "4/4",
+    "subdivision": 4,
+    "steps": [
+      "D",
+      ".",
+      "T",
+      "K",
+      "T",
+      ".",
+      "T",
+      ".",
+      "D",
+      ".",
+      "T",
+      ".",
+      "T",
+      ".",
+      ".",
+      "."
+    ],
+    "aliases": [
+      "zaffa",
+      "zafa",
+      "زفة"
+    ],
+    "source": "https://darbuka.org/study/rhythms/maqsum-baladi-saidi/"
+  },
+  {
+    "name": "Nawari",
+    "meter": "4/4",
+    "subdivision": 2,
+    "steps": [
+      "T",
+      "D",
+      ".",
+      "T",
+      "D",
+      ".",
+      "T",
+      "."
+    ],
+    "aliases": [
+      "nawari",
+      "nawary",
+      "نواري"
+    ],
+    "source": "https://darbuka.org/study/rhythms/maqsum-baladi-saidi/"
+  },
+  {
+    "name": "Jerk",
+    "meter": "4/4",
+    "subdivision": 4,
+    "steps": [
+      "D",
+      ".",
+      ".",
+      ".",
+      "T",
+      ".",
+      ".",
+      ".",
+      "D",
+      "D",
+      ".",
+      ".",
+      "T",
+      ".",
+      ".",
+      "."
+    ],
+    "aliases": [
+      "jerk",
+      "جيرك"
+    ],
+    "source": "https://darbuka.org/study/rhythms/maqsum-baladi-saidi/"
+  },
+  {
+    "name": "Masmoudi Kabir",
+    "meter": "8/4",
+    "subdivision": 1,
+    "steps": [
+      "D",
+      "D",
+      ".",
+      "T",
+      "D",
+      ".",
+      "T",
+      "."
+    ],
+    "aliases": [
+      "masmoudi kabir",
+      "masmudi kabir",
+      "masmoudi kebir",
+      "masmudi kebir",
+      "مصمودي كبير"
+    ],
+    "source": "https://darbuka.org/study/rhythms/masmoudi-and-chiftetelli/"
+  },
+  {
+    "name": "Bambi",
+    "meter": "8/4",
+    "subdivision": 2,
+    "steps": [
+      "D",
+      ".",
+      ".",
+      "T",
+      ".",
+      ".",
+      "T",
+      ".",
+      ".",
+      "T",
+      ".",
+      ".",
+      "D",
+      ".",
+      "D",
+      "."
+    ],
+    "aliases": [
+      "bambi",
+      "بمبي"
+    ],
+    "source": "https://darbuka.org/study/rhythms/masmoudi-and-chiftetelli/"
+  },
+  {
+    "name": "Ciftetelli",
+    "meter": "8/4",
+    "subdivision": 2,
+    "steps": [
+      "D",
+      ".",
+      ".",
+      "T",
+      ".",
+      ".",
+      "T",
+      ".",
+      "D",
+      ".",
+      "D",
+      ".",
+      "T",
+      ".",
+      ".",
+      "."
+    ],
+    "aliases": [
+      "ciftetelli",
+      "chiftetelli",
+      "çiftetelli",
+      "tsiftetelli",
+      "shiftetelli",
+      "chiftitelli",
+      "chifteteli",
+      "cifteteli",
+      "شفتتلي"
+    ],
+    "source": "https://darbuka.org/study/rhythms/masmoudi-and-chiftetelli/"
+  },
+  {
+    "name": "Waltz",
+    "meter": "3/4",
+    "subdivision": 2,
+    "steps": [
+      "D",
+      ".",
+      "T",
+      ".",
+      "T",
+      "."
+    ],
+    "aliases": [
+      "waltz",
+      "valse",
+      "vals",
+      "فالس",
+      "والتز"
+    ],
+    "source": "https://openbooks.library.baylor.edu/pianobasics/chapter/accompaniment-styles-broken-chord-alberti-bass-and-waltz-bass/"
+  }
+]

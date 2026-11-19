@@ -109,6 +109,7 @@ function createService({ArchiveModel=MusicRecording,models=M,deliveryUrl=value=>
     let next=value.parentId;const seen=new Set([id]);while(next){if(seen.has(next))fail('Vocabulary hierarchy cannot contain cycles.');seen.add(next);next=(await Vocabulary.findOne({externalId:next}).session(session).lean())?.parentId;}}
    const old=id?await Vocabulary.findOne({externalId:id}).session(session):null;
    if(id&&!old)fail('Metadata entity not found.',404);
+   if(value.kind==='rhythm'&&value.beatMap===undefined&&!old?.beatMap){const map=require('./rhythm-beat-map').beatMapFor(value.name);if(map)value.beatMap=map;}
    if(old&&value.kind!==old.kind)fail('Entity kind cannot be changed; create a separate entity.');
    if(old&&value.kind!=='genre'&&value.parentId!==old.parentId)fail('Parent identity cannot be changed for this entity; create a separate entity.');
    if(old&&value.revision!==old.revision)fail('This entity changed. Reload before editing.',409);

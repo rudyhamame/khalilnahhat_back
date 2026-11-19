@@ -79,8 +79,6 @@ function createInstagramService({repository=store,env=process.env,fetchImpl=fetc
    const verified=accessToken?await profile(accessToken):old.profile;
    return view(await persist(old,{...old,...settings,secret,profile:verified,...(accessToken?{syncedAt:new Date(now()),lastAttemptAt:new Date(now()),tokenRefreshedAt:new Date(now()),expiresAt:null,error:''}:{})}),true);
   }),
-  // For publishing: the saved account's id and its decrypted token (never sent to a client).
-  async credentials(){const row=await repository.load();if(!row?.secret||!row.profile?.id)throw failure(409,'Connect Instagram in the admin first (Instagram settings).');return {userId:row.profile.id,username:row.profile.username,token:unseal(row.secret,env)};},
   refresh:()=>exclusive(async()=>view(await sync(true),true)),
   disconnect:()=>exclusive(async()=>{const old=await repository.load();if(!old)return view(null,true);return view(await persist(old,{secret:'',profile:null,enabled:false,caption:old.caption,website:old.website,syncedAt:null,lastAttemptAt:null,tokenRefreshedAt:null,expiresAt:null,error:''}),true);}),
  };

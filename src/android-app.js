@@ -33,6 +33,14 @@ function register(app,{requireAdmin}){
   catch{return res.status(502).json({error:'The email could not be sent.'});}
   res.json({ok:true});
  });
+ // Public: the Echo Event client app (separate file on the same volume), for the badge on the home page.
+ const clientPath=()=>require('path').join(require('path').dirname(apkPath()),'EchoEvent.apk');
+ app.get('/api/android/client',(req,res)=>{
+  let st;try{st=fs.statSync(clientPath());}catch{return res.status(404).send('The app is not published yet.');}
+  res.set({'Content-Type':'application/vnd.android.package-archive','Content-Disposition':'attachment; filename="EchoEvent.apk"','Content-Length':String(st.size),'Cache-Control':'public, max-age=300'});
+  if(req.method==='HEAD')return res.end();
+  fs.createReadStream(clientPath()).pipe(res);
+ });
  app.get('/api/android/download',async(req,res)=>{
   if(!check(req.query.t))return res.status(403).send('This link is invalid or has expired.');
   const head={'Content-Type':'application/vnd.android.package-archive','Content-Disposition':'attachment; filename="EchoDJ.apk"','Cache-Control':'private, no-store'};

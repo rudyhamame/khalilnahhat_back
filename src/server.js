@@ -997,7 +997,6 @@ app.get('/api/service-requests/mine', requireAuth, async (request, response) => 
   });
 });
 
-require('./posting-studio').registerPostingStudio(app,{requireAdmin});
 
 app.get('/api/service-requests/admin', requireAdmin, async (_request, response) => {
   const [requests,equipment,prices]=await Promise.all([ServiceRequest.find().sort({createdAt:-1}),Equipment.find().select('slug priceCents'),ServicePrice.find({isActive:true}).select('serviceId amountCents')]);
@@ -1568,7 +1567,8 @@ registerContent(app, requireAdmin);
 require('./seasonal-theme').registerSeasonalTheme(app, { requireAdmin });
 require('./concept-map').registerConceptMap(app, { requireAdmin });
 require('./booking-signup').registerBookingSignup(app, { User, serializeUser, isAdminUser, issueSession: accountSessions.issueSession, sendMail: require('./brevo').sendSimpleEmail, hashPassword });
-require('./instagram-profile').registerInstagramProfile(app, { requireAdmin });
+const instagramService = require('./instagram-profile').registerInstagramProfile(app, { requireAdmin });
+require('./instagram-publish').registerInstagramPublish(app, { requireAdmin, credentials: () => instagramService.credentials() });
 require('./youtube-channel').registerYouTubeChannel(app, { requireAdmin });
 registerPayments(app, { requireAuth, requireAdmin, serialize: serializeServiceRequest });
 require('./booking-negotiation').registerBookingNegotiation(app,{requireAuth,serialize:serializeServiceRequest});

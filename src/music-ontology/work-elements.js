@@ -14,12 +14,12 @@ const State=mongoose.models.WorkElementCatalogState||mongoose.model('WorkElement
 const genres=['Pop','Dance pop','Synth-pop','Electropop','Indie pop','Arabic pop','K-pop','J-pop','Latin pop','Afrobeats','Amapiano','Highlife','Afro house','House','Deep house','Tech house','Progressive house','Electro house','Soulful house','Disco house','Organic house','Melodic house','EDM','Techno','Melodic techno','Minimal techno','Trance','Progressive trance','Psytrance','Hardstyle','Drum and bass','Jungle','Dubstep','UK garage','UK bass','Breakbeat','Electronica','Ambient','Downtempo','Trip-hop','Chillout','Lounge','Disco','Nu-disco','Funk','Soul','Neo-soul','R&B','Contemporary R&B','Hip-hop','Rap','Trap','Drill','Boom bap','Arabic hip-hop','Reggaeton','Dembow','Dancehall','Reggae','Dub','Ska','Rock','Classic rock','Alternative rock','Indie rock','Hard rock','Punk rock','Metal','Heavy metal','Blues','Blues rock','Jazz','Smooth jazz','Swing','Bebop','Bossa nova','Samba','Salsa','Bachata','Merengue','Cumbia','Mambo','Tango','Flamenco','Country','Bluegrass','Folk','Acoustic','Singer-songwriter','Classical','Orchestral','Chamber music','Opera','Film score','Soundtrack','Gospel','Christian music','Arabic classical','Tarab','Dabke','Shaabi','Mahraganat','Rai','Khaliji','Mawwal','Levantine folk','Egyptian pop','Lebanese pop','Turkish pop','Turkish folk','Persian pop','Bollywood','Bhangra','Qawwali','Latin jazz','Afro-Cuban jazz','World fusion'];
 // The moments of an event a client can pick a song for. Seeded once; the admin edits the list in Work Elements.
 const momentSeeds=['Intro','Entrance','First dance','Dinner','Cake cutting','Party','Slow dance','Outro'];
-const presets={bpm:['60','70','80','90','100','110','120','128','130','140','150','160','170','180'],duration:['180','240','300','600'],key:['C','C#','Db','D','D#','Eb','E','F','F#','Gb','G','G#','Ab','A','A#','Bb','B'].flatMap(note=>['major','minor'].map(mode=>`${note} ${mode}`)),mode:['Major','Minor','Dorian','Phrygian','Lydian','Mixolydian','Locrian','Harmonic minor','Melodic minor'],script:['Arabic','Latin','Cyrillic','Greek','Hebrew','Devanagari','Chinese','Japanese','Korean']};
+const presets={timeSignature:require('../../contracts/time-signatures.json'),bpm:['60','70','80','90','100','110','120','128','130','140','150','160','170','180'],duration:['180','240','300','600'],key:['C','C#','Db','D','D#','Eb','E','F','F#','Gb','G','G#','Ab','A','A#','Bb','B'].flatMap(note=>['major','minor'].map(mode=>`${note} ${mode}`)),mode:['Major','Minor','Dorian','Phrygian','Lydian','Mixolydian','Locrian','Harmonic minor','Melodic minor'],script:['Arabic','Latin','Cyrillic','Greek','Hebrew','Devanagari','Chinese','Japanese','Korean']};
 function createWorkElements(service){
  const {Vocabulary}=service.models;
  const definition=key=>{const result=definitions.find(row=>row.id===key);if(!result)fail('Unknown work element.');return result;};
  async function initialize(){
-  await ensureMoments();
+  await ensureMoments();await ensureTimeSignatures();
   await service.transaction(async session=>{
    if(await State.findById('starter-v1').session(session))return;
    const vocabulary=[...genres.map(name=>({kind:'genre',name})),...audioLanguages.map(([isoCode,label])=>({kind:'language',name:label.split(' · ')[0],isoCode}))];
@@ -36,6 +36,16 @@ function createWorkElements(service){
   await Option.bulkWrite(momentSeeds.map(value=>({updateOne:{filter:{key:'moments',normalizedValue:norm(value)},update:{$setOnInsert:{key:'moments',value,normalizedValue:norm(value),revision:1}},upsert:true}})));
   await State.updateOne({_id:'moments-v1'},{$set:{version:1}},{upsert:true});
  }
+ async function ensureTimeSignatures(){
+  if(await State.findById('time-signatures-v1'))return;
+  await Option.bulkWrite(presets.timeSignature.map(value=>({updateOne:{filter:{key:'timeSignature',normalizedValue:norm(value)},update:{$setOnInsert:{key:'timeSignature',value,normalizedValue:norm(value),revision:1}},upsert:true}})));
+  await State.updateOne({_id:'time-signatures-v1'},{$set:{version:1}},{upsert:true});
+ }
+ async function signatureUsed(value){
+  if(await Vocabulary.exists({kind:'rhythm','beatMap.meter':value,archived:{$ne:true}})||await service.models.Melody.exists({timeSignature:value}))return true;
+  const legacy=await Vocabulary.find({kind:'rhythm',beatMap:null,archived:{$ne:true}}).select('name').lean();
+  return legacy.some(row=>beatMapFor(row.name)?.meter===value);
+ }
  // Public, read-only: the options of an admin-managed preset list, in the order they were added.
  async function presetOptions(key){
   if(key!=='moments')fail('Unknown list.',404);
@@ -43,10 +53,12 @@ function createWorkElements(service){
   return (await Option.find({key,archived:{$ne:true}}).sort({_id:1}).lean()).map(option=>({id:String(option._id),value:option.value}));
  }
  async function list(){
+  await ensureTimeSignatures();
   const [vocabulary,options,types,recordings,works]=await Promise.all([Vocabulary.find({kind:{$nin:['concept','lyricist']}}).sort({name:1}).lean(),Option.find({archived:{$ne:true}}).sort({value:1}).lean(),service.listWorkTypes(),MusicRecording.find().select('externalId name revision').lean(),service.models.Work.find().select('externalId title revision').lean()]);
   return definitions.map(def=>({...def,editable:!['fixed','recording','work'].includes(def.source),options:def.source==='vocabulary'?vocabulary.filter(row=>!row.archived&&row.kind===def.kind).map(row=>({id:row.externalId,value:row.name,revision:row.revision,...(def.kind==='rhythm'?{beatMap:row.beatMap??beatMapFor(row.name)}:{}),parentId:row.parentId||'',...(def.kind==='musician'?{instrumentId:row.instrumentId||null,instrument:row.instrumentId?vocabulary.filter(item=>item.kind==='instrument').map(item=>({id:item.externalId,name:item.name})).find(item=>item.id===row.instrumentId)||null:null}:{}),isoCode:row.isoCode||'',languageIds:row.languageIds||[],...(def.kind==='artist'?{dialectIds:row.dialectIds||[],dialects:(row.dialectIds||[]).map(id=>vocabulary.find(dialect=>dialect.externalId===id&&dialect.kind==='dialect')).filter(Boolean).map(dialect=>({id:dialect.externalId,name:dialect.name}))}:{}),languages:(row.languageIds||[]).map(id=>vocabulary.find(language=>language.externalId===id&&language.kind==='language')).filter(Boolean).map(language=>({id:language.externalId,name:language.name})),description:row.description||'',provenance:row.provenance||{source:'',note:''}})):def.source==='workType'?[...(def.id==='workKind'?[{id:'ORIGINAL',value:'Original',locked:true}]:[]),...types.map(row=>({...row,value:row.name,languageIds:row.languageIds||[],languages:(row.languageIds||[]).map(id=>vocabulary.find(language=>language.externalId===id&&language.kind==='language')).filter(Boolean).map(language=>({id:language.externalId,name:language.name}))}))]:def.source==='fixed'?def.values.map(value=>({id:value,value,locked:true})):def.source==='recording'||def.source==='work'?(def.source==='recording'?recordings:works).map(row=>({id:row.externalId,value:row.externalId,label:row.name||row.title,locked:true})):options.filter(row=>row.key===def.id).map(row=>({id:String(row._id),value:row.value,description:row.description||'',revision:row.revision,languageIds:row.languageIds||[],languages:(row.languageIds||[]).map(id=>vocabulary.find(language=>language.externalId===id&&language.kind==='language')).filter(Boolean).map(language=>({id:language.externalId,name:language.name}))}))}));
  }
  function validateValue(key,value){
+  if(key==='timeSignature'&&!/^(?:[1-9]|1[0-6])\/(?:1|2|4|8|16|32)$/.test(value))fail('Use a time signature such as 3/4, 4/4 or 6/8.');
   if(key==='bpm'&&(!Number.isFinite(Number(value))||Number(value)<=0||Number(value)>1000))fail('Enter BPM between 0 and 1000.');
   if(key==='duration'&&(!Number.isFinite(Number(value))||Number(value)<0||Number(value)>86400))fail('Enter duration in seconds, up to 86400.');
   if(key==='releaseYear'&&(!/^\d{4}$/.test(value)||Number(value)<1000||Number(value)>2100))fail('Enter a release year between 1000 and 2100.');
@@ -56,11 +68,14 @@ function createWorkElements(service){
  }
  async function save(key,input,id,actor){
   const def=definition(key);if(['fixed','recording','work'].includes(def.source))fail('Manage these identities in their recording or content editor.');
+  if(['rhythm','timeSignature'].includes(key))await ensureTimeSignatures();
   const data=z.object({beatMap:beatMap.nullable().optional(),dialectIds:z.array(z.string().trim().min(1).max(160)).max(100).refine(values=>new Set(values).size===values.length,'Choose distinct dialects.').optional(),description:z.string().trim().max(2000).optional(),instrumentId:z.string().trim().min(1).max(160).nullable().optional(),languageIds:z.array(z.string().trim().min(1).max(160)).max(100).refine(values=>new Set(values).size===values.length,'Choose distinct languages.').optional(),value:z.string().trim().min(1).max(240),revision:z.number().int().positive().optional(),parentId:z.string().max(160).optional(),isoCode:z.string().max(20).optional()}).strict().parse(input);
   if(data.beatMap!=null&&key!=='rhythm')fail('Only rhythms have beat maps.');
   if(def.source==='vocabulary'){
    const old=id?await Vocabulary.findOne({externalId:id}).lean():await Vocabulary.findOne({kind:def.kind,normalizedName:norm(data.value),parentId:data.parentId||'',archived:true}).lean();
    if(id&&(!old||old.kind!==def.kind))fail('Option not found.',404);
+   const map=def.kind==='rhythm'?(data.beatMap??old?.beatMap??beatMapFor(data.value)):null;
+   if(map&&!await Option.exists({key:'timeSignature',value:map.meter,archived:{$ne:true}}))fail('Add '+map.meter+' in Time Signatures before assigning it to a rhythm.');
    const value={...(def.kind==='rhythm'&&data.beatMap!==undefined?{beatMap:data.beatMap}:{}),...(def.kind==='artist'&&data.dialectIds!==undefined?{dialectIds:data.dialectIds}:{}),...(data.languageIds!==undefined?{languageIds:data.languageIds}:{}),...(def.kind==='musician'?{instrumentId:data.instrumentId!==undefined?data.instrumentId:old?.instrumentId}:{}),kind:def.kind,name:data.value,parentId:def.kind==='genre'?'':(old?.parentId??data.parentId??''),isoCode:data.isoCode??old?.isoCode??'',description:def.kind==='genre'?(data.description??old?.description??''):(old?.description||''),provenance:{source:old?.provenance?.source||'',note:old?.provenance?.note||''},...(old?{revision:id?data.revision:old.revision}:{})};
    const row=await service.saveVocabulary(value,old?.externalId||null,actor);
    if(old?.archived)await Vocabulary.updateOne({externalId:old.externalId},{$set:{archived:false}});
@@ -71,6 +86,7 @@ function createWorkElements(service){
    return service.saveWorkType({languageIds:data.languageIds??old?.languageIds??[],name:data.value,nameArabic:old?.nameArabic||'',details:old?.details||'',detailsArabic:old?.detailsArabic||'',artworkUrl:old?.artworkUrl||'',...(old?{revision:data.revision}:{})},id);
   }
   validateValue(key,data.value);
+  if(key==='timeSignature'&&id){const previous=await Option.findOne({_id:id,key}).lean();if(previous&&previous.value!==data.value&&await signatureUsed(previous.value))fail('This time signature is used by a rhythm or work. Remove its assignments before renaming it.',409);}
   const descriptionSet={};
   const languageSet=data.languageIds!==undefined?{languageIds:data.languageIds}:{};
   if(languageSet.languageIds?.length&&await Vocabulary.countDocuments({externalId:{$in:languageSet.languageIds},kind:'language'})!==languageSet.languageIds.length)fail('Choose existing language terms.');
@@ -89,6 +105,7 @@ function createWorkElements(service){
   if(key==='instrument'&&(await Vocabulary.exists({kind:'musician',instrumentId:id,archived:{$ne:true}})||await MusicRecording.exists({'atoms.sound.musicianCredits.instrumentId':id})))fail('This instrument is assigned to a musician. Remove its assignments first.',409);
   if(def.source==='vocabulary'&&await Vocabulary.exists({parentId:id,archived:{$ne:true}}))fail('Remove this option’s child entries first.',409);
   if(def.source!=='vocabulary'&&!mongoose.isValidObjectId(id))fail('Option not found.',404);
+  if(key==='timeSignature'){const row=await Option.findOne({_id:id,key}).lean();if(row&&await signatureUsed(row.value))fail('This time signature is used by a rhythm or work. Remove its assignments first.',409);}
   const Model=def.source==='vocabulary'?Vocabulary:Option,query=def.source==='vocabulary'?{externalId:id,kind:def.kind}:{_id:id,key};
   const removed=await require('../permanent-deletion').remove(Model,{...query,revision,archived:{$ne:true}});if(!removed)fail('This option changed. Reload before deleting.',409);
  }

@@ -23,6 +23,11 @@
     "source": "preset"
   },
   {
+    "id": "timeSignature",
+    "label": "Time signature",
+    "source": "preset"
+  },
+  {
     "id": "rhythm",
     "label": "Rhythm",
     "source": "vocabulary",

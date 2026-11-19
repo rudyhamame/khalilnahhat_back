@@ -60,6 +60,27 @@ function registerMusicOntology(app,{requireAdmin,service=createService()}={}){
   res.json({ok:true,deleted:true,id:req.params.id,cloudinaryCleanupPending:cleanup.pending});
  }));
 
+ // Permanently delete a recording's audio and its separated channels from the cloud. The recording stays, as a Draft without audio.
+ // Version snapshots are cleared too, otherwise they would still reference the files and block the cloud cleanup (shared files are kept by the normal reference check).
+ app.delete(`${admin}/recordings/:id/audio`,requireAdmin,wrap(async(req,res)=>{
+  const {revision}=z.object({revision:z.number().int().nonnegative(),permanent:z.literal(true)}).strict().parse(req.body);
+  let deletionKeys=[],next=0;
+  await service.transaction(async session=>{
+   const row=await MusicRecording.findOne({externalId:req.params.id}).session(session);
+   if(!row)throw Object.assign(new Error('Recording not found.'),{status:404});
+   if((row.revision??0)!==revision)throw Object.assign(new Error('Recording changed. Reload before deleting its audio.'),{status:409});
+   const versions=await service.models.Version.find({recordingId:row.externalId}).session(session);
+   const owned=[{audioUrl:row.audioUrl,audioMetadata:row.audioMetadata,stems:row.stems},...versions.map(item=>({audioUrl:item.snapshot?.audioUrl,stems:item.snapshot?.stems}))].map(item=>JSON.parse(JSON.stringify(item)));
+   deletionKeys=await permanentDeletion.prepare(owned,{session});
+   await service.models.Version.updateMany({recordingId:row.externalId},{$set:{'snapshot.audioUrl':'','snapshot.stems':null,'snapshot.audioMetadata':null}},{session});
+   row.audioUrl='';row.audioMetadata=null;row.stems=null;row.durationMinutes=null;row.status='DRAFT';row.revision=(row.revision??0)+1;
+   for(const atom of row.atoms||[])atom.audioRange=undefined;
+   await row.save({session});next=row.revision;
+  });
+  const cleanup=await permanentDeletion.finish(deletionKeys);
+  res.json({ok:true,id:req.params.id,revision:next,status:'DRAFT',cloudinaryCleanupPending:cleanup.pending});
+ }));
+
  return service;
 }
 module.exports={registerMusicOntology};

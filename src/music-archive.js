@@ -6,6 +6,7 @@ const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { ArchiveItem } = require('./models');
 const MusicRecording = require('./music-ontology/recording-model');
+const { recordingName } = require('./music-ontology/recording-name');
 const archiveFiles = require('./music-archive-files');
 
 const common = { externalId: { type: String, unique: true, required: true }, title: String, description: String,
@@ -51,7 +52,7 @@ function serialize(row) {
 }
 // A recording shown in the older archive song shape (the public player and collections read this).
 const minutesText = m => m == null ? '' : `${Math.floor(m)}:${String(Math.round((m % 1) * 60) % 60).padStart(2, '0')}`;
-const asSong = r => ({ externalId: r.externalId, title: r.name, description: r.description || '', audioUrl: r.audioUrl || '', coverImage: r.coverImage || '', duration: minutesText(r.durationMinutes), date: r.releaseDate || '', artist: '', category: 'Music Archive', published: r.status === 'PUBLISHED', status: r.status, sortOrder: 0, workType: r.workType, createdAt: r.createdAt });
+const asSong = r => ({ externalId: r.externalId, title: recordingName(r), description: r.description || '', audioUrl: r.audioUrl || '', coverImage: r.coverImage || '', duration: minutesText(r.durationMinutes), date: r.releaseDate || '', artist: '', category: 'Music Archive', published: r.status === 'PUBLISHED', status: r.status, sortOrder: 0, workType: r.workType, createdAt: r.createdAt });
 function visibleSongs(songs) {
   return songs.filter(s => s.published !== false && s.status !== 'ARCHIVED');
 }

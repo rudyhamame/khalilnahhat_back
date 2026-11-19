@@ -1,4 +1,5 @@
 const LEGACY_LYRIC_FIELDS=['text','notes','completeness','conceptLabel','conceptSummary','primaryConceptId','conceptIds','concept','sentenceConcept','timedLyrics','lyricistCredits'];
+const {recordingName,recordingNames}=require('./recording-name');
 // Stored lyric data stays in the database but is never returned.
 const withoutLyricFields=l=>{const copy={...l};for(const key of LEGACY_LYRIC_FIELDS)delete copy[key];return copy;};
 const mongoose=require('mongoose');
@@ -205,7 +206,7 @@ function createService({ArchiveModel=MusicRecording,models=M,deliveryUrl=value=>
    if(v.audioUrl&&!require('../music-archive-files').localAssetPattern.test(v.audioUrl)&&!/\/video\/(upload|authenticated)\//.test(v.audioUrl))fail('Choose an uploaded audio asset.');
    if(v.status==='PUBLISHED'&&!v.audioUrl)fail('Published recordings require audio.');
    const recordId=id||makeId('recording');
-   const data={audioMetadata:v.audioMetadata!==undefined?v.audioMetadata:(old?.audioUrl===v.audioUrl?plain(old)?.audioMetadata:null),stems:v.stems!==undefined?v.stems:(old?.audioUrl===v.audioUrl?plain(old)?.stems||null:null),...(atoms!==undefined?{atoms}:{}),name:v.name,workType:v.workType,atomCount:atoms!==undefined?atoms.length:(old?.atomCount??0),status:v.status,revision:(old?.revision||0)+1,description:v.description,releaseDate:v.releaseDate,audioUrl:v.audioUrl,coverImage:v.coverImage,durationMinutes:v.durationMinutes};
+   const data={audioMetadata:v.audioMetadata!==undefined?v.audioMetadata:(old?.audioUrl===v.audioUrl?plain(old)?.audioMetadata:null),stems:v.stems!==undefined?v.stems:(old?.audioUrl===v.audioUrl?plain(old)?.stems||null:null),...(atoms!==undefined?{atoms}:{}),workType:v.workType,atomCount:atoms!==undefined?atoms.length:(old?.atomCount??0),status:v.status,revision:(old?.revision||0)+1,description:v.description,releaseDate:v.releaseDate,audioUrl:v.audioUrl,coverImage:v.coverImage,durationMinutes:v.durationMinutes};
    let row;
    if(old){old.set(data);row=await old.save({session});}else row=(await ArchiveModel.create([{...data,externalId:recordId}],{session}))[0];
    await Version.create([{externalId:makeId('version'),recordingId:recordId,number:data.revision,snapshot:plain(row),changedBy:actor||'admin'}],{session});
@@ -235,7 +236,7 @@ function createService({ArchiveModel=MusicRecording,models=M,deliveryUrl=value=>
    const artist=[...new Set(atoms.flatMap(item=>[...(item.sound?.musicianCredits||[]),...(item.lyrics?.vocalistCredits||[])]).map(c=>vocabulary.get(c.artistId)?.name).filter(Boolean))].join(', ');
    const type=workTypes.get(r.workType)||null;
    const minutes=r.durationMinutes??null;
-   return {id:r.externalId,name:r.name,description:r.description||'',workType:type?r.workType:null,workTypeDefinition:type,status:r.status||'DRAFT',atomCount:atoms.length,atoms:atoms.map(item=>({...item,lyrics:item.lyrics?withoutLyricFields(item.lyrics):null})),
+   return {id:r.externalId,name:recordingName(r),names:recordingNames(r),description:r.description||'',workType:type?r.workType:null,workTypeDefinition:type,status:r.status||'DRAFT',atomCount:atoms.length,atoms:atoms.map(item=>({...item,lyrics:item.lyrics?withoutLyricFields(item.lyrics):null})),
     stems:r.stems?{channels:(r.stems.channels||[]).filter(c=>c&&c.url).map(c=>({name:c.name,url:deliver(c.url),storedUrl:c.url,...(admin?{}:{previewUrl:lightUrl(c.url)||undefined})})),duration:r.stems.duration??null,splitAt:r.stems.splitAt||''}:null,
     audio:{metadata:r.audioMetadata||null,url:deliver(r.audioUrl||''),durationSeconds:minutes!=null?Math.round(minutes*60):null},audioUrl:deliver(r.audioUrl||''),coverImage:deliver(r.coverImage||''),
     durationMinutes:minutes,releaseDate:r.releaseDate||'',artist,recordingMetadata:inferredRecordingMetadata(atomWorks),revision:r.revision||0,createdAt:r.createdAt,updatedAt:r.updatedAt,

@@ -5,7 +5,6 @@ const {Schema}=mongoose;
 const credit={_id:false,artistId:{type:String,required:true}};
 const schema=new Schema({
  externalId:{type:String,required:true,unique:true},
- name:{type:String,required:true,trim:true},
  description:{type:String,default:'',trim:true},
  workType:{type:String,index:true},
  status:{type:String,enum:contract.recordingStatuses,default:'DRAFT',index:true},

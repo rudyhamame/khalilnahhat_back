@@ -18,6 +18,7 @@ const equipmentSchema = new mongoose.Schema(
     functionSummary: { type: String, default: '', trim: true, maxlength: 600 },
     eventFit: { type: mongoose.Schema.Types.Mixed, default: {} },
     imageUrl: { type: String, default: '' },
+    youtubeUrl: { type: String, default: '', trim: true, maxlength: 300 },
     modelUrl:{type:String,default:''},modelJobId:{type:String,default:''},modelSeeded:{type:Boolean,default:false},
     modelParts:{type:[new mongoose.Schema({name:String,nameAr:String,src:String,x:Number,y:Number,z:Number,rotation:Number},{_id:false})],default:[]},
     isSet:{type:Boolean,default:false},
@@ -55,7 +56,7 @@ async function attachDefaultModels() {
 const publicView = (e) => ({
   isSet:Boolean(e.isSet||(e.setItems||[]).length||(e.modelParts||[]).length),setItems:(e.setItems||[]).map(member=>({equipmentId:member.equipmentId,quantity:member.quantity,x:member.x||0,y:member.y||0,z:member.z||0,rotation:member.rotation||0})),
   id: e.slug, category: e.category, name: e.name, brandModel: e.brandModel,
-  description: e.description, functionSummary: e.functionSummary || '', eventFit: e.eventFit && typeof e.eventFit === 'object' ? e.eventFit : {}, imageUrl: e.imageUrl, modelUrl:e.modelUrl||'', modelParts:(e.modelParts||[]).map(part=>({name:part.name,nameAr:part.nameAr||'',src:part.src,x:part.x||0,y:part.y||0,z:part.z||0,rotation:part.rotation||0})), minQuantity: e.minQuantity, ...stockView(e),
+  description: e.description, functionSummary: e.functionSummary || '', eventFit: e.eventFit && typeof e.eventFit === 'object' ? e.eventFit : {}, imageUrl: e.imageUrl, youtubeUrl: e.youtubeUrl || '', modelUrl:e.modelUrl||'', modelParts:(e.modelParts||[]).map(part=>({name:part.name,nameAr:part.nameAr||'',src:part.src,x:part.x||0,y:part.y||0,z:part.z||0,rotation:part.rotation||0})), minQuantity: e.minQuantity, ...stockView(e),
   roomPlacement:e.roomPlacement&&Number.isFinite(e.roomPlacement.x)?{x:e.roomPlacement.x,fromBack:e.roomPlacement.fromBack||0,rotation:e.roomPlacement.rotation||0,height:e.roomPlacement.height||0,scale:e.roomPlacement.scale>0?e.roomPlacement.scale:1}:null,
 });
 const adminView = (e) => ({
@@ -80,6 +81,7 @@ const fields = {
   modelJobId:z.string().max(80).nullable(),
   category: z.string().trim().min(1), name: z.string().trim().min(1),
   brandModel: z.string().trim(), description: z.string().trim(), imageUrl: z.string().trim(),
+  youtubeUrl: z.string().trim().max(300).refine((value) => !value || /^https:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\//i.test(value), 'Use a YouTube link (https://youtube.com/… or https://youtu.be/…).'),
   functionSummary: z.string().trim().max(600),
   eventFit: z.object(Object.fromEntries(['wedding', 'engagement', 'birthday', 'corporate', 'party', 'graduation', 'other'].map((type) => [type, z.string().trim().max(600).optional()]))).strict(),
   priceCents: z.number().int().min(0), minQuantity: z.number().int().min(1),

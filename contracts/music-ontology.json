@@ -79,5 +79,8 @@
     "MEDLEY": "Medley",
     "MIX": "Mix",
     "LIVE": "Live"
+  },
+  "features": {
+    "atomRhythmTiming": true
   }
 }

@@ -37,12 +37,14 @@ function createWorkElements(service){
   await State.updateOne({_id:'moments-v1'},{$set:{version:1}},{upsert:true});
  }
  async function ensureTimeSignatures(){
-  if(await State.findById('time-signatures-v1'))return;
-  await Option.bulkWrite(presets.timeSignature.map(value=>({updateOne:{filter:{key:'timeSignature',normalizedValue:norm(value)},update:{$setOnInsert:{key:'timeSignature',value,normalizedValue:norm(value),revision:1}},upsert:true}})));
+  if(await State.findById('time-signatures-v2'))return;
+  const alreadySeeded=Boolean(await State.findById('time-signatures-v1')),signatures=alreadySeeded?['4/8','4/16']:presets.timeSignature;
+  await Option.bulkWrite(signatures.map(value=>({updateOne:{filter:{key:'timeSignature',normalizedValue:norm(value)},update:{$setOnInsert:{key:'timeSignature',value,normalizedValue:norm(value),revision:1}},upsert:true}})));
   await State.updateOne({_id:'time-signatures-v1'},{$set:{version:1}},{upsert:true});
+  await State.updateOne({_id:'time-signatures-v2'},{$set:{version:2}},{upsert:true});
  }
  async function signatureUsed(value){
-  if(await Vocabulary.exists({kind:'rhythm','beatMap.meter':value,archived:{$ne:true}})||await service.models.Melody.exists({timeSignature:value}))return true;
+  if(await Vocabulary.exists({kind:'rhythm','beatMap.meter':value,archived:{$ne:true}})||await service.models.Melody.exists({timeSignature:value})||await MusicRecording.exists({'atoms.sound.rhythmTiming.timeSignature':value}))return true;
   const legacy=await Vocabulary.find({kind:'rhythm',beatMap:null,archived:{$ne:true}}).select('name').lean();
   return legacy.some(row=>beatMapFor(row.name)?.meter===value);
  }

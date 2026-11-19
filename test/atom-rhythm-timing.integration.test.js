@@ -1,0 +1,10 @@
+const{test}=require('node:test');const assert=require('node:assert/strict');const{fixture}=require('./helpers/music-ontology-fixture.cjs');
+test('atom rhythm timing saves and reloads with quarter-note BPM and rejects invalid metadata',{timeout:120000},async t=>{
+ const db=await fixture();t.after(()=>db.stop());const request=async(path,method='GET',body)=>{const response=await fetch(db.origin+'/api'+path,{method,headers:{Authorization:'Bearer qa-admin','Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});return{status:response.status,data:await response.json()}};
+ const contract=await request('/music-ontology/contract');assert.equal(contract.data.features.atomRhythmTiming,true);
+ const timing={timeSignature:'4/16',beatStartSec:.25,source:'drums+bass'},atom={id:'beat-a',name:'Beat test atom',audioRange:{startSec:0,endSec:20},sound:{bpm:100,rhythmTiming:timing}};
+ const created=await request('/admin/music-ontology/recordings','POST',{name:'Beat measure test',workType:'MIX',atoms:[atom]});assert.equal(created.status,201,JSON.stringify(created.data));const item=created.data.item;
+ const saved=await request('/admin/music-ontology/recordings/'+item.id);assert.deepEqual(saved.data.item.atoms[0].sound.rhythmTiming,timing);assert.equal(saved.data.item.atoms[0].sound.bpm,100);
+ const updated=await request('/admin/music-ontology/recordings/'+item.id,'PUT',{name:'Beat measure test',workType:'MIX',revision:item.revision,atoms:[{...atom,sound:{...atom.sound,bpm:120,rhythmTiming:{...timing,timeSignature:'4/8'}}}]});assert.equal(updated.status,200,JSON.stringify(updated.data));assert.equal(updated.data.item.atoms[0].sound.rhythmTiming.timeSignature,'4/8');
+ for(const bad of [{...timing,timeSignature:'4/3'},{...timing,beatStartSec:-1},{...timing,source:'unknown'}]){const response=await request('/admin/music-ontology/recordings','POST',{name:'Bad timing',workType:'MIX',atoms:[{...atom,sound:{bpm:100,rhythmTiming:bad}}]});assert.equal(response.status,400);}
+});

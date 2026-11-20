@@ -62,7 +62,8 @@ async function recordingSongs(ArchiveModel, ids) {
 }
 async function publicSongs(ArchiveModel = ArchiveItem) {
   const recordings = ArchiveModel === ArchiveItem ? await MusicRecording.find({ status: 'PUBLISHED' }).sort({ createdAt: -1 }) : [];
-  return visibleSongs([...(await ArchiveModel.find().sort({ sortOrder: 1, createdAt: -1 })), ...recordings.map(r => asSong(r.toObject ? r.toObject() : r))]);
+  // The song shape drops a recording's saved split channels; the public mixer (stem-separation) needs them, so carry them along here.
+  return visibleSongs([...(await ArchiveModel.find().sort({ sortOrder: 1, createdAt: -1 })), ...recordings.map(r => { const plain = r.toObject ? r.toObject() : r; return { ...asSong(plain), stems: plain.stems || null }; })]);
 }
 
 function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, CollectionModel = Collection, cloudinaryClient = cloudinary, uploadAssetImpl = require('./cloudinary-assets').createAssetStore({client:cloudinaryClient}).upload, requireCloudinary = process.env.RENDER === 'true' || process.env.MUSIC_ARCHIVE_STORAGE_PROVIDER === 'cloudinary', useCloudinary = Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) } = {}) {

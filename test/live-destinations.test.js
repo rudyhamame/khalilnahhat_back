@@ -26,7 +26,7 @@ test('settings and status never reveal keys, encrypted payload or complete outpu
  const status=await h.service.list();for(const secret of [body.streamKey,h.rows[0].secret])assert.ok(!JSON.stringify(status).includes(secret));
 });
 test('duplicate starts are fenced and a stale room cannot start or stop another session',async()=>{
- const h=setup();await h.service.save('youtube',body);await assert.rejects(h.service.start('youtube','stale'),/Start the browser/);
+ const h=setup();await h.service.save('youtube',body);await assert.rejects(h.service.start('youtube','stale'),/Start the live on Echo/);
  const results=await Promise.allSettled([h.service.start('youtube','owned'),h.service.start('youtube','owned')]);assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(h.started.length,1);
  await assert.rejects(h.service.stop('youtube','stale'),/session has changed/);assert.equal(h.stopped.length,0);
  await assert.rejects(h.service.save('youtube',body),/Stop this destination/);
@@ -145,4 +145,24 @@ test('TikTok authenticated routes save, start, stop and delete through the share
  assert.equal((await call('POST','/start',{roomName:'owned'})).item.state,'live');
  await call('POST','/stop',{roomName:'owned'});await h.service.list();
  assert.equal((await call('DELETE','')).item.configured,false);
+});
+test('OBS lives forward to a platform through the relay and report its state',async()=>{
+ const relay=require('../src/obs-relay-client'),saved={configured:relay.configured,request:relay.request};
+ const room='khalil-obs-'+'a'.repeat(8)+'-'+'b'.repeat(4)+'-'+'c'.repeat(4)+'-'+'d'.repeat(4)+'-'+'e'.repeat(12);
+ const calls=[];let outputState='starting';
+ relay.configured=()=>true;
+ relay.request=async(route,options={})=>{calls.push([route,options.method||'GET',options.body]);return route.endsWith('/outputs/youtube')?{}:{state:'live',outputs:{youtube:outputState}};};
+ try{
+  const h=setup();h.live.broadcastMode='whep';h.live.obsRoomName=room;h.live.webrtcRoomName='';
+  await h.service.save('youtube',body);
+  const started=await h.service.start('youtube',room);
+  assert.equal(started.state,'starting');assert.equal(h.started.length,0);
+  assert.equal(calls[0][1],'POST');assert.equal(calls[0][2].url,body.serverUrl+'/'+body.streamKey);
+  outputState='running';assert.equal((await h.service.list()).items.find(i=>i.platform==='youtube').state,'live');
+  assert.ok(!JSON.stringify(await h.service.list()).includes(body.streamKey));
+  await h.service.stop('youtube',room);
+  assert.ok(calls.some(([route,method])=>route.endsWith('/outputs/youtube')&&method==='DELETE'));
+  assert.equal(h.rows[0].state,'ended');
+  await assert.rejects(h.service.start('youtube','khalil-obs-other'),/Start the live/);
+ }finally{Object.assign(relay,saved);}
 });

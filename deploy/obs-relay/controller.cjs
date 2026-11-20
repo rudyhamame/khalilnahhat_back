@@ -7,6 +7,7 @@ const ROOT = '/data', RECORDINGS = '/recordings';
 const ORIGIN = process.env.PUBLIC_ORIGIN;
 const TOKEN = process.env.CONTROL_TOKEN;
 if (!TOKEN || TOKEN.length < 40 || !/^https:\/\/[^/]+$/.test(ORIGIN || '')) throw new Error('Relay configuration missing');
+const outputs = require('./outputs.cjs').createOutputs();
 const sessions = new Map();
 const idPattern = /^khalil-obs-[a-f0-9-]{36}$/;
 const segmentPattern = /^[0-9_-]+\.mp4$/;
@@ -33,11 +34,12 @@ async function mtx(route, method='GET', data) {
 function view(row) {
  return {id:row.id, state:row.state, saveRecording:row.saveRecording!==false, error:row.error || '', expiresAt:row.expiresAt, endedAt:row.endedAt,
   playbackUrl:`${ORIGIN}/live/${row.id}/whep`,
+  outputs:outputs.states(row.id),
   segments:Object.values(row.segments).filter(segment=>!segment.acknowledged).map(({id,duration,bytes})=>({id,duration,bytes}))};
 }
 async function stop(row, reason='') {
  // Revoke publishing and playback before disconnecting the sender. Keep retrying deletion on failure.
- row.state='ending'; if(reason)row.error=reason; await persist(row);
+ row.state='ending'; if(reason)row.error=reason; outputs.stopAll(row.id); await persist(row);
  await mtx(`config/paths/delete/live/${row.id}`, 'DELETE');
  row.state='ended'; row.endedAt=Date.now(); await persist(row);
 }
@@ -135,6 +137,19 @@ async function start() {
     try {await mtx(`config/paths/add/live/${row.id}`,'POST',{source:'publisher',overridePublisher:false,record:saveRecording,recordPath:'/recordings/%path/%Y-%m-%d_%H-%M-%S-%f'});}
     catch(error){await stop(row).catch(()=>{});throw error;}
     return json(res,201,{...view(row),server:`${ORIGIN}/live/${row.id}/whip`,streamKey:`echo:${row.publishToken}`});
+   }
+   const output=url.pathname.match(/^\/control\/sessions\/(khalil-obs-[a-f0-9-]{36})\/outputs\/(youtube|instagram|tiktok)$/);
+   if(output) {
+    const orow=sessions.get(output[1]);if(!orow)return json(res,404,{});
+    if(req.method==='DELETE'){outputs.stop(output[1],output[2]);return json(res,200,view(orow));}
+    if(req.method==='POST') {
+     const data=await body(req);
+     if(orow.state!=='live')return json(res,409,{message:'Start OBS first.'});
+     if(typeof data.url!=='string'||!/^rtmps?:\/\/[^\s]+$/.test(data.url)||data.url.length>2300)return json(res,400,{});
+     try{outputs.start(output[1],output[2],data.url);}catch{return json(res,409,{message:'This output is already running.'});}
+     return json(res,200,view(orow));
+    }
+    return json(res,405,{});
    }
    const match=url.pathname.match(/^\/control\/sessions\/(khalil-obs-[a-f0-9-]{36})(?:\/segments\/([0-9_-]+\.mp4))?$/);
    const row=match && sessions.get(match[1]); if(!row)return json(res,404,{});

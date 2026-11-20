@@ -6,7 +6,7 @@ Public HTTPS name: `vps-ba7fb4cb.vps.ovh.ca` (OVH's existing DNS resolves to thi
 ## Media path
 
 OBS WHIP -> MediaMTX -> WHEP/WebRTC -> Echo's existing video/audio controls.
-RTMP, HLS, RTSP, SRT, MoQ, and playback/download servers are disabled.
+RTMP, HLS, SRT, MoQ, and playback/download servers are disabled.
 The live path forwards H.264 and Opus; it does not remux into HLS or run an encoder.
 Use H.264 Baseline, no B-frames, Opus, 720p30, keyframes every 2 seconds, and a sensible bitrate (2.5–4 Mbps initially).
 Browser support and network connectivity still require physical-device QA; no universal old-browser guarantee.
@@ -60,3 +60,6 @@ Set `ECHO_BROWSER_TRANSPORT=ovh` on the API to enable the browser studio's direc
 MediaMTX forwards those packets to authenticated WHEP viewers and records their original encoded tracks. The existing OVH recording provider uploads closed segments to the private archive, verifies them, and then acknowledges deletion. Archive splitting uses stream copy. There is no quality ladder or transcoding worker. Recording requires Cloudinary configuration and at least 2 GiB free; an active recording stops below 1 GiB free or above 2 GiB pending media. Originals are retained on archive errors.
 
 Deploy the controller with its `live-access.cjs` mount before enabling the API flag. Restarting the controller ends active relay sessions, so check for an active broadcast first. Disable `ECHO_BROWSER_TRANSPORT` to roll back browser transport; preserve relay files until archived. Browser-direct recording again requires a local recording folder after rollback.
+
+## Social outputs (YouTube, Instagram, TikTok)
+The controller image adds `ffmpeg` (`Dockerfile.controller`). MediaMTX exposes RTSP on `127.0.0.1:8554` only, and `authorizeMedia` lets only loopback read a live session. `POST /control/sessions/<id>/outputs/<platform>` starts one ffmpeg per platform (YouTube: video copy, AAC audio; Instagram/TikTok: centred 9:16 720x1280 H.264 re-encode) and `DELETE` stops it. Outputs stop when the OBS session ends. This is the only transcoding on the relay and uses up to about two cores while an Instagram/TikTok output runs. Rebuild with `docker compose build controller` and recreate `media` and `controller` to deploy.

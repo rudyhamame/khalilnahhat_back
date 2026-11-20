@@ -9,7 +9,9 @@ apiAddress: 127.0.0.1:19997
 metrics: false
 pprof: false
 playback: false
-rtsp: false
+rtsp: true
+rtspAddress: 127.0.0.1:8554
+rtspTransports: [tcp]
 rtmp: false
 hls: false
 moq: false

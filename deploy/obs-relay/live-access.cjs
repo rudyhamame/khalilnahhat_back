@@ -12,7 +12,10 @@ function verifyViewer(value,room,secret,now=Date.now()) {
  }catch{return false;}
 }
 function authorizeMedia(data,row,secret,now=Date.now()) {
- if(!row||!['waiting','live'].includes(row.state)||data.protocol!=='webrtc')return false;
+ if(!row||!['waiting','live'].includes(row.state))return false;
+ // ffmpeg for social outputs reads over RTSP bound to 127.0.0.1 only.
+ if(data.protocol==='rtsp')return data.action==='read'&&row.state==='live'&&['127.0.0.1','::1'].includes(data.ip);
+ if(data.protocol!=='webrtc')return false;
  const query=new URLSearchParams(data.query||''),token=data.token||data.password||query.get('token')||query.get('pass');
  if(data.action==='read')return row.state==='live'&&verifyViewer(token,row.id,secret,now);
  if(data.action!=='publish'||!(row.state==='live'||now<row.expiresAt)||typeof token!=='string'||typeof row.publishToken!=='string')return false;

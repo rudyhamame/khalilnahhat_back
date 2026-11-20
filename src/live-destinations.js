@@ -1,11 +1,13 @@
 const crypto=require('node:crypto');
 const mongoose=require('mongoose');
+const relay=require('./obs-relay-client');
 const {EgressClient}=require('livekit-server-sdk');
 const {StreamOutput,StreamProtocol,EncodingOptions,VideoCodec,AudioCodec}=require('@livekit/protocol');
 const platforms=['youtube','instagram','tiktok'];
 const active=['starting','live','stopping'];
 const schema=new mongoose.Schema({platform:{type:String,enum:platforms,unique:true,required:true},serverUrl:String,accessConfirmed:{type:Boolean,default:false},secret:{type:String,select:false},roomName:{type:String,default:''},jobId:{type:String,default:''},state:{type:String,default:'idle'},operation:String,error:{type:String,default:''}},{timestamps:true});
 const Destination=mongoose.models.LiveDestination||mongoose.model('LiveDestination',schema);
+const isObs=room=>/^khalil-obs-[a-f0-9-]{36}$/.test(room||'');
 const failure=(status,message)=>Object.assign(new Error(message),{status});
 function encryptionKey(env){const value=env.ECHO_STREAM_DESTINATION_KEY||'';if(!/^[a-f0-9]{64}$/i.test(value))throw failure(503,'Configure ECHO_STREAM_DESTINATION_KEY as a private 64-character hexadecimal key on the API server.');return Buffer.from(value,'hex');}
 function seal(value,env){const iv=crypto.randomBytes(12),cipher=crypto.createCipheriv('aes-256-gcm',encryptionKey(env),iv);const data=Buffer.concat([cipher.update(value,'utf8'),cipher.final()]);return [iv,cipher.getAuthTag(),data].map(x=>x.toString('base64')).join('.');}
@@ -35,8 +37,22 @@ function createDestinationService({Model=Destination,getLiveStreamConfig,env=pro
  const change=(row,patch)=>Model.findOneAndUpdate({_id:row._id,operation:row.operation,state:row.state},{$set:patch},{new:true}).select('+secret');
  const outputUrl=row=>row.serverUrl+'/'+unseal(row.secret,env);
  const jobs=async row=>(await client().listEgress({roomName:row.roomName}));
+ // OBS lives are forwarded by the relay itself; the relay reports each output's state.
+ async function refreshObs(row){
+  try{
+   const session=await relay.request(relay.sessionRoute(row.roomName),{allowMissing:true});
+   const output=session?.state==='live'?session.outputs?.[row.platform]:undefined;
+   if(row.state==='stopping'||!session||session.state!=='live'){
+    if(session&&output&&output!=='stopped')await relay.request(relay.sessionRoute(row.roomName)+'/outputs/'+row.platform,{method:'DELETE'});
+    return change(row,{state:'ended',error:''});
+   }
+   const state=output==='running'?'live':output==='starting'?'starting':output==='failed'?'failed':'ended';
+   return change(row,{state,error:state==='failed'?'The platform output failed. Check its key and platform dashboard.':''});
+  }catch{return change(row,{error:'Destination status unavailable. Refresh before retrying; Echo playback is separate.'});}
+ }
  async function refresh(row){
   if(!active.includes(row.state))return row;
+  if(isObs(row.roomName))return refreshObs(row);
   try{
    const list=await jobs(row),job=list.find(x=>row.jobId?x.egressId===row.jobId:x.streamResults?.some(s=>s.url===outputUrl(row)));
    if(!job){
@@ -54,7 +70,7 @@ function createDestinationService({Model=Destination,getLiveStreamConfig,env=pro
    return change(row,{jobId:job.egressId,state,error:state==='failed'?'The platform output failed. Check its key and platform dashboard.':''});
   }catch{return change(row,{error:'Destination status unavailable. Refresh before retrying; Echo playback is separate.'});}
  }
- async function list(){const items=[];for(const platform of platforms){let row=await read(platform);if(row)row=await refresh(row)||row;items.push(row?view(row):view({platform}));}return {items,ready:Boolean(env.LIVEKIT_URL&&env.LIVEKIT_API_KEY&&env.LIVEKIT_API_SECRET&&/^[a-f0-9]{64}$/i.test(env.ECHO_STREAM_DESTINATION_KEY||''))};}
+ async function list(){const items=[];for(const platform of platforms){let row=await read(platform);if(row)row=await refresh(row)||row;items.push(row?view(row):view({platform}));}return {items,ready:Boolean((env.LIVEKIT_URL&&env.LIVEKIT_API_KEY&&env.LIVEKIT_API_SECRET||relay.configured())&&/^[a-f0-9]{64}$/i.test(env.ECHO_STREAM_DESTINATION_KEY||''))};}
  async function save(platform,body){const value=validate(platform,body),secret=seal(value.streamKey,env);const previous=await read(platform);if(previous&&active.includes(previous.state))throw failure(409,'Stop this destination before replacing its settings.');
   try{const row=await Model.findOneAndUpdate({platform,state:{$nin:active}},{$set:{serverUrl:value.serverUrl,secret,accessConfirmed:platform==='youtube'||body.accessConfirmed===true,state:'idle',error:'',operation:crypto.randomUUID(),jobId:'',roomName:''}},{upsert:!previous,new:true}).select('+secret');if(!row)throw failure(409,'Destination changed. Refresh its status.');return view(row);}catch(e){if(e.code===11000)throw failure(409,'Destination changed. Refresh its status.');throw e;}
  }
@@ -68,8 +84,11 @@ function createDestinationService({Model=Destination,getLiveStreamConfig,env=pro
   return view(row);
  }
  async function start(platform,roomName){
-  const live=await getLiveStreamConfig();if(!live.isLive||live.broadcastMode!=='webrtc'||!roomName||live.webrtcRoomName!==roomName)throw failure(409,'Start the browser or Android live stream first. OBS relay output is not supported by these destinations.');
-  if(!env.LIVEKIT_URL||!env.LIVEKIT_API_KEY||!env.LIVEKIT_API_SECRET)throw failure(503,'Configure LiveKit on the API server.');
+  const live=await getLiveStreamConfig();
+  const obs=live.broadcastMode==='whep'&&isObs(roomName)&&live.obsRoomName===roomName;
+  if(!live.isLive||!roomName||!(obs||live.broadcastMode==='webrtc'&&live.webrtcRoomName===roomName))throw failure(409,'Start the live on Echo first (OBS, browser or Android).');
+  if(obs&&!relay.configured())throw failure(503,'Configure the OBS relay on the API server.');
+  if(!obs&&(!env.LIVEKIT_URL||!env.LIVEKIT_API_KEY||!env.LIVEKIT_API_SECRET))throw failure(503,'Configure LiveKit on the API server.');
   let row=await read(platform);if(!row?.secret)throw failure(409,'Save this destination’s server URL and stream key first.');
   if(platform==='tiktok'&&!row.accessConfirmed)throw failure(409,'Confirm external streaming access and a current server URL and stream key in this TikTok account before sending output.');
   if(platform==='instagram'&&!row.accessConfirmed)throw failure(409,'Instagram is prepared for later. Confirm Live Producer access in the studio after the account becomes eligible.');
@@ -78,6 +97,11 @@ function createDestinationService({Model=Destination,getLiveStreamConfig,env=pro
   row=await Model.findOneAndUpdate({_id:row._id,operation:row.operation,secret:row.secret,state:{$nin:active}},{$set:{state:'starting',operation,roomName,jobId:'',error:''}},{new:true}).select('+secret');if(!row)throw failure(409,'This destination changed, is already active or is awaiting reconciliation. Refresh before retrying.');
   try{
    const portrait=platform!=='youtube';
+   if(obs){
+    try{await relay.request(relay.sessionRoute(roomName)+'/outputs/'+platform,{method:'POST',body:{url}});}
+    catch(error){const message=error.status===409?error.message:'The OBS relay could not start this output. Try again shortly.';await change(row,{state:'failed',error:message});throw failure(503,message);}
+    const next=await change(row,{jobId:'relay'})||row;return view(await refresh(next)||next);
+   }
    const job=await client().startRoomCompositeEgress(roomName,{stream:new StreamOutput({protocol:StreamProtocol.RTMP,urls:[url]})},{layout:'single-speaker',...(portrait?{customBaseUrl:templateUrl}:{}),encodingOptions:new EncodingOptions({width:portrait?720:1280,height:portrait?1280:720,framerate:30,videoCodec:VideoCodec.H264_BASELINE,videoBitrate:2500,audioCodec:AudioCodec.AAC,audioBitrate:128,audioFrequency:48000,keyFrameInterval:2})});
    await change(row,{jobId:job.egressId});row={...row.toObject?.()||row,jobId:job.egressId};
    return view(await refresh(row)||row);

@@ -247,6 +247,9 @@ const liveStreamConfigSchema = new mongoose.Schema(
     liveStartedAt: { type: Date, default: null },
     key: { type: String, required: true, unique: true, trim: true },
     isLive: { type: Boolean, default: false },
+    // Who can see and watch this live: all | admins | clients (signed-in clients and admins) | specific (the chosen clients and admins).
+    audience: { type: String, enum: ['all', 'admins', 'clients', 'specific'], default: 'all' },
+    audienceUserIds: { type: [String], default: [] },
     title: { type: String, default: '', trim: true },
     streamUrl: { type: String, default: '', trim: true },
     posterImage: { type: String, default: '', trim: true },

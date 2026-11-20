@@ -9,7 +9,7 @@ function registerObsBroadcastRoutes(app, deps) {
   const filter = row => ({ key: defaults.key, obsRoomName: row.obsRoomName });
   const change = async (row, values, extra = {}) => {
     const updated=await LiveStreamConfig.findOneAndUpdate({ ...filter(row), ...extra }, values, { new: true });
-    if(updated)await deps.notifyLiveTransition?.(row,updated);
+    if(updated&&(updated.audience||'all')==='all')await deps.notifyLiveTransition?.(row,updated);
     return updated;
   };
   const missing = error => error?.status === 404 || error?.code === 'not_found' || error?.code === 5;
@@ -23,7 +23,7 @@ function registerObsBroadcastRoutes(app, deps) {
       try { await client(IngressClient).deleteIngress(ending.obsIngressId); } catch (error) { if (!missing(error)) throw error; }
     }
     try { await client(RoomServiceClient).deleteRoom(ending.obsRoomName); } catch (error) { if (!missing(error)) throw error; }
-    return await change(ending, { isLive: false, webrtcRoomName: '', obsRoomName: '', obsIngressId: '',
+    return await change(ending, { isLive: false, audience: 'all', audienceUserIds: [], webrtcRoomName: '', obsRoomName: '', obsIngressId: '',
       obsUrl: '', obsStreamKey: '', obsState: '', obsExpiresAt: null, statusLabel: defaults.statusLabel }) || getLiveStreamConfig();
   }
   async function synchronize() {

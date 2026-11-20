@@ -16,6 +16,7 @@ const { z } = require('zod');
 const { connectToDatabase, MONGODB_DB_NAME } = require('./db');
 const { ADMIN_USERNAME, ADMIN_USERNAMES, ADMIN_GOOGLE_EMAILS, defaultLiveStreamConfig } = require('./default-data');
 const {isAdminUser}=require('./admin-role');
+const {liveVisibleTo}=require('./live-audience');
 const {
   ArchiveItem,
   Booking,
@@ -560,7 +561,13 @@ function serializeLiveStreamConfig(config) {
     broadcastMode: config?.broadcastMode || defaultLiveStreamConfig.broadcastMode,
     broadcastSource: config?.broadcastSource || '',
     goal: config?.goal || 'broadcast',
+    audience: config?.audience || 'all',
   };
+}
+
+// What a visitor sees: a live they are not in the audience of does not exist for them.
+function serializePublicLiveStreamConfig(config, user = null) {
+  return serializeLiveStreamConfig(liveVisibleTo(config, user) ? config : null);
 }
 
 function buildMuxPlaybackUrl(playbackId) {
@@ -570,6 +577,7 @@ function buildMuxPlaybackUrl(playbackId) {
 function serializeAdminLiveStreamConfig(config) {
   return {
     ...serializeLiveStreamConfig(config),
+    audienceUserIds: config?.audienceUserIds || [],
     liveSetListId: config?.liveSetListId || 'none',
     studio:{transport:process.env.ECHO_BROWSER_TRANSPORT==='ovh'&&require('./obs-relay-client').configured()?'ovh':'livekit'},
     streamUrl: config?.streamUrl || '',
@@ -794,8 +802,11 @@ app.get('/api/ready', async (_request, response) => {
   finally { clearTimeout(timer); }
 });
 
-app.get('/api/bootstrap', async (_request, response) => {
+app.get('/api/bootstrap', async (request, response) => {
   const liveStreamConfig = await getLiveStreamConfig();
+  const restricted = liveStreamConfig.audience && liveStreamConfig.audience !== 'all';
+  const viewer = restricted ? await authFromRequest(request).catch(() => null) : null;
+  if (restricted) response.set('Cache-Control', 'no-store');
   const [liveSessions, archiveItems] = await Promise.all([
     getOrderedLiveSessions(liveBroadcastSession(liveStreamConfig)),
     require('./music-archive').publicSongs(),
@@ -804,7 +815,7 @@ app.get('/api/bootstrap', async (_request, response) => {
   response.json({
     liveSessions: liveSessions.map(serializeLiveSession),
     archiveItems: archiveItems.map(serializeArchiveItem),
-    liveStream: serializeLiveStreamConfig(liveStreamConfig),
+    liveStream: serializePublicLiveStreamConfig(liveStreamConfig, viewer),
   });
 });
 
@@ -1387,7 +1398,7 @@ require('./live-broadcast').registerLiveBroadcastRoutes(app, {
   prepareSetList:liveSetPlans.prepare,
   requireAdmin, getLiveStreamConfig, LiveStreamConfig, defaults: defaultLiveStreamConfig, notifyLiveTransition,
   createToken: createLiveKitToken, getConfig: getLiveKitConfig,
-  serialize: serializeAdminLiveStreamConfig, serializePublic: serializeLiveStreamConfig,
+  serialize: serializeAdminLiveStreamConfig, serializePublic: serializePublicLiveStreamConfig, authFromRequest,
   RoomServiceClient, IngressClient, randomUUID: crypto.randomUUID, prepareRecording: require('./live-recordings').prepareRecordingRoom, ensureRecording: require('./live-recordings').ensureRecording, recordingStatus: require('./live-recordings').statusForRoom,
   verifyWebhook: async (body, authorization) => {
     const { apiKey, apiSecret } = getLiveKitConfig();

@@ -45,3 +45,17 @@ test('relay rejects direct anonymous WHEP reads and never confuses viewer and pu
  assert.equal(authorizeMedia({...read,token},{...row,id:'another-room'},secret,now),false);
  assert.equal(authorizeMedia({...read,action:'publish',token:row.publishToken},{...row,state:'waiting',expiresAt:now-1},secret,now),false);
 });
+test('a restricted live gives playback credentials only to its audience',async t=>{
+ let minted=0,config,user;const app=express();app.use(express.json());
+ app.use((req,_res,next)=>{req.authUser=user;next();});
+ registerLiveAccess(app,{requireAuth:(_q,_s,next)=>next(),getLiveStreamConfig:async()=>config,createToken:async()=>{minted++;return 't';},getConfig:()=>({wsUrl:'wss://x'})});
+ const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
+ const status=async()=>(await fetch(`http://127.0.0.1:${server.address().port}/api/live-stream/playback`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session:'room-a'})})).status;
+ const live=extra=>({isLive:true,broadcastMode:'webrtc',webrtcRoomName:'room-a',...extra});
+ user={_id:'aaaaaaaaaaaaaaaaaaaaaaaa',username:'Ana'};
+ config=live({audience:'admins'});assert.equal(await status(),409);
+ config=live({audience:'specific',audienceUserIds:['bbbbbbbbbbbbbbbbbbbbbbbb']});assert.equal(await status(),409);
+ assert.equal(minted,0);
+ config=live({audience:'specific',audienceUserIds:['aaaaaaaaaaaaaaaaaaaaaaaa']});assert.equal(await status(),200);
+ config=live({audience:'clients'});assert.equal(await status(),200);
+});

@@ -1,10 +1,12 @@
 const {signViewer,verifyViewer}=require('../deploy/obs-relay/live-access.cjs');
+const {liveVisibleTo}=require('./live-audience');
 const {sessionKey,memberName}=require('./live-interactions');
 function registerLiveAccess(app,{requireAuth,getLiveStreamConfig,createToken,getConfig,relay=require('./obs-relay-client'),env=process.env}) {
  const playback=async(req,res)=>{
   res.set('Cache-Control','no-store');
   try {
    const current=await getLiveStreamConfig(),session=sessionKey(current);
+   if(!liveVisibleTo(current,req.authUser))return res.status(409).json({message:'There is no live stream right now.'});
    if(!session||req.body?.session!==session)return res.status(409).json({message:'The live stream changed. Refresh before reconnecting.'});
    if(current.broadcastMode==='whep'&&current.obsRoomName&&relay.configured()) {
     // Construct the URL from trusted relay configuration, never from an arbitrary saved URL.

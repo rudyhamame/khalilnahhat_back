@@ -1,4 +1,5 @@
 const {randomBytes}=require('node:crypto');
+const {audienceFromBody}=require('./live-audience');
 const defaultRelay=require('./obs-relay-client');
 const {captureOutputs,outputView}=require('./recording-outputs');
 // The browser sends one H.264/Opus stream directly to OVH. MediaMTX forwards it
@@ -27,7 +28,7 @@ function registerOvhBrowserRoutes(app,deps,legacy,{relay=defaultRelay,env=proces
    const id=`khalil-obs-${randomUUID()}`,portraitId=outputs.length===2?`khalil-obs-${randomUUID()}`:'',publishToken=randomBytes(32).toString('hex'),saveRecording=req.body.saveRecording!==false,title=String(req.body.title||current.title||defaults.title).trim().slice(0,180);
    if(saveRecording&&!env.CLOUDINARY_API_SECRET)throw Object.assign(new Error('Private recording archive is not configured.'),{status:503});
    await relay.request('health');
-   claimed=await LiveStreamConfig.findOneAndUpdate({key:defaults.key,isLive:{$ne:true},webrtcRoomName:{$in:['',null]},obsRoomName:{$in:['',null]}},{isLive:false,title,liveSetListId:setList?.id||'none',broadcastMode:'whep',broadcastSource:'browser',webrtcRoomName:id,obsRoomName:id,obsPortraitRoomName:portraitId,obsStreamKey:publishToken,obsUrl:'',obsState:'preparing',obsSaveRecording:saveRecording,obsExpiresAt:new Date(Date.now()+120000),streamUrl:'',statusLabel:'Connecting browser…'},{new:true});
+   claimed=await LiveStreamConfig.findOneAndUpdate({key:defaults.key,isLive:{$ne:true},webrtcRoomName:{$in:['',null]},obsRoomName:{$in:['',null]}},{isLive:false,title,liveSetListId:setList?.id||'none',broadcastMode:'whep',broadcastSource:'browser',webrtcRoomName:id,obsRoomName:id,obsPortraitRoomName:portraitId,obsStreamKey:publishToken,obsUrl:'',obsState:'preparing',obsSaveRecording:saveRecording,...audienceFromBody(req.body),obsExpiresAt:new Date(Date.now()+120000),streamUrl:'',statusLabel:'Connecting browser…'},{new:true});
    if(!claimed)return res.status(409).json({message:'Another source started first.'});
    await setList?.install(id);
    await relay.request('sessions',{method:'POST',body:{id,publishToken,saveRecording}});

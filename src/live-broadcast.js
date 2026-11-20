@@ -1,5 +1,6 @@
 const STALE_RESERVATION_MS = 90000, RECONCILE_AFTER_MS = 120000;
 // Atomic room ownership prevents a delayed phone stop from ending a newer broadcast.
+const { audienceFromBody } = require('./live-audience');
 function registerLiveBroadcastRoutes(app, deps) {
   const { requireAdmin, getLiveStreamConfig, LiveStreamConfig, defaults, createToken, getConfig, serialize, RoomServiceClient, randomUUID, verifyWebhook, serializePublic, prepareRecording, recordingStatus } = deps;
   const obs = deps.IngressClient ? require('./obs-broadcast').registerObsBroadcastRoutes(app, deps) : null;
@@ -14,8 +15,12 @@ function registerLiveBroadcastRoutes(app, deps) {
     return Boolean(await LiveStreamConfig.findOneAndUpdate({ key: defaults.key, broadcastMode: 'webrtc', webrtcRoomName: room }, { isLive: false, webrtcRoomName: '', statusLabel: defaults.statusLabel }, { new: true }));
   }
   if (!deps.disableLiveReconcile) { const timer = setInterval(() => reconcile().catch(() => {}), 30000); timer.unref?.(); }
-  app.get('/api/live-stream', async (_request, response) => {
-    try { return response.json({ item: serializePublic(await getLiveStreamConfig()) }); }
+  app.get('/api/live-stream', async (request, response) => {
+    try {
+      const config = await getLiveStreamConfig(), restricted = config.audience && config.audience !== 'all';
+      if (restricted) response.set('Cache-Control', 'no-store');
+      return response.json({ item: serializePublic(config, restricted ? await deps.authFromRequest?.(request).catch(() => null) : null) });
+    }
     catch { return response.status(503).json({ message: 'Live status is temporarily unavailable.' }); }
   });
   app.post('/api/live-stream/webrtc/webhook', async (request, response) => {
@@ -55,7 +60,7 @@ function registerLiveBroadcastRoutes(app, deps) {
       const updated = await LiveStreamConfig.findOneAndUpdate(
         { key: defaults.key, isLive: { $ne: true }, webrtcRoomName: stale ? current.webrtcRoomName : { $in: ['', null] }, obsRoomName: { $in: ['', null] } },
         { isLive: false, title: title || current.title || defaults.title, streamUrl: '',
-          statusLabel: 'Connecting browser…', broadcastMode: 'webrtc', broadcastSource: source, webrtcRoomName: roomName, liveSetListId:setList?.id||'none' },
+          statusLabel: 'Connecting browser…', broadcastMode: 'webrtc', broadcastSource: source, webrtcRoomName: roomName, ...audienceFromBody(request.body), liveSetListId:setList?.id||'none' },
         { new: true },
       );
       if (!updated) return response.status(409).json({ message: 'Another source started first. Refresh your live status.' });
@@ -102,7 +107,7 @@ function registerLiveBroadcastRoutes(app, deps) {
       if(!mediaReady)return response.status(409).json({message:'Publish a camera or microphone before going on air.'});
       const updated=await LiveStreamConfig.findOneAndUpdate({key:defaults.key,webrtcRoomName:roomName,broadcastSource:current.broadcastSource}, {isLive:true,statusLabel:'Live now — DJ Khalil is on air.'},{new:true});
       if(!updated)return response.status(409).json({message:'The live stream changed.'});
-      await deps.notifyLiveTransition?.(current,updated);
+      if((updated.audience||'all')==='all')await deps.notifyLiveTransition?.(current,updated);
       return response.json({item:serialize(updated)});
     }catch{return response.status(503).json({message:'Could not confirm the browser live stream. Retry its status.'});}
   });
@@ -133,7 +138,7 @@ function registerLiveBroadcastRoutes(app, deps) {
       }
       const updated = await LiveStreamConfig.findOneAndUpdate(
         { key: defaults.key, webrtcRoomName: current.webrtcRoomName || '' },
-        { isLive: false, statusLabel: defaults.statusLabel, webrtcRoomName: '' }, { new: true },
+        { isLive: false, statusLabel: defaults.statusLabel, webrtcRoomName: '', audience: 'all', audienceUserIds: [] }, { new: true },
       );
       if (!updated) {
         const latest=await getLiveStreamConfig();

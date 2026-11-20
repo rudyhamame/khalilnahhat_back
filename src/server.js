@@ -347,6 +347,7 @@ function serializeUser(user) {
     preferredContact: user.preferredContact === 'whatsapp' ? 'phone' : user.preferredContact || 'email',
     phoneContact: user.phoneContact || (user.preferredContact === 'whatsapp' ? 'whatsapp-text' : user.phoneNumber ? 'call' : ''),
     emailNotifications: user.emailNotifications !== false,
+    skipHome: user.skipHome === true,
     avatarVersion: user.avatarVersion || 0,
     emailVerified: Boolean(user.emailVerified),
     isAdmin: isAdminUser(user),
@@ -875,7 +876,8 @@ app.patch('/api/auth/profile', async (request, response) => {
   if (body.preferredContact !== undefined && !['any', 'email', 'phone'].includes(body.preferredContact)) return response.status(400).json({ message: 'Choose any method, email only or phone only.' });
   if (body.phoneContact !== undefined && !['', 'whatsapp-text', 'whatsapp-call', 'sms', 'call'].includes(body.phoneContact)) return response.status(400).json({ message: 'Choose WhatsApp text, WhatsApp call, text message or phone call.' });
   if (body.emailNotifications !== undefined && typeof body.emailNotifications !== 'boolean') return response.status(400).json({ message: 'Notifications must be on or off.' });
-  for (const [key, value] of Object.entries({ firstName, lastName, phoneNumber, company, preferredContact: body.preferredContact, phoneContact: body.phoneContact, emailNotifications: body.emailNotifications })) if (value !== undefined) user[key] = value;
+  if (body.skipHome !== undefined && typeof body.skipHome !== 'boolean') return response.status(400).json({ message: 'Skip home must be on or off.' });
+  for (const [key, value] of Object.entries({ firstName, lastName, phoneNumber, company, preferredContact: body.preferredContact, phoneContact: body.phoneContact, emailNotifications: body.emailNotifications, skipHome: body.skipHome })) if (value !== undefined) user[key] = value;
   await user.save();
   return response.json({ user: serializeUser(user) });
 });

@@ -1,4 +1,4 @@
-// OBS is retired. Keep legacy session reconciliation and key revocation for cleanup.
+// OBS streams over WHIP to the OVH relay; each connection owns one session, one recording and one revocable token.
 // Public serializers never receive connection secrets through this module.
 const IDENTITY = 'khalil-obs';
 function registerObsBroadcastRoutes(app, deps) {
@@ -62,12 +62,23 @@ function registerObsBroadcastRoutes(app, deps) {
     try { const row=await synchronize();const item=serialize(row);if(deps.recordingStatus)item.recording=await deps.recordingStatus(row.obsRoomName||row.webrtcRoomName);return res.json({item}); }
     catch { return res.status(503).json({ message: 'Could not check OBS. Try again shortly.' }); }
   });
-  const discontinued = (_req, res) => {
+  app.patch('/api/live-stream/obs/recording', requireAdmin, async (req, res) => {
     res.set?.('Cache-Control', 'no-store');
-    return res.status(410).json({ code: 'OBS_DISCONTINUED', message: 'OBS broadcasting has been discontinued. Use Echo browser studio or the Android app.' });
-  };
-  app.patch('/api/live-stream/obs/recording', requireAdmin, discontinued);
-  app.post('/api/live-stream/obs/prepare', requireAdmin, discontinued);
+    if (typeof req.body?.saveRecording !== 'boolean') return res.status(400).json({ message: 'Choose whether to save the recording.' });
+    try {
+      await getLiveStreamConfig();
+      const updated = await LiveStreamConfig.findOneAndUpdate({ key: defaults.key, isLive: { $ne: true }, webrtcRoomName: { $in: ['', null] }, obsRoomName: { $in: ['', null] } },
+        { $set: { obsSaveRecording: req.body.saveRecording } }, { new: true });
+      if (!updated) return res.status(409).json({ message: 'Choose recording before preparing the OBS connection. End the current connection to change it.' });
+      return res.json({ item: serialize(updated) });
+    } catch { return res.status(503).json({ message: 'Could not save the recording preference. Try again.' }); }
+  });
+  // New OBS connections go to the OVH relay only. The LiveKit ingress path stays retired because LiveKit bills it.
+  app.post('/api/live-stream/obs/prepare', requireAdmin, async (req, res) => {
+    res.set?.('Cache-Control', 'no-store');
+    if (!require('./obs-relay-client').configured()) return res.status(503).json({ code: 'OBS_RELAY_UNAVAILABLE', message: 'OBS streaming needs the OVH relay, which is not configured on this server.' });
+    return relay.prepare(req, res);
+  });
   app.post('/api/live-stream/obs/end', requireAdmin, async (req, res) => {
     res.set?.('Cache-Control', 'no-store');
     if (typeof req.body?.roomName !== 'string' || !req.body.roomName) return res.status(400).json({ message: 'The OBS session is required.' });

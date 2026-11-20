@@ -18,19 +18,26 @@ function setup(overrides={}) {
 function seedLegacy(c) {
  c.setRow({obsRoomName:'khalil-obs-test',webrtcRoomName:'khalil-obs-test',broadcastSource:'obs',broadcastMode:'webrtc',obsIngressId:'IN_test',obsState:'waiting',obsStreamKey:'private-test-key',obsExpiresAt:new Date(Date.now()+120000)});
 }
-test('discontinued OBS rejects new connections and recording changes without allocating resources',async()=>{
+test('without the OVH relay, OBS setup is refused and allocates nothing (LiveKit ingress stays retired)',async()=>{
  let allocations=0;
  const c=setup({prepareRecording:async()=>{allocations++;},IngressClient:class{constructor(){allocations++;}}});
  const original={...c.row};
- for(const [path,body] of [['/prepare',{title:'Retired'}],['/recording',{saveRecording:true}]]){
-  const result=await c.call(path,body);assert.equal(result.code,410);assert.equal(result.body.code,'OBS_DISCONTINUED');
- }
- assert.equal(allocations,0);assert.deepEqual(c.row,original);
+ const result=await c.call('/prepare',{title:'No relay'});
+ assert.equal(result.code,503);assert.equal(result.body.code,'OBS_RELAY_UNAVAILABLE');assert.equal(allocations,0);assert.deepEqual(c.row,original);
 });
-test('configured OVH relay cannot bypass OBS retirement',async()=>{
- const relay=require('../src/obs-relay-client');const original=relay.configured;
+test('with the OVH relay, prepare reserves a WHIP session, records on the relay and returns admin-only credentials',async()=>{
+ const relay=require('../src/obs-relay-client'),recordings=require('../src/live-recordings'),saved={configured:relay.configured,request:relay.request,create:recordings.LiveRecording.create};
+ const calls=[],created=[];
  relay.configured=()=>true;
- try{const c=setup();assert.equal((await c.call('/prepare')).code,410);assert.equal(c.row.obsRoomName,'');}finally{relay.configured=original;}
+ relay.request=async(route,options={})=>{calls.push([route,options.method||'GET',options.body]);return route==='sessions'?{server:'https://relay.example/whip',streamKey:'bearer-token',expiresAt:new Date(Date.now()+120000).toISOString()}:{};};
+ recordings.LiveRecording.create=async value=>{created.push(value);};
+ try{
+  const c=setup();const result=await c.call('/prepare',{title:'OBS night'});
+  assert.equal(result.code,201);assert.equal(c.row.broadcastMode,'whep');assert.equal(c.row.broadcastSource,'obs');assert.equal(c.row.isLive,false);
+  assert.equal(c.row.obsUrl,'https://relay.example/whip');assert.equal(c.row.obsStreamKey,'bearer-token');assert.equal(c.row.obsState,'waiting');
+  assert.equal(created[0].provider,'ovh');assert.equal(calls.find(([route])=>route==='sessions')[2].saveRecording,true);
+  assert.equal((await c.call('/prepare')).code,409);
+ }finally{Object.assign(relay,{configured:saved.configured,request:saved.request});recordings.LiveRecording.create=saved.create;}
 });
 test('OBS becomes live only after actual media, and disconnect revokes the key',async()=>{
  const c=setup();seedLegacy(c);c.setMedia({status:2});await c.service.synchronize();assert.equal(c.row.isLive,false);
@@ -38,8 +45,8 @@ test('OBS becomes live only after actual media, and disconnect revokes the key',
  c.setMedia({status:0,tracks:[]});await c.service.synchronize();assert.equal(c.row.isLive,false);assert.equal(c.row.obsStreamKey,'');assert.deepEqual(c.removed,['IN_test']);
 });
 test('OBS setup never replaces an active browser/Android broadcast or another pending OBS',async()=>{
- const c=setup();c.setRow({isLive:true,webrtcRoomName:'phone'});assert.equal((await c.call('/prepare')).code,410);assert.equal(c.row.webrtcRoomName,'phone');
- c.setRow({isLive:false,obsRoomName:'reserved'});assert.equal((await c.call('/prepare')).code,410);
+ const c=setup();c.setRow({isLive:true,webrtcRoomName:'phone'});assert.equal((await c.call('/prepare')).code,503);assert.equal(c.row.webrtcRoomName,'phone');
+ c.setRow({isLive:false,obsRoomName:'reserved'});assert.equal((await c.call('/prepare')).code,503);
 });
 test('stale end and old OBS webhook leave a newer session untouched',async()=>{
  const c=setup();seedLegacy(c);c.setRow({obsRoomName:'khalil-obs-new',isLive:true});
@@ -48,7 +55,7 @@ test('stale end and old OBS webhook leave a newer session untouched',async()=>{
 });
 test('failed key revocation retains reservation and retries instead of admitting another broadcaster',async()=>{
  const c=setup();seedLegacy(c);c.failDelete(true);assert.equal((await c.call('/end',{roomName:c.row.obsRoomName})).code,503);
- assert.equal(c.row.obsState,'ending');assert.equal(c.row.isLive,false);assert.equal((await c.call('/prepare')).code,410);
+ assert.equal(c.row.obsState,'ending');assert.equal(c.row.isLive,false);assert.equal((await c.call('/prepare')).code,503);
  c.failDelete(false);await c.service.synchronize();assert.equal(c.row.obsRoomName,'');
 });
 test('unused OBS connection expires, revoking its key',async()=>{
@@ -72,7 +79,7 @@ test('connected OBS without published media expires and cannot keep a false live
  await c.service.synchronize();assert.equal(c.row.isLive,false);assert.equal(c.row.obsRoomName,'');
 });
 
-test('OBS cannot replace a pending Android or browser preparation',async()=>{const c=setup();c.setRow({isLive:false,webrtcRoomName:'pending-camera',broadcastSource:'android'});assert.equal((await c.call('/prepare')).code,410);assert.equal(c.row.webrtcRoomName,'pending-camera');});
+test('OBS cannot replace a pending Android or browser preparation',async()=>{const c=setup();c.setRow({isLive:false,webrtcRoomName:'pending-camera',broadcastSource:'android'});const relay=require('../src/obs-relay-client'),saved={configured:relay.configured,request:relay.request};relay.configured=()=>true;relay.request=async()=>({});try{assert.equal((await c.call('/prepare')).code,409);}finally{Object.assign(relay,saved);}assert.equal(c.row.webrtcRoomName,'pending-camera');});
 
 test('AI offers browser/Android controls and legacy cleanup without OBS setup tools',()=>{
  const tools=[];

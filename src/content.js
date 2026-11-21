@@ -30,6 +30,7 @@ const mediaSchema = new mongoose.Schema(
     downloadable: { type: Boolean, default: false }, // UI hint only: the stored file URL is public
     isPublished: { type: Boolean, default: true },
     reel: { type: Boolean, default: false }, // a gallery video also published to the Reels player
+    reelCrop: { type: mongoose.Schema.Types.Mixed, default: null }, // 9:16 crop: {mode, zoom, x, y, track?}
     sortOrder: { type: Number, default: 0 },
   },
   { timestamps: true },
@@ -42,6 +43,7 @@ const testimonialFields = { name: str(120).min(1), eventType: str(80), text: str
 const mediaFields = {
   kind: z.enum(['mix', 'video', 'photo']), category: str(80), title: str(160).min(1), titleAr: str(160), coverUrl: str(500),
   mediaUrl: str(500).min(1), durationSec: z.number().int().min(0), downloadable: z.boolean(), isPublished: z.boolean(), reel: z.boolean(), sortOrder: z.number().int(),
+  reelCrop: z.object({ mode: z.enum(['manual', 'follow']), zoom: z.number().min(1).max(4), x: z.number().min(0).max(1), y: z.number().min(0).max(1), track: z.array(z.object({ t: z.number().min(0).max(86400), x: z.number().min(0).max(1), y: z.number().min(0).max(1) }).strict()).max(2000).optional() }).strict().nullable(),
 };
 
 const view = (d) => ({ id: d.id, ...d.toObject({ versionKey: false, transform: (_doc, o) => { delete o._id; delete o.createdAt; delete o.updatedAt; return o; } }) });

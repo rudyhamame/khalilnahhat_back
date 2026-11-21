@@ -19,14 +19,14 @@ function fixture(){
  const service=createAiConfiguration({store,env:{OPENAI_API_KEY:'never-expose-this'},fetchImpl:async url=>{access.push(url);return new Response(null,{status:200});}});
  return {service,store,usage,access};
 }
-test('default policy preserves model choices, includes AI, and keeps provider/customer currencies separate',()=>{
- const config=defaults({});assert.equal(configSchema.safeParse(config).success,true);assert.equal(config.voice.model,'gpt-realtime-2.1-mini');assert.equal(config.customerPricing.policy,'included');assert.equal(config.customerPricing.currency,'CAD');
- assert.equal(publicPolicy(config).chat.providerRates,undefined);assert.equal(providerEstimate(config,'voice',{}),null);
+test('default policy preserves model choices, includes AI Mixer, and keeps provider/customer currencies separate',()=>{
+ const config=defaults({});assert.equal(configSchema.safeParse(config).success,true);assert.equal(config.voice.model,'gpt-realtime-2.1-mini');assert.equal(config.mixer.enabled,true);assert.equal(config.mixer.maxOutputTokens,600);assert.equal(config.customerPricing.policy,'included');assert.equal(config.customerPricing.currency,'CAD');
+ assert.equal(publicPolicy(config).chat.providerRates,undefined);assert.deepEqual(publicPolicy(config).mixer,{enabled:true,model:'gpt-4o-mini',provider:'openai'});assert.equal(providerEstimate(config,'voice',{}),null);
  assert.equal(providerEstimate(config,'chat',{inputTokens:1000000,cachedInputTokens:500000,outputTokens:1000000}),0.7125);
 });
 test('configuration persists, validates mode capabilities, checks access, and rejects stale writes',async()=>{
  const {service,access}=fixture();const first=await service.load();first.chat.model='gpt-5.6-luna';first.chat.maxOutputTokens=3000;
- const saved=await service.save(first,'admin');assert.equal(saved.revision,1);assert.equal((await service.load()).chat.model,'gpt-5.6-luna');assert.equal(access.length,2);
+ const saved=await service.save(first,'admin');assert.equal(saved.revision,1);assert.equal((await service.load()).chat.model,'gpt-5.6-luna');assert.equal(access.length,4);
  await assert.rejects(service.save(first,'another-admin'),{status:409});
  const bad={...saved,chat:{...saved.chat,model:'gpt-realtime-2.1'}};await assert.rejects(service.save(bad,'admin'),{status:400});
  await assert.rejects(service.save({...saved,OPENAI_API_KEY:'exfiltrate'},'admin'),{status:400});

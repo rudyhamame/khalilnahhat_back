@@ -10,8 +10,8 @@ test('AI DJ validates the model selection against the supplied library',async()=
 });
 
 test('AI DJ returns a valid provider plan',async()=>{
- const configService={load:async()=>({chat:{enabled:true,provider:'openai',model:'test'}})};
+ const configService={load:async()=>({chat:{enabled:true,provider:'openai',model:'booking-model'},mixer:{enabled:true,provider:'openai',model:'mixer-model',maxOutputTokens:600}})};
  const plan={nextTrackId:'c',transitionBars:16,cueSeconds:2,targetBpm:118,style:'energy-lift',reason:'Controlled contrast.'};
- const fetchImpl=async()=>Response.json({output:[{content:[{type:'output_text',text:JSON.stringify(plan)}]}]});
+ const fetchImpl=async(_url,options)=>{assert.equal(JSON.parse(options.body).model,'mixer-model');return Response.json({output:[{content:[{type:'output_text',text:JSON.stringify(plan)}]}]});};
  assert.deepEqual(await createAiDj({configService,env:{OPENAI_API_KEY:'test'},fetchImpl})(state),{...plan,source:'ai'});
 });

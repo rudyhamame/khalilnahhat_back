@@ -1533,6 +1533,10 @@ registerAiConfiguration(app,{
   requireAdmin: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, adminCheck: isAdminUser }),
   service:aiConfiguration,
 });
+require('./ai-dj').registerAiDj(app,{
+  requireAdmin:require('./ai-booking-auth').createAiBookingAuth({localAuth:authFromRequest,adminCheck:isAdminUser}),
+  configService:aiConfiguration,
+});
 const {mongoBillingStore,createAiBilling,registerAiBilling}=require('./ai-billing');
 registerAiBilling(app, {
   requireAdmin: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, adminCheck: isAdminUser }),

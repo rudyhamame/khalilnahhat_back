@@ -1252,7 +1252,8 @@ app.patch('/api/live-stream', requireAdmin, async (request, response) => {
 // The goal ECHO is on air for (Broadcast, DJing in an Event, DJing in Home Studio, Chilling-out Mix Time, Echo Radio Music). Independent of the stream source.
 app.put('/api/live-stream/goal', requireAdmin, async (request, response) => {
   const goal = request.body?.goal;
-  if (!['broadcast', 'event', 'home-studio', 'chill-mix', 'radio'].includes(goal)) {
+  const mongooseLib = require('mongoose');
+  if (typeof goal !== 'string' || !mongooseLib.isValidObjectId(goal) || !(await mongooseLib.models.WorkElementOption?.exists({ _id: goal, key: 'liveGoal', archived: { $ne: true } }))) {
     return response.status(400).json({ message: 'Choose a valid on-air goal.' });
   }
   await getLiveStreamConfig();
@@ -1583,6 +1584,7 @@ require('./domain-mail').registerDomainMail(app, { requireAdmin });
 require('./contact-form').registerContactForm(app);
 registerEquipmentRoutes(app, requireAdmin);
 require('./pricing-catalog').registerPricingRoutes(app, requireAdmin);
+require('./pricing-lists').registerPricingListRoutes(app, requireAdmin);
 require('./equipment-3d').registerEquipment3D(app,{requireAdmin});
 registerPlanning(app, { requireAuth, serialize: serializeServiceRequest });
 require('./simulation-drafts').registerSimulationDrafts(app,{requireAuth});

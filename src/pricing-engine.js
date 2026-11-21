@@ -106,8 +106,10 @@ function calculateBookingPrice(booking, ctx) {
       if (base.quote) { line.status = 'quote_required'; quoteRequired = true; }
       else if (base.missing) { line.status = 'quote_required'; quoteRequired = true; warnings.push(`${offering.name}: ${base.missing} is required for ${policy.pricingMode} pricing.`); }
       else {
-        const { amount, adjustments } = applyConditions(policy, base.amount + extraUnits(policy, qty), { ...facts, quantity: qty }, qty, hours);
-        line.rate = policy.baseAmountCents; line.billingBasis = base.basis; line.adjustments = adjustments; line.total = amount;
+        const units = policy.pricingUnits || [];
+        const unitCharge = units.reduce((sum, unit) => sum + unit.amountCents * qty, 0);
+        const { amount, adjustments } = applyConditions(policy, base.amount + extraUnits(policy, qty) + unitCharge, { ...facts, quantity: qty }, qty, hours);
+        line.rate = policy.baseAmountCents; line.billingBasis = base.basis; line.adjustments = [...adjustments, ...units.map((unit) => ({ label: unit.type, change: unit.amountCents * qty }))]; line.total = amount;
       }
       // Fixed/included package price covers its required components; only components marked "priced" are charged again (explicit upgrades).
       for (const c of components) {
@@ -181,6 +183,9 @@ function reservationDemand(result) {
 function validatePolicy(p, existing = []) {
   const errors = [];
   if (!MODES.includes(p.pricingMode)) errors.push('Unknown pricing mode.');
+  const unitTypes = (p.pricingUnits || []).map((unit) => unit.type);
+  if (new Set(unitTypes).size !== unitTypes.length) errors.push('A pricing unit can only be added once.');
+  if ((p.pricingUnits || []).some((unit) => !['Rental fee', 'Installation fee', 'Delivery fee', 'Loading fee', 'Performance fee'].includes(unit.type) || !isCents(unit.amountCents))) errors.push('A pricing unit is invalid.');
   if (['fixed', 'hourly', 'daily', 'per_unit', 'per_unit_per_day'].includes(p.pricingMode) && !isCents(p.baseAmountCents)) errors.push('Enter a valid amount.');
   if (p.pricingMode === 'tiered') {
     const t = [...(p.tiers || [])].sort((a, b) => a.from - b.from);

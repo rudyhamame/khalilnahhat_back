@@ -4,7 +4,7 @@ const AUDIENCES=['all','admins','clients','specific'];
 const liveVisibleTo=(config,user)=>{
  const audience=config?.audience||'all';
  if(audience==='all')return true;
- if(!user||user.isBlocked)return false;
+ if(!user||user.isBlocked||user.isGuest)return false;// a guest can only watch a live that is open to everyone
  if(isAdminUser(user))return true;
  return audience==='clients'||(audience==='specific'&&(config.audienceUserIds||[]).map(String).includes(String(user._id)));
 };

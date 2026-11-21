@@ -755,6 +755,15 @@ async function requireAuth(request, response, next) {
   return next();
 }
 
+// Live page visitors (watching, commenting, song requests) need no account. A sign-in that is sent is still verified;
+// without one the visitor is a guest with a stable anonymous id (so rate limits still apply). Guests are never treated as clients.
+async function requireViewer(request, response, next) {
+  if (request.headers.authorization) return requireAuth(request, response, next);
+  const id = require('node:crypto').createHash('sha256').update(`${request.ip || ''}|${request.headers['user-agent'] || ''}`).digest('hex').slice(0, 24);
+  request.authUser = { _id: `guest-${id}`, firstName: 'Guest', isGuest: true, isBlocked: false };
+  return next();
+}
+
 app.use(
   cors({
     origin(origin, callback) {
@@ -1349,7 +1358,7 @@ require('./live-request-audio').registerLiveRequestAudio(app,{
 });
 
 require('./live-requests').registerLiveRequestRoutes(app,{
- requireAuth,requireAdmin,getLiveStreamConfig,LiveRequest,LiveSession,
+ requireAuth: requireViewer,requireAdmin,getLiveStreamConfig,LiveRequest,LiveSession,
  liveRequestAnalysisSchema,liveRequestCheckoutSchema,liveRequestReviewSchema,
  getOrderedLiveSessions,analyzeLiveRequest,buildDirectRequestMetadata,createCode,
  buildReorderedQueue,serializeLiveRequest,serializeLiveSession,
@@ -1408,7 +1417,7 @@ require('./live-broadcast').registerLiveBroadcastRoutes(app, {
 
 require('./live-destinations').registerLiveDestinations(app,{requireAdmin,getLiveStreamConfig});
 
-require('./live-access').registerLiveAccess(app, { requireAuth, getLiveStreamConfig, createToken: createLiveKitToken, getConfig: getLiveKitConfig });
+require('./live-access').registerLiveAccess(app, { requireAuth: requireViewer, getLiveStreamConfig, createToken: createLiveKitToken, getConfig: getLiveKitConfig });
 
 const youtubeSessionStore = createYoutubeSessionStore(process.env.YT_DLP_COOKIES_FILE);
 let youtubeConversionActive = false;
@@ -1564,7 +1573,7 @@ vouchers.registerVouchers(app, { requireAdmin, requireAuth });
 require('./live-recordings').registerLiveRecordings(app, requireAdmin);
 require('./direct-recording').registerDirectRecordingRoutes(app,requireAdmin);
 require('./live-suggestions').registerLiveSuggestions(app, { getLiveStreamConfig, requireAuth });
-require('./live-comments').registerLiveComments(app, { getLiveStreamConfig, requireAuth, requireAdmin });
+require('./live-comments').registerLiveComments(app, { getLiveStreamConfig, requireAuth: requireViewer, requireAdmin });
 require('./notification-emails').registerNotificationEmails(app, { requireAdmin });
 require('./domain-mail').registerDomainMail(app, { requireAdmin });
 require('./contact-form').registerContactForm(app);

@@ -6,7 +6,11 @@ function publicReels(rows,videoUrl){
 function registerEchoReels(app,{requireAdmin,Recording,serialize,videoUrl}){
  app.get('/api/reels',async(_req,res)=>{
   res.set('Cache-Control','no-store');
-  try{const rows=await Recording.find({deletedAt:null,test:{$ne:true},renders:{$elemMatch:{goal:ECHO_REEL_GOAL,status:'ready',echoPublished:true}}}).select('title renders deletedAt').sort({updatedAt:-1}).limit(100).lean();res.json({items:publicReels(rows,videoUrl)});}
+  try{const rows=await Recording.find({deletedAt:null,test:{$ne:true},renders:{$elemMatch:{goal:ECHO_REEL_GOAL,status:'ready',echoPublished:true}}}).select('title renders deletedAt').sort({updatedAt:-1}).limit(100).lean();const own=publicReels(rows,videoUrl);
+   // Gallery videos the admin published to Reels (playable files only, never a page link).
+   const media=await require('./content').MediaItem.find({kind:'video',reel:true,isPublished:true}).select('title mediaUrl durationSec updatedAt').sort({updatedAt:-1}).limit(100).lean();
+   const gallery=media.filter(m=>/^https:\/\/.+\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(m.mediaUrl)||/res\.cloudinary\.com\/.+\/video\/upload\//.test(m.mediaUrl)).map(m=>({id:'media-'+String(m._id),title:m.title||'Echo Reel',videoUrl:m.mediaUrl,width:0,height:0,duration:m.durationSec||0,publishedAt:m.updatedAt}));
+   res.json({items:[...own,...gallery].sort((a,b)=>new Date(b.publishedAt)-new Date(a.publishedAt)).slice(0,100)});}
   catch{res.status(503).json({message:'Reels are temporarily unavailable. Please retry.'});}
  });
  app.post('/api/admin/live-recordings/:id/renders/:renderId/echo',requireAdmin,async(req,res)=>{

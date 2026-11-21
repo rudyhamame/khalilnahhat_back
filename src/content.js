@@ -29,6 +29,7 @@ const mediaSchema = new mongoose.Schema(
     durationSec: { type: Number, default: 0 },
     downloadable: { type: Boolean, default: false }, // UI hint only: the stored file URL is public
     isPublished: { type: Boolean, default: true },
+    reel: { type: Boolean, default: false }, // a gallery video also published to the Reels player
     sortOrder: { type: Number, default: 0 },
   },
   { timestamps: true },
@@ -40,7 +41,7 @@ const str = (max) => z.string().trim().max(max);
 const testimonialFields = { name: str(120).min(1), eventType: str(80), text: str(2000).min(1), textAr: str(2000), reply: str(2000), imageUrl: str(500), isPublished: z.boolean(), sortOrder: z.number().int() };
 const mediaFields = {
   kind: z.enum(['mix', 'video', 'photo']), category: str(80), title: str(160).min(1), titleAr: str(160), coverUrl: str(500),
-  mediaUrl: str(500).min(1), durationSec: z.number().int().min(0), downloadable: z.boolean(), isPublished: z.boolean(), sortOrder: z.number().int(),
+  mediaUrl: str(500).min(1), durationSec: z.number().int().min(0), downloadable: z.boolean(), isPublished: z.boolean(), reel: z.boolean(), sortOrder: z.number().int(),
 };
 
 const view = (d) => ({ id: d.id, ...d.toObject({ versionKey: false, transform: (_doc, o) => { delete o._id; delete o.createdAt; delete o.updatedAt; return o; } }) });

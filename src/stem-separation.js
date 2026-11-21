@@ -5,7 +5,7 @@ const { spawn } = require('node:child_process');
 const { publicSongs, deliveryUrl } = require('./music-archive');
 
 const CHANNELS = ['vocals', 'drums', 'bass', 'other'];
-// Admin editor splits with the six-source model (adds guitar and piano); the public mixer keeps four channels.
+// New splits have four channels (vocals, drums, bass, other). Older saved recordings may still carry guitar and piano files: they are accepted here so those recordings keep playing, and the mixer folds them into Other.
 const ADMIN_CHANNELS = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'];
 const adminChannelPattern = ADMIN_CHANNELS.join('|');
 const ROOT = process.env.STEM_CACHE_DIR ? path.resolve(process.env.STEM_CACHE_DIR) : path.resolve(__dirname, '..', '.runtime', 'stems');
@@ -208,20 +208,20 @@ function registerStemSeparation(app,{requireAdmin}) {
     const key=await adminKey(url),manifest=await readManifest(key,ADMIN_CHANNELS),job=jobs.get(key),ready=Boolean(manifest),available=await separatorAvailable();
     res.set('Cache-Control','no-store').json({status:ready?'ready':job?.status||(available?'idle':'unavailable'),stage:ready?'Separated channels ready':job?.stage||(available?'':'The server audio separator is not installed.'),
       duration:manifest?.duration,canSeparate:available,separatorAvailable:available,
-      partial:ready&&manifest.channels.length<ADMIN_CHANNELS.length,channels:ready?manifest.channels.map(name=>({name,url:`/api/admin/stems/audio/${name}?url=${encodeURIComponent(url)}`})):[]});
+      partial:false,channels:ready?manifest.channels.map(name=>({name,url:`/api/admin/stems/audio/${name}?url=${encodeURIComponent(url)}`})):[]});
   });
   app.post('/api/admin/stems',adminOnly,async(req,res)=>{
     const url=adminSource(req,res);if(!url)return;
     const key=assetKey(url);
     const done=await readManifest(await adminKey(url),ADMIN_CHANNELS);
     // A four-channel fallback result may be re-run once the six-source model is available (?upgrade=1).
-    if(done&&!(req.query.upgrade==='1'&&done.channels.length<ADMIN_CHANNELS.length))return res.json({status:'ready'});
+    if(done)return res.json({status:'ready'});
     if(done)await fs.rm(path.join(ROOT,key,'ready.json'),{force:true});
     if(jobs.get(key)?.status==='processing')return res.status(202).json({status:'processing'});
     if(!await separatorAvailable())return res.status(503).json({message:'The server audio separator is not installed.'});
     if(activeJob)return res.status(409).json({message:'Another recording is separating. Try again in a few minutes.'});
     activeJob=key;
-    void startJob({audioUrl:url},key,'htdemucs_6s');
+    void startJob({audioUrl:url},key,'htdemucs');// four channels: vocals, drums, bass, other (no separate guitar / piano)
     res.status(202).json({status:'processing'});
   });
   app.get('/api/admin/stems/audio/:channel',adminOnly,async(req,res)=>{

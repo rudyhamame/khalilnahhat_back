@@ -903,6 +903,7 @@ app.patch('/api/auth/profile', async (request, response) => {
 });
 
 require('./account-avatar').register(app, { authFromRequest, User });
+require('./account-email').register(app, { authFromRequest, User, serializeUser, sendMail:require('./brevo').sendSimpleEmail });
 require('./account-deletion').registerAccountDeletion(app,{
   requireAuth,
   deleteAccount:require('./account-deletion').createAccountDeletion({

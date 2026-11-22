@@ -18,6 +18,8 @@ test('every Booking atom has a stable, independent Eidos; deletion stays permane
  assert.equal((await fetch(endpoint+'/booking-atoms',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,401);
  assert.equal((await request('POST',{atomId:'invented'},'/booking-atoms')).status,400);
  const manual=(await request('POST',{fourthGoal:'Keep this independent seed.'})).body.item;
+ const legacy=(await request('POST',{fourthGoal:'Historical combined-name purpose.'})).body.item;
+ await BookingAtomEidos.create({atomId:'customer.fullName',eidosId:legacy.id});
  const seeded=await Promise.all([request('POST',{},'/booking-atoms'),request('POST',{},'/booking-atoms')]);
  for(const result of seeded)assert.equal(result.status,200,JSON.stringify(result.body));
  assert.equal(seeded.reduce((sum,result)=>sum+result.body.created,0),BOOKING_ATOMS.length);
@@ -25,6 +27,9 @@ test('every Booking atom has a stable, independent Eidos; deletion stays permane
  assert.equal(links.length,BOOKING_ATOMS.length);assert.equal(new Set(links.map(row=>row.eidosId)).size,BOOKING_ATOMS.length);
  const original=new Map(links.map(row=>[row.atomId,row.eidosId]));
  for(const atom of BOOKING_ATOMS)assert.ok(original.has(atom.atomId),atom.atomId);
+ assert.notEqual(original.get('customer.firstName'),original.get('customer.lastName'));
+ assert.equal(original.has('customer.fullName'),false);assert.equal(await BookingAtomEidos.countDocuments({atomId:'customer.fullName'}),0);
+ assert.equal((await Eidos.findOne({externalId:legacy.id})).fourthGoal,'Historical combined-name purpose.');
  const dateId=original.get('event.date');
  assert.equal((await request('PUT',{fourthGoal:'Preserve the chosen purpose.',previousFourthGoal:''},'/'+dateId)).status,200);
  const again=await request('POST',{},'/booking-atoms');assert.equal(again.body.created,0);assert.deepEqual(new Map(again.body.bookingAtoms.map(row=>[row.atomId,row.eidosId])),original);

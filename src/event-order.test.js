@@ -5,7 +5,7 @@ const path=require('node:path');
 const core=require('./event-order');
 function completed(){
   let order=core.createEventOrder();
-  for(const [key,value] of Object.entries({'customer.fullName':'Example Client','customer.email':'example@example.invalid','customer.phone':'4165550123','customer.contactMethod':'email','customer.phoneContact':'sms','event.type':'wedding','event.date':'2099-06-20','event.startTime':'18:00','event.endTime':'01:00','event.guestCount':150,'event.venue.name':'Example venue','event.venue.address':'1 Example Street','event.venue.city':'Toronto','event.venue.postalCode':'M1A 1A1','event.venue.country':'Canada','event.venue.setting':'indoor',services:['dj']}))order=core.updateOrderField(order,key,value);
+  for(const [key,value] of Object.entries({'customer.firstName':'Example','customer.lastName':'Client','customer.email':'example@example.invalid','customer.phone':'4165550123','customer.contactMethod':'email','customer.phoneContact':'sms','event.type':'wedding','event.date':'2099-06-20','event.startTime':'18:00','event.endTime':'01:00','event.guestCount':150,'event.venue.name':'Example venue','event.venue.address':'1 Example Street','event.venue.city':'Toronto','event.venue.postalCode':'M1A 1A1','event.venue.country':'Canada','event.venue.setting':'indoor',services:['dj']}))order=core.updateOrderField(order,key,value);
   return core.applyAccountProfile(order,{firstName:'Example',lastName:'Client',email:'example@example.invalid',phoneNumber:'4165550123',phoneContact:'sms'});
 }
 test('new order has unknown answers, explicit Toronto time and separate post-booking planning',()=>{
@@ -32,7 +32,7 @@ test('server retains full brief, enforces identity and selections, and cannot re
   const order=completed();order.status='confirmed';order.price=1;order.event.setup.requirements='x'.repeat(2800);
   const user={firstName:'Verified',lastName:'Client',email:'verified@example.invalid',phoneNumber:'4165550123',phoneContact:'call',company:'Verified Company'};
   const result=core.prepareSubmittedOrder(order,user,[{serviceId:'svc-dj',name:'DJ',category:'service',quantity:1}],[]);
-  assert.equal(result.order.customer.fullName,'Verified Client');assert.equal(result.order.event.setup.requirements.length,2800);assert.equal(result.event.setupRequirements.length,2000);assert.equal(result.order.status,undefined);assert.equal(result.order.price,undefined);
+  assert.equal(result.order.customer.firstName,'Verified');assert.equal(result.order.event.setup.requirements.length,2800);assert.equal(result.event.setupRequirements.length,2000);assert.equal(result.order.status,undefined);assert.equal(result.order.price,undefined);
   assert.throws(()=>core.prepareSubmittedOrder(order,user,[{serviceId:'svc-lighting',name:'Lighting',category:'service',quantity:1}],[]),/selections changed/);
 });
 test('reference links are metadata, not fetched, and non-HTTPS references are rejected',()=>{
@@ -52,7 +52,7 @@ test('uploaded event document hashes use the same validated SHA-256 field',()=>{
 
 test('quote questionnaire asks only what the brief lists plus language and dialect',()=>{
   const keys=core.fields.filter(field=>!field.hidden).map(field=>field.key).sort();
-  const brief=['customer.fullName','customer.email','customer.phone','customer.contactMethod','customer.phoneContact','customer.company','event.type','event.date','event.startTime','event.endTime','event.guestCount','event.venue.name','event.venue.address','event.venue.city','event.venue.postalCode','event.venue.country','event.venue.addressDetails','event.venue.setting','event.setup.requirements','services','music.djRequested','music.mcRequested','rental.requested','music.djMc','references.images','additional.notes'].sort();
+  const brief=['customer.firstName','customer.lastName','customer.email','customer.phone','customer.contactMethod','customer.phoneContact','customer.company','event.type','event.date','event.startTime','event.endTime','event.guestCount','event.venue.name','event.venue.address','event.venue.city','event.venue.postalCode','event.venue.country','event.venue.addressDetails','event.venue.setting','event.setup.requirements','services','music.djRequested','music.mcRequested','rental.requested','music.djMc','references.images','additional.notes'].sort();
   assert.deepEqual(keys,brief);
 });
 
@@ -132,7 +132,7 @@ test('Special requests is not a data atom any more: old text becomes the Additio
 });
 
 test('a phone number needs one phone contact option; without a phone it is not asked',()=>{
-  const base=()=>{const order=core.createEventOrder();order.customer.fullName='A B';order.customer.email='a@example.invalid';order.customer.contactMethod='email';return order;};
+  const base=()=>{const order=core.createEventOrder();order.customer.firstName='A';order.customer.lastName='B';order.customer.email='a@example.invalid';order.customer.contactMethod='email';return order;};
   assert.equal(core.missingOrderFields(base()).some(field=>field.key==='customer.phoneContact'),false);
   const withPhone=base();withPhone.customer.phone='4165550123';
   assert.equal(core.missingOrderFields(withPhone).some(field=>field.key==='customer.phoneContact'),true);
@@ -158,8 +158,8 @@ test('the AI instructions follow the booking data atoms bible: no retired atoms,
 
 test('a guest can have Personal info saved by the AI; a signed-in client cannot change account fields', () => {
   const { sanitizeOrderPatch, guestOrderPatchJsonSchema, orderPatchJsonSchema } = require('./event-order');
-  const patch = [{ path: 'customer.fullName', value: 'Sam Lee' }, { path: 'customer.email', value: 'sam@example.com' }, { path: 'customer.phone', value: '4165550123' }];
-  assert.equal(sanitizeOrderPatch(patch, { guest: true }).length, 3);
+  const patch = [{ path: 'customer.firstName', value: 'Sam' }, { path: 'customer.lastName', value: 'Lee' }, { path: 'customer.email', value: 'sam@example.com' }, { path: 'customer.phone', value: '4165550123' }];
+  assert.equal(sanitizeOrderPatch(patch, { guest: true }).length, 4);
   assert.equal(sanitizeOrderPatch(patch).length, 0);
   assert.ok(guestOrderPatchJsonSchema.items.properties.path.enum.includes('customer.email'));
   assert.ok(!orderPatchJsonSchema.items.properties.path.enum.includes('customer.email'));
@@ -173,3 +173,15 @@ test('"Other" is an event type: the client\'s own type is required for Other, ne
   const wedding=core.createEventOrder();wedding.event.type='wedding';assert.ok(!missing(wedding).includes('event.title'));
   assert.equal(core.sanitizeOrderPatch([{path:'event.title',value:'Quinceañera'}]).length,1);
 });
+
+ test('name atoms are independent and legacy full names normalize without losing explicit parts',()=>{
+ const legacy=core.normalizeEventOrder({customer:{fullName:'  Mary Jane Watson  '}});
+ assert.equal(legacy.customer.firstName,'Mary');assert.equal(legacy.customer.lastName,'Jane Watson');assert.equal('fullName' in legacy.customer,false);
+ const explicit=core.normalizeEventOrder({customer:{fullName:'Old Name',firstName:'Mary Jane',lastName:'Watson Parker'}});
+ assert.equal(explicit.customer.firstName,'Mary Jane');assert.equal(explicit.customer.lastName,'Watson Parker');
+ const profile=core.applyAccountProfile(legacy,{firstName:'Jean Luc',lastName:'Picard'});
+ assert.equal(profile.customer.firstName,'Jean Luc');assert.equal(profile.customer.lastName,'Picard');
+ core.setAccountLock(false);
+ try{const edited=core.updateOrderField(profile,'customer.firstName','Jean');assert.equal(edited.customer.firstName,'Jean');assert.equal(edited.customer.lastName,'Picard');assert.equal(core.fields.some(field=>field.key==='customer.fullName'),false);}
+ finally{core.setAccountLock(true);}
+ });

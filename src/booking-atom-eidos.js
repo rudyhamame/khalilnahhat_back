@@ -5,7 +5,7 @@ const schema=new mongoose.Schema({atomId:{type:String,required:true,unique:true,
 const BookingAtomEidos=mongoose.models.BookingAtomEidos||mongoose.model('BookingAtomEidos',schema);
 const publicView=row=>({atomId:row.atomId,eidosId:row.eidosId});
 async function listBookingAtomEidos({Eidos}){
- const links=await BookingAtomEidos.find().sort({atomId:1}).lean();
+ const links=await BookingAtomEidos.find({atomId:{$in:BOOKING_ATOMS.map(atom=>atom.atomId)}}).sort({atomId:1}).lean();
  const seeds=await Eidos.find({externalId:{$in:links.map(row=>row.eidosId)}}).select('externalId').lean();
  const present=new Set(seeds.map(row=>row.externalId));
  return links.filter(row=>present.has(row.eidosId)).map(publicView);
@@ -18,6 +18,8 @@ async function seedBookingAtomEidos({Eidos}){
   const session=await mongoose.startSession();let created=0;
   try{
    await session.withTransaction(async()=>{
+    // Retire the old combined-name relationship; its seed remains an independent identity.
+    await BookingAtomEidos.deleteMany({atomId:'customer.fullName'}).session(session);
     const links=await BookingAtomEidos.find({atomId:{$in:BOOKING_ATOMS.map(row=>row.atomId)}}).session(session).lean();
     const existing=await Eidos.find({externalId:{$in:links.map(row=>row.eidosId)}}).select('externalId').session(session).lean();
     const ids=new Set(existing.map(row=>row.externalId)),linked=new Set(links.filter(row=>ids.has(row.eidosId)).map(row=>row.atomId));

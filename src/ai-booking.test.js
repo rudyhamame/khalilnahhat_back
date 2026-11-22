@@ -301,7 +301,7 @@ test('text never forwards an arbitrary navigation face',async t=>{
 
 test('AI patch schema and sanitizer reject all account contact edits',()=>{
  const {orderPatchJsonSchema,sanitizeOrderPatch}=require('./event-order');
- const paths=['customer.fullName','customer.email','customer.phone','customer.company'];
+ const paths=['customer.firstName','customer.lastName','customer.email','customer.phone','customer.company'];
  for(const path of paths)assert.ok(!orderPatchJsonSchema.items.properties.path.enum.includes(path));
  assert.deepEqual(sanitizeOrderPatch(paths.map(path=>({path,value:'Changed'}))),[]);
 });
@@ -341,7 +341,7 @@ test('language-only model patches retain the current language list by default',a
 });
 
 test('a visitor without an account gets their Personal info and venue saved by the chat, and one bad field never fails the reply',async t=>{
-  const patch=[{path:'customer.fullName',value:'Mark Tamer'},{path:'customer.email',value:'mark@example.invalid'},{path:'customer.phone',value:'4165550123'},{path:'event.venue.address',value:'123 Example Street'},{path:'event.venue.city',value:'Toronto'},{path:'event.venue.postalCode',value:'M1B 2K3'}];
+  const patch=[{path:'customer.firstName',value:'Mark'},{path:'customer.lastName',value:'Tamer'},{path:'customer.email',value:'mark@example.invalid'},{path:'customer.phone',value:'4165550123'},{path:'event.venue.address',value:'123 Example Street'},{path:'event.venue.city',value:'Toronto'},{path:'event.venue.postalCode',value:'M1B 2K3'}];
   let calls=0;
   const request=await fixture(t,{fetchImpl:async(_url,options)=>{calls++;const sent=JSON.parse(options.body);
     assert.ok(sent.text.format.schema.properties.orderPatch.items.properties.path.enum.includes('customer.email'));assert.match(sent.instructions,/no account yet/);

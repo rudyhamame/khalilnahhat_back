@@ -4,7 +4,8 @@
     [
       "01.01",
       [
-        "customer.fullName",
+        "customer.firstName",
+        "customer.lastName",
         "customer.email",
         "customer.phone",
         "customer.contactMethod",

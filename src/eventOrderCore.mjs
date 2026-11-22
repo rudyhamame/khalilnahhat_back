@@ -119,7 +119,14 @@ export function preserveMusicLanguages(order,patch,message=''){
   return {...change,value:typeof change.value==='string'?JSON.stringify(combined):combined};
  });
 }
+// Older saved bookings stored one name. Explicit name parts always take precedence.
+export function customerNameParts(customer={}) {
+ customer=customer||{};
+ const [first='',...rest]=String(customer.fullName||'').trim().split(/\s+/);
+ return {firstName:customer.firstName??(first||null),lastName:customer.lastName??(rest.join(' ')||null)};
+}
 export function normalizeEventOrder(input) {
+  input={...input,customer:{...input?.customer,...customerNameParts(input?.customer)}};
   const order=createEventOrder();
   for(const field of fields){const value=getPath(input,field.key);if(value!==undefined&&validValue(field,value))put(order,field.key,Array.isArray(value)?[...new Set(value)]:value);}
   for(const field of planningFields){const value=getPath(input,field.key);if(value!==undefined&&validValue(field,value))put(order,field.key,value);}
@@ -140,7 +147,8 @@ export const isLockedField=path=>accountLock&&lockedFields.some(field=>field.key
 export function accountProfile(user){
   if(!user)return {};
   return {
-    'customer.fullName':`${user.firstName||''} ${user.lastName||''}`.trim()||null,
+    'customer.firstName':user.firstName||null,
+    'customer.lastName':user.lastName||null,
     'customer.email':user.email||null,
     'customer.phone':user.phoneNumber||user.phone||null,
     'customer.company':user.company||null,
@@ -153,6 +161,7 @@ export function accountProfile(user){
 export function applyAccountProfile(order,user){
   if(!user)return order;
   const next=structuredClone(order);
+  if(next.customer)delete next.customer.fullName;
   for(const [path,value] of Object.entries(accountProfile(user)))put(next,path,value);
   return next;
 }

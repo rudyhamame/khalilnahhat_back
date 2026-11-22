@@ -8,14 +8,26 @@
    "ar": "عنك",
    "fields": [
     {
-     "key": "customer.fullName",
-     "label": "Your name",
-     "ar": "اسمك الكامل",
+     "key": "customer.firstName",
+     "label": "First name",
+     "ar": "الاسم الأول",
      "required": true,
      "private": true,
      "locked": "account",
-     "short": "Name",
-     "shortAr": "الاسم"
+     "short": "First name",
+     "shortAr": "الاسم الأول",
+     "maxLength": 60
+    },
+    {
+     "key": "customer.lastName",
+     "label": "Last name",
+     "ar": "اسم العائلة",
+     "required": true,
+     "private": true,
+     "locked": "account",
+     "short": "Last name",
+     "shortAr": "اسم العائلة",
+     "maxLength": 60
     },
     {
      "key": "customer.email",

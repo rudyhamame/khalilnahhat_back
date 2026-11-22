@@ -2,12 +2,13 @@ const mongoose=require('mongoose');
 const {randomUUID}=require('node:crypto');
 const {z}=require('zod');
 
-// An Eidos is only an identity seed. Labels, data and behavior belong to
-// destinations that reference it, and removing a view never deletes this seed.
-const schema=new mongoose.Schema({externalId:{type:String,required:true,unique:true,immutable:true,default:()=>`eidos-${randomUUID()}`}},{strict:'throw',versionKey:false});
+// Eidos keeps an immutable identity and its fourth goal. Removing a view never deletes the seed.
+const schema=new mongoose.Schema({externalId:{type:String,required:true,unique:true,immutable:true,default:()=>`eidos-${randomUUID()}`},fourthGoal:{type:String,default:'',maxlength:2000},hiddenFromMap:{type:Boolean,default:false}},{strict:'throw',versionKey:false});
 const Eidos=mongoose.models.EdenEidos||mongoose.model('EdenEidos',schema);
-const publicView=row=>({id:row.externalId});
-const input=z.object({}).strict();
+const publicView=row=>({id:row.externalId,fourthGoal:row.fourthGoal||'',...(row.hiddenFromMap?{removed:true}:{})});
+const fourthGoal=z.string().trim().max(2000,'Fourth goal must be 2000 characters or fewer.');
+const input=z.object({fourthGoal:fourthGoal.default('')}).strict();
+const updateInput=z.object({fourthGoal,previousFourthGoal:z.string().max(2000)}).strict();
 async function ensureBooking(){
  await Eidos.init();
  await Eidos.updateOne({externalId:'booking'},{$setOnInsert:{externalId:'booking'}},{upsert:true});
@@ -15,17 +16,44 @@ async function ensureBooking(){
 function registerEidos(app,{requireAdmin}){
  const wrap=fn=>async(req,res)=>{
   try{res.set('Cache-Control','no-store');await fn(req,res);}
-  catch(error){const status=error instanceof z.ZodError?400:503;res.status(status).json({message:status===400?'An Eidos contains only a generated identity.':'Eidos could not be loaded or saved. Please retry.'});}
+  catch(error){const status=error instanceof z.ZodError?400:error.status||503;res.status(status).json({message:status===400?error.issues[0].message:status<500?error.message:'Eidos could not be loaded or saved. Please retry.'});}
  };
- app.get('/api/admin/eden/eidos',requireAdmin,wrap(async(_req,res)=>{
+ app.get('/api/admin/eden/eidos',requireAdmin,wrap(async(req,res)=>{
   await ensureBooking();
-  res.json({items:(await Eidos.find().sort({_id:1}).lean()).map(publicView)});
+  const {includeRemoved}=z.object({includeRemoved:z.literal('1').optional()}).strict().parse(req.query);
+  res.json({items:(await Eidos.find(includeRemoved?{}:{hiddenFromMap:{$ne:true}}).sort({_id:1}).lean()).map(publicView)});
  }));
  app.post('/api/admin/eden/eidos',requireAdmin,wrap(async(req,res)=>{
-  input.parse(req.body);await ensureBooking();
-  const row=await Eidos.create({});
+  const value=input.parse(req.body);await ensureBooking();
+  const row=await Eidos.create(value);
   res.status(201).json({item:publicView(row)});
  }));
- // Intentionally no delete endpoint: identity outlives its presentations.
+ app.put('/api/admin/eden/eidos/:id',requireAdmin,wrap(async(req,res)=>{
+  const {fourthGoal,previousFourthGoal}=updateInput.parse(req.body);
+  const expected=previousFourthGoal===''?{$or:[{fourthGoal:''},{fourthGoal:{$exists:false}}]}:{fourthGoal:previousFourthGoal};
+  const row=await Eidos.findOneAndUpdate({externalId:req.params.id,...expected},{$set:{fourthGoal}},{returnDocument:'after',runValidators:true}).lean();
+  if(!row){const exists=await Eidos.exists({externalId:req.params.id});throw Object.assign(new Error(exists?'This seed changed. Reload Eidos before saving again.':'Eidos not found.'),{status:exists?409:404});}
+  res.json({item:publicView(row)});
+ }));
+ // Exact-ID lookup remains available even after an item is removed from the map.
+ app.get('/api/admin/eden/eidos/:id',requireAdmin,wrap(async(req,res)=>{
+  const row=await Eidos.findOne({externalId:req.params.id}).lean();
+  if(!row)throw Object.assign(new Error('Eidos not found.'),{status:404});
+  res.json({item:publicView(row)});
+ }));
+ app.delete('/api/admin/eden/eidos/:id',requireAdmin,wrap(async(req,res)=>{
+  const {previousFourthGoal}=z.object({previousFourthGoal:z.string().max(2000)}).strict().parse(req.body);
+  const expected=previousFourthGoal===''?{$or:[{fourthGoal:''},{fourthGoal:{$exists:false}}]}:{fourthGoal:previousFourthGoal};
+  const row=await Eidos.findOneAndUpdate({externalId:req.params.id,...expected},{$set:{hiddenFromMap:true}},{returnDocument:'after'}).lean();
+  if(!row){const exists=await Eidos.exists({externalId:req.params.id});throw Object.assign(new Error(exists?'This seed changed. Reload Eidos before deleting.':'Eidos not found.'),{status:exists?409:404});}
+  res.json({item:publicView(row)});
+ }));
+ app.post('/api/admin/eden/eidos/:id/restore',requireAdmin,wrap(async(req,res)=>{
+  z.object({}).strict().parse(req.body);
+  const row=await Eidos.findOneAndUpdate({externalId:req.params.id},{$set:{hiddenFromMap:false}},{returnDocument:'after'}).lean();
+  if(!row)throw Object.assign(new Error('Eidos not found.'),{status:404});
+  res.json({item:publicView(row)});
+ }));
+ // No operation physically deletes a seed's identity or its fourth goal.
 }
 module.exports={Eidos,registerEidos};

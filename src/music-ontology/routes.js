@@ -1,13 +1,14 @@
 const permanentDeletion=require('../permanent-deletion');
 const {z}=require('zod');
 const {createService}=require('./service');
+const {withoutGenreLanguages}=require('./genre-data');
 const MusicRecording=require('./recording-model');
 const contract=require('../../contracts/music-ontology.json');
 function registerMusicOntology(app,{requireAdmin,service=createService()}={}){
  const admin='/api/admin/music-ontology',pub='/api/music-ontology';
  const elements=require('./work-elements').createWorkElements(service);
  const wrap=fn=>async(req,res)=>{try{await fn(req,res);}catch(e){const status=e instanceof z.ZodError?400:e.code===11000?409:e.status||500;res.status(status).json({message:e instanceof z.ZodError?e.issues[0].message:e.code===11000?'This metadata identity already exists. Select the existing entity.':status<500?e.message:'The music archive could not complete this request.',...(e.status===503?{message:e.message}:{})});if(status>=500)console.error('Music ontology:',e.name,e.code||'',e.stack?.split('\n')[1]||'');}};
- const entity=r=>({...r,id:r.externalId,_id:undefined});
+ const entity=r=>({...withoutGenreLanguages(r),id:r.externalId,_id:undefined});
  const actor=req=>String(req.user?.externalId||req.user?._id||req.user?.id||'admin');
  const filterSchema=z.object(Object.fromEntries(contract.filters.map(key=>[key,['bpmMin','bpmMax'].includes(key)?z.coerce.number().positive().max(1000).optional():z.string().max(240).optional()]))).strict().refine(f=>f.bpmMin==null||f.bpmMax==null||f.bpmMin<=f.bpmMax,'Minimum BPM cannot exceed maximum BPM.');
  const readFilters=req=>{const f=filterSchema.parse(req.query);if(f.bpmScope&&!['work','recording'].includes(f.bpmScope))throw Object.assign(new Error('Choose work or recording BPM scope.'),{status:400});return f;};
@@ -24,6 +25,11 @@ function registerMusicOntology(app,{requireAdmin,service=createService()}={}){
   app.get(`${prefix}/vocabulary/:id`,...guards,wrap(async(req,res)=>{const item=await service.models.Vocabulary.findOne({externalId:req.params.id}).lean();if(!item)return res.status(404).json({message:'Metadata entity not found.'});res.json({item:entity(item)});}));
  }
  app.get(`${admin}/work-elements`,requireAdmin,wrap(async(_req,res)=>res.set('Cache-Control','no-store').json({items:await elements.list()})));
+ app.get(`${admin}/custom-work-elements`,requireAdmin,wrap(async(_req,res)=>res.set('Cache-Control','no-store').json({items:await elements.listCustom()})));
+ app.post(`${admin}/custom-work-elements`,requireAdmin,wrap(async(req,res)=>res.status(201).json({item:await elements.createCustom(req.body)})));
+ app.post(`${admin}/custom-work-elements/:id/options`,requireAdmin,wrap(async(req,res)=>res.status(201).json({item:await elements.addCustomOption(req.params.id,req.body)})));
+ app.delete(`${admin}/custom-work-elements/:id/options/:optionId`,requireAdmin,wrap(async(req,res)=>res.json({item:await elements.removeCustomOption(req.params.id,req.params.optionId)})));
+ app.delete(`${admin}/custom-work-elements/:id`,requireAdmin,wrap(async(req,res)=>{await elements.removeCustom(req.params.id);res.json({ok:true,deleted:true,id:req.params.id});}));
  app.post(`${admin}/work-elements/initialize`,requireAdmin,wrap(async(_req,res)=>{await elements.initialize();res.json({items:await elements.list()});}));
  app.post(`${admin}/work-elements/:key/options`,requireAdmin,wrap(async(req,res)=>{await elements.save(req.params.key,req.body,null,actor(req));res.status(201).json({items:await elements.list()});}));
  app.put(`${admin}/work-elements/:key/options/:id`,requireAdmin,wrap(async(req,res)=>{await elements.save(req.params.key,req.body,req.params.id,actor(req));res.json({items:await elements.list()});}));

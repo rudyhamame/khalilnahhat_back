@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const { createHash } = require('node:crypto');
 const { GoogleAuth } = require('google-auth-library');
 const { z } = require('zod');
+const { STATUS } = require('./booking-journey');
 
 const hash = (v) => createHash('sha256').update(v).digest('hex');
 const Device = mongoose.models.EchoClientDevice || mongoose.model('EchoClientDevice', new mongoose.Schema({
@@ -22,7 +23,7 @@ const MESSAGES = {
   expired: ['Your quote expired', 'Contact us to reactivate it.'],
 };
 function messageFor(sr) {
-  if (sr.status === 'cancelled') return sr.declinedBy === 'admin' ? ['Request declined', 'Your booking request could not be accepted.'] : null;
+  if (sr.status === STATUS.CANCELLED) return sr.declinedBy === 'admin' ? ['Request declined', 'Your booking request could not be accepted.'] : null;
   return MESSAGES[sr.status] || null;
 }
 

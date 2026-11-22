@@ -18,7 +18,7 @@ test('the summary carries the journey facts and the event, and nothing personal'
   const text = JSON.stringify(summarize(serialized('quoted')));
   assert.doesNotMatch(text, /private@example|Private Person|555-0100|customerEmail|customerName/);
   const summary = summarize(serialized('quoted'));
-  assert.equal(summary.journey.label, 'Quote ready');
+  assert.equal(summary.journey.label, "Waiting for client's decision");
   assert.equal(summary.journey.awaitingClient, true);
   assert.equal(summary.journey.isBooked, false);
   assert.equal(summary.event.date, '2099-06-20');

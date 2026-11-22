@@ -1,5 +1,6 @@
 const { z } = require('zod');
-const SERVICES = new Set(['dj', 'sound', 'lighting', 'led', 'fx', 'rental', 'corporate', 'mc']);
+// The service keys a saved booking accepts come from the shared order contract, the single definition.
+const SERVICES = new Set(require('./eventOrderCore.mjs').contract.sections.flatMap((section) => section.fields).find((field) => field.key === 'services').options);
 const validDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T12:00:00Z`)) && new Date(`${value}T12:00:00Z`).toISOString().slice(0, 10) === value;
 const text = (max) => z.string().trim().max(max).default('');
 const eventSchema = z.object({

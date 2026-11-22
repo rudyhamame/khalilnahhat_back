@@ -1,0 +1,4477 @@
+[
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be5a"
+    },
+    "normalizedName": "acoustic",
+    "kind": "genre",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-e74dc299-366f-4b66-b54e-f4edf8d0185b",
+    "name": "Acoustic",
+    "revision": {
+      "$numberInt": "6"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705121569"
+      }
+    },
+    "description": "Music centered on the sound of acoustic instruments and voices, often with sparse arrangements that foreground the performance.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be0f"
+    },
+    "kind": "genre",
+    "normalizedName": "afro house",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-c86e315b-c91d-4a92-af4e-681cb6aa3752",
+    "name": "Afro house",
+    "revision": {
+      "$numberInt": "6"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705125631"
+      }
+    },
+    "description": "House music built around layered African percussion, syncopated grooves, and melodic or vocal elements from African dance traditions.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be76"
+    },
+    "kind": "genre",
+    "normalizedName": "afro-cuban jazz",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-5325f697-8d90-49a7-b405-1a7437c8fa1c",
+    "name": "Afro-Cuban jazz",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705129680"
+      }
+    },
+    "description": "Jazz improvisation and harmony combined with Afro-Cuban rhythmic patterns such as clave and instruments such as congas and timbales.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be0c"
+    },
+    "kind": "genre",
+    "normalizedName": "afrobeats",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-6aac8d02-8231-43b3-9e04-d3a40ff7c51f",
+    "name": "Afrobeats",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705133791"
+      }
+    },
+    "description": "Contemporary West African popular music, especially from Nigeria and Ghana, built around syncopated dance rhythms, melodic vocals, and influences from local and global styles.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be42"
+    },
+    "normalizedName": "alternative rock",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-28564aa5-4730-4af2-9426-a31a70eff6b7",
+    "name": "Alternative rock",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705137841"
+      }
+    },
+    "description": "Rock rooted in independent and underground scenes, often combining guitar-driven arrangements with unconventional textures or songwriting.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be0d"
+    },
+    "kind": "genre",
+    "normalizedName": "amapiano",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-da3191c0-9598-44dd-ac27-9ea31f2d0479",
+    "name": "Amapiano",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705141886"
+      }
+    },
+    "description": "South African dance music recognized by its deep log-drum bass, syncopated percussion, and spacious piano or keyboard chords.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be28"
+    },
+    "normalizedName": "ambient",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-5306169f-8cc4-4128-a9af-6ceb40e46b66",
+    "name": "Ambient",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705145955"
+      }
+    },
+    "description": "Music that foregrounds atmosphere, texture, and space, often using slowly evolving sounds and a subtle or absent beat.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be64"
+    },
+    "normalizedName": "arabic classical",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-a413cd37-fe97-4536-9309-a4582aa685c4",
+    "name": "Arabic classical",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705096981"
+      }
+    },
+    "description": "Art music traditions of the Arab world built around maqam, rhythmic cycles, and expressive vocal or instrumental performance.",
+    "isoCode": "",
+    "languageIds": [
+      "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be39"
+    },
+    "normalizedName": "arabic hip-hop",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-4c6b41ba-a436-4e2a-97b9-a3e67c5c7a9f",
+    "name": "Arabic hip-hop",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705150941"
+      }
+    },
+    "description": "Hip-hop performed primarily in Arabic, using rap and beat production alongside regional dialects, samples, or musical influences.",
+    "isoCode": "",
+    "languageIds": [
+      "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be08"
+    },
+    "kind": "genre",
+    "normalizedName": "arabic pop",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-eefcb5b5-4a5c-4565-9c19-2811dc3933d4",
+    "name": "Arabic pop",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705198102"
+      }
+    },
+    "description": "Arabic-language popular music that combines regional melodies, rhythms, and vocal phrasing with contemporary pop production.",
+    "isoCode": "",
+    "languageIds": [
+      "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be51"
+    },
+    "normalizedName": "bachata",
+    "kind": "genre",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-75782059-5c78-48c6-91b1-afb3000ca336",
+    "name": "Bachata",
+    "revision": {
+      "$numberInt": "3"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705202154"
+      }
+    },
+    "description": "Dominican dance music with interlocking guitar lines, bongo and güira rhythms, and often romantic vocals.",
+    "isoCode": "",
+    "languageIds": [
+      "language-65f5f8e5-5b2e-4efb-8246-bbad45d67ab7"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be4d"
+    },
+    "normalizedName": "bebop",
+    "kind": "genre",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-bd134327-505e-4acd-8fae-9ee42f01b1bc",
+    "name": "Bebop",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705206196"
+      }
+    },
+    "description": "A small-group jazz style marked by fast tempos, complex chord changes, and agile improvisation.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be73"
+    },
+    "normalizedName": "bhangra",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-367aece2-234b-4f23-b63a-8b2a2b3d0458",
+    "name": "Bhangra",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705210278"
+      }
+    },
+    "description": "Punjabi music rooted in dance traditions, driven by dhol rhythms and often produced with contemporary pop or electronic sounds.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be58"
+    },
+    "normalizedName": "bluegrass",
+    "kind": "genre",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-be6323a1-2db1-4d57-88d7-213ca4c88809",
+    "name": "Bluegrass",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705214340"
+      }
+    },
+    "description": "Acoustic American roots music featuring instruments such as banjo, fiddle, and mandolin, with close vocal harmonies and instrumental breaks.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be48"
+    },
+    "normalizedName": "blues",
+    "kind": "genre",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-d3547f7f-da6d-4025-9e51-cca2d30972ef",
+    "name": "Blues",
+    "revision": {
+      "$numberInt": "3"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705221079"
+      }
+    },
+    "description": "An African American music tradition characterized by expressive phrasing, blue notes, and recurring forms such as the twelve-bar blues.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be49"
+    },
+    "normalizedName": "blues rock",
+    "kind": "genre",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-5d2b2f17-f606-4912-9539-4a5fafc6cafa",
+    "name": "Blues rock",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705226125"
+      }
+    },
+    "description": "Rock that builds on blues riffs, phrasing, and forms, typically with amplified guitar and a strong backbeat.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be72"
+    },
+    "kind": "genre",
+    "normalizedName": "bollywood",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-48b58af2-8290-4646-ba7f-cdd04891f3f4",
+    "name": "Bollywood",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705231774"
+      }
+    },
+    "description": "Popular music from Hindi cinema, spanning film songs that blend South Asian musical traditions with pop, dance, and other global styles.",
+    "isoCode": "",
+    "languageIds": [
+      "language-f3da82f8-b9cc-4695-a764-f870d54c8216"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be38"
+    },
+    "normalizedName": "boom bap",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-4ee03ca9-270d-4853-b5c7-1f07cb36a568",
+    "name": "Boom bap",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705236694"
+      }
+    },
+    "description": "A hip-hop production style built around punchy kick and snare patterns, sample-based loops, and prominent rap vocals.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be4e"
+    },
+    "normalizedName": "bossa nova",
+    "kind": "genre",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-74ed1fd0-8c4c-4c18-a1fb-4f064dd0ae38",
+    "name": "Bossa nova",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705240750"
+      }
+    },
+    "description": "Brazilian music combining a soft samba-derived guitar rhythm with understated vocals and jazz-influenced harmony.",
+    "isoCode": "",
+    "languageIds": [
+      "language-d1e18628-b44c-4d57-933e-641c13d9de8e"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be26"
+    },
+    "normalizedName": "breakbeat",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-6a52fc32-7216-4a8c-80a3-01822e5a14f4",
+    "name": "Breakbeat",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705244836"
+      }
+    },
+    "description": "Electronic dance music organized around syncopated drum breaks, often sampled or programmed into repeating patterns.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be5e"
+    },
+    "normalizedName": "chamber music",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-9efa3088-9b53-40ac-ae9f-ac48f8fc5bed",
+    "name": "Chamber music",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705248856"
+      }
+    },
+    "description": "Classical music for a small ensemble, typically with one performer per part and close interaction among the players.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be2b"
+    },
+    "normalizedName": "chillout",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-205c7fd6-c5c5-4b8f-acf9-afee4018c6ff",
+    "name": "Chillout",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705252595"
+      }
+    },
+    "description": "Relaxed, often electronic music with soft textures and gentle rhythms, suited to low-energy listening and lounge settings.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be63"
+    },
+    "normalizedName": "christian music",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-27442b06-a492-45b1-94ff-37302427ec81",
+    "name": "Christian music",
+    "revision": {
+      "$numberInt": "3"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705256715"
+      }
+    },
+    "description": "Music centered on Christian faith, worship, or devotional themes across styles such as pop, rock, hymns, and gospel.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be41"
+    },
+    "normalizedName": "classic rock",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-e7b0f108-cf98-4295-a5f7-67d53777ed9e",
+    "name": "Classic rock",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705262832"
+      }
+    },
+    "description": "A catalog and radio category for enduring rock recordings, especially from the late 1960s through the 1980s.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be5c"
+    },
+    "normalizedName": "classical",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "1"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-4453219a-e2e5-4504-8aea-4f7977aca491",
+    "name": "Classical",
+    "revision": {
+      "$numberInt": "2"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705268887"
+      }
+    },
+    "description": "Western art music spanning historical and contemporary traditions, including works for soloists, chamber ensembles, orchestras, and voices.",
+    "dialectIds": [],
+    "instrumentIds": [],
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be33"
+    },
+    "normalizedName": "contemporary r&b",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-80294eb2-d2fc-42cc-b22c-5e83b62bc877",
+    "name": "Contemporary R&B",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705275313"
+      }
+    },
+    "description": "A modern vocal-led style blending R&B and soul with pop, hip-hop, and electronic production.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be57"
+    },
+    "normalizedName": "country",
+    "kind": "genre",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-8623e8e6-c8bb-424c-8212-c47cf5ccf52a",
+    "name": "Country",
+    "revision": {
+      "$numberInt": "3"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705281474"
+      }
+    },
+    "description": "American popular music rooted in rural folk traditions, often combining storytelling lyrics with guitar, fiddle, banjo, or steel guitar.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be53"
+    },
+    "normalizedName": "cumbia",
+    "kind": "genre",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-d85526f8-32f6-443e-9ae9-44cec24e3637",
+    "name": "Cumbia",
+    "revision": {
+      "$numberInt": "3"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705287443"
+      }
+    },
+    "description": "A dance music tradition originating in Colombia, recognized by its lilting rhythm and developed into many regional Latin American styles.",
+    "isoCode": "",
+    "languageIds": [
+      "language-65f5f8e5-5b2e-4efb-8246-bbad45d67ab7"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be66"
+    },
+    "normalizedName": "dabke",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-0266925e-0639-4d8f-8c03-cdba915192de",
+    "name": "Dabke",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705291509"
+      }
+    },
+    "description": "Music for a Levantine group dance, with a strong pulse that supports synchronized steps and stomps.",
+    "isoCode": "",
+    "languageIds": [
+      "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be04"
+    },
+    "kind": "genre",
+    "parentId": "",
+    "normalizedName": "dance pop",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-b815bf9f-814f-42c9-ba52-970405b9757c",
+    "name": "Dance pop",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705295567"
+      }
+    },
+    "description": "Pop songwriting with catchy hooks, a steady dance beat, and polished production designed for both radio and the dance floor.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be3c"
+    },
+    "normalizedName": "dancehall",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-3a8b4da1-102e-4b06-9d5b-dca3f6165962",
+    "name": "Dancehall",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705299651"
+      }
+    },
+    "description": "Jamaican popular music built around rhythmic vocal delivery over repeated riddims, often using digital production.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be11"
+    },
+    "kind": "genre",
+    "normalizedName": "deep house",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-d3da7e11-d741-4495-9ca1-be55134720dd",
+    "name": "Deep house",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705303690"
+      }
+    },
+    "description": "House with warm bass, restrained grooves, and rich chords influenced by soul and jazz.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be3b"
+    },
+    "normalizedName": "dembow",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-6b8080d1-15a3-4db2-af89-3242de59ed87",
+    "name": "Dembow",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705307763"
+      }
+    },
+    "description": "A Dominican dance style built around a fast, repeating rhythm, sparse production, and energetic vocal chants.",
+    "isoCode": "",
+    "languageIds": [
+      "language-65f5f8e5-5b2e-4efb-8246-bbad45d67ab7"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be2d"
+    },
+    "normalizedName": "disco",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-a5f328b9-e7b5-44cc-872c-a9412cb6b4a7",
+    "name": "Disco",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705315953"
+      }
+    },
+    "description": "Dance music with a steady four-on-the-floor beat, syncopated bass, and often strings, horns, or lush vocal arrangements.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be16"
+    },
+    "kind": "genre",
+    "normalizedName": "disco house",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-edf35ae5-3dd9-4939-b54b-53511c639ca2",
+    "name": "Disco house",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705319985"
+      }
+    },
+    "description": "House music that uses disco samples or live-sounding disco basslines, strings, and vocals over a steady club beat.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be29"
+    },
+    "normalizedName": "downtempo",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-cffe99b9-bb28-42fc-a4fb-b06b43e858d3",
+    "name": "Downtempo",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705323548"
+      }
+    },
+    "description": "Beat-driven music with a slower pace, often using electronic production, sampling, and atmospheric textures.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be37"
+    },
+    "normalizedName": "drill",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-45433423-00f1-40b7-88d4-e84a7800297f",
+    "name": "Drill",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705327643"
+      }
+    },
+    "description": "A hip-hop style originating in Chicago, typically using dark loops, sparse beats, and forceful rap delivery, with distinct regional variants.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be21"
+    },
+    "normalizedName": "drum and bass",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-9a03128f-1e38-4cdb-b078-b48351dd9133",
+    "name": "Drum and bass",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705331680"
+      }
+    },
+    "description": "Fast electronic dance music built around rapid syncopated breakbeats and heavy basslines.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be3e"
+    },
+    "normalizedName": "dub",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-29a000e3-8601-4aca-8fc9-677d663b0fb3",
+    "name": "Dub",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705335771"
+      }
+    },
+    "description": "A Jamaican production tradition that reshapes recordings by emphasizing bass, drums, echo, reverb, and strategic drops in the mix.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be23"
+    },
+    "normalizedName": "dubstep",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-fc0dc079-e8b1-4e71-aa1d-34154114c8c0",
+    "name": "Dubstep",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705339789"
+      }
+    },
+    "description": "Electronic dance music that originated in the UK, typically using syncopated half-time rhythms and deep sub-bass.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be19"
+    },
+    "normalizedName": "edm",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "1"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-6d30d4a3-b15f-4476-ab99-9ec126b01028",
+    "name": "EDM",
+    "revision": {
+      "$numberInt": "2"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705342863"
+      }
+    },
+    "description": "An umbrella label for electronically produced dance music, often applied to club and festival styles such as house, trance, and dubstep.",
+    "dialectIds": [],
+    "instrumentIds": [],
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be6d"
+    },
+    "kind": "genre",
+    "normalizedName": "egyptian pop",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-43f58d67-2915-4e82-b051-438d3a8bd0a9",
+    "name": "Egyptian pop",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705349668"
+      }
+    },
+    "description": "Popular music from Egypt, typically sung in Egyptian Arabic and blending local vocal and melodic traditions with modern pop production.",
+    "isoCode": "",
+    "languageIds": [
+      "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be14"
+    },
+    "kind": "genre",
+    "normalizedName": "electro house",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-9272f664-1204-4b6e-87d2-609abdfd880a",
+    "name": "Electro house",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705353720"
+      }
+    },
+    "description": "House music with a prominent four-on-the-floor beat, punchy synthesized bass, and bright or distorted electronic leads.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be27"
+    },
+    "normalizedName": "electronica",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-bab920a3-1783-4829-8d5f-1c1832a9869d",
+    "name": "Electronica",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705357776"
+      }
+    },
+    "description": "A broad label for music made primarily with electronic instruments and production, spanning experimental, atmospheric, and beat-driven styles.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be06"
+    },
+    "kind": "genre",
+    "parentId": "",
+    "normalizedName": "electropop",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-1a4c2356-94e0-4a2d-a7ae-b260085526df",
+    "name": "Electropop",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705360854"
+      }
+    },
+    "description": "Pop songs in which synthesizers and electronic production shape the arrangement, with vocals and hooks at the center.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be60"
+    },
+    "normalizedName": "film score",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-a72efd53-0d43-4917-a80f-57de26abcfa8",
+    "name": "Film score",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705364889"
+      }
+    },
+    "description": "Music composed for a film to support its scenes, pacing, characters, and emotional development.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be56"
+    },
+    "normalizedName": "flamenco",
+    "kind": "genre",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-8cc17c15-7cfe-45ac-ac96-a53baf45c422",
+    "name": "Flamenco",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705373043"
+      }
+    },
+    "description": "An Andalusian performance tradition combining expressive singing, guitar, dance, and rhythmic handclaps across distinct forms.",
+    "isoCode": "",
+    "languageIds": [
+      "language-65f5f8e5-5b2e-4efb-8246-bbad45d67ab7"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be59"
+    },
+    "normalizedName": "folk",
+    "kind": "genre",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-f91e7ad9-da80-42e7-9e16-dfc8e1dc28e2",
+    "name": "Folk",
+    "revision": {
+      "$numberInt": "3"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705378207"
+      }
+    },
+    "description": "Music rooted in community traditions, including songs transmitted across generations and contemporary works drawing on those traditions.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be2f"
+    },
+    "normalizedName": "funk",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-c8f3b6a7-637d-4420-bbdf-3963663e21eb",
+    "name": "Funk",
+    "revision": {
+      "$numberInt": "3"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705383381"
+      }
+    },
+    "description": "Groove-centered music built around syncopated bass, tight drums, and interlocking guitar, keyboard, or horn parts.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be62"
+    },
+    "normalizedName": "gospel",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-8dc2673e-1b4b-42cc-b0d4-ba960e532b80",
+    "name": "Gospel",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705390107"
+      }
+    },
+    "description": "Christian vocal music rooted in Black American church traditions, often featuring powerful lead singing, choirs, and call-and-response.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be44"
+    },
+    "normalizedName": "hard rock",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-92fe6b68-4979-4995-9879-3a4a2b523df2",
+    "name": "Hard rock",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705395180"
+      }
+    },
+    "description": "A guitar-driven rock style with loud, distorted riffs, forceful drumming, and prominent vocals.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be20"
+    },
+    "normalizedName": "hardstyle",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-15f13cce-f698-4ecf-b436-4bb61ab83e3e",
+    "name": "Hardstyle",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705399206"
+      }
+    },
+    "description": "Electronic dance music with hard distorted kicks, a fast regular pulse, and often dramatic melodic breaks.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be47"
+    },
+    "normalizedName": "heavy metal",
+    "kind": "genre",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-b0f02592-11d5-4be2-a313-0a897fd32277",
+    "name": "Heavy metal",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705403250"
+      }
+    },
+    "description": "A foundational metal style centered on powerful distorted riffs, driving drums, and often dramatic vocals and guitar solos.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be0e"
+    },
+    "kind": "genre",
+    "normalizedName": "highlife",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-d29f1e33-f91f-4ca8-80b3-b2085bdbcaf2",
+    "name": "Highlife",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705407321"
+      }
+    },
+    "description": "A West African popular music tradition, strongly associated with Ghana, featuring lilting rhythms, interlocking guitars, or dance-band horns.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be34"
+    },
+    "normalizedName": "hip-hop",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-04e02fe6-948f-4aa8-9c5a-a91e8b203d93",
+    "name": "Hip-hop",
+    "revision": {
+      "$numberInt": "3"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705411395"
+      }
+    },
+    "description": "A musical tradition built around rhythmic vocal delivery, beatmaking, sampling, and DJ techniques, with many regional and stylistic forms.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be10"
+    },
+    "kind": "genre",
+    "normalizedName": "house",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-89e5e2e0-9492-4934-a425-5cc113c8485a",
+    "name": "House",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705414413"
+      }
+    },
+    "description": "Electronic dance music originating in Chicago, built around a four-on-the-floor kick, repeating bass patterns, and grooves designed for continuous mixing.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be07"
+    },
+    "kind": "genre",
+    "normalizedName": "indie pop",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-ca0735fa-924e-40b4-a375-49f3ca7993c8",
+    "name": "Indie pop",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705418512"
+      }
+    },
+    "description": "Pop rooted in independent music scenes, often pairing melodic hooks with intimate vocals or understated production.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be43"
+    },
+    "normalizedName": "indie rock",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-d321522c-699e-4d56-81ad-7c8546a4e3a4",
+    "name": "Indie rock",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705423281"
+      }
+    },
+    "description": "Rock rooted in independent music scenes, often using guitar-led arrangements with a wide range of experimental or intimate approaches.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be0a"
+    },
+    "kind": "genre",
+    "normalizedName": "j-pop",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-e601b98c-44d2-46ff-9bab-e7c9ff6f9212",
+    "name": "J-pop",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705426346"
+      }
+    },
+    "description": "Japanese popular music encompassing melodic, hook-driven styles associated with solo artists, bands, idol groups, and media soundtracks.",
+    "isoCode": "",
+    "languageIds": [
+      "language-ff6e2c19-ed16-4024-9f59-cd8163c15cd1"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be4a"
+    },
+    "normalizedName": "jazz",
+    "kind": "genre",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "1"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-b5976bcc-e128-4973-a4dd-f9ad76bc9c15",
+    "name": "Jazz",
+    "revision": {
+      "$numberInt": "2"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705429391"
+      }
+    },
+    "description": "An African American music tradition with a wide range of styles, often emphasizing improvisation, rhythmic interplay, and expressive phrasing.",
+    "dialectIds": [],
+    "instrumentIds": [],
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be22"
+    },
+    "normalizedName": "jungle",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-556395fb-4164-4077-8a4e-90c7b6a8298f",
+    "name": "Jungle",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705433447"
+      }
+    },
+    "description": "A UK dance style built around fast chopped breakbeats, heavy sub-bass, and frequent reggae or sound-system influences.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be09"
+    },
+    "kind": "genre",
+    "normalizedName": "k-pop",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-12aa3c07-966b-4b69-8664-9f80b566ea4b",
+    "name": "K-pop",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705437532"
+      }
+    },
+    "description": "South Korean popular music spanning dance-pop, hip-hop, R&B, and other styles, often associated with idol groups and polished vocal production.",
+    "isoCode": "",
+    "languageIds": [
+      "language-eedbb388-27b2-4a7e-86e8-dc560dd5f089"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be6a"
+    },
+    "kind": "genre",
+    "normalizedName": "khaliji",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-dc7f1b8e-8bdf-4182-bbbb-ede2503535c9",
+    "name": "Khaliji",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705441599"
+      }
+    },
+    "description": "Music of the Arab Gulf, often featuring Gulf Arabic vocals over layered percussion and regional rhythms such as samri.",
+    "isoCode": "",
+    "languageIds": [
+      "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be75"
+    },
+    "kind": "genre",
+    "normalizedName": "latin jazz",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-9d2a2c4b-f321-4fbd-b5f7-958634297846",
+    "name": "Latin jazz",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705444621"
+      }
+    },
+    "description": "Jazz improvisation and harmony combined with rhythms and performance traditions from Latin America and the Caribbean.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be0b"
+    },
+    "kind": "genre",
+    "normalizedName": "latin pop",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-dc1db36c-a1be-44a4-abb8-1628572bcdd2",
+    "name": "Latin pop",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705449796"
+      }
+    },
+    "description": "Popular music rooted in Latin American and Spanish-speaking markets, blending pop songwriting with a wide range of regional rhythms and styles.",
+    "isoCode": "",
+    "languageIds": [
+      "language-65f5f8e5-5b2e-4efb-8246-bbad45d67ab7"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be6e"
+    },
+    "kind": "genre",
+    "normalizedName": "lebanese pop",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-e8af97b7-133f-4ce3-9d80-f444807ece8d",
+    "name": "Lebanese pop",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705457352"
+      }
+    },
+    "description": "Popular music from Lebanon that often pairs Lebanese Arabic vocals and regional melodies with contemporary pop and dance production.",
+    "isoCode": "",
+    "languageIds": [
+      "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be6c"
+    },
+    "kind": "genre",
+    "normalizedName": "levantine folk",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-60e6d2e1-4a18-4987-b2a4-b907717f3f9d",
+    "name": "Levantine folk",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705463449"
+      }
+    },
+    "description": "Traditional music of the Levant, encompassing regional songs, dance tunes, and oral poetry performed in local styles and dialects.",
+    "isoCode": "",
+    "languageIds": [
+      "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be2c"
+    },
+    "normalizedName": "lounge",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-3ee77d12-724b-4171-8d8b-e36fc8d881aa",
+    "name": "Lounge",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705467385"
+      }
+    },
+    "description": "Music suited to relaxed social settings, often using mellow jazz, downtempo beats, or soft instrumental arrangements.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be68"
+    },
+    "kind": "genre",
+    "normalizedName": "mahraganat",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-155c5f90-c332-4d30-85b1-9ee7e2c82ede",
+    "name": "Mahraganat",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705472492"
+      }
+    },
+    "description": "Egyptian electronic street music from Cairo’s wedding scene, built around programmed beats, synthesizers, and heavily processed vocals.",
+    "isoCode": "",
+    "languageIds": [
+      "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be54"
+    },
+    "normalizedName": "mambo",
+    "kind": "genre",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-34b601f4-0cea-4d6a-a5d1-4dba9fd20c0c",
+    "name": "Mambo",
+    "revision": {
+      "$numberInt": "3"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705476513"
+      }
+    },
+    "description": "A Cuban dance music style with syncopated percussion, interlocking ensemble parts, and emphatic brass riffs in big-band arrangements.",
+    "isoCode": "",
+    "languageIds": [
+      "language-65f5f8e5-5b2e-4efb-8246-bbad45d67ab7"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be6b"
+    },
+    "kind": "genre",
+    "normalizedName": "mawwal",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-65c94986-e5fc-4af8-bc10-8c77437598fc",
+    "name": "Mawwal",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705480591"
+      }
+    },
+    "description": "An Arabic vocal form in which a singer elaborates on a vernacular poem, often using improvised ornamentation and flexible rhythm.",
+    "isoCode": "",
+    "languageIds": [
+      "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be18"
+    },
+    "kind": "genre",
+    "normalizedName": "melodic house",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-2b4cc76a-1675-401b-a38a-8c8b1251afcb",
+    "name": "Melodic house",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705487678"
+      }
+    },
+    "description": "House music that foregrounds memorable synth melodies, warm harmonies, and gradual development over a steady dance beat.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be1b"
+    },
+    "normalizedName": "melodic techno",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-ba1f920e-e141-475e-8ab5-4babd9af5be4",
+    "name": "Melodic techno",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705491785"
+      }
+    },
+    "description": "Techno that pairs a steady, driving beat with recurring synthesizer motifs, layered harmonies, and atmospheric builds.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be52"
+    },
+    "normalizedName": "merengue",
+    "kind": "genre",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-e7c8c35b-5dab-4b34-94cb-7cec03abe2b0",
+    "name": "Merengue",
+    "revision": {
+      "$numberInt": "3"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705497176"
+      }
+    },
+    "description": "Dominican dance music with a brisk, even pulse and a characteristic rhythmic interplay between tambora and güira.",
+    "isoCode": "",
+    "languageIds": [
+      "language-65f5f8e5-5b2e-4efb-8246-bbad45d67ab7"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be46"
+    },
+    "normalizedName": "metal",
+    "kind": "genre",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-b0864a7e-823e-428f-983a-f22830b71780",
+    "name": "Metal",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705502226"
+      }
+    },
+    "description": "A family of rock-derived styles centered on heavily distorted riffs, prominent drums, and a range of vocal and rhythmic approaches.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be1c"
+    },
+    "normalizedName": "minimal techno",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-08491861-3d1d-4a98-bcb2-93a216373ec2",
+    "name": "Minimal techno",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705506304"
+      }
+    },
+    "description": "Techno that creates movement through sparse arrangements, repeated patterns, small changes in texture, and precise percussion.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be31"
+    },
+    "normalizedName": "neo-soul",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-ce0c1594-d8db-4228-9e73-9435584123ff",
+    "name": "Neo-soul",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705511460"
+      }
+    },
+    "description": "A contemporary soul style that blends expressive vocals and rich harmonies with influences from R&B, jazz, funk, and hip-hop.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be2e"
+    },
+    "normalizedName": "nu-disco",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-6531e1ac-30af-49db-b8a9-76c219d5ca0e",
+    "name": "Nu-disco",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705517485"
+      }
+    },
+    "description": "A contemporary revival of disco and boogie sounds, combining funky basslines and vintage textures with modern dance production.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be5f"
+    },
+    "normalizedName": "opera",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-6fbb3283-89cd-4c67-b8fc-35387109e88f",
+    "name": "Opera",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705522627"
+      }
+    },
+    "description": "A staged dramatic work told through singing and instrumental music, often combining soloists, chorus, and orchestra.",
+    "isoCode": "",
+    "languageIds": [
+      "language-d41a8f28-c971-4f71-9997-fbe5d968c35b"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be5d"
+    },
+    "normalizedName": "orchestral",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-90f5a9b1-9515-479d-a4f0-ee2746eef0f4",
+    "name": "Orchestral",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705527655"
+      }
+    },
+    "description": "Music arranged for an orchestra, typically using strings, woodwinds, brass, and percussion in varied combinations.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be17"
+    },
+    "kind": "genre",
+    "normalizedName": "organic house",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-624c44f0-f067-4395-8bf3-83d4367f1709",
+    "name": "Organic house",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705531751"
+      }
+    },
+    "description": "House with earthy textures, acoustic instrumentation or samples, layered percussion, and a gentle, steady club groove.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be71"
+    },
+    "kind": "genre",
+    "normalizedName": "persian pop",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-9b20d06a-d016-44a6-940e-40a04b79d714",
+    "name": "Persian pop",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705538152"
+      }
+    },
+    "description": "Popular music sung mainly in Persian, blending local melodic or vocal traditions with contemporary pop arrangements and production.",
+    "isoCode": "",
+    "languageIds": [
+      "language-fd768a95-356b-4fc6-a3e4-6a1b6e7d1092"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be03"
+    },
+    "normalizedName": "pop",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-4e4f82a5-c62c-4d87-9593-296f585cf738",
+    "name": "Pop",
+    "revision": {
+      "$numberInt": "3"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705543242"
+      }
+    },
+    "description": "Popular music centered on memorable melodies, accessible song structures, and recurring hooks, drawing on a wide variety of styles.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be13"
+    },
+    "kind": "genre",
+    "normalizedName": "progressive house",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-610b1170-d3ee-4a06-b0a5-b6b2992b3d8b",
+    "name": "Progressive house",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705547285"
+      }
+    },
+    "description": "House built around gradually evolving arrangements, layered melodies, and extended builds over a steady dance beat.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be1e"
+    },
+    "normalizedName": "progressive trance",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-1e3082e0-3fbb-418c-b5da-adcdc2f076d8",
+    "name": "Progressive trance",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705551342"
+      }
+    },
+    "description": "Trance that develops through gradual changes in texture, melody, and energy over a steady pulse and repeating bassline.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be1f"
+    },
+    "normalizedName": "psytrance",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-573cd403-48c5-4928-86e2-d3309a8ef855",
+    "name": "Psytrance",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705554434"
+      }
+    },
+    "description": "Fast electronic dance music with a rolling bassline, repeated rhythmic patterns, and psychedelic synthetic textures.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be45"
+    },
+    "normalizedName": "punk rock",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-f93278f6-53c3-42c4-8947-22c0df8c131b",
+    "name": "Punk rock",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705559568"
+      }
+    },
+    "description": "Direct, energetic rock typically built around short songs, fast tempos, simple chord progressions, and raw vocal delivery.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be74"
+    },
+    "kind": "genre",
+    "normalizedName": "qawwali",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-7c083e2a-1777-4ac1-8009-d2ec945dd387",
+    "name": "Qawwali",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705563665"
+      }
+    },
+    "description": "South Asian Sufi devotional music featuring lead and chorus singing, rhythmic handclaps, and accompaniment such as harmonium and tabla.",
+    "isoCode": "",
+    "languageIds": [
+      "language-bbca2a5a-59ba-45a9-9996-0fead8dffc18"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be32"
+    },
+    "normalizedName": "r&b",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-4667f5b2-d57f-4712-b6e3-74381633aaf7",
+    "name": "R&B",
+    "revision": {
+      "$numberInt": "3"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705567639"
+      }
+    },
+    "description": "A broad family of African American popular music that developed from blues, jazz, and gospel and includes both classic rhythm and blues and modern vocal-led styles.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be69"
+    },
+    "kind": "genre",
+    "normalizedName": "rai",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-b9069b37-40eb-42fe-b62e-9e72f292f7d9",
+    "name": "Rai",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705572774"
+      }
+    },
+    "description": "Algerian popular music associated with Oran, combining regional song traditions with modern arrangements and candid lyrics about everyday life.",
+    "isoCode": "",
+    "languageIds": [
+      "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be35"
+    },
+    "normalizedName": "rap",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-502b31e2-d9af-4e9e-9d87-9a8f0e61013b",
+    "name": "Rap",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705576810"
+      }
+    },
+    "description": "Music centered on spoken or chanted rhymes delivered rhythmically, usually over a produced beat.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be3d"
+    },
+    "normalizedName": "reggae",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-9a81844e-d6ea-44e7-a179-d9bf414e1f2c",
+    "name": "Reggae",
+    "revision": {
+      "$numberInt": "3"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705580887"
+      }
+    },
+    "description": "Jamaican music known for offbeat accents, prominent basslines, and relaxed but tightly coordinated rhythmic grooves.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be3a"
+    },
+    "normalizedName": "reggaeton",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-dcc63688-dd0f-493a-b063-a96af8716912",
+    "name": "Reggaeton",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705584956"
+      }
+    },
+    "description": "A Caribbean-rooted urban dance style driven by the dembow rhythm and featuring rhythmic singing or rap, often in Spanish.",
+    "isoCode": "",
+    "languageIds": [
+      "language-65f5f8e5-5b2e-4efb-8246-bbad45d67ab7"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be40"
+    },
+    "normalizedName": "rock",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-38eb15c1-d016-4b5b-95d1-a158fc9b9bfc",
+    "name": "Rock",
+    "revision": {
+      "$numberInt": "3"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705589041"
+      }
+    },
+    "description": "A broad tradition of popular music commonly built around electric guitar, bass, drums, and a strong backbeat.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be50"
+    },
+    "normalizedName": "salsa",
+    "kind": "genre",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-48724421-65c9-435d-a6f0-4095f02d7dde",
+    "name": "Salsa",
+    "revision": {
+      "$numberInt": "3"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705593146"
+      }
+    },
+    "description": "Latin dance music drawing heavily on Afro-Cuban traditions, with clave-based rhythms, layered percussion, and often brass and call-and-response vocals.",
+    "isoCode": "",
+    "languageIds": [
+      "language-65f5f8e5-5b2e-4efb-8246-bbad45d67ab7"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be4f"
+    },
+    "normalizedName": "samba",
+    "kind": "genre",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-12423cb7-6257-4847-9f1c-7c11ae519b2e",
+    "name": "Samba",
+    "revision": {
+      "$numberInt": "3"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705597154"
+      }
+    },
+    "description": "A family of Afro-Brazilian music and dance styles characterized by syncopated rhythms and layered percussion.",
+    "isoCode": "",
+    "languageIds": [
+      "language-d1e18628-b44c-4d57-933e-641c13d9de8e"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be67"
+    },
+    "kind": "genre",
+    "normalizedName": "shaabi",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-510f04d6-9f00-4171-b49b-def4592c589b",
+    "name": "Shaabi",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705601226"
+      }
+    },
+    "description": "Egyptian urban popular music associated with working-class Cairo, often featuring colloquial lyrics and rhythms suited to social dancing.",
+    "isoCode": "",
+    "languageIds": [
+      "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be5b"
+    },
+    "kind": "genre",
+    "normalizedName": "singer-songwriter",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-9e2991d5-5d9c-40f1-b3fe-880802e16aac",
+    "name": "Singer-songwriter",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705607098"
+      }
+    },
+    "description": "Music that foregrounds an artist’s own songs, often using intimate vocals and lyrics with acoustic or relatively sparse accompaniment.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be3f"
+    },
+    "normalizedName": "ska",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-0624def1-00ea-4e34-9d30-f12715416cfd",
+    "name": "Ska",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705611239"
+      }
+    },
+    "description": "A Jamaican style with brisk offbeat guitar or piano accents, a moving bassline, and often horns, with later revivals around the world.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be4b"
+    },
+    "normalizedName": "smooth jazz",
+    "kind": "genre",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-b97c3742-deaa-4d7a-bbb0-8736fd1c4502",
+    "name": "Smooth jazz",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705616326"
+      }
+    },
+    "description": "A polished jazz-derived style combining melodic saxophone or guitar with accessible grooves influenced by pop and R&B.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be30"
+    },
+    "normalizedName": "soul",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-0503b562-b8de-4141-bf3c-79595dd254cf",
+    "name": "Soul",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705621344"
+      }
+    },
+    "description": "African American popular music combining gospel-derived vocal expression with the rhythms and arrangements of rhythm and blues.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be15"
+    },
+    "kind": "genre",
+    "normalizedName": "soulful house",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-febc2b71-8820-443e-ae34-be9c20943568",
+    "name": "Soulful house",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705625381"
+      }
+    },
+    "description": "House with warm chords and expressive vocals that draw on soul, gospel, and R&B over a steady dance beat.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be61"
+    },
+    "normalizedName": "soundtrack",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "1"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-607662c2-825f-4c0d-83ee-e7e8a92cc9a3",
+    "name": "Soundtrack",
+    "revision": {
+      "$numberInt": "2"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705629479"
+      }
+    },
+    "description": "Music associated with a film, series, game, or other production, which can include original score, commissioned songs, and existing recordings.",
+    "dialectIds": [],
+    "instrumentIds": [],
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be4c"
+    },
+    "normalizedName": "swing",
+    "kind": "genre",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-d52ea925-583e-41aa-94c1-a1e9ab47e1c0",
+    "name": "Swing",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705633504"
+      }
+    },
+    "description": "A jazz style built for dancing, often associated with big bands, arranged horn sections, and a buoyant rhythmic feel.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be05"
+    },
+    "kind": "genre",
+    "parentId": "",
+    "normalizedName": "synth-pop",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-99440618-1d79-46bd-a9fe-ae57770b6ead",
+    "name": "Synth-pop",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705637604"
+      }
+    },
+    "description": "Pop music built around synthesizers and electronic rhythms, typically using structured songs, melodic hooks, and prominent vocals.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be55"
+    },
+    "normalizedName": "tango",
+    "kind": "genre",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-3a5a63d7-0c56-47a8-ace4-f222bd738d04",
+    "name": "Tango",
+    "revision": {
+      "$numberInt": "3"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705642472"
+      }
+    },
+    "description": "A music and dance tradition from the Río de la Plata, known for expressive phrasing, rhythmic accents, and often the bandoneon.",
+    "isoCode": "",
+    "languageIds": [
+      "language-65f5f8e5-5b2e-4efb-8246-bbad45d67ab7"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be65"
+    },
+    "normalizedName": "tarab",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-983c622a-e350-4211-8a5a-7738b85ea00c",
+    "name": "Tarab",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705646555"
+      }
+    },
+    "description": "An Arabic performance tradition and the musical rapture it evokes through expressive singing, improvisation, and interaction with listeners.",
+    "isoCode": "",
+    "languageIds": [
+      "language-09d22d23-4426-497c-9f3a-6a996436fdbf"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be12"
+    },
+    "kind": "genre",
+    "normalizedName": "tech house",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-659196e6-b273-40e3-8591-06ec35bdc1bd",
+    "name": "Tech house",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705650587"
+      }
+    },
+    "description": "A club style combining the swing and groove of house with the stripped-down percussion and textures of techno.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be1a"
+    },
+    "normalizedName": "techno",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-67a74250-7897-4d79-b7b2-f0a96d258cea",
+    "name": "Techno",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705654658"
+      }
+    },
+    "description": "Electronic dance music rooted in Detroit, driven by repeating machine rhythms, synthesized textures, and gradual variation.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be1d"
+    },
+    "normalizedName": "trance",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-2764b600-a07d-48f1-b125-30535dfb0bb8",
+    "name": "Trance",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705658722"
+      }
+    },
+    "description": "Electronic dance music with a steady pulse, repeating melodic patterns, and extended builds and breakdowns designed to create a sense of lift.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be36"
+    },
+    "normalizedName": "trap",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-878d123b-2ddd-4cc5-b164-548263925682",
+    "name": "Trap",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705662802"
+      }
+    },
+    "description": "A Southern US hip-hop style recognizable by deep 808 bass, rapid hi-hat rolls, and sparse beats, with related electronic dance variants.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be2a"
+    },
+    "normalizedName": "trip-hop",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-05dfa9be-6f85-4c80-80aa-2a7f9e3be807",
+    "name": "Trip-hop",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705666852"
+      }
+    },
+    "description": "Downtempo music associated with Bristol that combines hip-hop-derived beats, samples, and atmospheric production.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be70"
+    },
+    "kind": "genre",
+    "normalizedName": "turkish folk",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-d80255c6-a209-4162-84a3-e0b2b4418e01",
+    "name": "Turkish folk",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705670940"
+      }
+    },
+    "description": "Traditional music from across Türkiye, reflecting regional song and dance forms and often featuring instruments such as the bağlama.",
+    "isoCode": "",
+    "languageIds": [
+      "language-7a6e8153-234e-4af8-be09-201319661595"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be6f"
+    },
+    "kind": "genre",
+    "normalizedName": "turkish pop",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-1561c97c-1e99-4082-8fb3-6fba63efd5cb",
+    "name": "Turkish pop",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705683563"
+      }
+    },
+    "description": "Popular music sung mainly in Turkish, blending contemporary pop production with a range of local melodic, vocal, and rhythmic influences.",
+    "isoCode": "",
+    "languageIds": [
+      "language-7a6e8153-234e-4af8-be09-201319661595"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be25"
+    },
+    "normalizedName": "uk bass",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-c6dafd15-dbad-40c5-a07b-c25fda745bb8",
+    "name": "UK bass",
+    "revision": {
+      "$numberInt": "4"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705687610"
+      }
+    },
+    "description": "An umbrella label for British club music centered on sub-bass and syncopated rhythms, drawing on styles such as garage, dubstep, and jungle.",
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be24"
+    },
+    "normalizedName": "uk garage",
+    "parentId": "",
+    "kind": "genre",
+    "__v": {
+      "$numberInt": "2"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-874ee058-1f99-4571-a1b6-41924c5472a0",
+    "name": "UK garage",
+    "revision": {
+      "$numberInt": "5"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705691682"
+      }
+    },
+    "description": "British dance music with swung or two-step rhythms, prominent basslines, and often chopped or soulful vocals.",
+    "isoCode": "",
+    "languageIds": [
+      "language-4cfaa356-69c0-40b5-82cc-c5357d0c2ae3"
+    ],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    },
+    "dialectIds": [],
+    "instrumentIds": []
+  },
+  {
+    "_id": {
+      "$oid": "6ae56712835cc1396462be77"
+    },
+    "kind": "genre",
+    "normalizedName": "world fusion",
+    "parentId": "",
+    "__v": {
+      "$numberInt": "1"
+    },
+    "archived": false,
+    "createdAt": {
+      "$date": {
+        "$numberLong": "1793419026665"
+      }
+    },
+    "externalId": "genre-8d0bf984-234e-449c-9aba-c1f929547a3e",
+    "name": "World fusion",
+    "revision": {
+      "$numberInt": "2"
+    },
+    "updatedAt": {
+      "$date": {
+        "$numberLong": "1794705694726"
+      }
+    },
+    "description": "Music that blends identifiable elements from multiple regional traditions with one another or with styles such as jazz, pop, or electronic music.",
+    "dialectIds": [],
+    "instrumentIds": [],
+    "isoCode": "",
+    "languageIds": [],
+    "provenance": {
+      "source": "",
+      "note": "",
+      "recordedBy": "6adef82f81d09c9af4802447"
+    }
+  }
+]

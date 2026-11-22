@@ -14,13 +14,13 @@ test('browser and Android administrator logins rotate independently and logout o
  assert.equal(selectSession(user,phone),null);assert.equal(selectSession(user,web),web);
  assert.equal(selectSession(user,undefined,createHash('sha256').update(phone2).digest('hex')),phone2);
  assert.equal(sessionActor(user,phone2).sessionToken,phone2);
- const User={updateOne:async(filter,update)=>{const field=Object.keys(update.$set)[0];if(user[field]===filter[field])user[field]=update.$set[field];}};
+ const User={updateOne:async(filter,update)=>{const hashKey=Object.keys(filter).find(key=>key.endsWith('Hash'));if(user[hashKey]===filter[hashKey])Object.assign(user,update.$set);}}; // sessions are stored as a hash plus an encrypted copy
  await revokeSession(User,user,phone2);assert.equal(selectSession(user,phone2),null);assert.equal(selectSession(user,web),web);
  await revokeSession(User,user,web);assert.equal(selectSession(user,web),null);
 });
 test('stale logout cannot clear a replacement login; blocking rejects every session',async()=>{
  const user={_id:'admin',username:'administrator',sessionToken:'new-web',androidSessionToken:'phone'};
- const User={updateOne:async(filter,update)=>{const field=Object.keys(update.$set)[0];if(user[field]===filter[field])user[field]=update.$set[field];}};
+ const User={updateOne:async(filter,update)=>{const hashKey=Object.keys(filter).find(key=>key.endsWith('Hash'));if(user[hashKey]===filter[hashKey])Object.assign(user,update.$set);}}; // sessions are stored as a hash plus an encrypted copy
  await revokeSession(User,user,'old-web');assert.equal(user.sessionToken,'new-web');
  user.isBlocked=true;assert.equal(selectSession(user,'new-web'),null);assert.equal(selectSession(user,'phone'),null);
 });
@@ -34,7 +34,7 @@ test('each admin sign-in saves its actual login time with the session, for brows
   const user={_id:'admin',username:'administrator',lastLoginAt:previous,save:async function(){saved=this.lastLoginAt;}};
   const before=Date.now();const token=await issueSession(user,request,isAdmin);
   assert.ok(saved instanceof Date);assert.ok(saved.getTime()>=before&&saved.getTime()<=Date.now());
-  assert.equal(user[sessionField(user,request,isAdmin)],token);
+  assert.equal(user[sessionField(user,request,isAdmin)+'Hash'],createHash('sha256').update(token).digest('hex'),'the slot keeps the token hash, not the token');
   selectSession(user,token);sessionActor(user,token);assert.equal(user.lastLoginAt,saved,'session reads do not change the login time');
  }
  const customer={username:'customer',save:async()=>{}};

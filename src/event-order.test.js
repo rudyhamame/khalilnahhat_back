@@ -5,7 +5,7 @@ const path=require('node:path');
 const core=require('./event-order');
 function completed(){
   let order=core.createEventOrder();
-  for(const [key,value] of Object.entries({'customer.fullName':'Example Client','customer.email':'example@example.invalid','customer.phone':'4165550123','customer.contactMethod':'email','customer.phoneContact':'sms','event.type':'wedding','event.date':'2099-06-20','event.startTime':'18:00','event.endTime':'01:00','event.guestCount':150,'event.venue.name':'Example venue','event.venue.address':'1 Example Street','event.venue.city':'Toronto','event.venue.postalCode':'M1A 1A1','event.venue.setting':'indoor',services:['dj']}))order=core.updateOrderField(order,key,value);
+  for(const [key,value] of Object.entries({'customer.fullName':'Example Client','customer.email':'example@example.invalid','customer.phone':'4165550123','customer.contactMethod':'email','customer.phoneContact':'sms','event.type':'wedding','event.date':'2099-06-20','event.startTime':'18:00','event.endTime':'01:00','event.guestCount':150,'event.venue.name':'Example venue','event.venue.address':'1 Example Street','event.venue.city':'Toronto','event.venue.postalCode':'M1A 1A1','event.venue.country':'Canada','event.venue.setting':'indoor',services:['dj']}))order=core.updateOrderField(order,key,value);
   return core.applyAccountProfile(order,{firstName:'Example',lastName:'Client',email:'example@example.invalid',phoneNumber:'4165550123',phoneContact:'sms'});
 }
 test('new order has unknown answers, explicit Toronto time and separate post-booking planning',()=>{

@@ -256,6 +256,7 @@
      "label": "Country",
      "ar": "الدولة",
      "maxLength": 80,
+     "required": true,
      "private": true,
      "short": "Country",
      "shortAr": "الدولة"

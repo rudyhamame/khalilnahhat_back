@@ -1,5 +1,5 @@
 // Loads the existing catalog (Equipment, services, ServicePrice) as engine offerings and manages admin-defined pricing policies.
-// Existing prices are exposed as "legacy" policies (priority -1) so nothing needs migrating and no rate is invented: price 0 = no policy.
+// Prices come only from the policies set in the Pricing tab; nothing is derived from older equipment or service prices.
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { z } = require('zod');
@@ -8,10 +8,10 @@ const { calculateBookingPrice, eventHours, suggestUnitPrices, reservationDemand,
 
 const policySchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true }, offeringId: { type: String, required: true, index: true },
-  name: { type: String, required: true, trim: true }, pricingMode: { type: String, enum: MODES, required: true },
+  name: { type: String, required: true, trim: true }, pricingMode: { type: String, enum: MODES, required: true }, modeId: { type: String, default: '' }, // modeId: the Mode card entry chosen; pricingMode is that mode's calculation type
   currency: { type: String, default: 'CAD' }, baseAmountCents: { type: Number, default: 0 }, minimumDuration: Number,
   includedQuantity: Number, additionalUnitRateCents: Number, tiers: { type: [new mongoose.Schema({ from: Number, to: Number, rateCents: Number }, { _id: false })], default: [] },
-  pricingUnits: { type: [new mongoose.Schema({ type: String, amountCents: Number }, { _id: false })], default: [] },
+  pricingUnits: { type: [new mongoose.Schema({ type: String, amountCents: Number, factors: { type: [mongoose.Schema.Types.Mixed], default: [] } }, { _id: false })], default: [] }, // fee lines; each may hold pricing factors with priced steps
   effectiveFrom: String, effectiveUntil: String, priority: { type: Number, default: 0 }, status: { type: String, enum: ['active', 'draft'], default: 'draft' },
   conditions: { type: [new mongoose.Schema({ field: String, operator: String, value: mongoose.Schema.Types.Mixed, adjustmentType: String, adjustmentValue: Number, priority: Number }, { _id: false })], default: [] },
   version: { type: Number, default: 1 },
@@ -20,33 +20,29 @@ const PricingPolicy = mongoose.models.PricingPolicy || mongoose.model('PricingPo
 
 const cents = z.number().int().min(0).max(100000000);
 const policyInput = z.object({
-  offeringId: z.string().trim().min(1).max(160), name: z.string().trim().min(1).max(160), pricingMode: z.enum(MODES), currency: z.enum(['CAD', 'USD']).default('CAD'),
+  offeringId: z.string().trim().min(1).max(160), name: z.string().trim().min(1).max(160), pricingMode: z.enum(MODES), modeId: z.string().trim().max(64).optional(), currency: z.enum(['CAD', 'USD']).default('CAD'),
   baseAmountCents: cents.default(0), minimumDuration: z.number().min(0).max(240).optional(), includedQuantity: z.number().int().min(1).optional(), additionalUnitRateCents: cents.optional(),
   tiers: z.array(z.object({ from: z.number().int().min(1), to: z.number().int().nullable().optional(), rateCents: cents })).max(20).default([]),
-  pricingUnits: z.array(z.object({ type: z.enum(['Rental fee', 'Installation fee', 'Delivery fee', 'Loading fee', 'Performance fee']), amountCents: cents })).max(5).default([]),
+  pricingUnits: z.array(z.object({ type: z.string().trim().min(1).max(80), amountCents: cents, factors: z.array(z.object({ factorId: z.string().trim().min(1).max(64), steps: z.array(z.object({ label: z.string().trim().min(1, 'Name every step.').max(80), amountCents: cents })).max(30).default([]) })).max(20).default([]) })).max(20).default([]),
   effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal('')), effectiveUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal('')),
   priority: z.number().int().min(0).max(1000).default(0), status: z.enum(['active', 'draft']).default('draft'),
   conditions: z.array(z.object({ field: z.string().trim().min(1).max(60), operator: z.enum(OPERATORS), value: z.any(), adjustmentType: z.enum(ADJUSTMENTS), adjustmentValue: z.number().finite(), priority: z.number().int().default(0) })).max(30).default([]),
 }).strict();
 
 async function loadContext() {
-  const { Equipment } = require('./equipment'), { ServicePrice } = require('./models'), setup = require('./setup-catalog');
-  const [equipment, services, prices, explicit] = await Promise.all([Equipment.find().lean(), setup.list(true), ServicePrice.find().lean(), PricingPolicy.find().lean()]);
-  const priceBy = new Map(prices.map((p) => [p.serviceId, p.amountCents]));
-  const offerings = [], legacy = [];
-  const legacyPolicy = (offeringId, name, mode, amount) => amount > 0 && legacy.push({ id: `legacy:${offeringId}`, offeringId, name: `${name} (existing price)`, pricingMode: mode, baseAmountCents: amount, status: 'active', priority: -1, version: 1, legacy: true });
+  const { Equipment } = require('./equipment'), setup = require('./setup-catalog');
+  const [equipment, services, explicit] = await Promise.all([Equipment.find().lean(), setup.list(true), PricingPolicy.find().lean()]);
+  const offerings = [];
   for (const s of services.filter((row) => row.kind === 'service')) {
     const id = `svc-${s.id}`;
     offerings.push({ id, name: s.name, type: 'service', category: s.category || 'service', isActive: s.isActive !== false, stock: 1, components: [] }); // one performer per service: staff capacity 1
-    legacyPolicy(id, s.name, 'fixed', priceBy.get(s.priceId) || 0);
   }
   for (const e of equipment) {
     const pkg = Boolean(e.isSet || (e.setItems || []).length);
     offerings.push({ id: e.slug, name: e.name, type: pkg ? 'package' : 'equipment', category: e.category, brandModel: e.brandModel || '', isActive: e.isActive !== false, minQuantity: e.minQuantity || 1,
       stock: e.stockTracked ? e.quantityOwned : null, components: (e.setItems || []).map((m) => ({ offeringId: m.equipmentId, quantity: m.quantity, inclusion: 'included' })) });
-    legacyPolicy(e.slug, e.name, pkg ? 'fixed' : 'per_unit', e.priceCents || priceBy.get(e.slug) || 0);
   }
-  return { offerings, policies: [...explicit.map(({ _id, __v, ...p }) => p), ...legacy], explicit: explicit.map(({ _id, __v, ...p }) => p), today: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' }) };
+  return { offerings, policies: explicit.map(({ _id, __v, ...p }) => p), explicit: explicit.map(({ _id, __v, ...p }) => p), today: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' }) };
 }
 
 const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -98,11 +94,30 @@ async function availabilityFor(result, event, ctx, excludeRequestId, buffers) {
 function registerPricingRoutes(app, requireAdmin) {
   const wrap = (fn) => async (req, res) => { try { await fn(req, res); } catch (e) { res.status(e instanceof z.ZodError ? 400 : 500).json({ message: e instanceof z.ZodError ? e.issues[0].message : 'Pricing request failed.' }); } };
   app.get('/api/admin/pricing', requireAdmin, wrap(async (_req, res) => { const c = await loadContext(); res.set('Cache-Control', 'no-store').json({ offerings: c.offerings, policies: c.policies, modes: MODES, issues: review(c) }); }));
-  const save = (id) => async (req, res) => {
+  const save = (requestedId) => async (req, res) => {
     const data = policyInput.parse(req.body), c = await loadContext();
-    if (!c.offerings.some((o) => o.id === data.offeringId)) return res.status(400).json({ message: 'Choose an existing offering.' });
+    if (!c.offerings.some((o) => o.id === data.offeringId)) return res.status(400).json({ message: 'Choose an existing priced data atom.' });
+    // The pricing mode is a label chosen from the Mode card; the price itself is the flat Amount.
+    if (data.modeId && !await require('./pricing-lists').modeById(data.modeId)) return res.status(400).json({ message: 'Choose a pricing mode from the Mode card in Pricing settings.' });
+    // One price per priced data atom: saving an atom that already has one updates it.
+    const owner = c.explicit.find((p) => p.offeringId === data.offeringId);
+    if (requestedId && owner && owner.id !== requestedId) return res.status(409).json({ message: 'This priced data atom already has a price.' });
+    const id = requestedId || owner?.id || null;
     const current = id && c.explicit.find((p) => p.id === id);
     if (id && !current) return res.status(404).json({ message: 'Policy not found.' });
+    // Fee lines must be Fee categories from the Pricing settings (a line this policy already has stays valid even if its category was later removed).
+    const categories = new Set(await require('./pricing-lists').feeCategoryNames()), kept = new Set((current?.pricingUnits || []).map((unit) => unit.type));
+    const unknown = data.pricingUnits.find((unit) => !categories.has(unit.type) && !kept.has(unit.type));
+    if (unknown) return res.status(400).json({ message: `"${unknown.type}" is not a fee category. Add it in Pricing settings first.` });
+    const { allowed } = await require('./pricing-lists').feeFactorRules();
+    for (const unit of data.pricingUnits) {
+      const ok = allowed.get(unit.type), seen = new Set();
+      for (const factor of unit.factors) {
+        if (seen.has(factor.factorId)) return res.status(400).json({ message: `${unit.type}: a pricing factor can only be added once.` });
+        seen.add(factor.factorId);
+        if (ok && !ok.has(factor.factorId)) return res.status(400).json({ message: `${unit.type}: choose a pricing factor that affects this fee (see Pricing settings).` });
+      }
+    }
     const policy = { ...data, id: id || crypto.randomUUID(), version: current ? current.version + 1 : 1 };
     const errors = validatePolicy(policy, c.explicit);
     if (errors.length) return res.status(400).json({ message: errors[0], errors });

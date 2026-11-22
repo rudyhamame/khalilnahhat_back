@@ -36,6 +36,15 @@ async function list(admin=false){
  const rows=await Entry.find({key:{$not:/^_meta:/}}).lean();
  return rows.map(row=>row.value).filter(row=>row&&!row.deleted&&(admin||row.isActive)).sort((a,b)=>a.sortOrder-b.sortOrder||a.name.localeCompare(b.name));
 }
+// Services that were deleted keep only an id marker (plus the place they had); built-in ones can be restored from the contract defaults.
+async function removedServices() {
+  await migrateDefaults();
+  const rows = await Entry.find({ key: /^service:/ }).lean();
+  return rows.map((row) => row.value).filter((value) => value && value.deleted).map((value) => {
+    const base = defaults.find((row) => row.kind === 'service' && row.id === value.id);
+    return { id: value.id, name: base?.name || '', restorable: Boolean(base), sortOrder: value.sortOrder };
+  });
+}
 function registerSetupCatalog(app,{requireAdmin}){
  const wrap=fn=>async(req,res)=>{try{await fn(req,res);}catch(error){const status=error instanceof z.ZodError?400:error.code===11000?409:500;res.status(status).json({message:error instanceof z.ZodError?error.issues[0].message:status===409?'This item ID already exists.':'Could not save or load the setup catalog.'});if(status===500)console.error('Setup catalog failed',error.name,error.code||'');}};
  app.get('/api/setup-catalog',wrap(async(_req,res)=>res.set('Cache-Control','no-store').json({items:await list()})));
@@ -45,7 +54,7 @@ function registerSetupCatalog(app,{requireAdmin}){
   const key=value.kind+':'+value.id,current=(await list(true)).find(row=>row.kind===value.kind&&row.id===value.id);
   if(creating&&current)return res.status(409).json({message:'This item ID already exists.'});
   if(!creating&&!current)return res.status(404).json({message:'Catalog item not found.'});
-  if(value.kind==='service'&&!value.category)return res.status(400).json({message:'Choose an equipment category for this service.'});
+  if(value.kind==='service'&&!value.category)value.category=value.id; // equipment now points at the service id; category is only a legacy label
   if(value.equipmentIds.length&&await Equipment.countDocuments({slug:{$in:[...new Set(value.equipmentIds)]}})!==new Set(value.equipmentIds).size)return res.status(400).json({message:'Choose existing equipment items.'});
   const item={...value,equipmentIds:[...new Set(value.equipmentIds)],priceId:value.kind==='service'?'service-'+value.id:''};
   if(value.kind==='service')await ServicePrice.updateOne({serviceId:item.priceId},{$set:{name:item.name,category:'Service'},$setOnInsert:{amountCents:0,currency:'CAD',isActive:true}},{upsert:true});
@@ -54,6 +63,21 @@ function registerSetupCatalog(app,{requireAdmin}){
  };
  app.post('/api/admin/setup-catalog',requireAdmin,wrap((req,res)=>save(req,res,true)));
  app.put('/api/admin/setup-catalog/:kind/:id',requireAdmin,wrap((req,res)=>save(req,res,false)));
+ // Deleted services keep only a marker. Built-in ones (the contract defaults) can be restored with their original content; the rest must be re-added by hand.
+ app.get('/api/admin/setup-catalog/deleted',requireAdmin,wrap(async(_req,res)=>{
+  const items=await removedServices();
+  const equipment=(await require('./equipment').EquipmentTombstone.find().sort({slug:1}).lean()).map(row=>({id:row.slug,serviceId:row.serviceId||''}));
+  res.set('Cache-Control','no-store').json({items,equipment});
+ }));
+ app.post('/api/admin/setup-catalog/service/:id/restore',requireAdmin,wrap(async(req,res)=>{
+  const id=slug.safeParse(req.params.id);if(!id.success)return res.status(400).json({message:'Invalid service ID.'});
+  const marker=await Entry.findOne({key:`service:${id.data}`}).lean();
+  if(!marker?.value?.deleted)return res.status(404).json({message:'This service is not deleted.'});
+  const base=defaults.find(row=>row.kind==='service'&&row.id===id.data);
+  if(!base)return res.status(400).json({message:'No saved content for this service. Add it again by hand.'});
+  const body=Object.fromEntries(['id','kind',...Object.keys(fields)].filter(key=>key in base).map(key=>[key,base[key]]));
+  await save({body},res,true);
+ }));
  app.delete('/api/admin/setup-catalog/:kind/:id',requireAdmin,wrap(async(req,res)=>{
   if(req.params.kind!=='service')return res.status(400).json({message:'Only services can be deleted from this action.'});
   const id=slug.safeParse(req.params.id);if(!id.success)return res.status(400).json({message:'Invalid service ID.'});
@@ -61,9 +85,9 @@ function registerSetupCatalog(app,{requireAdmin}){
   if(!current)return res.status(404).json({message:'Service not found.'});
   const cleanup=await permanentDeletion.prepare(current);
   // Keep only a seed-suppression marker; no deleted content or media survives.
-  await Entry.updateOne({key},{$set:{value:{id:id.data,kind:'service',deleted:true}}},{upsert:true});
+  await Entry.updateOne({key},{$set:{value:{id:id.data,kind:'service',deleted:true,sortOrder:current.sortOrder}}},{upsert:true});
   await permanentDeletion.finish(cleanup);
   res.json({removed:true,id:id.data});
  }));
 }
-module.exports={registerSetupCatalog,list,fields};
+module.exports={registerSetupCatalog,list,fields,removedServices};

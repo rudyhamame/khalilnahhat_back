@@ -7,13 +7,14 @@ const {z}=require('zod');
 const {randomUUID}=require('crypto');
 const M=require('./models');
 const V=require('./validation');
+const {withoutGenreLanguages}=require('./genre-data');
 const {ArchiveItem}=require('../models');
 const MusicRecording=require('./recording-model');
 const {MediaItem}=require('../content');
 const contract=require('../../contracts/music-ontology.json');
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 const makeId=kind=>`${kind}-${randomUUID()}`;
-const plain=row=>row?.toObject?row.toObject({flattenMaps:true}):row;
+const plain=row=>withoutGenreLanguages(row?.toObject?row.toObject({flattenMaps:true}):row);
 const norm=name=>name.normalize('NFKC').trim().toLocaleLowerCase().replace(/\s+/g,' ');
 function inferredRecordingMetadata(contents){
  const bpms=[...new Set(contents.map(w=>w.melody?.bpm).filter(v=>v!=null))],keys=[...new Set(contents.flatMap(w=>w.melody?.keys??(w.melody?.key?[w.melody.key]:[])))];
@@ -103,7 +104,7 @@ function createService({ArchiveModel=MusicRecording,models=M,deliveryUrl=value=>
   return true;
  }
  async function saveVocabulary(input,id,actor){
-  const value=V.vocabulary.parse(input);
+  const value=withoutGenreLanguages(V.vocabulary.parse(input));
   return transaction(async session=>{
    if(value.parentId){if(!['dialect','genre'].includes(value.kind))fail('Only dialects and genres have parents.');await references([value.parentId],value.kind==='dialect'?'language':'genre',session);if(value.parentId===id)fail('An entity cannot be its own parent.');
     let next=value.parentId;const seen=new Set([id]);while(next){if(seen.has(next))fail('Vocabulary hierarchy cannot contain cycles.');seen.add(next);next=(await Vocabulary.findOne({externalId:next}).session(session).lean())?.parentId;}}
@@ -125,7 +126,7 @@ function createService({ArchiveModel=MusicRecording,models=M,deliveryUrl=value=>
 
    if(value.instrumentIds?.length){if(value.kind!=='musician')fail('Only musicians have instruments.');if(await Vocabulary.countDocuments({externalId:{$in:value.instrumentIds},kind:'instrument',archived:{$ne:true}}).session(session)!==new Set(value.instrumentIds).size)fail('Choose existing instruments for this musician.');}
    if(value.instrumentId){if(value.kind!=='musician')fail('Only musicians have an instrument dependency.');const instrument=await Vocabulary.findOne({externalId:value.instrumentId,kind:'instrument',archived:{$ne:true}}).session(session);if(!instrument)fail('Choose an existing instrument for this musician.');}
-   const data={...value,...(value.kind==='musician'?{instrumentIds:value.instrumentIds!==undefined?[...new Set(value.instrumentIds)]:old?.instrumentIds||[],instrumentId:value.instrumentIds!==undefined?(value.instrumentIds[0]||null):value.instrumentId!==undefined?value.instrumentId:old?.instrumentId}:{}),languageIds:value.languageIds??old?.languageIds??[],dialectIds,externalId:id||makeId(value.kind),normalizedName:norm(value.name),provenance:provenance(value.provenance,actor),revision:(old?.revision||0)+1};
+   const data={...value,...(value.kind==='musician'?{instrumentIds:value.instrumentIds!==undefined?[...new Set(value.instrumentIds)]:old?.instrumentIds||[],instrumentId:value.instrumentIds!==undefined?(value.instrumentIds[0]||null):value.instrumentId!==undefined?value.instrumentId:old?.instrumentId}:{}),...(value.kind==='genre'?{}:{languageIds:value.languageIds??old?.languageIds??[]}),dialectIds,externalId:id||makeId(value.kind),normalizedName:norm(value.name),provenance:provenance(value.provenance,actor),revision:(old?.revision||0)+1};
    if(old){old.set(data);await old.save({session});return plain(old);}
    return plain((await Vocabulary.create([data],{session}))[0]);
   });
@@ -218,7 +219,7 @@ function createService({ArchiveModel=MusicRecording,models=M,deliveryUrl=value=>
   const works=await Work.find({externalId:{$in:ids}}).lean();
   const [melodies,lyrics,vocabulary,workTypes]=await Promise.all([Melody.find({externalId:{$in:works.map(w=>w.melodyId)}}).lean(),Lyrics.find({externalId:{$in:works.map(w=>w.lyricsId).filter(Boolean)}}).lean(),Vocabulary.find({}).lean(),listWorkTypes()]);
   const workTypeMap=new Map(workTypes.map(type=>[type.id,type]));
-  const vs=new Map(vocabulary.map(v=>[v.externalId,{...v,id:v.externalId,_id:undefined}]));
+  const vs=new Map(vocabulary.map(v=>[v.externalId,{...withoutGenreLanguages(v),id:v.externalId,_id:undefined}]));
   const entity=(kind,id)=>vs.get(id)?.kind===kind?vs.get(id):null;
   const mm=new Map(melodies.map(m=>[m.externalId,m])),lm=new Map(lyrics.map(l=>[l.externalId,l]));
   const mapped=works.map(w=>{

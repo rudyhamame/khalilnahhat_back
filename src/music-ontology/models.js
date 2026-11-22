@@ -1,9 +1,10 @@
 const mongoose=require('mongoose');
 const contract=require('../../contracts/music-ontology.json');
 const {Schema}=mongoose;
-const model=(name,fields,indexes=[])=>{
+const model=(name,fields,indexes=[],configure)=>{
  const schema=new Schema({externalId:{type:String,required:true,unique:true},revision:{type:Number,default:1},...fields},{timestamps:true,strict:'throw'});
  indexes.forEach(index=>schema.index(...index));
+ configure?.(schema);
  return mongoose.models[name]||mongoose.model(name,schema);
 };
 const credit={_id:false,artistId:{type:String,required:true},role:{type:String,enum:contract.creditRoles,required:true},detail:String};
@@ -13,7 +14,7 @@ const Melody=model('MusicMelody',{bpm:Number,key:String,rhythmId:String,genreIds
 const Lyrics=model('MusicLyrics',{languageId:String,languageIds:[String],dialectId:String,regionIds:[String],artistCredits:[credit],releaseYear:Number,script:String,translationRefs:[String],states:{type:Map,of:state},provenance});
 const Work=model('MusicalWork',{title:{type:String,required:true},type:{type:String,enum:contract.workTypes,required:true},lyricsId:String,melodyId:{type:String,required:true},credits:[credit],description:String,workKind:{type:String,default:'ORIGINAL'},provenance},[[{type:1,title:1},{}]]);
 const beatMapSchema=new Schema({meter:String,subdivision:Number,steps:[String],source:String},{_id:false,strict:'throw'});
-const Vocabulary=model('MusicVocabulary',{beatMap:{type:beatMapSchema,default:undefined},archived:{type:Boolean,default:false},languageIds:{type:[String],default:[]},dialectIds:{type:[String],default:[]},instrumentIds:{type:[String],default:[]},kind:{type:String,enum:contract.vocabularyKinds,required:true},instrumentId:String,name:{type:String,required:true},normalizedName:{type:String,required:true},parentId:{type:String,default:''},isoCode:String,description:String,provenance},[[{kind:1,normalizedName:1,parentId:1},{unique:true}],[{kind:1,isoCode:1},{unique:true,partialFilterExpression:{isoCode:{$gt:''}}}]]);
+const Vocabulary=model('MusicVocabulary',{beatMap:{type:beatMapSchema,default:undefined},archived:{type:Boolean,default:false},languageIds:{type:[String],default:function(){return this.kind==='genre'?undefined:[];}},dialectIds:{type:[String],default:[]},instrumentIds:{type:[String],default:[]},kind:{type:String,enum:contract.vocabularyKinds,required:true},instrumentId:String,name:{type:String,required:true},normalizedName:{type:String,required:true},parentId:{type:String,default:''},isoCode:String,description:String,provenance},[[{kind:1,normalizedName:1,parentId:1},{unique:true}],[{kind:1,isoCode:1},{unique:true,partialFilterExpression:{isoCode:{$gt:''}}}]],schema=>{schema.pre('validate',function(){if(this.kind==='genre')this.languageIds=undefined;});});
 const DjWorkType=model('DjWorkType',{languageIds:{type:[String],default:[]},artworkUrl:{type:String,default:''},name:{type:String,required:true},nameArabic:{type:String,default:''},normalizedName:{type:String,required:true},details:{type:String,default:''},detailsArabic:{type:String,default:''},sortOrder:{type:Number,default:0}},[[{normalizedName:1},{unique:true}]]);
 const DjWorkTypeSeed=model('DjWorkTypeSeed',{});
 const AudioAsset=model('MusicAudioAsset',{url:{type:String,required:true,unique:true},mime:String,durationSeconds:Number,originalName:String,provenance});

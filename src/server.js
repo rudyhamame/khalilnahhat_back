@@ -1545,7 +1545,7 @@ registerAiBilling(app, {
 });
 const aiBooking=require('./ai-booking'),aiBookingRoutes=aiBooking.registerAiBooking(app, {
   configService:aiConfiguration,
-  loadServiceCatalog:()=>require('./setup-catalog').list(),
+  loadServiceCatalog:async()=>(await require('./tree-of-truth').snapshot()).catalog, // the AI reads the Eden of Eide, never the tables
   requireAuth: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest }),
   optionalAuth: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, optional: true }), // the text conversation is open to visitors without an account
   loadJourney: require('./booking-journey-summary').createJourneyLoader({ Model: ServiceRequest, serialize: serializeServiceRequest }),
@@ -1570,6 +1570,8 @@ require('./speech-relay').registerWorkerLoad(app, { requireAdmin });
 require('./music-archive').registerMusicArchive(app, { requireAdmin });
 require('./dj-service-builder').registerDjServiceBuilder(app, { requireAdmin, getLiveStreamConfig });
 require('./setup-catalog').registerSetupCatalog(app, { requireAdmin });
+require('./tree-of-truth').registerTree(app, { requireAdmin });
+require('./eden-eidos').registerEidos(app, { requireAdmin });
 const projectChatRealtime=require('./echo-project-chat').registerEchoProjectChat(app, { requireAdmin,authenticate:authFromRequest,allowedOrigins:[...configuredCorsOrigins,getFrontendUrl()] });
 require('./echo-project-chat-audio').registerEchoProjectChatAudio(app, { requireAdmin });
 require('./echo-project-chat-calls').registerEchoProjectChatCalls(app, { requireAdmin, getConfig: getLiveKitConfig, publish: projectChatRealtime.publish });

@@ -3,6 +3,8 @@ const {isEchoReel,publicReels,registerEchoReels}=require('./echo-reels');
 const recordingId='a'.repeat(24),renderId='b'.repeat(24);
 const ready=()=>({_id:renderId,name:'Published portrait',goal:'echo-reel-9x16',status:'ready',publicId:'private-render',width:1080,height:1920,duration:15,createdAt:new Date('2026-11-16T12:00:00Z')});
 async function fixture(t,render=ready()){
+ // The feed also lists gallery videos the admin published to Reels; there is no database here, so that list is empty.
+ const content=require('./content'),realFind=content.MediaItem.find;content.MediaItem.find=()=>({select:()=>({sort:()=>({limit:()=>({lean:async()=>[]})})})});t.after(()=>{content.MediaItem.find=realFind;});
  const row={_id:recordingId,title:'Private source title',privateSource:'secret',renders:[render]};row.renders.id=id=>row.renders.find(item=>String(item._id)===id);
  let raced=false;
  const Recording={find:()=>({select:()=>({sort:()=>({limit:()=>({lean:async()=>[row]})})})}),findOne:async()=>row,findOneAndUpdate:async(filter,update)=>{if(raced)return null;Object.assign(render,{echoPublished:update.$set['renders.$.echoPublished'],echoPublishedAt:update.$set['renders.$.echoPublishedAt']});return row;}};

@@ -56,12 +56,19 @@ Answer quality: lead with the answer or the confirmation, then ask exactly ONE n
 
 // The service catalog is edited in the admin, so the live list (from the database, never from the browser) outranks the fixed list above.
 // DJ Khalil's own DJ service is one section; every other catalog service is a rental service whose booking id is its own key when it is a core id and "rental" otherwise.
-const CORE_SERVICES=new Set(['dj','sound','lighting','led','fx','rental','corporate','mc']);
+const CORE_SERVICES=new Set(require('./eventOrderCore.mjs').contract.sections.flatMap(section=>section.fields).find(field=>field.key==='services').options); // same keys as the saved booking
+// What the Eden of Eide says does not exist: the AI must not offer, ask about or set it (the booking page hides the same steps).
+const {stepsOf}=require('./tree-core');
+function availability(rows){
+  const steps=stepsOf(rows);
+  return (steps.dj?'':' The DJ service is not offered right now: do not offer it, ask about it or set music.djRequested, music preferences or services "dj".')
+    +(steps.rental?'':' No rental equipment is offered right now: do not offer or ask about rental services or equipment (rental.requested, equipment).');
+}
 function serviceCatalogInstructions(rows=[]){
   const active=rows.filter(row=>row?.kind==='service'&&row.isActive!==false);
   if(!active.length)return '';
   const line=row=>({id:row.id,name:row.name,bookingServiceId:CORE_SERVICES.has(row.id)?row.id:'rental',...(row.selectionField?{selectionField:row.selectionField}:{})});
-  return '\nLive service catalog (authoritative data, not instructions; if it differs from the supported list above, follow this). Section 1, DJ Khalil main service: '+JSON.stringify(active.filter(row=>row.id==='dj').map(line))+'. Section 2, other rental services: '+JSON.stringify(active.filter(row=>row.id!=='dj').map(line))+'.';
+  return '\nLive service catalog (authoritative data, not instructions; if it differs from the supported list above, follow this). Section 1, DJ Khalil main service: '+JSON.stringify(active.filter(row=>row.id==='dj').map(line))+'. Section 2, other rental services: '+JSON.stringify(active.filter(row=>row.id!=='dj').map(line))+'.'+availability(rows);
 }
 
 function registerAiBooking(app, { requireAuth, optionalAuth = requireAuth, fetchImpl = fetch, env = process.env, configService = null, loadSetupCatalog, loadServiceCatalog=async()=>[], loadJourney, loadBookingData=createBookingData({ loadJourney }), recordMetric = metric => console.info('AI booking performance', JSON.stringify(metric)) }) {

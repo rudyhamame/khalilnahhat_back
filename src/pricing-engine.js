@@ -185,7 +185,7 @@ function validatePolicy(p, existing = []) {
   if (!MODES.includes(p.pricingMode)) errors.push('Unknown pricing mode.');
   const unitTypes = (p.pricingUnits || []).map((unit) => unit.type);
   if (new Set(unitTypes).size !== unitTypes.length) errors.push('A pricing unit can only be added once.');
-  if ((p.pricingUnits || []).some((unit) => !['Rental fee', 'Installation fee', 'Delivery fee', 'Loading fee', 'Performance fee'].includes(unit.type) || !isCents(unit.amountCents))) errors.push('A pricing unit is invalid.');
+  if ((p.pricingUnits || []).some((unit) => !unit.type || !isCents(unit.amountCents))) errors.push('A pricing unit is invalid.');
   if (['fixed', 'hourly', 'daily', 'per_unit', 'per_unit_per_day'].includes(p.pricingMode) && !isCents(p.baseAmountCents)) errors.push('Enter a valid amount.');
   if (p.pricingMode === 'tiered') {
     const t = [...(p.tiers || [])].sort((a, b) => a.from - b.from);

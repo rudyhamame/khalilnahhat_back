@@ -2,7 +2,7 @@
 const mongoose=require('mongoose');
 const {Eidos,ensureBooking}=require('../src/eden-eidos');
 async function purgeRemovedEidos({apply=false}={}){
- await ensureBooking();
+ if(apply)await ensureBooking();
  const collection=mongoose.connection.db.collection(Eidos.collection.name);
  const pending=await collection.countDocuments({hiddenFromMap:true});
  if(!apply)return {mode:'dry-run',previouslyRemoved:pending};

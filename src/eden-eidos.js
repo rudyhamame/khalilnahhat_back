@@ -15,6 +15,7 @@ async function ensureBooking(){
  // Initialize once per database, so deleting the initial seed never recreates it.
  const key='identity-registry-initialized';
  if(await Initialization.exists({_id:key}))return;
+ await Promise.all([Eidos,Initialization].map(Model=>Model.createCollection().catch(error=>{if(error.code!==48)throw error;})));
  const session=await mongoose.startSession();
  try{await session.withTransaction(async()=>{
   if(await Initialization.exists({_id:key}).session(session))return;

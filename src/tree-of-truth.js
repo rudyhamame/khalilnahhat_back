@@ -10,7 +10,7 @@ async function snapshot({ admin = false } = {}) {
   const catalog = await setup.list(admin);
   const rows = await Equipment.find(admin ? {} : { isActive: true }).sort({ sortOrder: 1 });
   const equipment = withServiceIds(catalog, rows.map(publicView));
-  const tree = { catalog, equipment, steps: stepsOf(catalog) };
+  const tree = { catalog, equipment, steps: stepsOf(catalog), atomEidos: await require('./eden-eidos').bookingAtomBindings() };
   if (admin) {
     const markers = await setup.removedServices();
     const tombstones = await EquipmentTombstone.find().sort({ slug: 1 }).lean();

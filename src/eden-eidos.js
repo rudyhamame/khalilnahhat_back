@@ -1,6 +1,7 @@
 const mongoose=require('mongoose');
 const {randomUUID}=require('node:crypto');
 const {z}=require('zod');
+const {BookingAtomEidos,listBookingAtomEidos,seedBookingAtomEidos}=require('./booking-atom-eidos');
 
 const schema=new mongoose.Schema({externalId:{type:String,required:true,unique:true,immutable:true,default:()=>`eidos-${randomUUID()}`},fourthGoal:{type:String,default:'',maxlength:2000}},{strict:'throw',versionKey:false});
 const Eidos=mongoose.models.EdenEidos||mongoose.model('EdenEidos',schema);
@@ -23,6 +24,8 @@ async function ensureBooking(){
   await Initialization.create([{_id:key}],{session});
  });}finally{await session.endSession();}
 }
+async function seedBookingAtoms(){await ensureBooking();return seedBookingAtomEidos({Eidos});}
+const bookingAtomBindings=()=>listBookingAtomEidos({Eidos});
 function registerEidos(app,{requireAdmin}){
  const wrap=fn=>async(req,res)=>{
   try{res.set('Cache-Control','no-store');await fn(req,res);}
@@ -30,12 +33,17 @@ function registerEidos(app,{requireAdmin}){
  };
  app.get('/api/admin/eden/eidos',requireAdmin,wrap(async(req,res)=>{
   z.object({}).strict().parse(req.query);await ensureBooking();
-  res.json({items:(await Eidos.find().sort({_id:1}).lean()).map(publicView)});
+  res.json({items:(await Eidos.find().sort({_id:1}).lean()).map(publicView),bookingAtoms:await bookingAtomBindings()});
  }));
  app.post('/api/admin/eden/eidos',requireAdmin,wrap(async(req,res)=>{
   const value=input.parse(req.body);await ensureBooking();
   const row=await Eidos.create(value);
   res.status(201).json({item:publicView(row)});
+ }));
+ app.post('/api/admin/eden/eidos/booking-atoms',requireAdmin,wrap(async(req,res)=>{
+  z.object({}).strict().parse(req.body);
+  const result=await seedBookingAtoms();
+  res.json({...result,items:(await Eidos.find().sort({_id:1}).lean()).map(publicView)});
  }));
  app.put('/api/admin/eden/eidos/:id',requireAdmin,wrap(async(req,res)=>{
   const {fourthGoal,previousFourthGoal}=updateInput.parse(req.body);
@@ -53,9 +61,14 @@ function registerEidos(app,{requireAdmin}){
   const {previousFourthGoal}=z.object({permanent:z.literal(true),previousFourthGoal:z.string().max(2000)}).strict().parse(req.body);
   await ensureBooking();
   const expected=previousFourthGoal===''?{$or:[{fourthGoal:''},{fourthGoal:{$exists:false}}]}:{fourthGoal:previousFourthGoal};
-  const row=await Eidos.findOneAndDelete({externalId:req.params.id,...expected}).lean();
-  if(!row){const exists=await Eidos.exists({externalId:req.params.id});throw Object.assign(new Error(exists?'This seed changed. Reload Eidos before deleting.':'Eidos not found.'),{status:exists?409:404});}
-  res.json({deleted:true,id:row.externalId});
+  await BookingAtomEidos.init();
+  const session=await mongoose.startSession();
+  try{await session.withTransaction(async()=>{
+   const row=await Eidos.findOneAndDelete({externalId:req.params.id,...expected}).session(session).lean();
+   if(!row){const exists=await Eidos.exists({externalId:req.params.id}).session(session);throw Object.assign(new Error(exists?'This seed changed. Reload Eidos before deleting.':'Eidos not found.'),{status:exists?409:404});}
+   await BookingAtomEidos.deleteMany({eidosId:row.externalId}).session(session);
+  });}finally{await session.endSession();}
+  res.json({deleted:true,id:req.params.id});
  }));
 }
-module.exports={Eidos,Initialization,ensureBooking,registerEidos};
+module.exports={Eidos,Initialization,ensureBooking,seedBookingAtoms,bookingAtomBindings,registerEidos};

@@ -56,7 +56,8 @@
       [
         "music.djRequested",
         "music.mcRequested",
-        "music.djMc"
+        "music.djMc",
+        "services"
       ]
     ],
     [
@@ -92,13 +93,12 @@
     [
       "04.01",
       [
-        "services",
         "rental.requested",
         "equipment"
       ]
     ],
     [
-      "04.05",
+      "04.06",
       [
         "event.setup.requirements"
       ]

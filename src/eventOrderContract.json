@@ -46,7 +46,7 @@
      "ar": "رقم الهاتف",
      "type": "tel",
      "maxLength": 30,
-     "required": false,
+     "required": true,
      "private": true,
      "locked": "account",
      "short": "Phone",

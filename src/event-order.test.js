@@ -52,7 +52,7 @@ test('uploaded event document hashes use the same validated SHA-256 field',()=>{
 
 test('quote questionnaire asks only what the brief lists plus language and dialect',()=>{
   const keys=core.fields.filter(field=>!field.hidden).map(field=>field.key).sort();
-  const brief=['customer.firstName','customer.lastName','customer.email','customer.phone','customer.contactMethod','customer.phoneContact','customer.company','event.type','event.date','event.startTime','event.endTime','event.guestCount','event.venue.name','event.venue.address','event.venue.city','event.venue.postalCode','event.venue.country','event.venue.addressDetails','event.venue.setting','event.setup.requirements','services','music.djRequested','music.mcRequested','rental.requested','music.djMc','references.images','additional.notes'].sort();
+  const brief=['customer.firstName','customer.lastName','customer.email','customer.phone','customer.contactMethod','customer.phoneContact','customer.company','event.type','event.date','event.startTime','event.endTime','event.guestCount','event.venue.name','event.venue.address','event.venue.city','event.venue.postalCode','event.venue.country','event.venue.addressDetails','event.venue.setting','event.setup.requirements','services','music.djRequested','music.mcRequested','rental.requested','references.images','additional.notes'].sort();
   assert.deepEqual(keys,brief);
 });
 

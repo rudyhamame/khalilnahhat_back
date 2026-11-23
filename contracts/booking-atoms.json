@@ -61,30 +61,10 @@
     [
       "03.02",
       [
-        "music.languagePairs"
-      ]
-    ],
-    [
-      "03.03",
-      [
-        "music.genres"
-      ]
-    ],
-    [
-      "03.04",
-      [
-        "music.suggestedSongs"
-      ]
-    ],
-    [
-      "03.05",
-      [
-        "music.favouriteSongs"
-      ]
-    ],
-    [
-      "03.06",
-      [
+        "music.languagePairs",
+        "music.genres",
+        "music.suggestedSongs",
+        "music.favouriteSongs",
         "music.favouriteArtists"
       ]
     ],

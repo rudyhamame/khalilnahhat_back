@@ -103,3 +103,11 @@ test('suggested unit prices: per unit, derived package, quote required, indivisi
  const odd=run([O('z')],[P('z','fixed',1000)],[q('z',3)]);
  assert.equal(suggestUnitPrices(odd,[q('z',3)])[0].unitPrice,10); // 3 × fixed 1000 = 3000 → 10.00 each
 });
+
+test('each fee line is billed by its own pricing mode; lines without a mode stay amount × quantity',()=>{
+ const unit=(type,amountCents,basis)=>({type,amountCents,...(basis?{basis}:{})});
+ const pol=units=>P('a','fixed',0,{pricingUnits:units});
+ assert.equal(run([O('a')],[pol([unit('Rental fee',1000)])],[q('a',3)]).total,3000); // legacy line
+ assert.equal(run([O('a')],[pol([unit('Rental fee',1000,'daily')])],[q('a',3)],{days:2}).total,2000); // 2 days, quantity not multiplied
+ assert.equal(run([O('a')],[pol([unit('Rental fee',1000,'per_unit_per_day'),unit('Delivery fee',500,'fixed')])],[q('a',2)],{days:2}).total,4000+1000);
+});

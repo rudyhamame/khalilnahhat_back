@@ -11,19 +11,25 @@ const policySchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true }, pricingMode: { type: String, enum: MODES, required: true }, modeId: { type: String, default: '' }, // modeId: the Mode card entry chosen; pricingMode is that mode's calculation type
   currency: { type: String, default: 'CAD' }, baseAmountCents: { type: Number, default: 0 }, minimumDuration: Number,
   includedQuantity: Number, additionalUnitRateCents: Number, tiers: { type: [new mongoose.Schema({ from: Number, to: Number, rateCents: Number }, { _id: false })], default: [] },
-  pricingUnits: { type: [new mongoose.Schema({ type: String, amountCents: Number, factors: { type: [mongoose.Schema.Types.Mixed], default: [] } }, { _id: false })], default: [] }, // fee lines; each may hold pricing factors with priced steps
+  pricingUnits: { type: [new mongoose.Schema({ type: String, amountCents: Number, modeId: String, basis: String, currency: String, includedQuantity: Number, factors: { type: [mongoose.Schema.Types.Mixed], default: [] } }, { _id: false })], default: [] }, // fee lines; each may hold pricing factors with priced steps
   effectiveFrom: String, effectiveUntil: String, priority: { type: Number, default: 0 }, status: { type: String, enum: ['active', 'draft'], default: 'draft' },
   conditions: { type: [new mongoose.Schema({ field: String, operator: String, value: mongoose.Schema.Types.Mixed, adjustmentType: String, adjustmentValue: Number, priority: Number }, { _id: false })], default: [] },
   version: { type: Number, default: 1 },
 }, { timestamps: true });
 const PricingPolicy = mongoose.models.PricingPolicy || mongoose.model('PricingPolicy', policySchema);
+// An Offer is an admin-made bundle of more than one data atom (services and/or equipment). It is priced like any other data atom, under the id `offer-<id>`.
+const PricingOffer = mongoose.models.PricingOffer || mongoose.model('PricingOffer', new mongoose.Schema({
+  id: { type: String, required: true, unique: true }, name: { type: String, required: true, trim: true, maxlength: 120 },
+  components: { type: [new mongoose.Schema({ offeringId: String, quantity: Number }, { _id: false })], default: [] },
+}, { timestamps: true }));
+const offerInput = z.object({ name: z.string().trim().min(1, 'Enter an offer name.').max(120), components: z.array(z.object({ offeringId: z.string().trim().min(1).max(160), quantity: z.number().int().min(1).max(999).default(1) })).min(1, 'Add at least one data atom.').max(50) }).strict();
 
 const cents = z.number().int().min(0).max(100000000);
 const policyInput = z.object({
   offeringId: z.string().trim().min(1).max(160), name: z.string().trim().min(1).max(160), pricingMode: z.enum(MODES), modeId: z.string().trim().max(64).optional(), currency: z.enum(['CAD', 'USD']).default('CAD'),
   baseAmountCents: cents.default(0), minimumDuration: z.number().min(0).max(240).optional(), includedQuantity: z.number().int().min(1).optional(), additionalUnitRateCents: cents.optional(),
   tiers: z.array(z.object({ from: z.number().int().min(1), to: z.number().int().nullable().optional(), rateCents: cents })).max(20).default([]),
-  pricingUnits: z.array(z.object({ type: z.string().trim().min(1).max(80), amountCents: cents, factors: z.array(z.object({ factorId: z.string().trim().min(1).max(64), steps: z.array(z.object({ label: z.string().trim().min(1, 'Name every step.').max(80), amountCents: cents })).max(30).default([]) })).max(20).default([]) })).max(20).default([]),
+  pricingUnits: z.array(z.object({ type: z.string().trim().min(1).max(80), amountCents: cents, modeId: z.string().trim().max(64).optional(), currency: z.enum(['CAD', 'USD']).optional(), includedQuantity: z.number().int().min(1).optional(), factors: z.array(z.object({ factorId: z.string().trim().min(1).max(64), steps: z.array(z.object({ label: z.string().trim().min(1, 'Name every step.').max(80), amountCents: cents })).max(30).default([]) })).max(20).default([]) })).max(20).default([]),
   effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal('')), effectiveUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal('')),
   priority: z.number().int().min(0).max(1000).default(0), status: z.enum(['active', 'draft']).default('draft'),
   conditions: z.array(z.object({ field: z.string().trim().min(1).max(60), operator: z.enum(OPERATORS), value: z.any(), adjustmentType: z.enum(ADJUSTMENTS), adjustmentValue: z.number().finite(), priority: z.number().int().default(0) })).max(30).default([]),
@@ -31,7 +37,7 @@ const policyInput = z.object({
 
 async function loadContext() {
   const { Equipment } = require('./equipment'), setup = require('./setup-catalog');
-  const [equipment, services, explicit] = await Promise.all([Equipment.find().lean(), setup.list(true), PricingPolicy.find().lean()]);
+  const [equipment, services, explicit, offers] = await Promise.all([Equipment.find().lean(), setup.list(true), PricingPolicy.find().lean(), PricingOffer.find().sort({ createdAt: 1 }).lean()]);
   const offerings = [];
   for (const s of services.filter((row) => row.kind === 'service')) {
     const id = `svc-${s.id}`;
@@ -42,6 +48,7 @@ async function loadContext() {
     offerings.push({ id: e.slug, name: e.name, type: pkg ? 'package' : 'equipment', category: e.category, brandModel: e.brandModel || '', isActive: e.isActive !== false, minQuantity: e.minQuantity || 1,
       stock: e.stockTracked ? e.quantityOwned : null, components: (e.setItems || []).map((m) => ({ offeringId: m.equipmentId, quantity: m.quantity, inclusion: 'included' })) });
   }
+  for (const o of offers) offerings.push({ id: `offer-${o.id}`, name: o.name, type: 'package', category: 'offers', offer: true, isActive: true, stock: null, components: o.components.map((m) => ({ offeringId: m.offeringId, quantity: m.quantity, inclusion: 'included' })) });
   return { offerings, policies: explicit.map(({ _id, __v, ...p }) => p), explicit: explicit.map(({ _id, __v, ...p }) => p), today: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' }) };
 }
 
@@ -110,6 +117,13 @@ function registerPricingRoutes(app, requireAdmin) {
     const unknown = data.pricingUnits.find((unit) => !categories.has(unit.type) && !kept.has(unit.type));
     if (unknown) return res.status(400).json({ message: `"${unknown.type}" is not a fee category. Add it in Pricing settings first.` });
     const { allowed } = await require('./pricing-lists').feeFactorRules();
+    // Each fee line carries its own pricing mode; the engine bills it by that mode's basis.
+    for (const unit of data.pricingUnits) {
+      if (!unit.modeId) continue;
+      const mode = await require('./pricing-lists').modeById(unit.modeId);
+      if (!mode) return res.status(400).json({ message: `${unit.type}: choose a pricing mode from the Mode card in Pricing settings.` });
+      unit.basis = mode.basis;
+    }
     for (const unit of data.pricingUnits) {
       const ok = allowed.get(unit.type), seen = new Set();
       for (const factor of unit.factors) {
@@ -124,6 +138,25 @@ function registerPricingRoutes(app, requireAdmin) {
     await PricingPolicy.updateOne({ id: policy.id }, { $set: policy }, { upsert: true });
     res.status(id ? 200 : 201).json({ policy });
   };
+  // Offers: save the bundle; its price is set through the normal policy form under the id `offer-<id>`.
+  const saveOffer = (offerId) => async (req, res) => {
+    const data = offerInput.parse(req.body), c = await loadContext(), real = new Set(c.offerings.filter((o) => !o.offer).map((o) => o.id));
+    const merged = new Map();
+    for (const m of data.components) { if (!real.has(m.offeringId)) return res.status(400).json({ message: 'Choose existing services or equipment.' }); merged.set(m.offeringId, (merged.get(m.offeringId) || 0) + m.quantity); }
+    const components = [...merged].map(([offeringId, quantity]) => ({ offeringId, quantity }));
+    if (offerId && !await PricingOffer.exists({ id: offerId })) return res.status(404).json({ message: 'Offer not found.' });
+    const id = offerId || crypto.randomUUID();
+    await PricingOffer.updateOne({ id }, { $set: { name: data.name, components } }, { upsert: true });
+    res.status(offerId ? 200 : 201).json({ offer: { id: `offer-${id}`, name: data.name, components } });
+  };
+  app.post('/api/admin/pricing/offers', requireAdmin, wrap(saveOffer(null)));
+  app.put('/api/admin/pricing/offers/:id', requireAdmin, wrap((req, res) => saveOffer(req.params.id.replace(/^offer-/, ''))(req, res)));
+  app.delete('/api/admin/pricing/offers/:id', requireAdmin, wrap(async (req, res) => {
+    const id = req.params.id.replace(/^offer-/, '');
+    const removed = (await PricingOffer.deleteOne({ id })).deletedCount === 1;
+    if (removed) await PricingPolicy.deleteMany({ offeringId: `offer-${id}` });
+    res.json({ removed });
+  }));
   app.post('/api/admin/pricing/policies', requireAdmin, wrap(save(null)));
   app.put('/api/admin/pricing/policies/:id', requireAdmin, wrap((req, res) => save(req.params.id)(req, res)));
   app.delete('/api/admin/pricing/policies/:id', requireAdmin, wrap(async (req, res) => res.json({ removed: (await PricingPolicy.deleteOne({ id: req.params.id })).deletedCount === 1 })));

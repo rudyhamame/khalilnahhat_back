@@ -107,9 +107,11 @@ function calculateBookingPrice(booking, ctx) {
       else if (base.missing) { line.status = 'quote_required'; quoteRequired = true; warnings.push(`${offering.name}: ${base.missing} is required for ${policy.pricingMode} pricing.`); }
       else {
         const units = policy.pricingUnits || [];
-        const unitCharge = units.reduce((sum, unit) => sum + unit.amountCents * qty, 0);
+        // A fee line with its own pricing mode is billed by that mode's basis; older lines (no mode) stay amount × quantity.
+        const unitCost = (unit) => { if (!unit.basis) return unit.amountCents * qty; const part = baseCharge({ pricingMode: unit.basis, baseAmountCents: unit.amountCents, minimumDuration: 0, tiers: [] }, qty, hours, days); return part.amount || 0; };
+        const unitCharge = units.reduce((sum, unit) => sum + unitCost(unit), 0);
         const { amount, adjustments } = applyConditions(policy, base.amount + extraUnits(policy, qty) + unitCharge, { ...facts, quantity: qty }, qty, hours);
-        line.rate = policy.baseAmountCents; line.billingBasis = base.basis; line.adjustments = [...adjustments, ...units.map((unit) => ({ label: unit.type, change: unit.amountCents * qty }))]; line.total = amount;
+        line.rate = policy.baseAmountCents; line.billingBasis = base.basis; line.adjustments = [...adjustments, ...units.map((unit) => ({ label: unit.type, change: unitCost(unit) }))]; line.total = amount;
       }
       // Fixed/included package price covers its required components; only components marked "priced" are charged again (explicit upgrades).
       for (const c of components) {

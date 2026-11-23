@@ -55,9 +55,7 @@
       "03.01",
       [
         "music.djRequested",
-        "music.mcRequested",
-        "music.djMc",
-        "services"
+        "music.mcRequested"
       ]
     ],
     [

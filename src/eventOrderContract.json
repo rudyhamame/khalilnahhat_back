@@ -319,59 +319,6 @@
      "shortAr": "ملاحظات التجهيز"
     },
     {
-     "key": "services",
-     "label": "What do you need from us?",
-     "ar": "ماذا تحتاج منا؟",
-     "type": "multi",
-     "options": [
-      "dj",
-      "sound",
-      "lighting",
-      "led",
-      "fx",
-      "rental",
-      "corporate",
-      "mc"
-     ],
-     "required": false,
-     "short": "Services",
-     "shortAr": "الخدمات",
-     "optionNames": {
-      "dj": [
-       "DJ Khalil",
-       "دي جي خليل"
-      ],
-      "mc": [
-       "MC hosting",
-       "تقديم الحفل"
-      ],
-      "sound": [
-       "Sound systems",
-       "أنظمة الصوت"
-      ],
-      "lighting": [
-       "Lighting",
-       "الإضاءة"
-      ],
-      "led": [
-       "LED walls",
-       "شاشات LED"
-      ],
-      "fx": [
-       "Special effects",
-       "المؤثرات الخاصة"
-      ],
-      "rental": [
-       "Equipment rental",
-       "تأجير المعدات"
-      ],
-      "corporate": [
-       "Corporate production",
-       "إنتاج فعاليات الشركات"
-      ]
-     }
-    },
-    {
      "key": "event.venue.latitude",
      "label": "Venue latitude",
      "ar": "خط العرض",
@@ -510,14 +457,6 @@
      "hidden": true,
      "short": "Favourite artists",
      "shortAr": "الفنانون المفضلون"
-    },
-    {
-     "key": "music.djMc",
-     "label": "MC hosting and announcement notes (optional)",
-     "ar": "ملاحظات تقديم الحفل والإعلانات (اختياري)",
-     "type": "textarea",
-     "short": "Hosting notes",
-     "shortAr": "ملاحظات التقديم"
     }
    ]
   },

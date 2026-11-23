@@ -191,15 +191,10 @@ export function updateOrderField(order,path,value,{ai=false}={}) {
     if(value.includes('dj'))next.music.djRequested=true;
     else if(order.services?.includes('dj'))next.music.djRequested=false;
     if(value.includes('mc'))next.music.mcRequested=true;
-    else if(order.services?.includes('mc')){
-      next.music.mcRequested=false;
-      next.music.djMc=String(next.music.djMc||'').split('\n').filter(line=>line&&line!=='MC service requested').join('\n');
-    }
+    else if(order.services?.includes('mc'))next.music.mcRequested=false;
   }
   if(path==='music.mcRequested'&&typeof value==='boolean'){
     next.services=value?[...new Set([...(next.services||[]),'mc'])]:(next.services||[]).filter(id=>id!=='mc');
-    const notes=String(next.music.djMc||'').split('\n').filter(line=>line&&line!=='MC service requested');
-    if(value)notes.push('MC service requested');next.music.djMc=notes.join('\n');
   }
   if(ai)next.source='ai';return next;
 }
@@ -253,7 +248,7 @@ export function validateEventOrder(input,{submission=false,today=new Date().toLo
 }
 export function legacyToOrder(order, draft) {
   let next=order;
-  const map={eventType:'event.type',eventDate:'event.date',startTime:'event.startTime',endTime:'event.endTime',guests:'event.guestCount',venueName:'event.venue.name',venueAddress:'event.venue.address',city:'event.venue.city',postalCode:'event.venue.postalCode',notes:'additional.notes',setupRequirements:'event.setup.requirements',djMc:'music.djMc',phone:'customer.phone',contactMethod:'customer.contactMethod',company:'customer.company',services:'services'};
+  const map={eventType:'event.type',eventDate:'event.date',startTime:'event.startTime',endTime:'event.endTime',guests:'event.guestCount',venueName:'event.venue.name',venueAddress:'event.venue.address',city:'event.venue.city',postalCode:'event.venue.postalCode',notes:'additional.notes',setupRequirements:'event.setup.requirements',phone:'customer.phone',contactMethod:'customer.contactMethod',company:'customer.company',services:'services'};
   for(const [key,path] of Object.entries(map))if(draft?.[key]!==undefined&&draft[key]!==null&&draft[key]!=='')next=updateOrderField(next,path,key==='guests'?Number(draft[key]):draft[key]);
   return next;
 }
@@ -261,8 +256,8 @@ export function legacyToOrder(order, draft) {
 function legacyMusicStyle(pairs){const names=[...new Set((pairs||[]).map(pair=>String(pair.language||'').toLowerCase()))];const arabic=names.includes('arabic'),english=names.includes('english');return arabic&&english?'mixed':arabic&&names.length===1?'arabic':english&&names.length===1?'english':'other';}
 export function orderToLegacy(order) {
   const e=order.event,m=order.music,c=order.customer;
-  const legacy={eventType:e.type||'other',eventDate:e.date||'',startTime:e.startTime||'',endTime:e.endTime||'',phone:c.phone||'',contactMethod:c.contactMethod||'email',company:c.company||'',venueName:e.venue.name||'',venueAddress:e.venue.address||'',city:e.venue.city||'',postalCode:e.venue.postalCode||'',indoor:e.venue.setting!=='outdoor',guests:e.guestCount??0,services:order.services,musicStyle:legacyMusicStyle(m.languagePairs),notes:order.additional.notes||'',setupRequirements:e.setup.requirements||'',otherMusic:'',djMc:m.djMc||'',entrance:'',customMix:'',announcements:''};// the old free-text booking fields are no longer data atoms: they stay empty
-  for(const key of ['setupRequirements','otherMusic','djMc','entrance','customMix','announcements'])legacy[key]=legacy[key].slice(0,2000);
+  const legacy={eventType:e.type||'other',eventDate:e.date||'',startTime:e.startTime||'',endTime:e.endTime||'',phone:c.phone||'',contactMethod:c.contactMethod||'email',company:c.company||'',venueName:e.venue.name||'',venueAddress:e.venue.address||'',city:e.venue.city||'',postalCode:e.venue.postalCode||'',indoor:e.venue.setting!=='outdoor',guests:e.guestCount??0,services:order.services,musicStyle:legacyMusicStyle(m.languagePairs),notes:order.additional.notes||'',setupRequirements:e.setup.requirements||'',otherMusic:'',entrance:'',customMix:'',announcements:''};// the old free-text booking fields are no longer data atoms: they stay empty
+  for(const key of ['setupRequirements','otherMusic','entrance','customMix','announcements'])legacy[key]=legacy[key].slice(0,2000);
   return legacy;
 }
 // Hydrate validated current context without treating existing read-only facts as

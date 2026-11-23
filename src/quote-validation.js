@@ -12,7 +12,7 @@ const eventSchema = z.object({
   company: text(120), venueName: text(160), venueAddress: text(240), city: text(80), postalCode: text(12),
   indoor: z.boolean().default(true), guests: z.coerce.number().int().min(0).max(100000).default(0),
   services: z.array(z.enum([...SERVICES])).max(8).default([]), musicStyle: z.enum(['arabic', 'english', 'mixed', 'other']).default('mixed'),
-  notes: text(3000), setupRequirements: text(2000), otherMusic: text(2000), djMc: text(2000), entrance: text(2000), customMix: text(2000), announcements: text(2000),
+  notes: text(3000), setupRequirements: text(2000), otherMusic: text(2000), entrance: text(2000), customMix: text(2000), announcements: text(2000),
 });
 
 // Catalog rules are authoritative; never trust localStorage names or minimum quantities.

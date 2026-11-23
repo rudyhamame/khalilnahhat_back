@@ -109,8 +109,8 @@ const fields = {
 };
 // serviceId is the legacy name of equipmentCategoryId: an older client may still send it. Both stay equal on the record.
 const syncCategory = (data) => { const id = data.equipmentCategoryId ?? data.serviceId; if (id !== undefined) { data.equipmentCategoryId = id; data.serviceId = id; } return data; };
-const createSchema = z.object({ slug: z.string().trim().regex(/^[a-z0-9-]+$/), ...fields }).partial().required({ slug: true, category: true, name: true }).transform(syncCategory);
-const updateSchema = z.object(fields).partial().transform(syncCategory);
+const createSchema = z.object({ slug: z.string().trim().regex(/^[a-z0-9-]+$/), ...fields }).partial().required({ slug: true, category: true, name: true });
+const updateSchema = z.object(fields).partial(); // plain object schemas: the AI administrator registry reads them as such
 
 function registerEquipmentRoutes(app, requireAdmin) {
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
@@ -137,6 +137,7 @@ function registerEquipmentRoutes(app, requireAdmin) {
 
   app.post('/api/equipment', requireAdmin, async (req, res) => {
     const parsed = createSchema.safeParse(req.body);
+    if (parsed.success) syncCategory(parsed.data);
     if (!parsed.success) return bad(res, parsed);
     try {
       await validateSetMembers(parsed.data,null,Equipment);
@@ -153,6 +154,7 @@ function registerEquipmentRoutes(app, requireAdmin) {
 
   app.patch('/api/equipment/:id', requireAdmin, async (req, res) => {
     const parsed = updateSchema.safeParse(req.body);
+    if (parsed.success) syncCategory(parsed.data);
     if (!parsed.success) return bad(res, parsed);
     if(parsed.data.setItems!==undefined){try{await validateSetMembers(parsed.data,await Equipment.findOne({slug:req.params.id}),Equipment);}catch(error){return res.status(error.status||400).json({message:error.message});}}
     const {modelJobId,...data}=parsed.data;let model;try{model=await require('./equipment-3d').equipmentModelFields(req,modelJobId);}catch(error){if(error.status)return res.status(error.status).json({message:error.message});throw error;}

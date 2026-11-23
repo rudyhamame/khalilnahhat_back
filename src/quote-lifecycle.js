@@ -32,6 +32,17 @@ async function sweepQuotes({notifications=notificationEmails,Model=ServiceReques
   }
 }
 
+// Permanently removes a booking, and with it everything the client sees of it. It also releases what the booking held: its date and
+// equipment (the confirmed-booking record) and any call booked for it. Uploaded files are cleaned up by the shared permanent-deletion path.
+// A booking with recorded payments is refused: void them first, so a financial record is never lost by accident.
+async function deleteBooking(sr, { EventBooking, Meeting, remove }) {
+  if ((sr.payments || []).some((payment) => !payment.voided)) throw Object.assign(new Error('This booking has recorded payments. Void them first, then delete it.'), { status: 409 });
+  await EventBooking.deleteOne({ requestId: sr.externalId });
+  await Meeting.updateMany({ bookingRequestId: sr.externalId }, { status: 'open', bookedBy: null, bookedByName: '', bookedByEmail: '', topic: '', bookingRequestId: null, callMethod: '', contactPhone: '', reminderSentAt: null });
+  const removed = await remove({ externalId: sr.externalId });
+  return { deleted: Boolean(removed), cloudinaryCleanupPending: Boolean(removed?.cloudinaryCleanupPending) };
+}
+
 function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Model = ServiceRequest, sendDecision = sendBookingDecision }) {
   const find = (id) => Model.findOne({ externalId: id });
   const notFound = (res) => res.status(404).json({ message: 'Service request not found.' });
@@ -114,9 +125,24 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     return res.json({ item: serialize(sr, true) });
   });
 
+  app.post('/api/service-requests/:id/delete', requireAdmin, async (req, res) => {
+    if (req.body?.confirmation !== 'DELETE') return res.status(400).json({ message: 'Confirm that you want to permanently delete this booking.' });
+    const sr = await find(req.params.id);
+    if (!sr) return notFound(res);
+    try {
+      const { EventBooking } = require('./payments'), { Meeting } = require('./meetings'), permanent = require('./permanent-deletion');
+      const result = await deleteBooking(sr, { EventBooking, Meeting, remove: (filter) => permanent.remove(Model, filter) });
+      console.info('Booking deleted by an administrator:', sr.externalId);
+      return res.json(result);
+    } catch (error) {
+      if (error.status === 409) return res.status(409).json({ message: error.message });
+      throw error;
+    }
+  });
+
   if (require.main?.filename?.endsWith('server.js')) {
     setInterval(() => sweepQuotes().catch((e) => console.error('Quote sweep failed:', e)), SWEEP_MS).unref();
   }
 }
 
-module.exports = { DAY_MS, quoteTotals, registerQuoteLifecycle, sweepQuotes, isExpired };
+module.exports = { DAY_MS, quoteTotals, registerQuoteLifecycle, sweepQuotes, isExpired, deleteBooking };

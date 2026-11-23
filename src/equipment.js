@@ -11,7 +11,8 @@ const equipmentSchema = new mongoose.Schema(
   {
     slug: { type: String, required: true, unique: true, trim: true },
     category: { type: String, required: true, trim: true },
-    serviceId: { type: String, default: '', trim: true }, // the service this item belongs to (replaces matching by category)
+    equipmentCategoryId: { type: String, default: '', trim: true }, // the equipment category (rental category) this item belongs to
+    serviceId: { type: String, default: '', trim: true }, // legacy name of equipmentCategoryId, kept in sync until every client has moved
     name: { type: String, required: true, trim: true },
     brandModel: { type: String, default: '', trim: true },
     description: { type: String, default: '', trim: true },
@@ -37,29 +38,29 @@ const equipmentSchema = new mongoose.Schema(
 );
 // Deleting equipment erases its content and media; only an id marker stays so the admin can still see which ids were removed.
 const EquipmentTombstone = mongoose.models.EquipmentTombstone || mongoose.model('EquipmentTombstone', new mongoose.Schema({
-  slug: { type: String, required: true, unique: true }, serviceId: { type: String, default: '' }, category: { type: String, default: '' },
+  slug: { type: String, required: true, unique: true }, equipmentCategoryId: { type: String, default: '' }, serviceId: { type: String, default: '' }, category: { type: String, default: '' },
 }, { timestamps: true }));
 const Equipment = mongoose.models.Equipment || mongoose.model('Equipment', equipmentSchema);
 
 // Equipment lives only in the database. Nothing is ever created from a list in the code, so an item the admin deletes stays deleted
 // (a restart or a deploy cannot bring it back). Items that already exist may be given their default 3D model once.
 let seeded = false;
-// One-time, idempotent: equipment saved before serviceId existed gets the id of the service it belonged to (by its old category or the
-// service's equipment list), so the booking only needs serviceId.
-async function backfillServiceIds() {
-  const missing = await Equipment.find({ $or: [{ serviceId: '' }, { serviceId: { $exists: false } }] }).select('slug category').lean();
+// One-time, idempotent: equipment saved before equipmentCategoryId existed gets it from its legacy serviceId, or else the id of the category it
+// belonged to (by its old category or the category's equipment list), so the booking only needs equipmentCategoryId.
+async function backfillEquipmentCategoryIds() {
+  const missing = await Equipment.find({ $or: [{ equipmentCategoryId: '' }, { equipmentCategoryId: { $exists: false } }] }).select('slug category serviceId').lean();
   if (!missing.length) return;
   const services = (await require('./setup-catalog').list(true)).filter((row) => row.kind === 'service');
   for (const item of missing) {
-    const service = services.find((row) => row.category === item.category || (row.equipmentIds || []).includes(item.slug));
-    if (service) await Equipment.updateOne({ slug: item.slug }, { $set: { serviceId: service.id } });
+    const id = item.serviceId || services.find((row) => row.category === item.category || (row.equipmentIds || []).includes(item.slug))?.id;
+    if (id) await Equipment.updateOne({ slug: item.slug }, { $set: { equipmentCategoryId: id, serviceId: id } });
   }
 }
 
 async function ensureSeed() {
   if (seeded) return;
   await attachDefaultModels();
-  await backfillServiceIds().catch(() => {}); // never blocks the equipment list
+  await backfillEquipmentCategoryIds().catch(() => {}); // never blocks the equipment list
   seeded = true;
 }
 
@@ -73,7 +74,8 @@ async function attachDefaultModels() {
 
 const publicView = (e) => ({
   isSet:Boolean(e.isSet||(e.setItems||[]).length||(e.modelParts||[]).length),setItems:(e.setItems||[]).map(member=>({equipmentId:member.equipmentId,quantity:member.quantity,x:member.x||0,y:member.y||0,z:member.z||0,rotation:member.rotation||0})),
-  id: e.slug, category: e.category, serviceId: e.serviceId || '', name: e.name, brandModel: e.brandModel,
+  id: e.slug, category: e.category, equipmentCategoryId: e.equipmentCategoryId || e.serviceId || '', serviceId: e.equipmentCategoryId || e.serviceId || '', // serviceId: legacy alias for older clients
+   name: e.name, brandModel: e.brandModel,
   description: e.description, functionSummary: e.functionSummary || '', eventFit: e.eventFit && typeof e.eventFit === 'object' ? e.eventFit : {}, imageUrl: e.imageUrl, youtubeUrl: e.youtubeUrl || '', modelUrl:e.modelUrl||'', modelParts:(e.modelParts||[]).map(part=>({name:part.name,nameAr:part.nameAr||'',src:part.src,x:part.x||0,y:part.y||0,z:part.z||0,rotation:part.rotation||0})), minQuantity: e.minQuantity, ...stockView(e),
   roomPlacement:e.roomPlacement&&Number.isFinite(e.roomPlacement.x)?{x:e.roomPlacement.x,fromBack:e.roomPlacement.fromBack||0,rotation:e.roomPlacement.rotation||0,height:e.roomPlacement.height||0,scale:e.roomPlacement.scale>0?e.roomPlacement.scale:1}:null,
 });
@@ -97,7 +99,7 @@ const fields = {
   modelParts:z.array(modelPartSchema).max(32),
   roomPlacement:z.object({x:z.number().finite().min(-50).max(50),fromBack:z.number().finite().min(0).max(100),rotation:z.number().finite().min(-360).max(360).default(0),height:z.number().finite().min(0).max(10).default(0),scale:z.number().finite().min(.2).max(5).default(1)}).strict().nullable(),
   modelJobId:z.string().max(80).nullable(),
-  category: z.string().trim().min(1), serviceId: z.string().trim().max(80).regex(/^$|^[a-z0-9]+(?:-[a-z0-9]+)*$/), name: z.string().trim().min(1),
+  category: z.string().trim().min(1), equipmentCategoryId: z.string().trim().max(80).regex(/^$|^[a-z0-9]+(?:-[a-z0-9]+)*$/), serviceId: z.string().trim().max(80).regex(/^$|^[a-z0-9]+(?:-[a-z0-9]+)*$/), name: z.string().trim().min(1),
   brandModel: z.string().trim(), description: z.string().trim(), imageUrl: z.string().trim(),
   youtubeUrl: z.string().trim().max(300).refine((value) => !value || /^https:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\//i.test(value), 'Use a YouTube link (https://youtube.com/… or https://youtu.be/…).'),
   functionSummary: z.string().trim().max(600),
@@ -105,8 +107,10 @@ const fields = {
   priceCents: z.number().int().min(0), minQuantity: z.number().int().min(1),
   quantityOwned: z.number().int().min(0), stockTracked: z.boolean(), isActive: z.boolean(), sortOrder: z.number().int(),
 };
-const createSchema = z.object({ slug: z.string().trim().regex(/^[a-z0-9-]+$/), ...fields }).partial().required({ slug: true, category: true, name: true });
-const updateSchema = z.object(fields).partial();
+// serviceId is the legacy name of equipmentCategoryId: an older client may still send it. Both stay equal on the record.
+const syncCategory = (data) => { const id = data.equipmentCategoryId ?? data.serviceId; if (id !== undefined) { data.equipmentCategoryId = id; data.serviceId = id; } return data; };
+const createSchema = z.object({ slug: z.string().trim().regex(/^[a-z0-9-]+$/), ...fields }).partial().required({ slug: true, category: true, name: true }).transform(syncCategory);
+const updateSchema = z.object(fields).partial().transform(syncCategory);
 
 function registerEquipmentRoutes(app, requireAdmin) {
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
@@ -157,9 +161,9 @@ function registerEquipmentRoutes(app, requireAdmin) {
   });
 
   app.delete('/api/equipment/:id', requireAdmin, async (req, res) => {
-    const prior = await Equipment.findOne({ slug: req.params.id }).select('slug serviceId category').lean();
+    const prior = await Equipment.findOne({ slug: req.params.id }).select('slug equipmentCategoryId serviceId category').lean();
     const item = await permanentDeletion.remove(Equipment,{slug:req.params.id});
-    if (item && prior) await EquipmentTombstone.updateOne({ slug: prior.slug }, { $set: { serviceId: prior.serviceId || '', category: prior.category || '' } }, { upsert: true });
+    if (item && prior) await EquipmentTombstone.updateOne({ slug: prior.slug }, { $set: { equipmentCategoryId: prior.equipmentCategoryId || prior.serviceId || '', serviceId: prior.equipmentCategoryId || prior.serviceId || '', category: prior.category || '' } }, { upsert: true });
     return item ? res.json({ok:true,cloudinaryCleanupPending:Boolean(item.cloudinaryCleanupPending)}) : res.status(404).json({ message: 'Equipment not found.' });
   });
 

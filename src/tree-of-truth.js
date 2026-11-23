@@ -4,17 +4,17 @@
 //   GET /api/admin/tree  admin: also inactive items and the ids that were removed (they keep their id, nothing else)
 const setup = require('./setup-catalog');
 const { Equipment, EquipmentTombstone, publicView } = require('./equipment');
-const { stepsOf, withServiceIds } = require('./tree-core');
+const { stepsOf, withEquipmentCategoryIds } = require('./tree-core');
 
 async function snapshot({ admin = false } = {}) {
   const catalog = await setup.list(admin);
   const rows = await Equipment.find(admin ? {} : { isActive: true }).sort({ sortOrder: 1 });
-  const equipment = withServiceIds(catalog, rows.map(publicView));
+  const equipment = withEquipmentCategoryIds(catalog, rows.map(publicView));
   const tree = { catalog, equipment, steps: stepsOf(catalog), atomEidos: await require('./eden-eidos').bookingAtomBindings() };
   if (admin) {
     const markers = await setup.removedServices();
     const tombstones = await EquipmentTombstone.find().sort({ slug: 1 }).lean();
-    tree.removed = { items: markers, equipment: tombstones.map((row) => ({ id: row.slug, serviceId: row.serviceId || '' })) };
+    tree.removed = { items: markers, equipment: tombstones.map((row) => ({ id: row.slug, equipmentCategoryId: row.equipmentCategoryId || row.serviceId || '', serviceId: row.equipmentCategoryId || row.serviceId || '' })) };
   }
   return tree;
 }

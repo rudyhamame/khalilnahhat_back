@@ -69,7 +69,7 @@ function registerSetupCatalog(app,{requireAdmin}){
  // Deleted services keep only a marker. Built-in ones (the contract defaults) can be restored with their original content; the rest must be re-added by hand.
  app.get('/api/admin/setup-catalog/deleted',requireAdmin,wrap(async(_req,res)=>{
   const items=await removedServices();
-  const equipment=(await require('./equipment').EquipmentTombstone.find().sort({slug:1}).lean()).map(row=>({id:row.slug,serviceId:row.serviceId||''}));
+  const equipment=(await require('./equipment').EquipmentTombstone.find().sort({slug:1}).lean()).map(row=>({id:row.slug,equipmentCategoryId:row.equipmentCategoryId||row.serviceId||'',serviceId:row.equipmentCategoryId||row.serviceId||''}));
   res.set('Cache-Control','no-store').json({items,equipment});
  }));
  app.post('/api/admin/setup-catalog/service/:id/restore',requireAdmin,wrap(async(req,res)=>{
@@ -100,7 +100,7 @@ function registerSetupCatalog(app,{requireAdmin}){
  const categoryInput=z.object({name:z.string().trim().min(1,'Enter a category name.').max(160),nameAr:z.string().trim().max(160).default('')}).strict();
  const categories=async()=>{
   const rows=(await list(true)).filter(row=>row.kind==='service'&&!CORE_SERVICES.includes(row.id));
-  const owned=await Equipment.aggregate([{$match:{serviceId:{$in:rows.map(row=>row.id)}}},{$group:{_id:'$serviceId',count:{$sum:1}}}]);
+  const owned=await Equipment.aggregate([{$addFields:{cat:{$ifNull:[{$cond:[{$gt:[{$strLenCP:{$ifNull:['$equipmentCategoryId','']}},0]},'$equipmentCategoryId',null]},'$serviceId']}}},{$match:{cat:{$in:rows.map(row=>row.id)}}},{$group:{_id:'$cat',count:{$sum:1}}}]);
   const counts=new Map(owned.map(row=>[row._id,row.count]));
   return rows.map(row=>({id:row.id,name:row.name,nameAr:row.nameAr||'',equipmentCount:counts.get(row.id)||0}));
  };
@@ -129,7 +129,7 @@ function registerSetupCatalog(app,{requireAdmin}){
  }));
  app.delete('/api/admin/rental-categories/:id',requireAdmin,wrap(async(req,res)=>{
   if(CORE_SERVICES.includes(req.params.id))return res.status(400).json({message:'DJ Khalil Nahhat and MC host are services, not categories.'});
-  const used=await Equipment.countDocuments({serviceId:req.params.id});
+  const used=await Equipment.countDocuments({$or:[{equipmentCategoryId:req.params.id},{serviceId:req.params.id}]});
   if(used)return res.status(409).json({message:`${used} rental equipment item${used>1?'s use':' uses'} this category. Move them to another category first.`});
   return removeService(req.params.id,res);
  }));

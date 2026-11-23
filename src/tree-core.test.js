@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { stepsOf, withServiceIds } = require('./tree-core');
+const { stepsOf, withEquipmentCategoryIds } = require('./tree-core');
 const { serviceCatalogInstructions } = require('./ai-booking');
 
 const dj = { kind: 'service', id: 'dj', name: 'DJ Khalil', nameAr: '', isActive: true };
@@ -14,10 +14,11 @@ test('steps exist only while their service id is in the tree', () => {
   assert.equal(stepsOf([{ ...dj, isActive: false }, sound]).dj, false);
 });
 
-test('equipment links to a service by serviceId; older items are matched once by category or the service equipment list', () => {
-  const rows = withServiceIds([dj, sound, { ...mc, category: 'mc', equipmentIds: ['lectern'] }], [
-    { id: 'a', category: 'sound' }, { id: 'lectern', category: 'x' }, { id: 'b', category: 'sound', serviceId: 'dj' }, { id: 'c', category: 'none' },
+test('equipment links to a category by equipmentCategoryId (serviceId is its legacy alias); older items are matched once by category or the service equipment list', () => {
+  const rows = withEquipmentCategoryIds([dj, sound, { ...mc, category: 'mc', equipmentIds: ['lectern'] }], [
+    { id: 'a', category: 'sound' }, { id: 'lectern', category: 'x' }, { id: 'b', category: 'sound', equipmentCategoryId: 'dj' }, { id: 'c', category: 'none' },
   ]);
+  assert.deepEqual(rows.map((row) => row.equipmentCategoryId), ['sound', 'mc', 'dj', '']);
   assert.deepEqual(rows.map((row) => row.serviceId), ['sound', 'mc', 'dj', '']);
 });
 

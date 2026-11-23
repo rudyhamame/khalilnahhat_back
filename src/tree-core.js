@@ -13,12 +13,15 @@ function stepsOf(catalog = []) {
   };
 }
 
-// Equipment belongs to the service it points at (serviceId). Items saved before serviceId existed are matched once here.
-function withServiceIds(catalog = [], equipment = []) {
+// Equipment belongs to the equipment category it points at (equipmentCategoryId; serviceId is its legacy name, still sent for older clients).
+// Items saved before either existed are matched once here.
+function withEquipmentCategoryIds(catalog = [], equipment = []) {
   const services = catalog.filter((row) => row?.kind === 'service');
-  return equipment.map((row) => (row.serviceId ? row : {
-    ...row, serviceId: services.find((service) => service.category === row.category || (service.equipmentIds || []).includes(row.id))?.id || '',
-  }));
+  return equipment.map((row) => {
+    const id = row.equipmentCategoryId || row.serviceId
+      || services.find((service) => service.category === row.category || (service.equipmentIds || []).includes(row.id))?.id || '';
+    return { ...row, equipmentCategoryId: id, serviceId: id };
+  });
 }
 
-module.exports = { DJ_ID, MC_ID, stepsOf, withServiceIds };
+module.exports = { DJ_ID, MC_ID, stepsOf, withEquipmentCategoryIds };

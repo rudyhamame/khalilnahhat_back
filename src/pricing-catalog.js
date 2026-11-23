@@ -44,9 +44,8 @@ async function loadContext() {
     offerings.push({ id, name: s.name, type: 'service', category: s.category || 'service', isActive: s.isActive !== false, stock: 1, components: [] }); // one performer per service: staff capacity 1
   }
   for (const e of equipment) {
-    const pkg = Boolean(e.isSet || (e.setItems || []).length);
-    offerings.push({ id: e.slug, name: e.name, type: pkg ? 'package' : 'equipment', category: e.category, brandModel: e.brandModel || '', isActive: e.isActive !== false, minQuantity: e.minQuantity || 1,
-      stock: e.stockTracked ? e.quantityOwned : null, components: (e.setItems || []).map((m) => ({ offeringId: m.equipmentId, quantity: m.quantity, inclusion: 'included' })) });
+    offerings.push({ id: e.slug, name: e.name, type: 'equipment', category: e.category, brandModel: e.brandModel || '', isActive: e.isActive !== false, minQuantity: e.minQuantity || 1,
+      stock: e.stockTracked ? e.quantityOwned : null, components: [] });
   }
   for (const o of offers) offerings.push({ id: `offer-${o.id}`, name: o.name, type: 'package', category: 'offers', offer: true, isActive: true, stock: null, components: o.components.map((m) => ({ offeringId: m.offeringId, quantity: m.quantity, inclusion: 'included' })) });
   return { offerings, policies: explicit.map(({ _id, __v, ...p }) => p), explicit: explicit.map(({ _id, __v, ...p }) => p), today: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' }) };

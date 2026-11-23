@@ -1,6 +1,5 @@
 const permanentDeletion=require('./permanent-deletion');
 const {uploadAsset}=require('./cloudinary-assets');
-const {validateSetMembers}=require('./equipment-demand');
 const mongoose = require('mongoose');
 const multer = require('multer');
 const { z } = require('zod');
@@ -22,9 +21,6 @@ const equipmentSchema = new mongoose.Schema(
     imageUrl: { type: String, default: '' },
     youtubeUrl: { type: String, default: '', trim: true, maxlength: 300 },
     modelUrl:{type:String,default:''},modelJobId:{type:String,default:''},modelSeeded:{type:Boolean,default:false},
-    modelParts:{type:[new mongoose.Schema({name:String,nameAr:String,src:String,x:Number,y:Number,z:Number,rotation:Number},{_id:false})],default:[]},
-    isSet:{type:Boolean,default:false},
-    setItems:{type:[new mongoose.Schema({equipmentId:String,quantity:Number,x:Number,y:Number,z:Number,rotation:Number},{_id:false})],default:[]},
     priceCents: { type: Number, default: 0, min: 0 }, // internal only, never in public output
     minQuantity: { type: Number, default: 1, min: 1 },
     quantityOwned: { type: Number, default: 1, min: 0 },
@@ -73,30 +69,16 @@ async function attachDefaultModels() {
 }
 
 const publicView = (e) => ({
-  isSet:Boolean(e.isSet||(e.setItems||[]).length||(e.modelParts||[]).length),setItems:(e.setItems||[]).map(member=>({equipmentId:member.equipmentId,quantity:member.quantity,x:member.x||0,y:member.y||0,z:member.z||0,rotation:member.rotation||0})),
   id: e.slug, category: e.category, equipmentCategoryId: e.equipmentCategoryId || e.serviceId || '', serviceId: e.equipmentCategoryId || e.serviceId || '', // serviceId: legacy alias for older clients
    name: e.name, brandModel: e.brandModel,
-  description: e.description, functionSummary: e.functionSummary || '', eventFit: e.eventFit && typeof e.eventFit === 'object' ? e.eventFit : {}, imageUrl: e.imageUrl, youtubeUrl: e.youtubeUrl || '', modelUrl:e.modelUrl||'', modelParts:(e.modelParts||[]).map(part=>({name:part.name,nameAr:part.nameAr||'',src:part.src,x:part.x||0,y:part.y||0,z:part.z||0,rotation:part.rotation||0})), minQuantity: e.minQuantity, ...stockView(e),
+  description: e.description, functionSummary: e.functionSummary || '', eventFit: e.eventFit && typeof e.eventFit === 'object' ? e.eventFit : {}, imageUrl: e.imageUrl, youtubeUrl: e.youtubeUrl || '', modelUrl:e.modelUrl||'', minQuantity: e.minQuantity, ...stockView(e),
   roomPlacement:e.roomPlacement&&Number.isFinite(e.roomPlacement.x)?{x:e.roomPlacement.x,fromBack:e.roomPlacement.fromBack||0,rotation:e.roomPlacement.rotation||0,height:e.roomPlacement.height||0,scale:e.roomPlacement.scale>0?e.roomPlacement.scale:1}:null,
 });
 const adminView = (e) => ({
   ...publicView(e),modelJobId:e.modelJobId||'', priceCents: e.priceCents, quantityOwned: e.quantityOwned, stockTracked: e.stockTracked, isActive: e.isActive, sortOrder: e.sortOrder,
 });
 
-const modelPartSchema=z.object({
- name:z.string().trim().min(1).max(160),nameAr:z.string().trim().max(160).default(''),
- src:z.string().trim().max(2048).refine(value=>{
-  if(/^\/echo\/[a-zA-Z0-9_./-]+\.glb$/.test(value))return !value.includes('..');
-  try{const url=new URL(value);return url.protocol==='https:'&&!url.username&&!url.password;}catch{return false;}
- },'Choose an HTTPS model URL or an /echo/ GLB asset.'),
- x:z.number().finite().min(-100).max(100).default(0),y:z.number().finite().min(0).max(100).default(0),z:z.number().finite().min(-100).max(100).default(0),
- rotation:z.number().finite().min(-360).max(360).default(0),
-}).strict();
-const setItemSchema=z.object({equipmentId:z.string().trim().regex(/^[a-z0-9-]+$/).max(160),quantity:z.number().int().min(1).max(32),x:z.number().finite().min(-100).max(100).default(0),y:z.number().finite().min(0).max(100).default(0),z:z.number().finite().min(-100).max(100).default(0),rotation:z.number().finite().min(-360).max(360).default(0)}).strict();
 const fields = {
-  isSet:z.boolean(),
-  setItems:z.array(setItemSchema).max(32).refine(items=>items.reduce((total,item)=>total+item.quantity,0)<=32,'A set can contain up to 32 pieces.').refine(items=>new Set(items.map(item=>item.equipmentId)).size===items.length,'Each equipment type must appear once.'),
-  modelParts:z.array(modelPartSchema).max(32),
   roomPlacement:z.object({x:z.number().finite().min(-50).max(50),fromBack:z.number().finite().min(0).max(100),rotation:z.number().finite().min(-360).max(360).default(0),height:z.number().finite().min(0).max(10).default(0),scale:z.number().finite().min(.2).max(5).default(1)}).strict().nullable(),
   modelJobId:z.string().max(80).nullable(),
   category: z.string().trim().min(1), equipmentCategoryId: z.string().trim().max(80).regex(/^$|^[a-z0-9]+(?:-[a-z0-9]+)*$/), serviceId: z.string().trim().max(80).regex(/^$|^[a-z0-9]+(?:-[a-z0-9]+)*$/), name: z.string().trim().min(1),
@@ -140,7 +122,6 @@ function registerEquipmentRoutes(app, requireAdmin) {
     if (parsed.success) syncCategory(parsed.data);
     if (!parsed.success) return bad(res, parsed);
     try {
-      await validateSetMembers(parsed.data,null,Equipment);
       const {modelJobId,...data}=parsed.data;const model=await require('./equipment-3d').equipmentModelFields(req,modelJobId);
       const created = await Equipment.create({...data,...model});
       await EquipmentTombstone.deleteOne({ slug: created.slug }); // re-adding an id clears its removed marker
@@ -156,7 +137,6 @@ function registerEquipmentRoutes(app, requireAdmin) {
     const parsed = updateSchema.safeParse(req.body);
     if (parsed.success) syncCategory(parsed.data);
     if (!parsed.success) return bad(res, parsed);
-    if(parsed.data.setItems!==undefined){try{await validateSetMembers(parsed.data,await Equipment.findOne({slug:req.params.id}),Equipment);}catch(error){return res.status(error.status||400).json({message:error.message});}}
     const {modelJobId,...data}=parsed.data;let model;try{model=await require('./equipment-3d').equipmentModelFields(req,modelJobId);}catch(error){if(error.status)return res.status(error.status).json({message:error.message});throw error;}
     const item = await Equipment.findOneAndUpdate({ slug: req.params.id }, {...data,...model}, { new: true });
     return item ? res.json({ item: adminView(item) }) : res.status(404).json({ message: 'Equipment not found.' });

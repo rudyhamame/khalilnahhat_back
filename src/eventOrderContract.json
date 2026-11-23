@@ -332,7 +332,7 @@
       "corporate",
       "mc"
      ],
-     "required": true,
+     "required": false,
      "short": "Services",
      "shortAr": "الخدمات",
      "optionNames": {

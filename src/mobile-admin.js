@@ -21,6 +21,9 @@ const { ADMIN_USERNAMES } = require('./default-data');
 const {isAdminUser}=require('./admin-role');
 
 User.schema.add({ adminNotes: { type: String, default: '', maxlength: 6000 } });
+// An administrator's home address (looked up on the map once, when it is saved): the start of the distance shown on every booking.
+User.schema.add({ homeAddress: { text: { type: String, default: '', maxlength: 300 }, latitude: { type: Number, default: null }, longitude: { type: Number, default: null } } });
+const distance = require('./admin-distance').createDistance();
 const fileSchema = new mongoose.Schema({
   name: { type: String, required: true }, publicId: { type: String, required: true, unique: true },
   bytes: Number, mime: String, format: String, resourceType: { type: String, default: 'raw' },
@@ -53,8 +56,48 @@ function registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest 
     const q=String(req.query.q||'').trim().slice(0,100);
     const role={$or:[{username:{$in:[...ADMIN_USERNAMES]}},{isAdmin:true,adminGrantedAt:{$ne:null},adminGrantedBy:{$ne:null}}]};
     const filter={$and:[role,...(q?[{$or:['firstName','lastName','email','username'].map(key=>({[key]:{$regex:q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),$options:'i'}}))}]:[])]};
-    const rows=await User.find(filter).select('_id firstName lastName username email isAdmin isBlocked adminGrantedAt adminGrantedBy createdAt lastLoginAt').sort({username:1}).limit(500).lean();
-    res.json({items:rows.filter(isAdminUser).map(user=>({id:String(user._id),name:[user.firstName,user.lastName].filter(Boolean).join(' '),username:user.username,email:user.email||'',role:ADMIN_USERNAMES.has(String(user.username).toLowerCase())?'Owner':'Administrator',isBlocked:Boolean(user.isBlocked),grantedAt:user.adminGrantedAt||null,createdAt:user.createdAt,lastLoginAt:user.lastLoginAt||null}))});
+    const rows=await User.find(filter).select('_id firstName lastName username email isAdmin isBlocked adminGrantedAt adminGrantedBy createdAt lastLoginAt homeAddress').sort({username:1}).limit(500).lean();
+    res.json({items:rows.filter(isAdminUser).map(user=>({id:String(user._id),homeAddress:user.homeAddress?.text||'',name:[user.firstName,user.lastName].filter(Boolean).join(' '),username:user.username,email:user.email||'',role:ADMIN_USERNAMES.has(String(user.username).toLowerCase())?'Owner':'Administrator',isBlocked:Boolean(user.isBlocked),grantedAt:user.adminGrantedAt||null,createdAt:user.createdAt,lastLoginAt:user.lastLoginAt||null}))});
+  });
+  // Set (or clear, with an empty address) an administrator's home address. It is looked up on the map so distances can be computed from it.
+  app.patch('/api/admin/admins/:id/address', requireAdmin, async (req, res) => {
+    const parsed = z.object({ address: z.string().trim().max(300), latitude: z.number().min(-90).max(90).optional(), longitude: z.number().min(-180).max(180).optional() }).strict().safeParse(req.body);
+    if (!parsed.success || !validId(req.params.id)) return fail(res, 400, 'Enter a valid address.');
+    const user = await User.findById(req.params.id);
+    if (!user || !isAdminUser(user)) return fail(res, 404, 'Administrator not found.');
+    if (!parsed.data.address) {
+      user.homeAddress = { text: '', latitude: null, longitude: null }; await user.save();
+      return res.json({ item: { id: String(user._id), homeAddress: '' } });
+    }
+    let place;
+    // A place picked from the search already carries its map point; a typed address is looked up.
+    if (parsed.data.latitude != null && parsed.data.longitude != null) place = { latitude: parsed.data.latitude, longitude: parsed.data.longitude };
+    else { try { place = await distance.geocode(parsed.data.address); } catch (error) { return fail(res, 503, error.message); } }
+    if (!place) return fail(res, 422, "We couldn't find that address on the map. Add the street, city and postal code.");
+    user.homeAddress = { text: parsed.data.address, latitude: place.latitude, longitude: place.longitude }; await user.save();
+    return res.json({ item: { id: String(user._id), homeAddress: parsed.data.address } });
+  });
+  // Search the map for a place (the Admins tab address field).
+  app.get('/api/admin/places/search', requireAdmin, async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const q = String(req.query.q || '').trim().slice(0, 200);
+    if (q.length < 3) return res.json({ items: [] });
+    try { return res.json({ items: await distance.search(q) }); } catch (error) { return fail(res, 503, error.message); }
+  });
+  // Distance from the signed-in administrator's home to a booking's venue. Always 200: the status says what is missing.
+  app.get('/api/admin/service-requests/:id/distance', requireAdmin, async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const me = await User.findById(req.authUser._id).select('homeAddress').lean();
+    const home = me?.homeAddress;
+    if (!home?.text || !Number.isFinite(home.latitude) || !Number.isFinite(home.longitude)) return res.json({ status: 'no-home' });
+    const request = await ServiceRequest.findOne({ externalId: req.params.id }).lean();
+    if (!request) return fail(res, 404, 'Service request not found.');
+    try {
+      const point = await distance.venuePoint(request.order, request.event || {});
+      if (!point) return res.json({ status: 'venue-not-found' });
+      const result = await distance.between(home, point);
+      return res.json({ status: 'ok', km: Math.round(result.km * 10) / 10, minutes: result.minutes, driving: result.driving, from: home.text });
+    } catch { return res.json({ status: 'unavailable' }); }
   });
   app.get('/api/admin/overview', requireAdmin, async (_req,res) => {
     const [clients,requests,pending,confirmed,media,archive,vault,queue,meetings,equipment] = await Promise.all([

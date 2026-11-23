@@ -1290,7 +1290,18 @@ app.get('/api/live-stream/admin', requireAdmin, async (_request, response) => {
   });
 });
 
-app.get('/api/youtube/search', requireAuth, async (request, response) => {
+// Song search is open to visitors (no sign-in), so it is rate limited per address to protect the YouTube quota.
+// ponytail: in-memory per process; use a shared store if the API ever runs on several instances.
+const youtubeSearchHits = new Map();
+function youtubeSearchLimited(request) {
+  const now = Date.now(), key = request.ip || 'unknown', recent = (youtubeSearchHits.get(key) || []).filter((time) => now - time < 60_000);
+  if (recent.length >= 20) { youtubeSearchHits.set(key, recent); return true; }
+  recent.push(now); youtubeSearchHits.set(key, recent);
+  if (youtubeSearchHits.size > 5000) for (const [address, times] of youtubeSearchHits) if (!times.some((time) => now - time < 60_000)) youtubeSearchHits.delete(address);
+  return false;
+}
+app.get('/api/youtube/search', async (request, response) => {
+  if (youtubeSearchLimited(request)) return response.status(429).json({ message: 'Too many searches. Try again in a minute.' });
   const parsed = youtubeSearchSchema.safeParse({ query: request.query.q });
 
   if (!parsed.success) {

@@ -20,7 +20,7 @@ const mongoStore = {
 const hashCode = (email, code) => crypto.createHash('sha256').update(`${email}:${code}`).digest('hex');
 const email = z.string().trim().toLowerCase().email('A valid email is required.').max(254);
 const startSchema = z.object({
-  firstName: z.string().trim().min(1, 'First name is required.').max(120), lastName: z.string().trim().min(1, 'Last name is required.').max(120), email,
+  firstName: z.string().trim().min(1, 'First name is required.').max(60), lastName: z.string().trim().min(1, 'Last name is required.').max(60), email,
   password: z.string().min(8, 'Choose a password of at least 8 characters.').max(128),
   phoneNumber: z.string().trim().max(40).optional().default(''), company: z.string().trim().max(120).optional().default(''),
   preferredContact: z.enum(['any', 'email', 'phone']).optional(), phoneContact: z.enum(['whatsapp-text', 'whatsapp-call', 'sms', 'call']).optional(),

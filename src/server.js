@@ -96,8 +96,8 @@ const bookingSchema = z.object({
 });
 
 const signupSchema = z.object({
-  firstName: z.string().trim().min(1, 'First name is required.'),
-  lastName: z.string().trim().min(1, 'Last name is required.'),
+  firstName: z.string().trim().min(1, 'First name is required.').max(60),
+  lastName: z.string().trim().min(1, 'Last name is required.').max(60),
   username: z.string().trim().min(1).optional(),
   password: z.string().min(8, 'Choose a password of at least 8 characters.').max(128),
   email: z.string().trim().email('A valid email is required.'),
@@ -889,8 +889,8 @@ app.patch('/api/auth/profile', async (request, response) => {
   if (!user) return response.status(401).json({ message: 'No active session.' });
   const body = request.body || {}, text = (key) => (typeof body[key] === 'string' ? body[key].trim() : undefined);
   const firstName = text('firstName'), lastName = text('lastName'), phoneNumber = text('phoneNumber'), company = text('company');
-  if (firstName !== undefined && (!firstName || firstName.length > 80)) return response.status(400).json({ message: 'Enter a first name (up to 80 characters).' });
-  if (lastName !== undefined && (lastName.length > 80 || (!lastName && !user.googleSubject))) return response.status(400).json({ message: 'Enter a last name (up to 80 characters).' });
+  if (firstName !== undefined && (!firstName || firstName.length > 60)) return response.status(400).json({ message: 'Enter a first name (up to 60 characters).' });
+  if (lastName !== undefined && (lastName.length > 60 || (!lastName && !user.googleSubject))) return response.status(400).json({ message: 'Enter a last name (up to 60 characters).' });
   if (phoneNumber !== undefined && !/^[0-9+()\-.\s]{0,30}$/.test(phoneNumber)) return response.status(400).json({ message: 'Enter a valid phone number.' });
   if (company !== undefined && company.length > 120) return response.status(400).json({ message: 'Company name can be up to 120 characters.' });
   if (body.preferredContact !== undefined && !['any', 'email', 'phone'].includes(body.preferredContact)) return response.status(400).json({ message: 'Choose any method, email only or phone only.' });

@@ -15,6 +15,8 @@ test('a visitor creates an account, confirms the email with a code, and is only 
  try{
   assert.equal((await post('/start',{...details,password:'short'})).status,400);assert.equal(users.length,0);
   assert.equal((await post('/start',{...details,lastName:''})).status,400);
+  for(const key of ['firstName','lastName'])assert.equal((await post('/start',{...details,[key]:'x'.repeat(61)})).status,400);
+  assert.equal(users.length,0);assert.equal(mails.length,0);
   assert.equal((await post('/start',details)).status,202);
   assert.equal(users.length,1);assert.equal(users[0].awaitingVerification,true);assert.equal(users[0].emailVerified,false);assert.equal(users[0].passwordHash,'hash:long-enough-pw');
   assert.equal(mails.length,1);assert.equal(mails[0].to,'sam@example.com');assert.ok(mails[0].html.includes('123456'));

@@ -131,9 +131,9 @@ test('Special requests is not a data atom any more: old text becomes the Additio
   assert.equal(core.isAiEditableField('references.images'),true);
 });
 
-test('a phone number needs one phone contact option; without a phone it is not asked',()=>{
+test('phone and phone contact are both required',()=>{
   const base=()=>{const order=core.createEventOrder();order.customer.firstName='A';order.customer.lastName='B';order.customer.email='a@example.invalid';order.customer.contactMethod='email';return order;};
-  assert.equal(core.missingOrderFields(base()).some(field=>field.key==='customer.phoneContact'),false);
+  assert.equal(core.missingOrderFields(base()).some(field=>field.key==='customer.phoneContact'),true);
   const withPhone=base();withPhone.customer.phone='4165550123';
   assert.equal(core.missingOrderFields(withPhone).some(field=>field.key==='customer.phoneContact'),true);
   withPhone.customer.phoneContact='whatsapp-call';

@@ -85,6 +85,7 @@
      "key": "customer.phoneContact",
      "label": "How may we reach you on your phone?",
      "ar": "كيف نتواصل معك على هاتفك؟",
+     "required": true,
      "options": [
       "whatsapp-text",
       "whatsapp-call",
@@ -462,6 +463,7 @@
     },
     {
      "key": "music.genres",
+     "gate": "music.djRequested",
      "label": "Which music genres do you like?",
      "ar": "ما الأنواع الموسيقية التي تفضلها؟",
      "type": "tags",
@@ -471,6 +473,7 @@
     },
     {
      "key": "music.languagePairs",
+     "gate": "music.djRequested",
      "label": "Languages, each with its dialect (the first is the main language)",
      "ar": "اللغات، لكل لغة لهجتها (الأولى هي الرئيسية)",
      "type": "pairs",
@@ -480,6 +483,7 @@
     },
     {
      "key": "music.suggestedSongs",
+     "gate": "music.djRequested",
      "label": "Suggested songs, in order, each with its moment (intro, outro ...)",
      "ar": "الأغاني المقترحة بالترتيب، لكل أغنية لحظتها (مقدمة، ختام ...)",
      "type": "songs",
@@ -489,6 +493,7 @@
     },
     {
      "key": "music.favouriteSongs",
+     "gate": "music.djRequested",
      "label": "Favourite songs (optional)",
      "ar": "الأغاني المفضلة (اختياري)",
      "type": "songs",
@@ -498,6 +503,7 @@
     },
     {
      "key": "music.favouriteArtists",
+     "gate": "music.djRequested",
      "label": "Favourite artists (optional)",
      "ar": "الفنانون المفضلون (اختياري)",
      "type": "tags",

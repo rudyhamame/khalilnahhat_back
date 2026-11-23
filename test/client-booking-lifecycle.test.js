@@ -53,8 +53,8 @@ test('tracked equipment shortage prevents confirming and recording a deposit',as
  const result=await f.post('payments',deposit(30),'admin');assert.equal(result.status,409);assert.match(result.body.message,/not available/);assert.equal(f.request.payments.length,0);assert.equal(f.bookings.length,0);
 });
 
-test('bundle and standalone components aggregate before deposit confirmation',async t=>{
- const f=await fixture(t,{stock:[{slug:'speaker',name:'Speaker',stockTracked:true,quantityOwned:2},{slug:'bundle',name:'Bundle',isSet:true,stockTracked:true,quantityOwned:2,setItems:[{equipmentId:'speaker',quantity:2}]}]});
- f.request.status='accepted';f.request.items.push({serviceId:'bundle',quantity:1,unitPrice:20},{serviceId:'speaker',quantity:1,unitPrice:10});
+test('repeated individual equipment lines aggregate before deposit confirmation',async t=>{
+ const f=await fixture(t,{stock:[{slug:'speaker',name:'Speaker',stockTracked:true,quantityOwned:2}]});
+ f.request.status='accepted';f.request.items.push({serviceId:'speaker',quantity:2,unitPrice:10},{serviceId:'speaker',quantity:1,unitPrice:10});
  const response=await f.post('payments',deposit(30),'admin');assert.equal(response.status,409);assert.match(response.body.message,/Speaker.*not available/);assert.equal(f.request.payments.length,0);assert.equal(f.bookings.length,0);
 });

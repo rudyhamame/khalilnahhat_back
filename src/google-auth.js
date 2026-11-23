@@ -1,4 +1,6 @@
 const crypto = require('crypto');
+const bookingFields=require('./eventOrderContract.json').sections.flatMap(section=>section.fields);
+const nameLimit=key=>bookingFields.find(field=>field.key===key).maxLength;
 const {issueSession}=require('./account-sessions');
 const {hasGrantedAdminRole}=require('./admin-role');
 const { OAuth2Client } = require('google-auth-library');
@@ -53,8 +55,8 @@ function registerGoogleAuth(app, { User, serializeUser, isAdminUser, clientId = 
           user = await User.create({
             googleSubject: profile.sub,
             username: `google-${crypto.randomBytes(16).toString('hex')}`,
-            firstName: String(profile.given_name || profile.name || 'Client').slice(0, 120),
-            lastName: String(profile.family_name || '').slice(0, 120),
+            firstName: String(profile.given_name || profile.name || 'Client').trim().slice(0,nameLimit('customer.firstName')),
+            lastName: String(profile.family_name || '').trim().slice(0,nameLimit('customer.lastName')),
             email, emailVerified: true, phoneNumber: '', isAdmin: false,
             // Google accounts have no usable local password. Password reset can add one.
             passwordHash: await hashPassword(crypto.randomBytes(48).toString('hex')),

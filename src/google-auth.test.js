@@ -96,3 +96,10 @@ test('an explicitly promoted client keeps verified Google access to the same adm
   }
   assert.equal(api.stats().created,0);assert.equal(api.records[0].googleSubject,'google-subject');assert.equal(api.records[0].passwordHash,'unchanged');
 });
+
+test('new Google profile names respect the booking contract limits',async t=>{
+ const api=await setup(t,{profile:{given_name:'A'.repeat(90),family_name:'B'.repeat(90)}});
+ await api.config();assert.equal((await api.post()).status,200);
+ const fields=require('./eventOrderContract.json').sections.flatMap(section=>section.fields);
+ for(const [key,path] of [['firstName','customer.firstName'],['lastName','customer.lastName']])assert.equal(api.records[0][key].length,fields.find(field=>field.key===path).maxLength);
+});

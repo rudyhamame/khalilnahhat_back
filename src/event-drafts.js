@@ -1,7 +1,7 @@
 const mongoose=require('mongoose');
 const {randomUUID}=require('node:crypto');
 const {z}=require('zod');
-const {normalizeEventOrder,validateEventOrder,applyAccountProfile}=require('./event-order');
+const {normalizeEventOrder,validateEventOrder,applyDraftAccountProfile}=require('./event-order');
 const deletedDrafts=require('./deleted-event-drafts');
 const schema=new mongoose.Schema({_id:String,draftId:{type:String,default:randomUUID},order:mongoose.Schema.Types.Mixed,version:{type:Number,default:1}},{timestamps:true});
 const EventDraft=mongoose.models.EventDraft||mongoose.model('EventDraft',schema);
@@ -22,7 +22,7 @@ const mongoStore={
   async remove(owner,version,draftId){return (await EventDraft.deleteOne({_id:owner,version,...(draftId?{draftId}:{})})).deletedCount===1;},
 };
 const inputSchema=z.object({version:z.number().int().min(0),draftId:z.uuid().optional(),order:z.record(z.string(),z.unknown())}).strict();
-const serialize=(item,user)=>item?{draftId:item.draftId,order:applyAccountProfile(item.order,user),version:item.version,updatedAt:item.updatedAt}:null;
+const serialize=(item,user)=>item?{draftId:item.draftId,order:applyDraftAccountProfile(normalizeEventOrder(item.order),user),version:item.version,updatedAt:item.updatedAt}:null;
 function registerEventDrafts(app,{requireAuth,store=mongoStore,retireDraft=store===mongoStore?deletedDrafts.retire:async()=>{},removeConversation=store===mongoStore?(owner,id)=>require('./booking-conversations').Conversation.deleteOne({_id:id,owner}):async()=>{},removeRetiredDraft=store===mongoStore?(owner,draftId)=>EventDraft.deleteOne({_id:owner,draftId}):async()=>{}}){
   const writes=new Map();
   const guarded=handler=>async(req,res)=>{
@@ -40,7 +40,7 @@ function registerEventDrafts(app,{requireAuth,store=mongoStore,retireDraft=store
     const parsed=inputSchema.safeParse(req.body);
     if(!parsed.success||JSON.stringify(req.body).length>100000)return res.status(400).json({message:'Invalid event draft.'});
     // Drafts can be incomplete, but must still satisfy the shared field types.
-    const order=applyAccountProfile(parsed.data.order,req.authUser);
+    const order=applyDraftAccountProfile(parsed.data.order,req.authUser);
     if(validateEventOrder(order).length)return res.status(400).json({message:'Some draft values are invalid.'});
     const draftId=parsed.data.draftId||(await store.get(owner))?.draftId||randomUUID();
     const item=await store.put(owner,parsed.data.version,normalizeEventOrder(order),draftId);

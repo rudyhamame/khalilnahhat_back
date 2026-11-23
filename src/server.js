@@ -581,7 +581,7 @@ function serializeAdminLiveStreamConfig(config) {
     liveSetListId: config?.liveSetListId || 'none',
     studio:{transport:process.env.ECHO_BROWSER_TRANSPORT==='ovh'&&require('./obs-relay-client').configured()?'ovh':'livekit'},
     streamUrl: config?.streamUrl || '',
-    obs: { roomName: config?.obsRoomName || '', state: config?.obsState || '',
+    obs: { roomName: config?.obsRoomName || '', state: config?.obsState || '', goLive: config?.obsGoLive !== false,
       saveRecording: config?.obsSaveRecording !== false,
       url: config?.obsUrl || '', streamKey: config?.obsStreamKey || '', expiresAt: config?.obsExpiresAt || null,
       transport: config?.broadcastMode === 'whep' || (!config?.obsRoomName && require('./obs-relay-client').configured()) ? 'ovh' : 'livekit', error: config?._obsRelayError || '' },

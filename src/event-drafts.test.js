@@ -49,10 +49,22 @@ test('cleared optional venue details remain empty after saving and reloading',as
 });
 
 test('draft saves and resumes use account contacts instead of supplied values',async t=>{
- const request=await fixture(t),order=createEventOrder();
+ const request=await fixture(t),order=createEventOrder();order.accountDetailsImported=true;
  Object.assign(order.customer,{firstName:'Forged',lastName:'Name',email:'forged@example.invalid',phone:'9999999999',company:'Forged Company'});
  const response=await request('PUT',{version:0,order});assert.equal(response.status,200);
  const saved=(await response.json()).item.order.customer;
  assert.deepEqual(saved,{firstName:'Account',lastName:'Client',email:'account@example.invalid',phone:'4165550199',company:'Account Company',contactMethod:'email',phoneContact:'call'});
  assert.deepEqual((await(await request()).json()).item.order.customer,saved);
+});
+
+test('account contacts stay empty until explicitly imported, including after saving and reloading',async t=>{
+ const request=await fixture(t),order=createEventOrder();
+ Object.assign(order.customer,{firstName:'Previously automatic',email:'old@example.invalid'});
+ let response=await request('PUT',{version:0,order});assert.equal(response.status,200);
+ let item=(await response.json()).item;assert.equal(item.order.accountDetailsImported,false);assert.ok(Object.values(item.order.customer).every(value=>value===null));
+ assert.equal((await(await request()).json()).item.order.customer.email,null);
+ order.accountDetailsImported=true;response=await request('PUT',{version:1,order});assert.equal(response.status,200);
+ item=(await response.json()).item;assert.equal(item.order.accountDetailsImported,true);assert.equal(item.order.customer.email,'account@example.invalid');
+ assert.equal((await(await request()).json()).item.order.customer.email,'account@example.invalid');
+ order.accountDetailsImported=false;response=await request('PUT',{version:2,order});assert.equal(response.status,200);assert.equal((await response.json()).item.order.customer.email,null);
 });

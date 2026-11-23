@@ -8,7 +8,7 @@ function createRelayBroadcast(deps) {
   if(!ending)return getLiveStreamConfig();
   if(row.obsPortraitRoomName)await relay.request(relay.sessionRoute(row.obsPortraitRoomName),{method:'DELETE',allowMissing:true});
   await relay.request(relay.sessionRoute(row.obsRoomName),{method:'DELETE',allowMissing:true});
-  return await LiveStreamConfig.findOneAndUpdate(owned(row),{isLive:false,audience:'all',audienceUserIds:[],webrtcRoomName:'',obsRoomName:'',obsPortraitRoomName:'',obsIngressId:'',obsUrl:'',obsStreamKey:'',obsState:'',obsExpiresAt:null,streamUrl:'',statusLabel:defaults.statusLabel},{new:true}) || getLiveStreamConfig();
+  return await LiveStreamConfig.findOneAndUpdate(owned(row),{isLive:false,audience:'all',audienceUserIds:[],webrtcRoomName:'',obsRoomName:'',obsPortraitRoomName:'',obsGoLive:true,obsIngressId:'',obsUrl:'',obsStreamKey:'',obsState:'',obsExpiresAt:null,streamUrl:'',statusLabel:defaults.statusLabel},{new:true}) || getLiveStreamConfig();
  }
  async function synchronize(row) {
   if(row.obsState==='ending')return stop(row);
@@ -20,9 +20,11 @@ function createRelayBroadcast(deps) {
   }
   const portrait=row.obsPortraitRoomName?await relay.request(relay.sessionRoute(row.obsPortraitRoomName),{allowMissing:true}):null;
   if(portrait?.state==='ended')return stop(row);
-  const live=status.state==='live'&&(!row.obsPortraitRoomName||portrait?.state==='live');
-  const updated=await LiveStreamConfig.findOneAndUpdate({...owned(row),obsState:{$in:['preparing','waiting','live']}},
-   {isLive:live,obsState:live?'live':'waiting',streamUrl:live?status.playbackUrl:'',statusLabel:live?'Live now — DJ Khalil is on air.':defaults.statusLabel},{new:true});
+  // Media reaching the relay only makes the connection `ready` (private). The site goes live when the admin presses Go live (obsGoLive).
+  const flowing=status.state==='live'&&(!row.obsPortraitRoomName||portrait?.state==='live');
+  const live=flowing&&row.obsGoLive!==false;
+  const updated=await LiveStreamConfig.findOneAndUpdate({...owned(row),obsState:{$in:['preparing','waiting','ready','live']}},
+   {isLive:live,obsState:live?'live':flowing?'ready':'waiting',streamUrl:live?status.playbackUrl:'',statusLabel:live?'Live now — DJ Khalil is on air.':defaults.statusLabel},{new:true});
   if(updated&&(updated.audience||'all')==='all')await deps.notifyLiveTransition?.(row,updated);
   return updated || getLiveStreamConfig();
  }
@@ -37,7 +39,7 @@ function createRelayBroadcast(deps) {
    const roomName=`khalil-obs-${randomUUID()}`;
    const title=(typeof req.body?.title==='string' && req.body.title.trim().slice(0,180)) || current.title || defaults.title;
    claimed=await LiveStreamConfig.findOneAndUpdate({key:defaults.key,isLive:{$ne:true},webrtcRoomName:{$in:['',null]},obsRoomName:{$in:['',null]}},
-    {isLive:false,title,streamUrl:'',broadcastMode:'whep',broadcastSource:'obs',webrtcRoomName:'',obsRoomName:roomName,obsState:'preparing',obsExpiresAt:new Date(Date.now()+120000)},{new:true});
+    {isLive:false,obsGoLive:false,title,streamUrl:'',broadcastMode:'whep',broadcastSource:'obs',webrtcRoomName:'',obsRoomName:roomName,obsState:'preparing',obsExpiresAt:new Date(Date.now()+120000)},{new:true});
    if(!claimed)return res.status(409).json({message:'Another broadcaster started first.'});
    const saveRecording=claimed.obsSaveRecording!==false;
    if(saveRecording)await LiveRecording.create({roomName,title,provider:'ovh',status:'waiting'});

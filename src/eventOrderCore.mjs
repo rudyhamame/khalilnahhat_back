@@ -68,7 +68,7 @@ export function hasEventDraftContent(order) {
   });
 }
 export function createEventOrder() {
-  const order={schemaVersion:contract.version,source:'manual'};
+  const order={schemaVersion:contract.version,source:'manual',accountDetailsImported:false};
   for(const field of fields)put(order,field.key,['multi','links','songs','tags','pairs','attachments'].includes(field.type)?[]:null);
   order.event.timezone=contract.timezone;
   order.equipment=[];
@@ -128,6 +128,7 @@ export function customerNameParts(customer={}) {
 export function normalizeEventOrder(input) {
   input={...input,customer:{...input?.customer,...customerNameParts(input?.customer)}};
   const order=createEventOrder();
+  order.accountDetailsImported=input?.accountDetailsImported===true;
   for(const field of fields){const value=getPath(input,field.key);if(value!==undefined&&validValue(field,value))put(order,field.key,Array.isArray(value)?[...new Set(value)]:value);}
   for(const field of planningFields){const value=getPath(input,field.key);if(value!==undefined&&validValue(field,value))put(order,field.key,value);}
   // Special requests is no longer a data atom: what a client already wrote there becomes the Additional notes.
@@ -164,6 +165,14 @@ export function applyAccountProfile(order,user){
   if(next.customer)delete next.customer.fullName;
   for(const [path,value] of Object.entries(accountProfile(user)))put(next,path,value);
   return next;
+}
+// A draft gets account contacts only after its owner explicitly imports them.
+export function applyDraftAccountProfile(order,user){
+ if(!user)return order;
+ if(order.accountDetailsImported===true)return applyAccountProfile(order,user);
+ const next=structuredClone(order);next.accountDetailsImported=false;
+ for(const field of lockedFields)put(next,field.key,null);
+ return next;
 }
 // Awareness is broader than write access: location provenance is readable, but
 // only a real venue selection may write it. Account fields stay account-owned.
@@ -226,6 +235,7 @@ export function missingOrderFields(order) {
 }
 export function validateEventOrder(input,{submission=false,today=new Date().toLocaleDateString('en-CA',{timeZone:contract.timezone})}={}) {
   const errors=[];
+  if(input?.accountDetailsImported!==undefined&&typeof input.accountDetailsImported!=='boolean')errors.push('accountDetailsImported');
   if(input?.schemaVersion!==contract.version)errors.push('schemaVersion');
   for(const field of [...fields,...planningFields]){const value=getPath(input,field.key);if(value!==undefined&&!validValue(field,value))errors.push(field.key);}
   if(input?.event?.timezone!==contract.timezone)errors.push('event.timezone');

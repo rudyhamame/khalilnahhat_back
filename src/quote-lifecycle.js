@@ -2,6 +2,7 @@ const { z } = require('zod');
 const { ServiceRequest } = require('./models');
 const { sendQuoteExpiryReminder } = require('./brevo');
 const { sendBookingDecision, sendBookingRequested } = require('./booking-process-mail');
+const { notifyBooking } = require('./booking-events-mail');
 const { notificationEmails } = require('./notification-emails');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -14,9 +15,11 @@ const { STATUS } = journey;
 const isExpired = (sr) => journey.rule(sr.status).expires && sr.expiresAt && sr.expiresAt <= new Date();
 
 // Expire overdue quotes and send each enabled reminder within its configured window.
-async function sweepQuotes({notifications=notificationEmails,Model=ServiceRequest,send=sendQuoteExpiryReminder,clock=Date.now} = {}) {
+async function sweepQuotes({notifications=notificationEmails,Model=ServiceRequest,send=sendQuoteExpiryReminder,clock=Date.now,notify=notifyBooking} = {}) {
   const now = new Date(clock());
+  const expiring = typeof Model.find === 'function' ? await Model.find({ status: { $in: journey.statusesWhere('expires') }, expiresAt: { $lte: now } }) : [];
   await Model.updateMany({ status: { $in: journey.statusesWhere('expires') }, expiresAt: { $lte: now } }, { status: STATUS.EXPIRED });
+  for (const sr of expiring) { sr.status = STATUS.EXPIRED; void notify(sr, 'booking-quote-expired'); }
   const rule = await notifications.get('quote-expiry-reminder');
   if (!rule.enabled) return;
   const due = await Model.find({
@@ -43,7 +46,7 @@ async function deleteBooking(sr, { EventBooking, Meeting, remove }) {
   return { deleted: Boolean(removed), cloudinaryCleanupPending: Boolean(removed?.cloudinaryCleanupPending) };
 }
 
-function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Model = ServiceRequest, sendDecision = sendBookingDecision, sendRequested = sendBookingRequested }) {
+function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Model = ServiceRequest, sendDecision = sendBookingDecision, sendRequested = sendBookingRequested, notify = notifyBooking }) {
   const find = (id) => Model.findOne({ externalId: id });
   const notFound = (res) => res.status(404).json({ message: 'Service request not found.' });
   const own = (req, sr) => sr && String(sr.userId) === String(req.authUser._id);
@@ -89,6 +92,7 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     sr.status = STATUS.PENDING; sr.acceptedAt = null; sr.expiresAt = null; sr.reminderSentAt = null;
     sr.quoteRevision = (sr.quoteRevision || 0) + 1; // stale client accept/negotiate calls on the withdrawn quote fail
     try { await sr.save(); } catch (error) { if (error.name === 'VersionError') return res.status(409).json({ message: 'The booking changed. Reload before continuing.' }); throw error; }
+    void notify(sr, parsed.data.to === 'requested' ? 'booking-step-back-requested' : 'booking-step-back-available');
     return res.json({ item: serialize(sr, true) });
   });
 
@@ -129,6 +133,9 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
       sr.status = STATUS.PENDING; sr.acceptedAt = null; sr.expiresAt = null; sr.reminderSentAt = null; sr.quoteRevision = (sr.quoteRevision || 0) + 1;
     }
     try { await sr.save(); } catch (error) { if (error.name === 'VersionError') return res.status(409).json({ message: 'The booking changed. Reload before continuing.' }); throw error; }
+    const changedDetail = String(field.short || field.label || path).toLowerCase();
+    if (reset) { void notify(sr, 'booking-details-recheck', { changedDetail }); void notify(sr, 'booking-details-recheck-admin', { changedDetail }); }
+    else void notify(sr, 'booking-details-updated-admin', { changedDetail });
     return res.json({ item: serialize(sr, false), reset });
   });
 
@@ -162,8 +169,8 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     if (isExpired(sr) || !journey.rule(sr.status).canNegotiate) return res.status(409).json({message:'This request can no longer be declined.'});
     sr.status = STATUS.CANCELLED; sr.declinedBy = 'client';
     try{await sr.save();}catch(error){if(error.name==='VersionError')return res.status(409).json({message:'The booking changed. Reload before continuing.'});throw error;}
-    const mail = await sendDecision(sr,'declined').catch(() => ({sent:false}));
-    return res.json({item:serialize(sr,false),notificationSent:!!mail.sent});
+    const mail = await notify(sr,'booking-withdrawn'); void notify(sr,'booking-withdrawn-admin');
+    return res.json({item:serialize(sr,false),notificationSent:!!mail?.sent});
   });
 
   app.post('/api/service-requests/:id/accept', requireAuth, async (req, res) => {
@@ -178,6 +185,7 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     sr.status = STATUS.ACCEPTED;
     sr.acceptedAt = new Date();
     try{await sr.save();}catch(error){if(error.name==='VersionError')return res.status(409).json({message:'The booking changed. Reload before continuing.'});throw error;}
+    void notify(sr,'booking-quote-accepted'); void notify(sr,'booking-accepted-admin');
     return res.json({ item: serialize(sr, false) });
   });
 
@@ -190,6 +198,7 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     sr.status = STATUS.CHANGES_REQUESTED;
     sr.changeRequest = parsed.data.message;
     try{await sr.save();}catch(error){if(error.name==='VersionError')return res.status(409).json({message:'The booking changed. Reload before continuing.'});throw error;}
+    void notify(sr,'booking-changes-requested',{message:sr.changeRequest}); void notify(sr,'booking-changes-requested-admin',{message:sr.changeRequest});
     return res.json({ item: serialize(sr, false) });
   });
 
@@ -210,6 +219,7 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     sr.quoteRevision=(sr.quoteRevision||0)+1;
     sr.reminderSentAt = null;
     try{await sr.save();}catch(error){if(error.name==='VersionError')return res.status(409).json({message:'The booking changed. Reload before continuing.'});throw error;}
+    void notify(sr,'booking-quote-extended');
     return res.json({ item: serialize(sr, true) });
   });
 
@@ -218,6 +228,7 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     if (!sr) return notFound(res);
     sr.status = STATUS.CANCELLED;
     try{await sr.save();}catch(error){if(error.name==='VersionError')return res.status(409).json({message:'The booking changed. Reload before continuing.'});throw error;}
+    void notify(sr,'booking-cancelled');
     return res.json({ item: serialize(sr, true) });
   });
 

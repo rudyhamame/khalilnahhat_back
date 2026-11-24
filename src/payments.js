@@ -53,7 +53,8 @@ async function stockProblem(sr, EquipmentModel = Equipment, BookingModel = Event
   return '';
 }
 
-function registerPayments(app, { requireAuth, requireAdmin, serialize, Model = ServiceRequest, BookingModel = EventBooking, EquipmentModel = Equipment, sendConfirmation = sendBookingConfirmation }) {
+const money = (cents) => new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(Number(cents || 0) / 100);
+function registerPayments(app, { requireAuth, requireAdmin, serialize, Model = ServiceRequest, BookingModel = EventBooking, EquipmentModel = Equipment, sendConfirmation = sendBookingConfirmation, notify = require('./booking-events-mail').notifyBooking }) {
   const find = (id) => Model.findOne({ externalId: id });
   const fail = (res, code, message) => res.status(code).json({ message });
 
@@ -99,6 +100,7 @@ function registerPayments(app, { requireAuth, requireAdmin, serialize, Model = S
       throw e;
     }
     if (booking) sendConfirmation(sr, cents).catch((e) => console.error('Booking confirmation email failed:', e));
+    else if (kind !== 'refund') void notify(sr, 'booking-deposit-received', { paymentAmount: money(cents), balance: money(totalCents - (net + cents)) });
     return res.status(201).json({ item: serialize(sr, true) });
   });
 
@@ -109,6 +111,7 @@ function registerPayments(app, { requireAuth, requireAdmin, serialize, Model = S
     if (!p || p.voided) return fail(res, 404, 'Payment not found.');
     p.voided = true;
     await sr.save();
+    void notify(sr, 'booking-payment-voided', { paymentAmount: money(Math.abs(p.amountCents)), balance: money(toCents(quoteTotals(sr).total) - netPaidCents(sr)) });
     return res.json({ item: serialize(sr, true) });
   });
 

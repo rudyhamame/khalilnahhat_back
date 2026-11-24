@@ -1053,6 +1053,8 @@ app.patch('/api/service-requests/:id/quote', requireAdmin, async (request, respo
     });
   }
 
+  const hadQuote = Boolean(serviceRequest.quotedAt); // a second send is an update, with its own email
+
   if (!journey.rule(serviceRequest.status).repriceable || (serviceRequest.payments || []).some((p) => !p.voided)) {
     return response.status(409).json({ message: 'A cancelled or paid booking cannot be repriced through the quote editor.' });
   }
@@ -1100,8 +1102,8 @@ app.patch('/api/service-requests/:id/quote', requireAdmin, async (request, respo
   let notificationSent = false;
 
   try {
-    const notification = await sendServiceQuoteNotification(serviceRequest);
-    notificationSent = notification.sent;
+    const notification = hadQuote ? await require('./booking-events-mail').notifyBooking(serviceRequest, 'booking-quote-updated') : await sendServiceQuoteNotification(serviceRequest);
+    notificationSent = Boolean(notification?.sent);
   } catch (error) {
     console.error('Failed to send Brevo service quote notification:', error);
   }
@@ -1557,6 +1559,7 @@ require('./ai-paraphrase').registerAiBookingSummary(app,{
   configService:aiConfiguration,
   Model:ServiceRequest,
 });
+require('./quote-terms').registerQuoteTerms(app,{requireAdmin:require('./ai-booking-auth').createAiBookingAuth({localAuth:authFromRequest,adminCheck:isAdminUser})});
 require('./ai-paraphrase').registerAiEmail(app,{
   requireAdmin:require('./ai-booking-auth').createAiBookingAuth({localAuth:authFromRequest,adminCheck:isAdminUser}),
   configService:aiConfiguration,

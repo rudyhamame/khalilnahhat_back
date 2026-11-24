@@ -142,12 +142,16 @@
   "requested": {
    "label": "Booking requested",
    "labelAr": "تم طلب الحجز",
+   "adminLabel": "Booking received",
+   "adminLabelAr": "تم استلام الحجز",
    "step": 0,
    "clientNext": "wait_for_availability"
   },
   "available": {
    "label": "Booking date available",
    "labelAr": "تاريخ الحجز متاح",
+   "adminLabel": "Booking date availability confirmed",
+   "adminLabelAr": "تم تأكيد توفر تاريخ الحجز",
    "step": 1,
    "clientNext": "wait_for_quote"
   },
@@ -160,11 +164,15 @@
   "quote_ready": {
    "label": "Booking quote ready",
    "labelAr": "عرض سعر الحجز جاهز",
+   "adminLabel": "Booking quote sent",
+   "adminLabelAr": "تم إرسال عرض سعر الحجز",
    "step": 2
   },
   "deposit_paid": {
    "label": "Deposit paid",
    "labelAr": "تم دفع العربون",
+   "adminLabel": "Deposit received",
+   "adminLabelAr": "تم استلام العربون",
    "step": 3,
    "clientNext": "wait_for_confirmation"
   },

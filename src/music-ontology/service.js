@@ -205,7 +205,7 @@ function createService({ArchiveModel=MusicRecording,models=M,deliveryUrl=value=>
    const atoms=v.atoms===undefined?plain(old)?.atoms:v.atoms;
    await checkRecordingItems(atoms,v.audioUrl,v.durationSeconds,session);
    if(v.audioUrl&&!ownedAsset(v.audioUrl)||v.coverImage&&!ownedAsset(v.coverImage)||v.stems?.channels?.some(c=>!ownedAsset(c.url)))fail('Choose media uploaded to this website.');
-   if(v.audioUrl&&!require('../music-archive-files').localAssetPattern.test(v.audioUrl)&&!/\/video\/(upload|authenticated)\//.test(v.audioUrl))fail('Choose an uploaded audio asset.');
+   if(v.audioUrl&&!require('../music-archive-files').localAssetPattern.test(v.audioUrl)&&!require('../vps-media').isAudio(v.audioUrl)&&!/\/video\/(upload|authenticated)\//.test(v.audioUrl))fail('Choose an uploaded audio asset.');
    if(v.status==='PUBLISHED'&&!v.audioUrl)fail('Published recordings require audio.');
    const recordId=id||makeId('recording');
    const data={audioMetadata:v.audioMetadata!==undefined?v.audioMetadata:(old?.audioUrl===v.audioUrl?plain(old)?.audioMetadata:null),stems:v.stems!==undefined?v.stems:(old?.audioUrl===v.audioUrl?plain(old)?.stems||null:null),...(atoms!==undefined?{atoms}:{}),workType:v.workType,atomCount:atoms!==undefined?atoms.length:(old?.atomCount??0),status:v.status,revision:(old?.revision||0)+1,description:v.description,releaseDate:v.releaseDate,audioUrl:v.audioUrl,coverImage:v.coverImage,durationMinutes:v.durationMinutes};
@@ -255,7 +255,7 @@ function createService({ArchiveModel=MusicRecording,models=M,deliveryUrl=value=>
   const type=await DjWorkType.findOne({externalId:v.workType}).lean();if(!type)fail('Choose an existing DJ work type.');
   await checkRecordingItems(v.atoms,v.audioUrl,v.durationSeconds);
   if(v.audioUrl&&!ownedAsset(v.audioUrl)||v.coverImage&&!ownedAsset(v.coverImage)||v.stems?.channels?.some(c=>!ownedAsset(c.url)))fail('Choose media uploaded to this website.');
-  if(v.audioUrl&&!require('../music-archive-files').localAssetPattern.test(v.audioUrl)&&!/\/video\/(upload|authenticated)\//.test(v.audioUrl))fail('Choose an uploaded audio asset.');
+  if(v.audioUrl&&!require('../music-archive-files').localAssetPattern.test(v.audioUrl)&&!require('../vps-media').isAudio(v.audioUrl)&&!/\/video\/(upload|authenticated)\//.test(v.audioUrl))fail('Choose an uploaded audio asset.');
   if(v.status==='PUBLISHED'&&!v.audioUrl)fail('Published recordings require audio.');
   return v;
  }

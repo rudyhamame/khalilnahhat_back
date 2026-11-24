@@ -27,8 +27,8 @@ function messageFor(sr) {
   if (sr.status === STATUS.CANCELLED) return sr.declinedBy === 'admin' ? ['Request declined', 'Your booking request could not be accepted.'] : null;
   if(sr.status===STATUS.PENDING){
     const availability=availabilityFor(sr);
-    if(availability.status==='available')return ['Booking date and/or time available', 'Your booking is waiting for quote. We will notify you when it is ready.'];
-    if(availability.status==='unavailable')return ['Booking date and/or time unavailable', 'Open your booking for the reason. You may book an optional meeting or suggest another date and time.'];
+    if(availability.status==='available')return ['Booking date available', 'Your booking is waiting for quote. We will notify you when it is ready.'];
+    if(availability.status==='unavailable')return ['Booking date unavailable', 'Open your booking for the reason. You may book an optional meeting or suggest another date and time.'];
   }
   return MESSAGES[sr.status] || null;
 }

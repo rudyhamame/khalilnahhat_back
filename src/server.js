@@ -1541,6 +1541,15 @@ require('./ai-dj').registerAiDj(app,{
   requireAdmin:require('./ai-booking-auth').createAiBookingAuth({localAuth:authFromRequest,adminCheck:isAdminUser}),
   configService:aiConfiguration,
 });
+require('./ai-paraphrase').registerAiParaphrase(app,{
+  requireAdmin:require('./ai-booking-auth').createAiBookingAuth({localAuth:authFromRequest,adminCheck:isAdminUser}),
+  configService:aiConfiguration,
+});
+require('./ai-paraphrase').registerAiBookingSummary(app,{
+  requireAdmin:require('./ai-booking-auth').createAiBookingAuth({localAuth:authFromRequest,adminCheck:isAdminUser}),
+  configService:aiConfiguration,
+  Model:ServiceRequest,
+});
 const {mongoBillingStore,createAiBilling,registerAiBilling}=require('./ai-billing');
 registerAiBilling(app, {
   requireAdmin: require('./ai-booking-auth').createAiBookingAuth({ localAuth: authFromRequest, adminCheck: isAdminUser }),

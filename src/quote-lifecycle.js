@@ -83,7 +83,7 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     if (parsed.data.quoteRevision !== undefined && parsed.data.quoteRevision !== (sr.quoteRevision || 0)) return res.status(409).json({ message: 'The booking changed. Reload before continuing.' });
     const availability = require('./booking-availability'), previous = availability.availabilityFor(sr);
     if (parsed.data.to === 'available' && (previous.status !== 'available' || !journey.rule(sr.status).showsPrices)) return res.status(409).json({ message: 'Only a booking with a quote ready can go back to availability.' });
-    if (parsed.data.to === 'requested' && previous.status === 'pending') return res.status(409).json({ message: 'This booking is already at the requested stage.' });
+    if (parsed.data.to === 'requested' && !previous.informedAt) return res.status(409).json({ message: 'This booking is already at the requested stage.' });
     if (previous.informedAt) sr.availabilityHistory = [...(sr.availabilityHistory || []), { ...previous, window: sr.availabilityWindow, changedAt: new Date() }];
     if (parsed.data.to === 'requested') { sr.availabilityAcceptedAt = null; sr.availabilityUnavailableAt = null; sr.availabilityReason = ''; }
     sr.status = STATUS.PENDING; sr.acceptedAt = null; sr.expiresAt = null; sr.reminderSentAt = null;
@@ -107,12 +107,12 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     if (!own(req, sr)) return notFound(res);
     if (!sr.order || sr.status === STATUS.CANCELLED) return res.status(409).json({ message: 'This booking can no longer be edited.' });
     const field = eventOrder.fields.find(item => item.key === path);
-    if (!field || READ_ONLY.has(path)) return res.status(400).json({ message: 'This detail cannot be edited here.' });
+    if (!field || READ_ONLY.has(path) || path.startsWith('customer.')) return res.status(400).json({ message: 'Personal info comes from your account. Change it in your account, not in the booking.' });
     if (PRICED.has(path) || field.type === 'attachments') return res.status(400).json({ message: 'Use "Request changes" to change your services, equipment or files.' });
     if (!eventOrder.validValue(field, value)) return res.status(400).json({ message: 'That value is not valid for this detail.' });
     if (parsed.data.quoteRevision !== undefined && parsed.data.quoteRevision !== (sr.quoteRevision || 0)) return res.status(409).json({ message: 'The booking changed. Reload before editing.' });
     const availability = require('./booking-availability'), previous = availability.availabilityFor(sr);
-    const reset = AFFECTS_AVAILABILITY(path) && (previous.status !== 'pending' || journey.rule(sr.status).showsPrices);
+    const reset = AFFECTS_AVAILABILITY(path) && (previous.informedAt || journey.rule(sr.status).showsPrices);
     if (AFFECTS_AVAILABILITY(path) && (sr.payments || []).some(p => !p.voided)) return res.status(409).json({ message: 'This detail changes your date, venue or event. Contact us to change it after a payment.' });
     if (reset && !parsed.data.acknowledgeReset) return res.status(409).json({ code: 'RESET_REQUIRED', message: 'Changing this sends your booking back for a new availability check and withdraws the quote.' });
     const next = structuredClone(sr.order.toObject ? sr.order.toObject() : sr.order);

@@ -27,9 +27,9 @@ test('a status change on a saved booking notifies its owner, an unrelated edit d
 
 test('availability push uses the new stages and only the current event window',()=>{
  const sr={status:'pending',event:{eventDate:'2099-06-01',startTime:'18:00',endTime:'23:00'},availabilityAcceptedAt:new Date()};
- assert.equal(messageFor(sr)[0],'Booking date and/or time available');
+ assert.equal(messageFor(sr)[0],'Booking date available');
  sr.availabilityAcceptedAt=null;sr.availabilityUnavailableAt=new Date();sr.availabilityReason='Already booked';
- assert.equal(messageFor(sr)[0],'Booking date and/or time unavailable');assert.match(messageFor(sr)[1],/optional meeting/);
+ assert.equal(messageFor(sr)[0],'Booking date unavailable');assert.match(messageFor(sr)[1],/optional meeting/);
  sr.availabilityWindow=require('../src/booking-availability').windowKey(sr);sr.event.eventDate='2099-06-02';assert.equal(messageFor(sr),null);
 });
 test('availability changes trigger one owner-scoped push without changing the internal status',()=>{
@@ -37,7 +37,7 @@ test('availability changes trigger one owner-scoped push without changing the in
  const schema={pre:(_event,fn)=>hooks.pre=fn,post:(_event,fn)=>hooks.post=fn};const calls=[];
  watchSchema(schema,async(user,msg)=>{calls.push([user,msg.title]);});
  const doc={isNew:false,$locals:{},userId:'owner',externalId:'r1',status:'pending',availabilityAcceptedAt:new Date(),isModified:key=>key==='availabilityAcceptedAt'};
- hooks.pre.call(doc);hooks.post(doc);assert.deepEqual(calls,[['owner','Booking date and/or time available']]);
+ hooks.pre.call(doc);hooks.post(doc);assert.deepEqual(calls,[['owner','Booking date available']]);
  doc.isModified=()=>false;hooks.pre.call(doc);hooks.post(doc);assert.equal(calls.length,1);
  doc.isNew=true;doc.isModified=()=>true;hooks.pre.call(doc);hooks.post(doc);assert.equal(calls.length,1);
 });

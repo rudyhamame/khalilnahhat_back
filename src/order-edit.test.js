@@ -1,0 +1,21 @@
+const assert=require('node:assert'),{test}=require('node:test');
+const core=require('./event-order');
+const {registerQuoteLifecycle}=require('./quote-lifecycle');
+const routes={};const app={post:(p,...h)=>{routes[p]=h[h.length-1];},get(){},patch(){},put(){}};
+let sr;
+const Model={findOne:async()=>sr};
+registerQuoteLifecycle(app,{requireAuth:1,requireAdmin:1,serialize:x=>x,Model});
+const order=core.createEventOrder();
+Object.assign(order.customer,{firstName:'A',lastName:'B',email:'a@b.co',phone:'+14165550101',contactMethod:'email'});
+Object.assign(order.event,{type:'wedding',date:'2099-01-01',startTime:'18:00',endTime:'23:00',guestCount:50,venue:{name:'Hall',address:'1 St',city:'Toronto',country:'Canada'}});
+order.music.djRequested=true;
+const mk=()=>({userId:'u1',status:'quoted',order:structuredClone(order),event:{},quoteRevision:2,payments:[],availabilityAcceptedAt:new Date(),save:async function(){}});
+const call=async body=>{const res={code:200,status(c){this.code=c;return this;},json(b){this.body=b;return this;}};await routes['/api/service-requests/:id/order-edit']({params:{id:'x'},body,authUser:{_id:'u1'}},res);return res;};
+test('client order-edit: safe edits apply, availability edits need acknowledgement, priced atoms and paid bookings are refused',async()=>{
+ sr=mk();let r=await call({path:'additional.notes',value:'hello'});assert.equal(r.code,200,JSON.stringify(r.body));assert.equal(sr.order.additional.notes,'hello');assert.equal(sr.status,'quoted');
+ sr=mk();r=await call({path:'event.date',value:'2099-02-02'});assert.equal(r.code,409);assert.equal(r.body.code,'RESET_REQUIRED');
+ r=await call({path:'event.date',value:'2099-02-02',acknowledgeReset:true});assert.equal(r.code,200,JSON.stringify(r.body));assert.equal(sr.status,'pending');assert.equal(sr.quoteRevision,3);assert.equal(sr.availabilityAcceptedAt,null);
+ sr=mk();r=await call({path:'services',value:['dj']});assert.equal(r.code,400);
+ sr=mk();r=await call({path:'customer.firstName',value:'Z'});assert.equal(r.code,400);assert.equal(sr.order.customer.firstName,'A');
+ sr=mk();sr.payments=[{voided:false}];r=await call({path:'event.guestCount',value:60,acknowledgeReset:true});assert.equal(r.code,409);
+});

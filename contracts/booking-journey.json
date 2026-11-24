@@ -145,14 +145,14 @@
    "clientNext": "wait_for_availability"
   },
   "available": {
-   "label": "Booking date and/or time available (waiting for quote)",
-   "labelAr": "تاريخ و/أو وقت الحجز متاح (بانتظار عرض السعر)",
+   "label": "Booking date available",
+   "labelAr": "تاريخ الحجز متاح",
    "step": 1,
    "clientNext": "wait_for_quote"
   },
   "unavailable": {
-   "label": "Booking date and/or time unavailable",
-   "labelAr": "تاريخ و/أو وقت الحجز غير متاح",
+   "label": "Booking date unavailable",
+   "labelAr": "تاريخ الحجز غير متاح",
    "step": 1,
    "clientNext": "optional_availability_meeting"
   },

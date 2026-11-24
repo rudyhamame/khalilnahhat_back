@@ -20,9 +20,10 @@ function createRelayBroadcast(deps) {
   }
   const portrait=row.obsPortraitRoomName?await relay.request(relay.sessionRoute(row.obsPortraitRoomName),{allowMissing:true}):null;
   if(portrait?.state==='ended')return stop(row);
-  // Media reaching the relay only makes the connection `ready` (private). The site goes live when the admin presses Go live (obsGoLive).
+  // OBS goes on air as soon as the relay receives media, including sessions prepared by older clients.
+  // Preserve any explicit release gate for browser publishing.
   const flowing=status.state==='live'&&(!row.obsPortraitRoomName||portrait?.state==='live');
-  const live=flowing&&row.obsGoLive!==false;
+  const live=flowing&&(row.broadcastSource==='obs'||row.obsGoLive!==false);
   const updated=await LiveStreamConfig.findOneAndUpdate({...owned(row),obsState:{$in:['preparing','waiting','ready','live']}},
    {isLive:live,obsState:live?'live':flowing?'ready':'waiting',streamUrl:live?status.playbackUrl:'',statusLabel:live?'Live now — DJ Khalil is on air.':defaults.statusLabel},{new:true});
   if(updated&&(updated.audience||'all')==='all')await deps.notifyLiveTransition?.(row,updated);
@@ -38,7 +39,7 @@ function createRelayBroadcast(deps) {
    const roomName=`khalil-obs-${randomUUID()}`;
    const title=(typeof req.body?.title==='string' && req.body.title.trim().slice(0,180)) || current.title || defaults.title;
    claimed=await LiveStreamConfig.findOneAndUpdate({key:defaults.key,isLive:{$ne:true},webrtcRoomName:{$in:['',null]},obsRoomName:{$in:['',null]}},
-    {isLive:false,obsGoLive:false,obsSaveRecording:false,title,streamUrl:'',broadcastMode:'whep',broadcastSource:'obs',webrtcRoomName:'',obsRoomName:roomName,obsState:'preparing',obsExpiresAt:new Date(Date.now()+120000)},{new:true});
+    {isLive:false,obsGoLive:true,obsSaveRecording:false,title,streamUrl:'',broadcastMode:'whep',broadcastSource:'obs',webrtcRoomName:'',obsRoomName:roomName,obsState:'preparing',obsExpiresAt:new Date(Date.now()+120000)},{new:true});
    if(!claimed)return res.status(409).json({message:'Another broadcaster started first.'});
    const saveRecording=false;
    const connection=await relay.request('sessions',{method:'POST',body:{id:roomName,publishToken:randomBytes(32).toString('hex'),saveRecording}});

@@ -89,20 +89,23 @@ test('AI offers browser/Android controls and legacy cleanup without OBS setup to
  assert.ok(!names.includes('live_obs_prepare'));assert.ok(!names.includes('live_recording_update'));
  assert.ok(!tools.some(tool=>['/api/live-stream/obs/prepare','/api/live-stream/obs/recording'].includes(tool.route.path)));
 });
-test('OBS relay media only makes the connection ready; the site goes live when the admin presses Go live',async()=>{
+test('OBS relay automatically goes live when media arrives and clears the live when OBS stops',async()=>{
  const relay=require('../src/obs-relay-client'),recordings=require('../src/live-recordings'),saved={configured:relay.configured,request:relay.request,create:recordings.LiveRecording.create};
  let relayState='waiting';
  relay.configured=()=>true;
  relay.request=async(route)=>route==='sessions'?{server:'https://relay.example/whip',streamKey:'bearer-token',expiresAt:new Date(Date.now()+120000).toISOString()}:route==='health'?{}:{state:relayState,playbackUrl:'https://relay.example/play'};
  recordings.LiveRecording.create=async()=>{};
  try{
-  const c=setup({randomUUID:()=>'11111111-1111-4111-8111-111111111111'});assert.equal((await c.call('/prepare',{title:'Night'})).code,201);assert.equal(c.row.obsGoLive,false);
+  const c=setup({randomUUID:()=>'11111111-1111-4111-8111-111111111111'});assert.equal((await c.call('/prepare',{title:'Night'})).code,201);assert.equal(c.row.obsGoLive,true);assert.equal(c.row.isLive,false);
   const room=c.row.obsRoomName;
   const early=await c.call('/go-live',{roomName:room});assert.equal(early.code,409,'no media yet: Go live is refused '+JSON.stringify(early.body));
+  // A session prepared by an older client must also go live without another admin action.
+  c.setRow({obsGoLive:false});
   relayState='live';await c.service.synchronize();
-  assert.equal(c.row.isLive,false,'media alone must not put the site on air');assert.equal(c.row.obsState,'ready');
-  assert.equal((await c.call('/go-live',{roomName:room})).code,200);
   assert.equal(c.row.isLive,true);assert.equal(c.row.obsState,'live');assert.equal(c.row.streamUrl,'https://relay.example/play');
+  assert.equal((await c.call('/go-live',{roomName:room})).code,200,'older clients can still call the compatibility endpoint');
+  relayState='ended';await c.service.synchronize();
+  assert.equal(c.row.isLive,false);assert.equal(c.row.obsRoomName,'');assert.equal(c.row.streamUrl,'');assert.equal(c.row.obsStreamKey,'');
  }finally{Object.assign(relay,{configured:saved.configured,request:saved.request});recordings.LiveRecording.create=saved.create;}
 });
 

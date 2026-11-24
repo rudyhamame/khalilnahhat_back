@@ -270,7 +270,7 @@ const liveStreamConfigSchema = new mongoose.Schema(
     obsUrl: { type: String, default: '' },
     obsStreamKey: { type: String, default: '' },
     obsState: { type: String, default: '' },
-    obsGoLive: { type: Boolean, default: true }, // OBS connections start with false: the site goes live only after the admin presses Go live
+    obsGoLive: { type: Boolean, default: true }, // OBS goes live automatically when the relay receives media
     obsExpiresAt: { type: Date, default: null },
     obsSaveRecording: { type: Boolean, default: false },
     djSetPlan: { type: mongoose.Schema.Types.Mixed, default: null },

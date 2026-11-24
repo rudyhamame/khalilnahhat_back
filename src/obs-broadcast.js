@@ -70,7 +70,7 @@ function registerObsBroadcastRoutes(app, deps) {
     if (!require('./obs-relay-client').configured()) return res.status(503).json({ code: 'OBS_RELAY_UNAVAILABLE', message: 'OBS streaming needs the OVH relay, which is not configured on this server.' });
     return relay.prepare(req, res);
   });
-  // The OBS connection only becomes the live stream when the admin presses Go live; media arriving at the relay is not enough.
+  // Compatibility for older clients: OBS already goes live automatically when media arrives.
   app.post('/api/live-stream/obs/go-live', requireAdmin, async (req, res) => {
     res.set?.('Cache-Control', 'no-store');
     if (typeof req.body?.roomName !== 'string' || !req.body.roomName) return res.status(400).json({ message: 'The OBS session is required.' });
@@ -79,7 +79,7 @@ function registerObsBroadcastRoutes(app, deps) {
       if (req.body.roomName !== current.obsRoomName || current.broadcastMode !== 'whep') return res.status(409).json({ message: 'This OBS connection is no longer active.' });
       const synced = await synchronize();
       if (synced.obsRoomName !== req.body.roomName) return res.status(409).json({ message: 'This OBS connection is no longer active.' });
-      if (synced.obsState !== 'ready' && synced.obsState !== 'live') return res.status(409).json({ message: 'OBS is not sending video yet. Start streaming in OBS, then press Go live.' });
+      if (synced.obsState !== 'ready' && synced.obsState !== 'live') return res.status(409).json({ message: 'OBS is not sending video yet. Start streaming in OBS; the Studio will go live automatically.' });
       await LiveStreamConfig.findOneAndUpdate({ ...filter(synced), broadcastMode: 'whep' }, { obsGoLive: true });
       return res.json({ item: serialize(await synchronize()) });
     } catch { return res.status(503).json({ message: 'Could not go live. Try again shortly.' }); }

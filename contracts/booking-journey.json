@@ -135,6 +135,7 @@
   "requested",
   "available",
   "quote_ready",
+  "deposit_paid",
   "booked"
  ],
  "clientStages": {
@@ -161,10 +162,16 @@
    "labelAr": "عرض سعر الحجز جاهز",
    "step": 2
   },
+  "deposit_paid": {
+   "label": "Deposit paid",
+   "labelAr": "تم دفع العربون",
+   "step": 3,
+   "clientNext": "wait_for_confirmation"
+  },
   "booked": {
    "label": "Booked",
    "labelAr": "تم الحجز",
-   "step": 3,
+   "step": 4,
    "clientNext": "plan_the_event"
   }
  }

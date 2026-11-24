@@ -13,8 +13,11 @@ test('paraphrase: empty text and disabled AI are refused, a reply is returned tr
 test('booking summary: unknown booking is 404, contact details are not sent, summary is returned',async()=>{
  const {createBookingSummarizer}=require('./ai-paraphrase');let sent='';
  const sr={status:'pending',items:[{name:'DJ',quantity:1}],order:{customer:{email:'secret@x.co',phone:'555'},event:{type:'wedding',date:'2099-01-01',guestCount:50}}};
- const run=(Model,body)=>createBookingSummarizer({configService:{load:async()=>({chat:{enabled:true,provider:'openai',model:'m'}})},Model,env:{OPENAI_API_KEY:'k'},fetchImpl:async(_u,o)=>{sent=o.body;return {ok:true,json:async()=>({output:[{content:[{type:'output_text',text:JSON.stringify({summary:' A wedding. '})}]}]})};}})(body);
+ let calls=0;const run=(Model,body)=>createBookingSummarizer({configService:{load:async()=>({chat:{enabled:true,provider:'openai',model:'m'}})},Model,env:{OPENAI_API_KEY:'k'},fetchImpl:async(_u,o)=>{calls++;sent=o.body;return {ok:true,json:async()=>({output:[{content:[{type:'output_text',text:JSON.stringify({summary:' A wedding. '})}]}]})};}})(body);
+ const Model={findOne:async()=>sr,updateOne:async(_q,update)=>{sr.bookingAiSummary=update.$set.bookingAiSummary;}};
  await assert.rejects(run({findOne:async()=>null},{id:'x'}),{status:404});
- assert.equal(await run({findOne:async()=>sr},{id:'x'}),'A wedding.');
+ assert.equal(await run(Model,{id:'x'}),'A wedding.');assert.equal(calls,1);
+ assert.equal(await run(Model,{id:'x'}),'A wedding.');assert.equal(calls,1,'unchanged booking reuses the stored summary');
+ sr.order.event.guestCount=80;await run(Model,{id:'x'});assert.equal(calls,2,'an edited booking is summarized again');
  assert.ok(!sent.includes('secret@x.co')&&!sent.includes('555'));
 });

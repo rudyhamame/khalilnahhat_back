@@ -338,6 +338,8 @@ const serviceRequestSchema = new mongoose.Schema(
     confirmationCode: { type: String, default: undefined, trim: true, immutable: true },
     event: { type: mongoose.Schema.Types.Mixed, default: null },
     order: { type: mongoose.Schema.Types.Mixed, default: null },
+    bookingStatus: { type: String, default: 'requested', index: true }, // the real booking status, kept in sync on every save (see booking-journey.bookingStatusOf)
+    bookingAiSummary: { type: mongoose.Schema.Types.Mixed, default: null }, // {text, hash, at}: admin-only AI summary, rewritten when the summarized data changes
     adminNote: { type: String, default: '', trim: true },
     quotedAt: { type: Date, default: null },
   },
@@ -368,6 +370,7 @@ const ArchiveItem = mongoose.model('ArchiveItem', archiveItemSchema);
 const Booking = mongoose.model('Booking', bookingSchema);
 const LiveStreamConfig = mongoose.model('LiveStreamConfig', liveStreamConfigSchema);
 require('./client-push').watchSchema(serviceRequestSchema);
+serviceRequestSchema.pre('validate', function () { this.bookingStatus = require('./booking-journey').bookingStatusOf(this) || this.bookingStatus; });
 const ServiceRequest = mongoose.model('ServiceRequest', serviceRequestSchema);
 const ServicePrice = mongoose.model('ServicePrice', servicePriceSchema);
 

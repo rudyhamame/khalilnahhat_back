@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-11-20T21:35:12.730Z",
+  "generatedAt": "2026-11-24T20:21:37.068Z",
   "database": "isolated ephemeral MongoDB replica set",
-  "registered": 89,
+  "registered": 88,
   "verifiedCapabilities": [
     "administrator_open_section"
   ],
@@ -59,7 +59,6 @@
     "music_classification_proposal",
     "live_stream_read",
     "live_title_update",
-    "live_goal_update",
     "live_obs_end",
     "live_browser_end",
     "live_destinations_read",

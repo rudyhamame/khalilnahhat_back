@@ -393,6 +393,7 @@ function serializeServiceRequest(serviceRequest, includeQuote = true) {
     availability: require('./booking-availability').availabilityFor(serviceRequest),
     availabilityAcceptedAt: require('./booking-availability').availabilityFor(serviceRequest).status==='available'?serviceRequest.availabilityAcceptedAt:null,
     declinedBy: serviceRequest.declinedBy || '',
+    bookingStatus: journey.bookingStatusOf(serviceRequest),
     journey: {...journey.describeRequest(serviceRequest), ...(serviceRequest.declinedBy ? {label:'Declined',labelAr:'مرفوض'} : {})},
     currency: serviceRequest.currency || 'CAD',
     adminNote: isQuoted || includeQuote ? serviceRequest.adminNote || '' : '',

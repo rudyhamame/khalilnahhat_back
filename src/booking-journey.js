@@ -29,9 +29,12 @@ const describe = status => ({ status, ...rule(status), path: PATH_STEPS });
 function describeRequest(request){
  const internal=describe(request.status),availability=require('./booking-availability').availabilityFor(request);
  if(!TABLE[request.status]||request.status===STATUS.CANCELLED)return {...internal,clientStatus:null,canDiscussAvailability:false};
- const stage=internal.isBooked?'booked':internal.showsPrices?'quote_ready':availability.status==='unavailable'?'unavailable':availability.status==='available'?'available':'requested';
+ const paid=(request.payments||[]).some(p=>!p.voided&&(p.amountCents||0)>0);
+ const stage=internal.isBooked?'booked':paid?'deposit_paid':internal.showsPrices?'quote_ready':availability.status==='unavailable'?'unavailable':availability.status==='available'?'available':'requested';
  const display=contract.clientStages[stage];
  const path=contract.clientPath.map(key=>key==='available'&&stage==='unavailable'?'unavailable':key).map(key=>({status:key,...contract.clientStages[key]}));
  return {...internal,...display,clientStatus:stage,path,canDiscussAvailability:stage==='unavailable'&&internal.repriceable&&!(request.payments||[]).some(p=>!p.voided)};
 }
-module.exports = { STATUS, STATUSES, PATH, PATH_STEPS, rule, statusesWhere, describe, describeRequest };
+// The REAL booking status: one stored key on the booking (requested, available, unavailable, quote_ready, deposit_paid, booked, cancelled), derived from the lifecycle status, availability and payments.
+const bookingStatusOf=request=>request.status===STATUS.CANCELLED?'cancelled':(describeRequest(request).clientStatus||'');
+module.exports = { STATUS, STATUSES, PATH, PATH_STEPS, rule, statusesWhere, describe, describeRequest, bookingStatusOf };

@@ -92,6 +92,46 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     return res.json({ item: serialize(sr, true) });
   });
 
+  // The client edits ONE data atom of their own booking. Atoms that change what was priced or checked (date, time, venue, guests, event type)
+  // send the booking back for a new availability check and withdraw the quote, only after the client acknowledges it; they are refused once a payment exists.
+  // Service/equipment selections are priced items, so they stay on the "Request changes" flow.
+  const eventOrder = require('./event-order');
+  const PRICED = new Set(['services', 'equipment', 'music.djRequested', 'music.mcRequested', 'rental.requested']);
+  const READ_ONLY = new Set(['customer.email', 'event.venue.latitude', 'event.venue.longitude', 'event.venue.source', 'event.venue.sourceId', 'event.venue.sourceAttribution']);
+  const AFFECTS_AVAILABILITY = path => /^event\.(type|title|date|startTime|endTime|guestCount|venue\.|setup\.)/.test(path);
+  app.post('/api/service-requests/:id/order-edit', requireAuth, async (req, res) => {
+    const parsed = z.object({ path: z.string().max(80), value: z.any(), quoteRevision: z.number().int().nonnegative().optional(), acknowledgeReset: z.boolean().optional() }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: 'Choose a detail and its new value.' });
+    const { path, value } = parsed.data;
+    const sr = await find(req.params.id);
+    if (!own(req, sr)) return notFound(res);
+    if (!sr.order || sr.status === STATUS.CANCELLED) return res.status(409).json({ message: 'This booking can no longer be edited.' });
+    const field = eventOrder.fields.find(item => item.key === path);
+    if (!field || READ_ONLY.has(path)) return res.status(400).json({ message: 'This detail cannot be edited here.' });
+    if (PRICED.has(path) || field.type === 'attachments') return res.status(400).json({ message: 'Use "Request changes" to change your services, equipment or files.' });
+    if (!eventOrder.validValue(field, value)) return res.status(400).json({ message: 'That value is not valid for this detail.' });
+    if (parsed.data.quoteRevision !== undefined && parsed.data.quoteRevision !== (sr.quoteRevision || 0)) return res.status(409).json({ message: 'The booking changed. Reload before editing.' });
+    const availability = require('./booking-availability'), previous = availability.availabilityFor(sr);
+    const reset = AFFECTS_AVAILABILITY(path) && (previous.status !== 'pending' || journey.rule(sr.status).showsPrices);
+    if (AFFECTS_AVAILABILITY(path) && (sr.payments || []).some(p => !p.voided)) return res.status(409).json({ message: 'This detail changes your date, venue or event. Contact us to change it after a payment.' });
+    if (reset && !parsed.data.acknowledgeReset) return res.status(409).json({ code: 'RESET_REQUIRED', message: 'Changing this sends your booking back for a new availability check and withdraws the quote.' });
+    const next = structuredClone(sr.order.toObject ? sr.order.toObject() : sr.order);
+    const keys = path.split('.'); let target = next; for (const key of keys.slice(0, -1)) target = target[key] = target[key] && typeof target[key] === 'object' ? target[key] : {};
+    target[keys.at(-1)] = value;
+    const errors = eventOrder.validateEventOrder(next);
+    if (errors.length) return res.status(400).json({ message: 'That change leaves the booking incomplete or invalid.', fields: errors });
+    const legacy = require('./quote-validation').eventSchema.safeParse(eventOrder.orderToLegacy(next));
+    if (!legacy.success) return res.status(400).json({ message: 'Event details failed validation.' });
+    sr.order = next; sr.event = legacy.data;
+    if (reset) {
+      if (previous.informedAt) sr.availabilityHistory = [...(sr.availabilityHistory || []), { ...previous, window: sr.availabilityWindow, changedAt: new Date() }];
+      sr.availabilityAcceptedAt = null; sr.availabilityUnavailableAt = null; sr.availabilityReason = ''; sr.availabilityWindow = '';
+      sr.status = STATUS.PENDING; sr.acceptedAt = null; sr.expiresAt = null; sr.reminderSentAt = null; sr.quoteRevision = (sr.quoteRevision || 0) + 1;
+    }
+    try { await sr.save(); } catch (error) { if (error.name === 'VersionError') return res.status(409).json({ message: 'The booking changed. Reload before continuing.' }); throw error; }
+    return res.json({ item: serialize(sr, false), reset });
+  });
+
   app.post('/api/service-requests/:id/reschedule-request',requireAuth,async(req,res)=>{
     const date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value=>!Number.isNaN(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value);
     const time=z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);

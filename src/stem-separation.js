@@ -20,11 +20,13 @@ let remoteCatalog;
 let remoteCatalogTime = 0;
 const keyFor = url => createHash('sha256').update(`htdemucs-v1:${url}`).digest('hex');
 // Uploaded admin assets are content-addressed (…/khalil/assets/<profile>/<sha256>.<ext>): the same audio keeps one cache entry even if its delivery URL differs.
-const assetHash = url => /\/khalil\/assets\/[^/]+\/([0-9a-f]{64})\.[a-z0-9]+$/i.exec((() => { try { return new URL(url).pathname; } catch { return ''; } })())?.[1]?.toLowerCase();
+const assetHash = url => /(?:\/khalil\/assets\/[^/]+|\/khalil-media\/(?:public|private))\/([0-9a-f]{64})\.[a-z0-9]+$/i.exec((() => { try { return new URL(url).pathname; } catch { return ''; } })())?.[1]?.toLowerCase();
 const legacyAssetKey = url => { const hash = assetHash(url); return hash ? createHash('sha256').update(`htdemucs-v1:asset:${hash}`).digest('hex') : keyFor(url); };
 const assetKey = url => { const hash = assetHash(url); return createHash('sha256').update(hash ? `htdemucs_6s-v1:asset:${hash}` : `htdemucs_6s-v1:${url}`).digest('hex'); };
 const localRequest = req => process.env.NODE_ENV !== 'production' && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
 function validateSource(url) {
+  if(process.env.STEM_WORKER_MODE==='1'){try{const u=new URL(url);if(u.origin===process.env.MEDIA_PUBLIC_ORIGIN&&/^\/khalil-media\/(?:public|private)\/[a-f0-9]{64}\.(?:wav|mp3|m4a|mp4|webm|ogg|flac|aac)$/.test(u.pathname))return true;}catch{}}
+  if(require('./vps-media').isAudio(url))return true;
   try { const parsed = new URL(url); return parsed.protocol === 'https:' && parsed.hostname === 'res.cloudinary.com' && /\/video\/(upload|authenticated)\//.test(parsed.pathname); }
   catch { return false; }
 }

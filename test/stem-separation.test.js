@@ -57,3 +57,10 @@ test('six-source admin keys differ from the four-source keys, but share one entr
   assert.equal(legacyAssetKey(a),legacyAssetKey(b));
   assert.deepEqual(ADMIN_CHANNELS,['vocals','drums','bass','guitar','piano','other']);
 });
+test('OVH worker accepts only the configured media origin and stable audio object paths',()=>{
+ const before={mode:process.env.STEM_WORKER_MODE,origin:process.env.MEDIA_PUBLIC_ORIGIN};process.env.STEM_WORKER_MODE='1';process.env.MEDIA_PUBLIC_ORIGIN='https://media.example';
+ try{const base='https://media.example/khalil-media/private/'+'a'.repeat(64);assert.equal(validateSource(base+'.wav?expires=123&signature=test'),true);assert.equal(validateSource(base+'.png'),false);assert.equal(validateSource(base.replace('media.example','media.example.evil')+'.wav'),false);assert.equal(validateSource('https://media.example/unrelated.wav'),false);}finally{if(before.mode===undefined)delete process.env.STEM_WORKER_MODE;else process.env.STEM_WORKER_MODE=before.mode;if(before.origin===undefined)delete process.env.MEDIA_PUBLIC_ORIGIN;else process.env.MEDIA_PUBLIC_ORIGIN=before.origin;}
+});
+test('OVH audio cache keys remain stable when a private link is renewed',()=>{
+ const {assetKey}=require('../src/stem-separation');const base='https://media.example/khalil-media/private/'+'a'.repeat(64)+'.flac';assert.equal(assetKey(base+'?signature=one'),assetKey(base+'?signature=two'));
+});

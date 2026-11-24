@@ -1,5 +1,7 @@
 # OVH LiveKit recording staging
 
+As of the 2026-11-23 source change, automatic live recording is removed. Deploy both the API and frontend to apply it. All new OBS, OVH browser and LiveKit/Android sessions are live-only regardless of stored recording preferences or legacy client requests. Recording chunk/finish/status routes return 410, and the automatic recording archive worker is stopped. Existing media and historical archive management are retained; no files or database records are purged. The OBS instructions remain available for independent local recording. The infrastructure and recovery details below describe the former recording pipeline, not the current live-session behavior.
+
 Production switched from Backblaze B2 to the existing OVH Garage service on 2026-11-08. Cloudinary remains the final private archive. The updated web studio records its published media in the browser and uploads durable, ordered chunks directly to OVH. LiveKit still carries audience playback but creates no egress job for browser recording. Native Android remains on its older participant-recording path pending a native recorder release. OBS is discontinued.
 
 ## Production paths

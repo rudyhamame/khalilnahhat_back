@@ -1,9 +1,9 @@
-// OBS streams over WHIP to the OVH relay; each connection owns one session, one recording and one revocable token.
+// OBS streams over WHIP to the OVH relay; each connection owns one session and one revocable token.
 // Public serializers never receive connection secrets through this module.
 const IDENTITY = 'khalil-obs';
 function registerObsBroadcastRoutes(app, deps) {
   const { requireAdmin, getLiveStreamConfig, LiveStreamConfig, defaults, getConfig,
-    serialize, IngressClient, RoomServiceClient, ensureRecording } = deps;
+    serialize, IngressClient, RoomServiceClient } = deps;
   const relay = require('./obs-relay-broadcast').createRelayBroadcast(deps);
   const client = Class => { const c = getConfig(); return new Class(c.wsUrl, c.apiKey, c.apiSecret); };
   const filter = row => ({ key: defaults.key, obsRoomName: row.obsRoomName });
@@ -46,8 +46,6 @@ function registerObsBroadcastRoutes(app, deps) {
       catch (error) { if (missing(error)) return stop(row); throw error; }
       const publishing = participants.some(p => p.identity === IDENTITY && p.tracks?.length);
       if (!publishing && (row.obsState === 'live' || new Date(row.obsExpiresAt).getTime() <= Date.now())) return stop(row);
-      // Media is flowing: make sure it is being recorded even if LiveKit recreated the room after it timed out empty.
-      if (publishing && row.obsSaveRecording !== false) Promise.resolve(ensureRecording?.(row.obsRoomName)).catch(() => {});
       if (publishing && row.obsState !== 'live') {
         row = await change(row, { isLive: true, obsState: 'live', statusLabel: 'Live now — DJ Khalil is on air.' },
           { obsState: { $in: ['waiting', 'live'] } }) || await getLiveStreamConfig();
@@ -59,19 +57,12 @@ function registerObsBroadcastRoutes(app, deps) {
   }
   app.get('/api/live-stream/obs', requireAdmin, async (_req, res) => {
     res.set?.('Cache-Control', 'no-store');
-    try { const row=await synchronize();const item=serialize(row);if(deps.recordingStatus)item.recording=await deps.recordingStatus(row.obsRoomName||row.webrtcRoomName);return res.json({item}); }
+    try { const row=await synchronize();const item=serialize(row);item.recording={mode:'none'};return res.json({item}); }
     catch { return res.status(503).json({ message: 'Could not check OBS. Try again shortly.' }); }
   });
-  app.patch('/api/live-stream/obs/recording', requireAdmin, async (req, res) => {
+  app.patch('/api/live-stream/obs/recording', requireAdmin, async (_req, res) => {
     res.set?.('Cache-Control', 'no-store');
-    if (typeof req.body?.saveRecording !== 'boolean') return res.status(400).json({ message: 'Choose whether to save the recording.' });
-    try {
-      await getLiveStreamConfig();
-      const updated = await LiveStreamConfig.findOneAndUpdate({ key: defaults.key, isLive: { $ne: true }, webrtcRoomName: { $in: ['', null] }, obsRoomName: { $in: ['', null] } },
-        { $set: { obsSaveRecording: req.body.saveRecording } }, { new: true });
-      if (!updated) return res.status(409).json({ message: 'Choose recording before preparing the OBS connection. End the current connection to change it.' });
-      return res.json({ item: serialize(updated) });
-    } catch { return res.status(503).json({ message: 'Could not save the recording preference. Try again.' }); }
+    return res.status(410).json({code:'LIVE_RECORDING_REMOVED',message:'Live recording has been removed. You can record locally in OBS.'});
   });
   // New OBS connections go to the OVH relay only. The LiveKit ingress path stays retired because LiveKit bills it.
   app.post('/api/live-stream/obs/prepare', requireAdmin, async (req, res) => {

@@ -11,9 +11,10 @@ function summarize(item) {
     requestNumber: item.requestNumber || null,
     status: item.status,
     journey: {
-      label: journey.label, step: journey.step, clientNext: journey.clientNext, adminNext: journey.adminNext,
+      label: journey.label, clientStatus:journey.clientStatus, canDiscussAvailability:journey.canDiscussAvailability, step: journey.step, clientNext: journey.clientNext, adminNext: journey.adminNext,
       awaitingClient: journey.awaitingClient, canRecordDeposit: journey.canRecordDeposit, isBooked: journey.isBooked, expires: journey.expires,
     },
+    availability: item.availability ? {status:item.availability.status,reason:item.availability.reason||''} : null,
     event: {
       type: order.type ?? legacy.eventType ?? null,
       date: order.date ?? legacy.eventDate ?? null,

@@ -1,5 +1,5 @@
 const BREVO_TRANSACTIONAL_EMAIL_URL = 'https://api.brevo.com/v3/smtp/email';
-const {notificationAddress,senderAddress,senderName} = require('./business-mail-identity');
+const {notificationAddress,senderAddress,senderName,NOREPLY} = require('./business-mail-identity');
 const { notificationEmails } = require('./notification-emails');
 
 function escapeHtml(value) {
@@ -20,7 +20,8 @@ function formatCad(value) {
 
 async function sendBrevoEmail(payload, {notifications=notificationEmails,fetchImpl=fetch,env=process.env} = {}) {
   const apiKey = env.BREVO_API_KEY?.trim();
-  const senderEmail = senderAddress(env);
+  const bookingMail=(payload.tags||[]).some(tag=>/^(?:booking-|service-request$|service-quote$|quote-expiry-reminder$|meeting(?:-|$))/.test(tag));
+  const senderEmail = bookingMail?NOREPLY:senderAddress(env);
 
   if (!apiKey || !senderEmail) {
     console.warn('Brevo notification skipped: BREVO_API_KEY or EMAIL_FROM_ADDRESS is missing.');
@@ -44,7 +45,7 @@ async function sendBrevoEmail(payload, {notifications=notificationEmails,fetchIm
       body: JSON.stringify({
         ...payload,
         sender: {
-          name: senderName(env),
+          name: bookingMail?'Echo Website':senderName(env),
           email: senderEmail,
         },
       }),
@@ -149,7 +150,7 @@ async function sendServiceQuoteNotification(serviceRequest) {
       email: khalilEmail,
       name: 'Khalil Nahhat',
     },
-    subject: 'Your DJ Khalil Nahhat service quote is ready',
+    subject: `Booking quote ready — ${serviceRequest.confirmationCode||serviceRequest.requestNumber||serviceRequest.externalId}`,
     tags: ['service-quote'],
     notificationContext: {customerName:serviceRequest.customerName,requestId:serviceRequest.requestNumber||serviceRequest.externalId,details:[...serviceRequest.items.map(item=>`${item.name} × ${item.quantity} — ${formatCad(Number(item.unitPrice||0)*item.quantity)}`),...pricingSummary].join('\n'),total:formatCad(total),adminNote:serviceRequest.adminNote||'',actionUrl:customerServicesUrl||''},
     htmlContent: `<!doctype html>
@@ -157,8 +158,8 @@ async function sendServiceQuoteNotification(serviceRequest) {
         <body style="margin:0;background:#080808;color:#f4f1ed;font-family:Arial,sans-serif;">
           <div style="max-width:680px;margin:0 auto;padding:32px 20px;">
             <p style="margin:0 0 8px;color:#ef3939;font-size:12px;letter-spacing:2px;">KN// REQUESTED SERVICES</p>
-            <h1 style="margin:0 0 12px;font-size:30px;">Availability confirmed &amp; your quote is ready</h1>
-            <p style="margin:0 0 24px;color:#b8b3ad;line-height:1.6;">Hello ${escapeHtml(serviceRequest.customerName)}, We are available for your event and have prepared the quote below. Please log in to accept, decline, or negotiate. After accepting your quote, choose a meeting time to discuss your event by phone or WhatsApp. Your date is reserved only after final confirmation and the required deposit.</p>
+            <h1 style="margin:0 0 12px;font-size:30px;">Booking quote ready</h1>
+            <p style="margin:0 0 24px;color:#b8b3ad;line-height:1.6;">Hello ${escapeHtml(serviceRequest.customerName)}, We are available for your event and have prepared the quote below. Please log in to accept, decline, or negotiate. Accepting this quote does not mark the event as Booked. Your booking becomes Booked after the required deposit is recorded and final confirmation is sent. You can also book an optional meeting to discuss your event.</p>
             <div style="padding:14px 18px;background:#121212;border:1px solid #292929;">
               <p style="margin:0;"><strong>Request:</strong> ${escapeHtml(serviceRequest.confirmationCode || serviceRequest.requestNumber || serviceRequest.externalId)}</p>
             </div>
@@ -180,7 +181,7 @@ async function sendServiceQuoteNotification(serviceRequest) {
             </div>
             ${adminNote}
             ${customerServicesUrl ? `<p style="margin:24px 0 0;"><a href="${escapeHtml(customerServicesUrl)}" style="display:inline-block;padding:12px 18px;background:#c12a32;color:#fff;text-decoration:none;">Log in to review and respond</a></p>` : ''}
-            <p style="margin:24px 0 0;color:#777;font-size:12px;line-height:1.6;">Please log in to accept, decline, or negotiate your quote and, after accepting, choose a meeting time.</p>
+            <p style="margin:24px 0 0;color:#777;font-size:12px;line-height:1.6;">Review and respond to your booking quote in your dashboard. Your event is not Booked until the required deposit and final confirmation.</p>
           </div>
         </body>
       </html>`,
@@ -209,11 +210,11 @@ async function sendBookingConfirmation(sr, paidCents) {
   const khalilEmail = notificationAddress();
   const ref = escapeHtml(sr.requestNumber || sr.externalId);
   const body = (who) => `<p>${who}</p>
-    <p>Booking <strong>${ref}</strong> is <strong>confirmed</strong> for <strong>${escapeHtml(sr.event.eventDate)}</strong> at ${escapeHtml(sr.event.venueName || sr.event.city || 'your venue')}.</p>
+    <p>Booking <strong>${ref}</strong> is <strong>Booked</strong> for <strong>${escapeHtml(sr.event.eventDate)}</strong> at ${escapeHtml(sr.event.venueName || sr.event.city || 'your venue')}.</p>
     <p>Deposit received: ${formatCad(paidCents / 100)}. Remaining balance is shown in your dashboard.</p>
     <p>Echo Event Entertainment</p>`;
   const notificationContext={customerName:sr.customerName,requestId:sr.requestNumber||sr.externalId,eventDate:sr.event.eventDate,venue:sr.event.venueName||sr.event.city||'your venue',depositAmount:formatCad(paidCents/100)};
-  await sendBrevoEmail({ to: [{ email: sr.customerEmail, name: sr.customerName }], notificationContext, subject: `Booking confirmed ${ref}`, tags: ['booking-confirmation'], htmlContent: body(`Hello ${escapeHtml(sr.customerName)},`) });
+  await sendBrevoEmail({ to: [{ email: sr.customerEmail, name: sr.customerName }], notificationContext, subject: `Booked — ${ref}`, tags: ['booking-confirmation'], htmlContent: body(`Hello ${escapeHtml(sr.customerName)},`) });
   await sendBrevoEmail({ to: [{ email: khalilEmail }], notificationContext, subject: `New confirmed booking ${ref}`, tags: ['booking-admin'], htmlContent: body(`${escapeHtml(sr.customerName)} paid the deposit.`) });
 }
 

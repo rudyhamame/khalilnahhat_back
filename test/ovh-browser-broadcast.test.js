@@ -20,8 +20,8 @@ test('OVH releases its offline reservation if the set list cannot be installed',
  const response=await f.request('go-live',{transport:'ovh',setListId:'livestream',saveRecording:false});
  assert.equal(response.status,503);assert.equal(f.current.obsRoomName,'');assert.equal(response.body.token,undefined);
 });
-test('OVH claim returns one publisher and a server recording; only received media becomes live',async()=>{
- const f=fixture();const result=await f.request('go-live',{transport:'ovh',title:'Test set',saveRecording:true});assert.equal(result.status,201);assert.equal(result.body.transport,'ovh');assert.equal(result.body.recording.mode,'ovh');assert.equal(result.body.recording.id,'recording-1');assert.equal(f.current.isLive,false);assert.equal(f.recordings[0].provider,'ovh');assert.match(result.body.url,/\/whip$/);assert.equal(result.body.item.token,undefined);
+test('OVH ignores recording requests and only received media becomes live',async()=>{
+ const f=fixture();const result=await f.request('go-live',{transport:'ovh',title:'Test set',saveRecording:true});assert.equal(result.status,201);assert.equal(result.body.transport,'ovh');assert.deepEqual(result.body.recording,{mode:'none'});assert.equal(f.current.isLive,false);assert.equal(f.recordings.length,0);assert.equal(f.current.obsSaveRecording,false);assert.equal(f.calls.find(c=>c.route==='sessions').options.body.saveRecording,false);assert.match(result.body.url,/\/whip$/);assert.equal(result.body.item.token,undefined);
  const ready=await f.request('ready',{roomName:result.body.roomName});assert.equal(ready.body.item.isLive,true);
  const stale=await f.request('end',{roomName:'old-room'});assert.equal(stale.body.ended,false);assert.equal(f.current.isLive,true);
  assert.equal((await f.request('end',{roomName:result.body.roomName})).body.ended,true);
@@ -30,14 +30,14 @@ test('recording-off creates no recording; older LiveKit clients pass through unc
  const f=fixture();assert.equal((await f.request('go-live',{recordingMode:'direct'})).next,true);const result=await f.request('go-live',{transport:'ovh',saveRecording:false});assert.deepEqual(result.body.recording,{mode:'none'});assert.equal(f.recordings.length,0);assert.equal(f.calls.find(c=>c.route==='sessions').options.body.saveRecording,false);
 });
 
-test('two cameras create two real relay recordings with one shared parent and survive reconnect',async()=>{
+test('two cameras publish and reconnect without recording even when explicitly requested',async()=>{
  const f=fixture(),outputs=[{key:'main',width:1280,height:720},{key:'portrait',width:720,height:1280}];
  const result=await f.request('go-live',{transport:'ovh',saveRecording:true,outputs});assert.equal(result.status,201);
- assert.equal(f.recordings.length,2);assert.equal(f.recordings[1].parentRecordingId,f.recordings[0]._id);assert.equal(f.recordings[1].sessionRoomName,f.recordings[0].roomName);
- assert.equal(result.body.recording.outputs.length,2);assert.notEqual(result.body.recording.outputs[0].id,result.body.recording.outputs[1].id);
+ assert.equal(f.recordings.length,0);assert.deepEqual(result.body.recording,{mode:'none'});
+ assert.ok(f.calls.filter(c=>c.route==='sessions').every(c=>c.options.body.saveRecording===false));
  assert.match(result.body.portraitPublisher.url,/\/whip$/);assert.notEqual(result.body.portraitPublisher.url,result.body.url);
  assert.equal(f.calls.filter(c=>c.route==='sessions').length,2);
- const resumed=await f.request('resume');assert.deepEqual(resumed.body.recording.outputs,result.body.recording.outputs);assert.equal(resumed.body.portraitPublisher.url,result.body.portraitPublisher.url);
+ const resumed=await f.request('resume');assert.deepEqual(resumed.body.recording,{mode:'none'});assert.equal(resumed.body.portraitPublisher.url,result.body.portraitPublisher.url);
  await f.request('ready',{roomName:result.body.roomName});assert.ok(f.calls.some(c=>c.route==='sessions/'+f.current.obsPortraitRoomName));
 });
 test('two-camera live-only mode prepares both publishers without creating archive records',async()=>{

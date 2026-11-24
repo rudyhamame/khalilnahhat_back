@@ -95,22 +95,17 @@ test('LiveKit webhook verifies the original webhook+json bytes and rejects tampe
   } finally { await new Promise(resolve=>server.close(resolve)); }
 });
 
-test('recording setup failure releases only its own live claim and returns no token',async()=>{
- const ctx=setup({prepareRecording:async()=>{throw Object.assign(new Error('Recording unavailable'),{status:503});}});
- const result=await ctx.call('go-live');assert.equal(result.statusCode,503);assert.equal(result.body.token,undefined);
- assert.equal(ctx.writes.length,2);assert.deepEqual(ctx.writes[1].filter,{key:'live',webrtcRoomName:'khalil-live-new'});assert.equal(ctx.writes[1].change.isLive,false);
-});
-
-test('recording disk admission failure explains the blocker and releases its reservation',async()=>{
- const message='Recording disk is full. Pending data is kept for recovery.';
- const ctx=setup({prepareRecording:async()=>{throw Object.assign(new Error(message),{status:507});}});
- const result=await ctx.call('go-live',{recordingMode:'direct'});
- assert.equal(result.statusCode,507);assert.equal(result.body.message,message);assert.equal(result.body.token,undefined);
- assert.equal(ctx.writes.length,2);assert.deepEqual(ctx.writes[1].filter,{key:'live',webrtcRoomName:'khalil-live-new'});assert.equal(ctx.writes[1].change.webrtcRoomName,'');
+test('recording setup and storage failures cannot block a live-only broadcast',async()=>{
+ for(const status of [503,507]){
+  const ctx=setup({prepareRecording:async()=>{throw Object.assign(new Error('Recording unavailable'),{status});}});
+  const result=await ctx.call('go-live',{saveRecording:true,recordingMode:'direct'});
+  assert.equal(result.statusCode,201);assert.deepEqual(result.body.recording,{mode:'none'});
+  assert.equal(ctx.writes.length,1);assert.equal(result.body.token,'temporary-token');
+ }
 });
 
 test('unexpected startup errors keep internal details out of the response',async()=>{
- const ctx=setup({prepareRecording:async()=>{throw new Error('private implementation detail');}});
+ const ctx=setup({createToken:async()=>{throw new Error('private implementation detail');}});
  const result=await ctx.call('go-live');
  assert.equal(result.statusCode,500);assert.equal(result.body.message,'Could not start the live stream.');assert.equal(result.body.token,undefined);
 });
@@ -138,12 +133,12 @@ test('live-only mode skips recording preparation and explicitly confirms no reco
  const result=await ctx.call('go-live',{title:'Live only',recordingMode:'direct',saveRecording:false});
  assert.equal(result.statusCode,201);assert.equal(prepared,0);assert.equal(result.body.recording.mode,'none');assert.equal(result.body.roomName,'khalil-live-new');assert.equal(result.body.token,'temporary-token');
 });
-test('saving remains enabled by default and only an explicit false disables it',async()=>{
- for(const value of [undefined,true,'false',null,0]){
+test('browser and Android requests cannot enable recording, including legacy defaults',async()=>{
+ for(const source of ['browser','android'])for(const value of [undefined,true,false,'false',null,0]){
   let prepared=0;
   const ctx=setup({prepareRecording:async(_room,_title,_test,options)=>{prepared++;assert.equal(options.mode,'direct');return {_id:'recording-1',provider:'direct'};}});
-  const result=await ctx.call('go-live',{recordingMode:'direct',...(value===undefined?{}:{saveRecording:value})});
-  assert.equal(result.statusCode,201);assert.equal(prepared,1);assert.deepEqual(JSON.parse(JSON.stringify(result.body.recording)),{id:'recording-1',mode:'direct'});
+  const result=await ctx.call('go-live',{source,recordingMode:'direct',...(value===undefined?{}:{saveRecording:value})});
+  assert.equal(result.statusCode,201);assert.equal(prepared,0);assert.deepEqual(result.body.recording,{mode:'none'});
  }
 });
 test('a dead reservation is reclaimable and a live whose room vanished is reconciled, but errors never clear a live', async () => {
@@ -161,4 +156,30 @@ test('a dead reservation is reclaimable and a live whose room vanished is reconc
   const present = mk([{ name: 'r' }]); assert.equal(await present.reconcile(), false); assert.equal(present.writes.length, 0);
   const down = mk(new Error('network')); await assert.rejects(down.reconcile()); assert.equal(down.writes.length, 0);
   const recent = mk([]); recent.current.updatedAt = new Date(); assert.equal(await recent.reconcile(), false);
+});
+
+test('reconnect never resumes a legacy recording',async()=>{
+ let read=0;const ctx=setup({recordingStatus:async()=>{read++;return {id:'old',status:'recording'};}});
+ Object.assign(ctx.current,{isLive:true,webrtcRoomName:'room',broadcastSource:'browser'});
+ const result=await ctx.call('resume');assert.equal(result.statusCode,200);assert.equal(read,0);assert.deepEqual(result.body.recording,{mode:'none'});
+});
+
+test('retired recording HTTP routes reject stale clients before accepting media',async()=>{
+ const express=require('express'),fs=require('node:fs'),vm=require('node:vm');
+ const source=fs.readFileSync(require('node:path').join(__dirname,'../src/server.js'),'utf8');
+ const declaration=source.split('\n').find(line=>line.startsWith("app.use('/api/live-stream/recordings',"));
+ assert.ok(declaration);
+ const app=express();let fallback=0;
+ const requireAdmin=(req,res,next)=>req.headers.authorization==='Bearer admin'?next():res.sendStatus(401);
+ vm.runInNewContext(declaration,{app,requireAdmin});
+ app.use((_req,res)=>{fallback++;res.sendStatus(500);});
+ const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));
+ try{
+  const base=`http://127.0.0.1:${server.address().port}/api/live-stream/recordings/legacy`;
+  for(const [method,suffix] of [['POST','/chunks/0'],['POST','/finish'],['GET','/status']]){
+   const response=await fetch(base+suffix,{method,headers:{Authorization:'Bearer admin','Content-Type':'application/octet-stream'},...(method==='POST'?{body:Buffer.from('old recording media')}:{})});
+   assert.equal(response.status,410);assert.equal((await response.json()).code,'LIVE_RECORDING_REMOVED');
+  }
+  assert.equal((await fetch(base+'/status')).status,401);assert.equal(fallback,0);
+ }finally{await new Promise(resolve=>server.close(resolve));}
 });

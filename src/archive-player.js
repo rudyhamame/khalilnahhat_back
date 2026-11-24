@@ -3,7 +3,7 @@ const { z } = require('zod');
 const { ArchiveItem } = require('./models');
 const { publicSongs, deliveryUrl } = require('./music-archive');
 const { localAssetPattern } = require('./music-archive-files');
-const isArchiveAudio = (url,cloudName) => localAssetPattern.test(url) || isCloudinaryAudio(url,cloudName);
+const isArchiveAudio = (url,cloudName) => localAssetPattern.test(url) || require('./vps-media').isAudio(url) || isCloudinaryAudio(url,cloudName);
 const schema=new mongoose.Schema({key:{type:String,unique:true,default:'footer'},enabled:{type:Boolean,default:true},archiveIds:{type:[String],default:[]}},{timestamps:true});
 const FooterPlaylist=mongoose.models.FooterPlaylist||mongoose.model('FooterPlaylist',schema);
 const playlistInput=z.object({enabled:z.boolean(),archiveIds:z.array(z.string().trim().min(1).max(120)).max(100)}).strict();

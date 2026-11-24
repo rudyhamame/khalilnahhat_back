@@ -5,6 +5,7 @@ const { createHash } = require('node:crypto');
 const { GoogleAuth } = require('google-auth-library');
 const { z } = require('zod');
 const { STATUS } = require('./booking-journey');
+const {availabilityFor} = require('./booking-availability');
 
 const hash = (v) => createHash('sha256').update(v).digest('hex');
 const Device = mongoose.models.EchoClientDevice || mongoose.model('EchoClientDevice', new mongoose.Schema({
@@ -18,12 +19,17 @@ let auth;
 
 // What a booking status change means to the client. Changes the client makes themselves (accept, request changes, decline) never notify.
 const MESSAGES = {
-  quoted: ['Your quote is ready', 'Review and accept your quote in the Echo app.'],
-  confirmed: ['Booking confirmed', 'Your booking is confirmed.'],
+  quoted: ['Booking quote ready', 'Review your quote in the Echo app. Your event is Booked after the required deposit and confirmation.'],
+  confirmed: ['Booked', 'Your event booking is confirmed. Open the Echo app for details.'],
   expired: ['Your quote expired', 'Contact us to reactivate it.'],
 };
 function messageFor(sr) {
   if (sr.status === STATUS.CANCELLED) return sr.declinedBy === 'admin' ? ['Request declined', 'Your booking request could not be accepted.'] : null;
+  if(sr.status===STATUS.PENDING){
+    const availability=availabilityFor(sr);
+    if(availability.status==='available')return ['Booking date and/or time available', 'Your booking is waiting for quote. We will notify you when it is ready.'];
+    if(availability.status==='unavailable')return ['Booking date and/or time unavailable', 'Open your booking for the reason. You may book an optional meeting or suggest another date and time.'];
+  }
   return MESSAGES[sr.status] || null;
 }
 
@@ -48,9 +54,9 @@ async function notifyUser(userId, { title, body, requestId }, { fetchImpl = fetc
 // One hook on the schema covers every place a status can change (quote sent, confirmed, declined, expired by the sweep).
 // Attach it BEFORE mongoose.model() compiles the schema; models.js does this.
 function watchSchema(schema, send = notifyUser) {
-  schema.pre('save', function () { this.$locals.pushStatus = !this.isNew && this.isModified('status'); this.$locals.pushQuote = !this.isNew && this.isModified('quoteRevision'); });
+  schema.pre('save', function () { this.$locals.pushStatus = !this.isNew && this.isModified('status'); this.$locals.pushQuote = !this.isNew && this.isModified('quoteRevision'); this.$locals.pushAvailability = !this.isNew && ['availabilityAcceptedAt','availabilityUnavailableAt','availabilityReason','availabilityWindow'].some(key=>this.isModified(key)); });
   schema.post('save', function (doc) {
-    const m = (doc.$locals.pushStatus || doc.$locals.pushQuote) ? messageFor(doc) : null;
+    const m = (doc.$locals.pushStatus || doc.$locals.pushQuote || doc.$locals.pushAvailability) ? messageFor(doc) : null;
     if (m) send(doc.userId, { title: m[0], body: m[1], requestId: doc.externalId || doc.id }).catch((e) => console.error('Client push failed:', e.message));
   });
 }

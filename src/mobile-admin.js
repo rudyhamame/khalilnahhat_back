@@ -47,6 +47,7 @@ const fileView = d => ({ id: String(d._id), name: d.name, bytes: d.bytes, mime: 
 const validId = value => mongoose.isValidObjectId(value);
 const fail = (res, status, message) => res.status(status).json({ message });
 function signedFileUrl(file) {
+  if(require('./vps-media').enabled()){const media=require('./vps-media').store();const m=media.metadata(file.publicId)||media.metadata(cloudinary.url(file.publicId,{resource_type:file.resourceType,type:file.delivery,format:file.format||undefined,secure:true}));if(m)return media.urlFor(m,{attachment:true,ttl:180});}
   return cloudinary.utils.private_download_url(file.publicId, file.format || '', {
     resource_type: file.resourceType, type: file.delivery, expires_at: Math.floor(Date.now()/1000)+180, attachment: true,
   });

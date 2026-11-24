@@ -3,6 +3,8 @@
  * Generated media is registered under /echo/models/ using its filename.
  * Intermediate -unjoined, -blender and -welded GLBs are excluded.
  */
+// VPS migration: never silently restore Cloudinary delivery URLs in the frontend.
+if(process.env.ALLOW_LEGACY_CLOUDINARY_SYNC!=='1')throw Error('Cloudinary site publishing is retired. Upload new assets through the VPS-backed app. Set ALLOW_LEGACY_CLOUDINARY_SYNC=1 only for an intentional legacy-provider rollback.');
 const fs=require('node:fs');
 const path=require('node:path');
 const crypto=require('node:crypto');

@@ -22,7 +22,7 @@ function register(app,{authFromRequest,User,serializeUser,sendMail,now=Date.now,
   let challenge;
   try{challenge=await Challenge.findOneAndUpdate({userId:user._id,$or:[{sentAt:{$lte:new Date(now()-60000)}},{sentAt:{$exists:false}}]},{$set:{email,previousEmail:user.email,codeHash,attempts:0,sentAt:at,expiresAt:new Date(now()+600000)}},{upsert:true,returnDocument:'after'});}
   catch(error){if(error.code===11000)return fail('Wait one minute before requesting another code.',429);throw error;}
-  try{await sendMail({to:email,name:user.firstName,subject:'Confirm your new email — Echo Event Entertainment',tags:['account-email-change'],html:`<p>Your code to change your Echo email address is:</p><p style="font-size:28px;letter-spacing:6px;font-weight:700">${code}</p><p>It expires in 10 minutes. If you did not request this change, ignore this email.</p>`});}
+  try{await sendMail({to:email,name:user.firstName,subject:'Confirm your new email — Echo Event Entertainment',tags:['account-email-change'],notificationContext:{code},html:`<p>Your code to change your Echo email address is:</p><p style="font-size:28px;letter-spacing:6px;font-weight:700">${code}</p><p>It expires in 10 minutes. If you did not request this change, ignore this email.</p>`});}
   catch(error){await Challenge.deleteOne({_id:challenge._id,codeHash});throw error;}
   res.status(202).json({pending:true,email,retryAfter:60});
  }));

@@ -1,7 +1,7 @@
 const { z } = require('zod');
 const { ServiceRequest } = require('./models');
 const { sendQuoteExpiryReminder } = require('./brevo');
-const { sendBookingDecision } = require('./booking-process-mail');
+const { sendBookingDecision, sendBookingRequested } = require('./booking-process-mail');
 const { notificationEmails } = require('./notification-emails');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -43,22 +43,57 @@ async function deleteBooking(sr, { EventBooking, Meeting, remove }) {
   return { deleted: Boolean(removed), cloudinaryCleanupPending: Boolean(removed?.cloudinaryCleanupPending) };
 }
 
-function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Model = ServiceRequest, sendDecision = sendBookingDecision }) {
+function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Model = ServiceRequest, sendDecision = sendBookingDecision, sendRequested = sendBookingRequested }) {
   const find = (id) => Model.findOne({ externalId: id });
   const notFound = (res) => res.status(404).json({ message: 'Service request not found.' });
   const own = (req, sr) => sr && String(sr.userId) === String(req.authUser._id);
 
   app.post('/api/service-requests/:id/admin-review', requireAdmin, async (req, res) => {
-    const parsed = z.object({ decision: z.enum(['accept', 'decline']) }).safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({message:'Choose Accept or Decline.'});
+    const parsed = z.object({ decision: z.enum(['accept', 'decline', 'unavailable']), reason:z.string().trim().max(2000).optional(), quoteRevision:z.number().int().nonnegative().optional() }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({message:'Choose an availability decision and a valid reason.'});
+    if(parsed.data.decision==='unavailable'&&!parsed.data.reason)return res.status(400).json({message:'Explain why the requested date and time are not available.'});
     const sr = await find(req.params.id);
     if (!sr) return notFound(res);
-    if (sr.status !== STATUS.PENDING || sr.availabilityAcceptedAt) return res.status(409).json({message:'This request has already been reviewed.'});
-    if (parsed.data.decision === 'accept') sr.availabilityAcceptedAt = new Date();
-    else { sr.status = STATUS.CANCELLED; sr.declinedBy = 'admin'; }
+    if(!journey.rule(sr.status).repriceable||(sr.payments||[]).some(p=>!p.voided))return res.status(409).json({message:'Availability cannot be changed for a paid or closed booking.'});
+    if(parsed.data.quoteRevision!==undefined&&parsed.data.quoteRevision!==(sr.quoteRevision||0))return res.status(409).json({message:'The booking changed. Reload before informing availability.'});
+    const availability=require('./booking-availability'),previous=availability.availabilityFor(sr);
+    if(parsed.data.decision==='accept'&&previous.status==='available')return res.status(409).json({message:'Availability has already been confirmed for this date and time.'});
+    if(previous.informedAt)sr.availabilityHistory=[...(sr.availabilityHistory||[]),{...previous,window:sr.availabilityWindow,changedAt:new Date()}];
+    if (parsed.data.decision === 'accept') {sr.availabilityAcceptedAt = new Date();sr.availabilityUnavailableAt=null;sr.availabilityReason='';}
+    else if(parsed.data.decision==='unavailable'){
+      sr.availabilityAcceptedAt=null;sr.availabilityUnavailableAt=new Date();sr.availabilityReason=parsed.data.reason;
+      sr.status=STATUS.PENDING;sr.acceptedAt=null;sr.expiresAt=null;sr.reminderSentAt=null;
+    }else{sr.status=STATUS.CANCELLED;sr.declinedBy='admin';}
+    sr.availabilityWindow=availability.windowKey(sr);
+    if(parsed.data.decision!=='accept')sr.quoteRevision=(sr.quoteRevision||0)+1;
     try{await sr.save();}catch(error){if(error.name==='VersionError')return res.status(409).json({message:'The booking changed. Reload before continuing.'});throw error;}
-    const mail = await sendDecision(sr, parsed.data.decision === 'accept' ? 'available' : 'declined').catch(() => ({sent:false}));
+    const decision=parsed.data.decision==='accept'?'available':parsed.data.decision==='unavailable'?'unavailable':'declined';
+    const mail = await sendDecision(sr, decision).catch(() => ({sent:false}));
     return res.json({item:serialize(sr,true), notificationSent:!!mail.sent});
+  });
+
+  app.post('/api/service-requests/:id/reschedule-request',requireAuth,async(req,res)=>{
+    const date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value=>!Number.isNaN(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value);
+    const time=z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
+    const parsed=z.object({date,startTime:time,endTime:time,quoteRevision:z.number().int().nonnegative()}).strict().safeParse(req.body);
+    if(!parsed.success||parsed.data.startTime===parsed.data.endTime)return res.status(400).json({message:'Choose a valid date, start time and end time.'});
+    const sr=await find(req.params.id);if(!own(req,sr))return notFound(res);
+    const availability=require('./booking-availability'),previous=availability.availabilityFor(sr);
+    if(previous.status!=='unavailable'||!journey.rule(sr.status).repriceable||(sr.payments||[]).some(p=>!p.voided))return res.status(409).json({message:'A different date can only be requested after the current date is marked not available.'});
+    if(parsed.data.quoteRevision!==(sr.quoteRevision||0))return res.status(409).json({message:'The booking changed. Reload before choosing another date.'});
+    const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Toronto',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+    if(parsed.data.date<today)return res.status(400).json({message:'Choose today or a future date.'});
+    const next={...availability.windowFor(sr),date:parsed.data.date,startTime:parsed.data.startTime,endTime:parsed.data.endTime};
+    if(JSON.stringify(next)===availability.windowKey(sr))return res.status(400).json({message:'Choose a different date or time.'});
+    sr.availabilityHistory=[...(sr.availabilityHistory||[]),{...previous,window:sr.availabilityWindow,changedAt:new Date()}];
+    sr.order={...(sr.order||{}),event:{...(sr.order?.event||{}),...next}};
+    sr.event={...(sr.event||{}),eventDate:next.date,startTime:next.startTime,endTime:next.endTime,timezone:next.timezone};
+    sr.availabilityAcceptedAt=null;sr.availabilityUnavailableAt=null;sr.availabilityReason='';sr.availabilityWindow='';
+    sr.status=STATUS.PENDING;sr.acceptedAt=null;sr.expiresAt=null;sr.reminderSentAt=null;sr.quoteRevision=(sr.quoteRevision||0)+1;
+    sr.markModified?.('order');sr.markModified?.('event');
+    try{await sr.save();}catch(error){if(error.name==='VersionError')return res.status(409).json({message:'The booking changed. Reload before trying again.'});throw error;}
+    const notification=await sendRequested(sr).catch(()=>({sent:false}));
+    return res.json({item:serialize(sr,false),notificationSent:Boolean(notification.sent)});
   });
 
   app.post('/api/service-requests/:id/decline', requireAuth, async (req,res) => {
@@ -107,6 +142,7 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     if (!journey.rule(sr.status).extendable || !sr.quotedAt) {
       return res.status(409).json({ message: 'Only a sent quote can be extended or reactivated.' });
     }
+    try{require('./booking-availability').requireAvailability(sr);}catch(error){return res.status(error.status).json({message:error.message,code:error.code});}
     if(sr.negotiation && !sr.negotiation.resolvedAt)return res.status(409).json({message:'Review the client offer and publish a revised quote before extending.'});
     const base = journey.rule(sr.status).expires && sr.expiresAt > new Date() ? sr.expiresAt.getTime() : Date.now();
     sr.expiresAt = new Date(base + parsed.data.days * DAY_MS);

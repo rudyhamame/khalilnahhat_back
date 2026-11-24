@@ -25,17 +25,17 @@ test('without the OVH relay, OBS setup is refused and allocates nothing (LiveKit
  const result=await c.call('/prepare',{title:'No relay'});
  assert.equal(result.code,503);assert.equal(result.body.code,'OBS_RELAY_UNAVAILABLE');assert.equal(allocations,0);assert.deepEqual(c.row,original);
 });
-test('with the OVH relay, prepare reserves a WHIP session, records on the relay and returns admin-only credentials',async()=>{
+test('with the OVH relay, prepare reserves a live-only WHIP session and returns admin-only credentials',async()=>{
  const relay=require('../src/obs-relay-client'),recordings=require('../src/live-recordings'),saved={configured:relay.configured,request:relay.request,create:recordings.LiveRecording.create};
  const calls=[],created=[];
  relay.configured=()=>true;
  relay.request=async(route,options={})=>{calls.push([route,options.method||'GET',options.body]);return route==='sessions'?{server:'https://relay.example/whip',streamKey:'bearer-token',expiresAt:new Date(Date.now()+120000).toISOString()}:{};};
  recordings.LiveRecording.create=async value=>{created.push(value);};
  try{
-  const c=setup();const result=await c.call('/prepare',{title:'OBS night'});
+  const c=setup();c.setRow({obsSaveRecording:true});const result=await c.call('/prepare',{title:'OBS night',saveRecording:true});
   assert.equal(result.code,201);assert.equal(c.row.broadcastMode,'whep');assert.equal(c.row.broadcastSource,'obs');assert.equal(c.row.isLive,false);
   assert.equal(c.row.obsUrl,'https://relay.example/whip');assert.equal(c.row.obsStreamKey,'bearer-token');assert.equal(c.row.obsState,'waiting');
-  assert.equal(created[0].provider,'ovh');assert.equal(calls.find(([route])=>route==='sessions')[2].saveRecording,true);
+  assert.equal(created.length,0);assert.equal(c.row.obsSaveRecording,false);assert.equal(calls.find(([route])=>route==='sessions')[2].saveRecording,false);
   assert.equal((await c.call('/prepare')).code,409);
  }finally{Object.assign(relay,{configured:saved.configured,request:saved.request});recordings.LiveRecording.create=saved.create;}
 });
@@ -104,4 +104,13 @@ test('OBS relay media only makes the connection ready; the site goes live when t
   assert.equal((await c.call('/go-live',{roomName:room})).code,200);
   assert.equal(c.row.isLive,true);assert.equal(c.row.obsState,'live');assert.equal(c.row.streamUrl,'https://relay.example/play');
  }finally{Object.assign(relay,{configured:saved.configured,request:saved.request});recordings.LiveRecording.create=saved.create;}
+});
+
+test('the retired recording preference cannot re-enable capture',async()=>{
+ const c=setup();const result=await c.call('/recording',{saveRecording:true});
+ assert.equal(result.code,410);assert.equal(result.body.code,'LIVE_RECORDING_REMOVED');assert.equal(c.row.obsSaveRecording,undefined);
+});
+test('legacy OBS synchronization cannot restart an automatic recording',async()=>{
+ let starts=0;const c=setup({ensureRecording:async()=>{starts++;}});seedLegacy(c);c.setRow({obsSaveRecording:true});c.setMedia({status:2,tracks:[{sid:'video'}]});
+ await c.service.synchronize();assert.equal(c.row.isLive,true);assert.equal(starts,0);
 });

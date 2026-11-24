@@ -7,7 +7,7 @@ const id='60b34139-905f-4493-88e9-952f82459e76';
 const payload=()=>({clientSubmissionId:id,event:{eventType:'wedding',eventDate:'2099-10-12',phone:'4165550100'},items:[{serviceId:'svc-dj',name:'DJ',category:'service',quantity:1}]});
 
 async function fixture(t,options={}) {
- const saved=[];const counters={notify:0,reserve:0,release:0,codeAttempts:0};
+ const saved=[];const counters={receipt:0,notify:0,reserve:0,release:0,codeAttempts:0};
  const app=express();app.use(express.json());
  registerServiceRequestSubmission(app,{
   requireAuth:(req,res,next)=>{if(!req.headers.authorization)return res.status(401).json({message:'Sign in.'});req.authUser={_id:req.headers.authorization,firstName:'Test',lastName:'Client',username:'test',email:'test@example.invalid',phoneNumber:'4165550100',phoneContact:'call'};next();},
@@ -25,6 +25,7 @@ async function fixture(t,options={}) {
   vouchers:{reserve:async()=>{counters.reserve++;return {voucher:{code:'TEST'}};},release:async()=>{counters.release++;},snapshot:v=>v,record:async()=>{}},
   serializeServiceRequest:item=>({id:item.externalId,requestNumber:item.requestNumber,confirmationCode:item.confirmationCode,status:item.status,customerEmail:item.customerEmail}),
   loadConversation:options.loadConversation,
+  sendBookingRequested:async()=>{counters.receipt++;return {sent:true};},
   sendServiceRequestNotification:async()=>{counters.notify++;if(options.failEmail)throw new Error('Mail unavailable');return {sent:true};},
  });
  app.use((error,req,res,next)=>res.status(500).json({message:'Unable to save request.'}));
@@ -65,7 +66,7 @@ test('lost-response retry returns the same owned request without claiming vouche
  const first=await f.post(body);const retry=await f.post(body);
  assert.equal(first.status,201);assert.equal(retry.status,200);assert.equal(retry.body.replayed,true);
  assert.equal(first.body.item.id,retry.body.item.id);assert.equal(f.saved.length,1);
- assert.equal(f.counters.notify,1);assert.equal(f.counters.reserve,1);
+ assert.equal(f.counters.notify,1);assert.equal(f.counters.receipt,1);assert.equal(first.body.customerNotificationSent,true);assert.equal(f.counters.reserve,1);
  assert.equal(retry.body.item.customerEmail,'test@example.invalid');
 });
 test('changed payload with the same key conflicts; another account has an independent key scope',async t=>{

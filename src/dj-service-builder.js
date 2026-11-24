@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { z } = require('zod');
 const journey = require('./booking-journey');
 const { ArchiveItem, ServiceRequest, LiveStreamConfig } = require('./models');
@@ -11,6 +12,10 @@ const djSegment = z.object({
 }).strict();
 const djSetSchema = z.object({ segments: z.array(djSegment).max(100), notes: z.string().trim().max(3000).default('') }).strict();
 
+// One saved set per live stream, so past and upcoming streams each keep their own prepared set list.
+const LiveStreamPlan = mongoose.models.LiveStreamPlan || mongoose.model('LiveStreamPlan', new mongoose.Schema({ title: { type: String, required: true, trim: true, maxlength: 180 }, djSet: { type: Object, default: { segments: [], notes: '' } } }, { timestamps: true }));
+const count = (djSet) => (djSet?.segments || []).reduce((n, row) => n + (row.entries?.length || (row.recordingIds?.length || 0) + (row.manualTracks?.length || 0)), 0);
+
 function registerDjServiceBuilder(app, { requireAdmin, ArchiveModel = ArchiveItem, BookingModel = ServiceRequest, StreamModel = LiveStreamConfig, getLiveStreamConfig }) {
   const validateSet = async (req,res) => {
     const parsed=z.object({djSet:djSetSchema}).strict().safeParse(req.body);
@@ -22,6 +27,11 @@ function registerDjServiceBuilder(app, { requireAdmin, ArchiveModel = ArchiveIte
   };
   app.get('/api/admin/dj-service-builder/livestream',requireAdmin,async(_req,res)=>{try{const stream=getLiveStreamConfig?await getLiveStreamConfig():await StreamModel.findOne({key:'primary'});res.set('Cache-Control','no-store').json({djSet:stream?.djSetPlan||{segments:[],notes:''}});}catch{res.status(503).json({message:'The livestream plan could not be loaded.'});}});
   app.put('/api/admin/dj-service-builder/livestream',requireAdmin,async(req,res)=>{try{const djSet=await validateSet(req,res);if(!djSet)return;const stream=getLiveStreamConfig?await getLiveStreamConfig():await StreamModel.findOne({key:'primary'});if(!stream)return res.status(404).json({message:'Livestream configuration not found.'});stream.djSetPlan=djSet;await stream.save();res.set('Cache-Control','no-store').json({djSet});}catch{res.status(503).json({message:'The livestream plan could not be saved.'});}});
+  const planView = (row) => ({ id: String(row._id), title: row.title, createdAt: row.createdAt, trackCount: count(row.djSet) });
+  app.get('/api/admin/dj-service-builder/live-plans',requireAdmin,async(_req,res)=>{try{const rows=await LiveStreamPlan.find().sort({createdAt:-1}).limit(200).lean();res.set('Cache-Control','no-store').json({items:rows.map(planView)});}catch{res.status(503).json({message:'Live streams could not be loaded.'});}});
+  app.post('/api/admin/dj-service-builder/live-plans',requireAdmin,async(req,res)=>{const parsed=z.object({title:z.string().trim().min(1).max(180)}).strict().safeParse(req.body);if(!parsed.success)return res.status(400).json({message:'Enter a live stream title.'});try{const row=await LiveStreamPlan.create({title:parsed.data.title});res.status(201).json({item:planView(row.toObject())});}catch{res.status(503).json({message:'The live stream could not be created.'});}});
+  app.get('/api/admin/dj-service-builder/live-plans/:id',requireAdmin,async(req,res)=>{try{const row=mongoose.isValidObjectId(req.params.id)&&await LiveStreamPlan.findById(req.params.id).lean();if(!row)return res.status(404).json({message:'Live stream not found.'});res.set('Cache-Control','no-store').json({item:planView(row),djSet:row.djSet});}catch{res.status(503).json({message:'The live stream could not be loaded.'});}});
+  app.put('/api/admin/dj-service-builder/live-plans/:id',requireAdmin,async(req,res)=>{try{if(!mongoose.isValidObjectId(req.params.id))return res.status(404).json({message:'Live stream not found.'});const djSet=await validateSet(req,res);if(!djSet)return;const row=await LiveStreamPlan.findByIdAndUpdate(req.params.id,{$set:{djSet}},{new:true}).lean();if(!row)return res.status(404).json({message:'Live stream not found.'});res.set('Cache-Control','no-store').json({item:planView(row),djSet:row.djSet});}catch{res.status(503).json({message:'The live stream set could not be saved. Your changes remain in the editor; please retry.'});}});
   app.put('/api/admin/dj-service-builder/:bookingId', requireAdmin, async (req, res) => {
     try {
       const djSet=await validateSet(req,res);if(!djSet)return;
@@ -34,4 +44,4 @@ function registerDjServiceBuilder(app, { requireAdmin, ArchiveModel = ArchiveIte
   });
 }
 
-module.exports = { registerDjServiceBuilder };
+module.exports = { registerDjServiceBuilder, LiveStreamPlan };

@@ -259,8 +259,6 @@ const liveStreamConfigSchema = new mongoose.Schema(
     muxPlaybackId: { type: String, default: '', trim: true },
     muxStreamKey: { type: String, default: '', trim: true },
     muxRtmpUrl: { type: String, default: '', trim: true },
-    // What ECHO is on air for: broadcast | event | home-studio | chill-mix | radio
-    goal: { type: String, default: 'broadcast', trim: true },
     // The photo viewers see while the live is paused or halted (a reference to a gallery image and how it is framed).
     pausePhoto: { type: new mongoose.Schema({ id: String, title: String, url: String, crop: { zoom: Number, cx: Number, cy: Number }, cropPortrait: { zoom: Number, cx: Number, cy: Number }, message: { text: String, x: Number, y: Number, px: Number, py: Number, size: Number, color: String } }, { _id: false }), default: null },
     broadcastMode: { type: String, enum: ['youtube', 'mux', 'webrtc', 'whep'], default: 'youtube', trim: true },
@@ -274,7 +272,7 @@ const liveStreamConfigSchema = new mongoose.Schema(
     obsState: { type: String, default: '' },
     obsGoLive: { type: Boolean, default: true }, // OBS connections start with false: the site goes live only after the admin presses Go live
     obsExpiresAt: { type: Date, default: null },
-    obsSaveRecording: { type: Boolean, default: true },
+    obsSaveRecording: { type: Boolean, default: false },
     djSetPlan: { type: mongoose.Schema.Types.Mixed, default: null },
     liveSetListId: { type: String, default: 'none' },
   },
@@ -325,6 +323,10 @@ const serviceRequestSchema = new mongoose.Schema(
     negotiation: {type:mongoose.Schema.Types.Mixed,default:null},
     negotiationHistory: {type:[mongoose.Schema.Types.Mixed],default:[]},
     availabilityAcceptedAt: { type: Date, default: null },
+    availabilityUnavailableAt: { type: Date, default: null },
+    availabilityReason: { type: String, default: '', maxlength: 2000 },
+    availabilityWindow: { type: String, default: '' },
+    availabilityHistory: { type: [mongoose.Schema.Types.Mixed], default: [] },
     declinedBy: { type: String, enum: ['', 'admin', 'client'], default: '' },
     paymentInstructions: { type: String, default: '' },
     planning: { type: mongoose.Schema.Types.Mixed, default: null },

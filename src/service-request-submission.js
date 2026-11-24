@@ -20,7 +20,7 @@ const serviceRequestCreateSchema = z.object({
   voucherCode: z.string().trim().max(40).optional(),
 });
 
-function registerServiceRequestSubmission(app, { requireAuth, ServiceRequest, Equipment, vouchers, serializeServiceRequest, sendServiceRequestNotification, createConfirmationCode=createBookingCode, loadConversation=(owner,id)=>require('./booking-conversations').mongoStore.get(owner,id) }) {
+function registerServiceRequestSubmission(app, { requireAuth, ServiceRequest, Equipment, vouchers, serializeServiceRequest, sendServiceRequestNotification, sendBookingRequested=require('./booking-process-mail').sendBookingRequested, createConfirmationCode=createBookingCode, loadConversation=(owner,id)=>require('./booking-conversations').mongoStore.get(owner,id) }) {
   app.post('/api/service-requests', requireAuth, async (request, response) => {
     const parsed = serviceRequestCreateSchema.safeParse(request.body);
 
@@ -110,7 +110,7 @@ function registerServiceRequestSubmission(app, { requireAuth, ServiceRequest, Eq
     require('./admin-alerts').alert('booking');
     if (voucher) await vouchers.record(voucher, user, serviceRequest).catch((error) => console.error('Voucher redemption record failed:', error));
 
-    let notificationSent = false;
+    let notificationSent = false,customerNotificationSent=false;
 
     try {
       const notification = await sendServiceRequestNotification(serviceRequest);
@@ -119,9 +119,11 @@ function registerServiceRequestSubmission(app, { requireAuth, ServiceRequest, Eq
       console.error('Failed to send Brevo service request notification:', error);
     }
 
+    try{customerNotificationSent=Boolean((await sendBookingRequested(serviceRequest)).sent);}catch(error){console.error('Booking receipt email failed:',error.name);}
+
     return response.status(201).json({
       item: serializeServiceRequest(serviceRequest, false),
-      notificationSent,
+      notificationSent,customerNotificationSent,
     });
   });
 

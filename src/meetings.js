@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
 const { z } = require('zod');
 const { ServiceRequest } = require('./models');
-const { STATUS } = require('./booking-journey');
+const journey = require('./booking-journey');
+const { STATUS } = journey;
 const CALL_MODES = ['phone', 'whatsapp-voice', 'whatsapp-video'];
 const modeLabel = mode => ({phone:'Phone call','whatsapp-voice':'WhatsApp voice call','whatsapp-video':'WhatsApp video call',online:'Online','in-person':'In person'}[mode] || mode);
 const { sendSimpleEmail } = require('./brevo');
@@ -23,6 +24,7 @@ const meetingSchema = new mongoose.Schema(
     bookedByEmail: { type: String, default: '' },
     topic: { type: String, default: '' },
     bookingRequestId: {type:String, default:null},
+    meetingPurpose: {type:String,enum:['planning','availability'],default:'planning'},
     callMethod: {type:String, enum:['', ...CALL_MODES], default:''},
     contactPhone: {type:String, default:''},
     reminderSentAt: { type: Date, default: null },
@@ -37,13 +39,13 @@ const when = (d) => new Intl.DateTimeFormat('en-CA', { dateStyle: 'full', timeSt
 const adminEmail = () => notificationAddress();
 
 const publicSlot = (m) => ({ id: m.id, start: m.start, durationMin: m.durationMin, mode: m.mode });
-const bookedView = (m) => ({ ...publicSlot(m), bookingRequestId:m.bookingRequestId, callMethod:m.callMethod, contactPhone:m.contactPhone, link: m.link, location: m.location, topic: m.topic, bookedByName: m.bookedByName, bookedByEmail: m.bookedByEmail });
+const bookedView = (m) => ({ ...publicSlot(m), bookingRequestId:m.bookingRequestId, meetingPurpose:m.meetingPurpose||'planning', callMethod:m.callMethod, contactPhone:m.contactPhone, link: m.link, location: m.location, topic: m.topic, bookedByName: m.bookedByName, bookedByEmail: m.bookedByEmail });
 
 function mail(m, subject, intro) {
   const event = subject.toLowerCase().replaceAll(' ', '-');
   const notificationContext = meetingEmailContext(m);
   const body = `<p>${esc(intro)}</p><p><strong>${esc(when(m.start))}</strong> (Toronto time, ${m.durationMin} min)<br>
-    ${CALL_MODES.includes(m.callMethod || m.mode) ? `${esc(modeLabel(m.callMethod || m.mode))} — ${esc(m.contactPhone)}` : m.mode === 'online' ? `Online${m.link ? `: <a href="${esc(m.link)}">${esc(m.link)}</a>` : ''}` : `In person${m.location ? `: ${esc(m.location)}` : ''}`}</p><p>Echo Event Entertainment</p>`;
+    ${CALL_MODES.includes(m.callMethod || m.mode) ? `${esc(modeLabel(m.callMethod || m.mode))} — ${esc(m.contactPhone)}` : m.mode === 'online' ? `Online${m.link ? `: <a href="${esc(m.link)}">${esc(m.link)}</a>` : ''}` : `In person${m.location ? `: ${esc(m.location)}` : ''}`}</p><p>This confirms the meeting only, not your event booking. Your event is Booked only after its required deposit and final confirmation.</p><p>Echo Event Entertainment</p>`;
   return Promise.allSettled([
     sendSimpleEmail({ to: m.bookedByEmail, name: m.bookedByName, subject, html: body, tags: [event,'meeting'], notificationContext }),
     sendSimpleEmail({ to: adminEmail(), subject: `${subject} — ${m.bookedByName}`, html: body, tags: [`${event}-admin`,'meeting-admin'], notificationContext }),
@@ -114,14 +116,18 @@ function registerMeetings(app, { requireAuth, requireAdmin, BookingModel=Service
 
   app.post('/api/meetings/:id/book', requireAuth, async (req, res) => {
     const topic = String(req.body?.topic || '').slice(0, 500);
-    const parsed = z.object({bookingRequestId:z.string().trim().min(1).max(200).optional(),callMethod:z.enum(CALL_MODES).optional(),contactPhone:z.string().trim().min(5).max(80).optional()}).safeParse(req.body || {});
+    const parsed = z.object({bookingRequestId:z.string().trim().min(1).max(200).optional(),callMethod:z.enum(CALL_MODES).optional(),contactPhone:z.string().trim().min(5).max(80).optional(),purpose:z.enum(['planning','availability']).default('planning')}).safeParse(req.body || {});
     if (!parsed.success) return bad(res,'Choose a call method and enter your contact number.');
-    const details = parsed.data;
+    const {purpose,...details} = parsed.data;
+    details.meetingPurpose=purpose;
     if (details.bookingRequestId) {
-      const booking = await BookingModel.findOne({externalId:details.bookingRequestId,userId:req.authUser._id,status:{$in:[STATUS.ACCEPTED,STATUS.CONFIRMED]}});
-      if (!booking || (booking.status===STATUS.ACCEPTED && booking.expiresAt && booking.expiresAt<=new Date())) return res.status(409).json({message:'Accept your active quote before scheduling its meeting.'});
+      const booking = await BookingModel.findOne({externalId:details.bookingRequestId,userId:req.authUser._id});
+      const discussion=booking&&journey.describeRequest(booking).canDiscussAvailability;
+      const planning=booking&&[STATUS.ACCEPTED,STATUS.CONFIRMED].includes(booking.status)&&!(booking.status===STATUS.ACCEPTED&&booking.expiresAt&&booking.expiresAt<=new Date());
+      if(purpose==='availability'?!discussion:!planning)return res.status(409).json({message:purpose==='availability'?'Availability discussion meetings are only offered for your unavailable booking request.':'Accept your active quote before scheduling its planning meeting.'});
       if (!details.callMethod || !details.contactPhone) return bad(res,'Choose a call method and enter your contact number.');
     }
+    if(purpose==='availability'&&!details.bookingRequestId)return bad(res,'Choose the booking whose availability you want to discuss.');
     const slot = await MeetingModel.findById(req.params.id);
     if (!slot) return notFound(res);
     if(CALL_MODES.includes(slot.mode) && !details.bookingRequestId)return bad(res,'Accept your quote and schedule this call from your booking dashboard.');
@@ -148,12 +154,12 @@ function registerMeetings(app, { requireAuth, requireAdmin, BookingModel=Service
   app.post('/api/meetings/:id/reschedule', requireAuth, async (req, res) => {
     const old = await MeetingModel.findById(req.params.id);
     if (!mine(old, req.authUser) || old.status !== 'booked') return notFound(res);
-    if(old.bookingRequestId){const booking=await BookingModel.findOne({externalId:old.bookingRequestId,userId:old.bookedBy,status:{$in:[STATUS.ACCEPTED,STATUS.CONFIRMED]}});if(!booking)return res.status(409).json({message:'This booking no longer permits a meeting.'});const slot=await MeetingModel.findById(req.body?.toSlotId);if(!slot||!CALL_MODES.includes(slot.mode))return bad(res,'Choose a phone or WhatsApp appointment.');}
+    if(old.bookingRequestId){const booking=await BookingModel.findOne({externalId:old.bookingRequestId,userId:old.bookedBy});const eligible=booking&&(old.meetingPurpose==='availability'?journey.describeRequest(booking).canDiscussAvailability:[STATUS.ACCEPTED,STATUS.CONFIRMED].includes(booking.status)&&!(booking.status===STATUS.ACCEPTED&&booking.expiresAt&&booking.expiresAt<=new Date()));if(!eligible)return res.status(409).json({message:'This booking no longer permits a meeting.'});const slot=await MeetingModel.findById(req.body?.toSlotId);if(!slot||!CALL_MODES.includes(slot.mode))return bad(res,'Choose a phone or WhatsApp appointment.');}
     if(!old.bookingRequestId){const slot=await MeetingModel.findById(req.body?.toSlotId);if(slot&&CALL_MODES.includes(slot.mode))return bad(res,'Schedule booking calls from an accepted booking.');}
     const next = await bookSlot(req.body?.toSlotId, req.authUser, old.topic);
     if (!next) return res.status(409).json({ message: 'That time is no longer available.' });
     await freeSlot(old);
-    next.bookingRequestId=old.bookingRequestId; next.callMethod=CALL_MODES.includes(next.mode)?next.mode:old.callMethod; next.contactPhone=old.contactPhone; await next.save();
+    next.meetingPurpose=old.meetingPurpose; next.bookingRequestId=old.bookingRequestId; next.callMethod=CALL_MODES.includes(next.mode)?next.mode:old.callMethod; next.contactPhone=old.contactPhone; await next.save();
     mail(next, 'Meeting rescheduled', 'Your meeting was moved to the time below.');
     res.json({ item: bookedView(next) });
   });

@@ -390,9 +390,10 @@ function serializeServiceRequest(serviceRequest, includeQuote = true) {
     negotiationRevision: serviceRequest.negotiationRevision || 0,
     negotiation: serviceRequest.negotiation || null,
     negotiationHistory: serviceRequest.negotiationHistory || [],
-    availabilityAcceptedAt: serviceRequest.availabilityAcceptedAt || null,
+    availability: require('./booking-availability').availabilityFor(serviceRequest),
+    availabilityAcceptedAt: require('./booking-availability').availabilityFor(serviceRequest).status==='available'?serviceRequest.availabilityAcceptedAt:null,
     declinedBy: serviceRequest.declinedBy || '',
-    journey: {...journey.describe(serviceRequest.status), ...(serviceRequest.declinedBy ? {label:'Declined',labelAr:'مرفوض'} : {})},
+    journey: {...journey.describeRequest(serviceRequest), ...(serviceRequest.declinedBy ? {label:'Declined',labelAr:'مرفوض'} : {})},
     currency: serviceRequest.currency || 'CAD',
     adminNote: isQuoted || includeQuote ? serviceRequest.adminNote || '' : '',
     total: isQuoted || includeQuote
@@ -560,7 +561,6 @@ function serializeLiveStreamConfig(config) {
     webrtcRoomName: config?.webrtcRoomName || '',
     broadcastMode: config?.broadcastMode || defaultLiveStreamConfig.broadcastMode,
     broadcastSource: config?.broadcastSource || '',
-    goal: config?.goal || 'broadcast',
     audience: config?.audience || 'all',
   };
 }
@@ -582,7 +582,7 @@ function serializeAdminLiveStreamConfig(config) {
     studio:{transport:process.env.ECHO_BROWSER_TRANSPORT==='ovh'&&require('./obs-relay-client').configured()?'ovh':'livekit'},
     streamUrl: config?.streamUrl || '',
     obs: { roomName: config?.obsRoomName || '', state: config?.obsState || '', goLive: config?.obsGoLive !== false,
-      saveRecording: config?.obsSaveRecording !== false,
+      saveRecording: false,
       url: config?.obsUrl || '', streamKey: config?.obsStreamKey || '', expiresAt: config?.obsExpiresAt || null,
       transport: config?.broadcastMode === 'whep' || (!config?.obsRoomName && require('./obs-relay-client').configured()) ? 'ovh' : 'livekit', error: config?._obsRelayError || '' },
     pausePhoto: config?.pausePhoto?.url ? { id: config.pausePhoto.id || '', title: config.pausePhoto.title || '', url: config.pausePhoto.url, crop: { zoom: config.pausePhoto.crop?.zoom ?? 0, cx: config.pausePhoto.crop?.cx ?? 0.5, cy: config.pausePhoto.crop?.cy ?? 0.5 }, cropPortrait: { zoom: config.pausePhoto.cropPortrait?.zoom ?? 0, cx: config.pausePhoto.cropPortrait?.cx ?? 0.5, cy: config.pausePhoto.cropPortrait?.cy ?? 0.5 }, message: { text: config.pausePhoto.message?.text || '', x: config.pausePhoto.message?.x ?? 0.5, y: config.pausePhoto.message?.y ?? 0.82, px: config.pausePhoto.message?.px ?? 0.5, py: config.pausePhoto.message?.py ?? 0.78, size: config.pausePhoto.message?.size ?? 7, color: config.pausePhoto.message?.color || '#ffffff' } } : null,
@@ -782,6 +782,7 @@ app.use(
   }),
 );
 
+if(require('./vps-media').enabled())require('./vps-media').store().register(app);
 require('./cloudflare-mail').registerMailIngress(app);
 app.use(require('./security-controls').resourceAdmission);
 app.use('/api/auth', express.json({ limit: '16kb' }), require('./security-controls').authRateLimit);
@@ -1051,6 +1052,8 @@ app.patch('/api/service-requests/:id/quote', requireAdmin, async (request, respo
     return response.status(409).json({ message: 'A cancelled or paid booking cannot be repriced through the quote editor.' });
   }
 
+  try{require('./booking-availability').requireAvailability(serviceRequest);}catch(error){return response.status(error.status).json({message:error.message,code:error.code});}
+
   if(parsed.data.quoteRevision!==undefined && parsed.data.quoteRevision!==(serviceRequest.quoteRevision||0))return response.status(409).json({message:'The quote changed. Reload before publishing.'});
   if(serviceRequest.negotiation && !serviceRequest.negotiation.resolvedAt && parsed.data.negotiationRevision!==(serviceRequest.negotiationRevision||0))return response.status(409).json({message:'The client offer changed. Reload and review it before publishing.'});
   let selectedItems;
@@ -1155,7 +1158,7 @@ app.post('/api/live-sessions/upload-audio', requireAdmin, upload.single('audio')
     });
   }
 
-  if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+  if (!require('./vps-media').enabled() && (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET)) {
     return response.status(500).json({
       message: 'Cloudinary credentials are missing from the server environment.',
     });
@@ -1184,7 +1187,7 @@ app.post('/api/live-stream/upload-poster', requireAdmin, upload.single('poster')
     return response.status(400).json({ message: 'Poster image is required.' });
   }
 
-  if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+  if (!require('./vps-media').enabled() && (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET)) {
     return response.status(500).json({ message: 'Cloudinary credentials are missing from the server environment.' });
   }
 
@@ -1205,7 +1208,7 @@ app.post('/api/live-stream/upload-poster', requireAdmin, upload.single('poster')
 
 app.post('/api/live-sessions/upload-cover', requireAdmin, upload.single('cover'), async (request, response) => {
   if (!request.file) return response.status(400).json({ message: 'Cover image is required.' });
-  if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+  if (!require('./vps-media').enabled() && (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET)) {
     return response.status(500).json({ message: 'Cloudinary credentials are missing from the server environment.' });
   }
 
@@ -1250,18 +1253,6 @@ app.patch('/api/live-stream', requireAdmin, async (request, response) => {
   });
 });
 
-// The goal ECHO is on air for (Broadcast, DJing in an Event, DJing in Home Studio, Chilling-out Mix Time, Echo Radio Music). Independent of the stream source.
-app.put('/api/live-stream/goal', requireAdmin, async (request, response) => {
-  const goal = request.body?.goal;
-  const mongooseLib = require('mongoose');
-  if (typeof goal !== 'string' || !mongooseLib.isValidObjectId(goal) || !(await mongooseLib.models.WorkElementOption?.exists({ _id: goal, key: 'liveGoal', archived: { $ne: true } }))) {
-    return response.status(400).json({ message: 'Choose a valid on-air goal.' });
-  }
-  await getLiveStreamConfig();
-  const config = await LiveStreamConfig.findOneAndUpdate({ key: defaultLiveStreamConfig.key }, { $set: { goal } }, { new: true });
-  return response.json({ item: serializeAdminLiveStreamConfig(config) });
-});
-
 // The pause photo is kept with the live so a reload, another browser or a halted recording shows the same photo.
 app.put('/api/live-stream/pause-photo', requireAdmin, async (request, response) => {
   const parsed = z.object({ id: z.string().trim().max(120).default(''), title: z.string().trim().max(240).default(''), url: z.string().trim().max(2048).refine(value => /^https:\/\//.test(value), 'Choose a photo from the gallery.'), crop: z.object({ zoom: z.number().finite().min(0).max(4), cx: z.number().finite().min(0).max(1), cy: z.number().finite().min(0).max(1) }).strict().default({ zoom: 0, cx: 0.5, cy: 0.5 }), cropPortrait: z.object({ zoom: z.number().finite().min(0).max(4), cx: z.number().finite().min(0).max(1), cy: z.number().finite().min(0).max(1) }).strict().default({ zoom: 0, cx: 0.5, cy: 0.5 }), message: z.object({ text: z.string().max(300).default(''), x: z.number().finite().min(0).max(1).default(0.5), y: z.number().finite().min(0).max(1).default(0.82), px: z.number().finite().min(0).max(1).default(0.5), py: z.number().finite().min(0).max(1).default(0.78), size: z.number().finite().min(2).max(20).default(7), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#ffffff') }).strict().default({ text: '', x: 0.5, y: 0.82, size: 7, color: '#ffffff' }) }).strict().safeParse(request.body);
@@ -1286,7 +1277,7 @@ app.get('/api/live-stream/admin', requireAdmin, async (_request, response) => {
   const config = await getLiveStreamConfig();
 
   return response.json({
-    item: {...serializeAdminLiveStreamConfig(config),recording:await require('./live-recordings').statusForRoom(config.obsRoomName||config.webrtcRoomName)},
+    item: {...serializeAdminLiveStreamConfig(config),recording:{mode:'none'}},
   });
 });
 
@@ -1421,7 +1412,7 @@ require('./live-broadcast').registerLiveBroadcastRoutes(app, {
   requireAdmin, getLiveStreamConfig, LiveStreamConfig, defaults: defaultLiveStreamConfig, notifyLiveTransition,
   createToken: createLiveKitToken, getConfig: getLiveKitConfig,
   serialize: serializeAdminLiveStreamConfig, serializePublic: serializePublicLiveStreamConfig, authFromRequest,
-  RoomServiceClient, IngressClient, randomUUID: crypto.randomUUID, prepareRecording: require('./live-recordings').prepareRecordingRoom, ensureRecording: require('./live-recordings').ensureRecording, recordingStatus: require('./live-recordings').statusForRoom,
+  RoomServiceClient, IngressClient, randomUUID: crypto.randomUUID,
   verifyWebhook: async (body, authorization) => {
     const { apiKey, apiSecret } = getLiveKitConfig();
     return new WebhookReceiver(apiKey, apiSecret).receive(body, authorization);
@@ -1589,8 +1580,9 @@ require('./echo-project-chat-audio').registerEchoProjectChatAudio(app, { require
 require('./echo-project-chat-calls').registerEchoProjectChatCalls(app, { requireAdmin, getConfig: getLiveKitConfig, publish: projectChatRealtime.publish });
 require('./availability').registerAvailability(app, { requireAdmin });
 vouchers.registerVouchers(app, { requireAdmin, requireAuth });
-require('./live-recordings').registerLiveRecordings(app, requireAdmin);
-require('./direct-recording').registerDirectRecordingRoutes(app,requireAdmin);
+require('./live-recordings').registerLiveRecordings(app, requireAdmin, {startWorker:false});
+// Reject stale clients before they can upload recording chunks or finalize captures.
+app.use('/api/live-stream/recordings', requireAdmin, (_req,res)=>res.status(410).json({code:'LIVE_RECORDING_REMOVED',message:'Live recording has been removed. You can record locally in OBS.'}));
 require('./live-suggestions').registerLiveSuggestions(app, { getLiveStreamConfig, requireAuth });
 require('./live-comments').registerLiveComments(app, { getLiveStreamConfig, requireAuth: requireViewer, requireAdmin });
 require('./notification-emails').registerNotificationEmails(app, { requireAdmin });

@@ -17,6 +17,7 @@ const text = z.string().trim().max(4000);
 const base = { title: z.string().trim().min(1).max(240), description: text.default(''), published: z.boolean().default(false), sortOrder: z.number().int().min(0).max(1000000).default(0) };
 function ownedAsset(value) {
   if (!value) return true;
+  if(require('./vps-media').isOwned(value))return true;
   if (archiveFiles.localAssetPattern.test(value)) return true;
   try { const u = new URL(value); return u.protocol === 'https:' && u.hostname === 'res.cloudinary.com' && u.pathname.startsWith(`/${process.env.CLOUDINARY_CLOUD_NAME}/`); } catch { return false; }
 }
@@ -24,13 +25,14 @@ const asset = z.string().max(2048).refine(ownedAsset, 'Choose a file uploaded to
 const inputs = {
   collections: z.object({ ...base, coverImage: asset.default(''), workTypeId: z.string().trim().max(120).default(''), recordingIds: z.array(z.string().min(1).max(120)).max(5000).default([]) }).strict(),
   songs: z.object({ ...base, artist: z.string().trim().max(240).default('DJ Khalil'),
-    date: z.string().regex(/^$|^\d{4}-\d{2}-\d{2}$/).refine(value => !value || (!Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value), 'Choose a valid date.').default(''), audioUrl: asset.refine(value => Boolean(value) && (archiveFiles.localAssetPattern.test(value) || /\/video\/(upload|authenticated)\//.test(value)), 'Upload an audio file.'),
+    date: z.string().regex(/^$|^\d{4}-\d{2}-\d{2}$/).refine(value => !value || (!Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value), 'Choose a valid date.').default(''), audioUrl: asset.refine(value => Boolean(value) && (archiveFiles.localAssetPattern.test(value) || require('./vps-media').isAudio(value) || /\/video\/(upload|authenticated)\//.test(value)), 'Upload an audio file.'),
     coverImage: asset.default(''), duration: z.string().max(30).default('') }).strict(),
 };
 
 // Authenticated uploads stay private at rest; only authorized responses sign them.
 function deliveryUrl(value) {
   if (!value) return '';
+  const local=require('./vps-media').resolve(value);if(local!==value||require('./vps-media').isOwned(value))return local;
   if (/\/authenticated\/s--[^/]+--\//.test(value)) return value;
   const match = value.match(/^https:\/\/res\.cloudinary\.com\/([^/]+)\/(image|video)\/authenticated\/(?:v\d+\/)?(.+)$/);
   if (!match || match[1] !== process.env.CLOUDINARY_CLOUD_NAME) return value;
@@ -39,6 +41,7 @@ function deliveryUrl(value) {
 // A small streaming copy (128 kbps MP3) of a lossless channel file. Cloudinary makes it on first request and serves it from cache after that;
 // the stored original is never changed. Returns '' when the URL is not one of ours, so callers keep using the original.
 function lightweightUrl(value) {
+  if(require('./vps-media').enabled())return require('./vps-media').resolve(value);
   const match = String(value || '').match(/^https:\/\/res\.cloudinary\.com\/([^/]+)\/video\/authenticated\/(?:s--[^/]+--\/)?(?:v\d+\/)?(.+?)(?:\.[a-z0-9]+)?$/);
   if (!match || match[1] !== process.env.CLOUDINARY_CLOUD_NAME) return '';
   try { return cloudinary.url(match[2], { resource_type: 'video', type: 'authenticated', secure: true, sign_url: true, format: 'mp3', transformation: [{ audio_codec: 'mp3', bit_rate: '128k' }] }); } catch { return ''; }
@@ -66,7 +69,7 @@ async function publicSongs(ArchiveModel = ArchiveItem) {
   return visibleSongs([...(await ArchiveModel.find().sort({ sortOrder: 1, createdAt: -1 })), ...recordings.map(r => { const plain = r.toObject ? r.toObject() : r; return { ...asSong(plain), stems: plain.stems || null }; })]);
 }
 
-function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, CollectionModel = Collection, cloudinaryClient = cloudinary, uploadAssetImpl = require('./cloudinary-assets').createAssetStore({client:cloudinaryClient}).upload, requireCloudinary = process.env.RENDER === 'true' || process.env.MUSIC_ARCHIVE_STORAGE_PROVIDER === 'cloudinary', useCloudinary = Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) } = {}) {
+function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, CollectionModel = Collection, cloudinaryClient = cloudinary, uploadAssetImpl = (input,options)=>require('./vps-media').enabled()?require('./cloudinary-assets').uploadVpsAsset(input,options):require('./cloudinary-assets').createAssetStore({client:cloudinaryClient}).upload(input,options), requireCloudinary = process.env.RENDER === 'true' || process.env.MUSIC_ARCHIVE_STORAGE_PROVIDER === 'cloudinary', useCloudinary = Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) } = {}) {
   const models = { collections: CollectionModel, songs: ArchiveModel };
   const ontology = ArchiveModel === ArchiveItem ? require('./music-ontology/routes').registerMusicOntology(app, { requireAdmin, service: require('./music-ontology/service').createService({ deliveryUrl, lightUrl: lightweightUrl, previewUrl: archiveFiles.previewUrl, ownedAsset }) }) : null;
   const countRecordings = async filter => (await ArchiveModel.countDocuments(filter)) + (ontology ? await MusicRecording.countDocuments(filter) : 0);
@@ -150,13 +153,13 @@ function registerMusicArchive(app, { requireAdmin, ArchiveModel = ArchiveItem, C
     const image = file && /^image\/(?!svg)[a-z0-9.+-]+$/i.test(file.mimetype);
     if (!audio && !image) return res.status(400).json({ message: 'Choose an MP3, WAV, M4A, Ogg, AAC, FLAC, WebM audio file or an image (JPG, PNG, WebP, GIF, AVIF, HEIC, TIFF, BMP…). SVG is not accepted.' });
     if (image && file.size > 10 * 1024 * 1024) return res.status(400).json({ message: 'Cover images must be under 10 MB.' });
-    if (requireCloudinary && !useCloudinary) return res.status(503).json({ message: 'Cloudinary storage is not configured. Contact the administrator; your file has not been saved.' });
+    if (requireCloudinary && !useCloudinary && !require('./vps-media').enabled()) return res.status(503).json({ message: 'Cloudinary storage is not configured. Contact the administrator; your file has not been saved.' });
     const exportFormat=req.body?.exportFormat;
     if(exportFormat!==undefined&&(!audio||!['mp3','aac'].includes(exportFormat)||!/^audio\/(wav|x-wav|wave)$/.test(file.mimetype)))return res.status(400).json({message:'Compressed trim export requires WAV audio and an MP3 or AAC format.'});
     try {
       if(exportFormat)file=await require('./compress-trimmed-audio').compressTrimmedAudio(file,exportFormat);
       const audioMetadata=audio?{format:require('node:path').extname(file.originalname||'').slice(1).toLowerCase(),sizeBytes:file.buffer.length}:null;
-      if (!useCloudinary) return res.status(201).json({...await archiveFiles.saveLocalFile(file),...(audio?{audioMetadata}:{}),...(exportFormat?{exportFormat,sizeBytes:file.size}:{})});
+      if (!useCloudinary && !require('./vps-media').enabled()) return res.status(201).json({...await archiveFiles.saveLocalFile(file),...(audio?{audioMetadata}:{}),...(exportFormat?{exportFormat,sizeBytes:file.size}:{})});
       const result = await uploadAssetImpl(file.buffer,{folder:'khalil/music-archive',resource_type:audio?'video':'image',type:'authenticated',...(image?{transformation:[{width:1600,height:1600,crop:'limit',quality:'auto'}]}:{})});
       res.status(201).json({ ...(audio?{audioMetadata}:{}),...(exportFormat?{exportFormat,sizeBytes:file.size}:{}),url: result.secure_url, previewUrl: deliveryUrl(result.secure_url), duration: result.duration ? `${Math.floor(result.duration / 60)}:${String(Math.floor(result.duration % 60)).padStart(2, '0')}` : '' });
     } catch (error) { console.error('Music archive upload failed:', error); res.status(error.status||502).json({ message: error.status?error.message:'The file could not be uploaded. Try again.' }); }

@@ -17,7 +17,7 @@ const draft=item=>({revision:item.revision,enabled:item.enabled,subject:item.sub
 const payload={to:[{email:'recipient@example.test',name:'Alex'}],subject:'Original subject',htmlContent:'<p>Original rich email</p>',tags:['password-reset'],notificationContext:{actionUrl:'https://example.test/reset?token=private-token'}};
 
 test('all current events have valid defaults and existing rich emails are preserved until saved',async()=>{
- const {service,rows}=fixture();const events=await service.list();assert.equal(events.length,15);
+ const {service,rows}=fixture();const events=await service.list();assert.equal(events.length,22);
  for(const event of events){assert.equal(event.enabled,true);validate(event.id,draft(event));}
  const actual=await service.apply(payload);assert.equal(actual.htmlContent,payload.htmlContent);assert.equal(actual.subject,payload.subject);assert.equal(actual.notificationContext,undefined);assert.equal(rows.size,0);
 });
@@ -79,4 +79,11 @@ test('the settings and preview endpoints require admin authentication and expose
  const value=draft(await service.get('meeting-reminder'));
  assert.equal((await call('/meeting-reminder','PUT',{...value,leadHours:3},'admin')).status,200);
  assert.equal((await call('/meeting-reminder/preview','POST',value,'admin')).status,200);
+});
+
+test('not-available emails require the reason and date-change link and escape the customer-facing reason',async()=>{
+ const {service}=fixture();const rule=await service.get('booking-decision-unavailable');
+ assert.throws(()=>validate(rule.id,{...draft(rule),body:'Please choose another date: {{actionUrl}}'}),e=>e.status===400);
+ await service.save(rule.id,draft(rule),'admin');const email=await service.apply({to:[{email:'client@example.test',name:'Client'}],tags:[rule.id],subject:'Not available',htmlContent:'fallback',notificationContext:{customerName:'Client',eventCode:'ECHO-TEST',reason:'Already booked <script>bad()</script>',actionUrl:'https://example.test/dashboard/bookings',meetingUrl:'https://example.test/dashboard/bookings?meeting=availability'}});
+ assert.ok(email.htmlContent.includes('Already booked &lt;script&gt;'));assert.ok(!email.htmlContent.includes('<script>'));assert.match(email.htmlContent,/optional meeting/i);assert.ok(email.htmlContent.includes('meeting=availability'));assert.ok(email.htmlContent.includes('https://example.test/dashboard/bookings'));
 });

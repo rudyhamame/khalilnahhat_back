@@ -11,6 +11,10 @@ function entriesOf(plan){
 function createLiveSetPlans({getLiveStreamConfig,BookingModel,ArchiveModel,LiveSession}){
  async function planFor(id){
   if(id==='livestream')return (await getLiveStreamConfig()).djSetPlan;
+  if(typeof id==='string'&&id.startsWith('liveplan:')&&id.length<=100){
+   const {LiveStreamPlan}=require('./dj-service-builder'),plan=require('mongoose').isValidObjectId(id.slice(9))&&await LiveStreamPlan.findById(id.slice(9)).lean();
+   return plan?.djSet;
+  }
   if(typeof id==='string'&&id.startsWith('booking:')&&id.length<=200){
    const booking=await BookingModel.findOne({externalId:id.slice(8),status:{$in:journey.statusesWhere('isBooked')}});
    return booking?.planning?.djSet;
@@ -20,7 +24,8 @@ function createLiveSetPlans({getLiveStreamConfig,BookingModel,ArchiveModel,LiveS
  async function list(){
   const stream=await getLiveStreamConfig();
   const bookings=await BookingModel.find({status:{$in:journey.statusesWhere('isBooked')},'planning.djSet.segments.0':{$exists:true}}).select('externalId requestNumber customerName planning.djSet').lean();
-  return [{id:'livestream',title:'DJ Builder — Live stream',plan:stream.djSetPlan},...bookings.map(row=>({id:'booking:'+row.externalId,title:[row.requestNumber||row.externalId,row.customerName].filter(Boolean).join(' · '),plan:row.planning?.djSet}))]
+  const {LiveStreamPlan}=require('./dj-service-builder'),streams=require('mongoose').connection.readyState===1?await LiveStreamPlan.find().sort({createdAt:-1}).limit(200).lean():[];
+  return [{id:'livestream',title:'DJ Builder — Live stream',plan:stream.djSetPlan},...streams.map(row=>({id:'liveplan:'+row._id,title:'Live stream · '+row.title,plan:row.djSet})),...bookings.map(row=>({id:'booking:'+row.externalId,title:[row.requestNumber||row.externalId,row.customerName].filter(Boolean).join(' · '),plan:row.planning?.djSet}))]
    .map(({id,title,plan})=>({id,title,trackCount:entriesOf(plan).length})).filter(row=>row.trackCount>0);
  }
  async function prepare(id='none'){

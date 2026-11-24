@@ -130,5 +130,42 @@
    "meaning": "Administrator cancelled the request/quote.",
    "whoActsNext": "Contact the team through existing account support channels."
   }
+ },
+ "clientPath": [
+  "requested",
+  "available",
+  "quote_ready",
+  "booked"
+ ],
+ "clientStages": {
+  "requested": {
+   "label": "Booking requested",
+   "labelAr": "تم طلب الحجز",
+   "step": 0,
+   "clientNext": "wait_for_availability"
+  },
+  "available": {
+   "label": "Booking date and/or time available (waiting for quote)",
+   "labelAr": "تاريخ و/أو وقت الحجز متاح (بانتظار عرض السعر)",
+   "step": 1,
+   "clientNext": "wait_for_quote"
+  },
+  "unavailable": {
+   "label": "Booking date and/or time unavailable",
+   "labelAr": "تاريخ و/أو وقت الحجز غير متاح",
+   "step": 1,
+   "clientNext": "optional_availability_meeting"
+  },
+  "quote_ready": {
+   "label": "Booking quote ready",
+   "labelAr": "عرض سعر الحجز جاهز",
+   "step": 2
+  },
+  "booked": {
+   "label": "Booked",
+   "labelAr": "تم الحجز",
+   "step": 3,
+   "clientNext": "plan_the_event"
+  }
  }
 }

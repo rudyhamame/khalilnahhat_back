@@ -7,7 +7,7 @@ const {registerLiveSuggestions}=require('../src/live-suggestions');
 
 test('broadcast identity survives song, title, goal and timestamp edits but changes on a new start',()=>{
  const current={isLive:true,broadcastMode:'youtube',broadcastSessionId:externalBroadcastId(null,{isLive:true})};
- const edited={...current,title:'New title',goal:'radio',activeSessionId:'next-song',updatedAt:new Date()};
+ const edited={...current,title:'New title',activeSessionId:'next-song',updatedAt:new Date()};
  assert.equal(sessionKey(edited),sessionKey(current));
  assert.equal(externalBroadcastId(current,edited),current.broadcastSessionId);
  assert.notEqual(externalBroadcastId({...current,streamUrl:'https://youtube.com/one'},{...current,streamUrl:'https://youtube.com/two'}),current.broadcastSessionId);

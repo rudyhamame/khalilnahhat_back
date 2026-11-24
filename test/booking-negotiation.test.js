@@ -41,3 +41,13 @@ test('accepted booking schedules its selected call type and contact details',asy
 test('meeting rejects an expired accepted quote or a mismatched call method',async t=>{const f=await fixture(t);f.sr.status='accepted';f.slotAvailable=true;f.sr.expiresAt=new Date(0);assert.equal((await f.post('meetings/slot/book',{bookingRequestId:'r1',callMethod:'phone',contactPhone:'4165551234'})).status,409);f.sr.expiresAt=new Date(Date.now()+86400000);assert.equal((await f.post('meetings/slot/book',{bookingRequestId:'r1',callMethod:'whatsapp-video',contactPhone:'4165551234'})).status,400);});
 
 test('call slots cannot bypass acceptance by omitting the booking ID',async t=>{const f=await fixture(t);f.slotAvailable=true;assert.equal((await f.post('meetings/slot/book',{callMethod:'phone',contactPhone:'4165551234'})).status,400);});
+
+ test('unavailable requests can optionally discuss availability without accepting a quote',async t=>{
+ const f=await fixture(t);f.sr.status='pending';f.sr.availabilityUnavailableAt=new Date();f.sr.availabilityReason='Already booked';f.slotAvailable=true;
+ const body={bookingRequestId:'r1',purpose:'availability',callMethod:'phone',contactPhone:'4165551234'};
+ assert.equal((await f.post('meetings/slot/book',body,'other')).status,409);
+ assert.equal((await f.post('meetings/slot/book',{...body,purpose:'planning'})).status,409);
+ const result=await f.post('meetings/slot/book',body);assert.equal(result.status,201);assert.equal(result.body.item.meetingPurpose,'availability');assert.equal(f.sr.status,'pending');
+ f.sr.availabilityUnavailableAt=null;assert.equal((await f.post('meetings/slot/book',body)).status,409);
+ f.sr.availabilityUnavailableAt=new Date();f.sr.payments=[{amount:100}];assert.equal((await f.post('meetings/slot/book',body)).status,409);
+ });

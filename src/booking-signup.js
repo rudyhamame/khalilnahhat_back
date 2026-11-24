@@ -36,7 +36,7 @@ function registerBookingSignup(app, { User, serializeUser, isAdminUser, issueSes
     if (row?.sentAt && now() - new Date(row.sentAt).getTime() < RESEND_MS) return Math.ceil((RESEND_MS - (now() - new Date(row.sentAt).getTime())) / 1000);
     const code = randomCode();
     await store.save(address, { codeHash: hashCode(address, code), attempts: 0, sentAt: new Date(now()), expiresAt: new Date(now() + CODE_MS) });
-    await sendMail({ to: address, name, subject: 'Your verification code — Echo Event Entertainment', tags: ['booking-signup'],
+    await sendMail({ to: address, name, subject: 'Your verification code — Echo Event Entertainment', tags: ['booking-signup'], notificationContext: { code },
       html: `<p>Welcome to Echo Event Entertainment. Your verification code is:</p><p style="font-size:28px;letter-spacing:6px;font-weight:700">${code}</p><p>It works for 10 minutes. If you did not create an account, ignore this email.</p>` });
     return 0;
   }

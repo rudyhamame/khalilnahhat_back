@@ -9,6 +9,7 @@ function deletionIdentities(value,cloud,resourceType='video'){
  const visit=(item,fallback)=>{
   if(!item||typeof item!=='object')return;
   if(Array.isArray(item)){item.forEach(child=>visit(child,fallback));return;}
+  if(typeof item.publicId==='string'&&item.publicId.startsWith('vps/')&&require('./vps-media').enabled()){const m=require('./vps-media').store().metadata(item.publicId);if(m&&!m.pinned){const asset={cloud:'vps',publicId:`vps/${m.id}.${m.ext}`,resourceType:m.resourceType,delivery:m.delivery};identities.set(['vps',asset.resourceType,asset.delivery,asset.publicId].join(':'),asset);}}
   if(typeof item.publicId==='string'&&managed.test(item.publicId)){
    const asset={cloud,publicId:item.publicId,resourceType:item.resourceType||fallback,delivery:item.delivery||'authenticated'};
    identities.set([cloud,asset.resourceType,asset.delivery,asset.publicId].join(':'),asset);
@@ -25,7 +26,7 @@ function createPermanentDeletion({Model=Asset,client=cloudinary,db=()=>mongoose.
   const plain=value?.toObject?value.toObject():value;
   const cloud=client.config().cloud_name||process.env.CLOUDINARY_CLOUD_NAME;
   const needsCloud=item=>{
-   if(typeof item==='string'){try{const url=new URL(item);return Boolean(ownedIdentity(item,url.pathname.split('/')[1]));}catch{return false;}}
+   if(typeof item==='string'){try{const url=new URL(item);const identity=ownedIdentity(item,url.pathname.split('/')[1]);return Boolean(identity&&identity.cloud!=='vps');}catch{return false;}}
    return !!item&&typeof item==='object'&&Object.values(item).some(needsCloud);
   };
   if(!cloud&&needsCloud(plain))throw Object.assign(new Error('Cloudinary must be configured before deleting uploaded files.'),{status:503});
@@ -40,7 +41,7 @@ function createPermanentDeletion({Model=Asset,client=cloudinary,db=()=>mongoose.
   }
   const keys=[];
   for(const [key,asset]of identities){
-   if(!cloud)throw Object.assign(new Error('Cloudinary must be configured before deleting uploaded files.'),{status:503});
+   if(!cloud&&asset.cloud!=='vps')throw Object.assign(new Error('Storage must be configured before deleting uploaded files.'),{status:503});
    await Model.updateOne({key},{$set:{deleteRequested:true},$setOnInsert:{...asset,key,state:'ready',holdUntil:new Date(0)}},{upsert:true,session});
    keys.push(key);
   }
@@ -50,6 +51,7 @@ function createPermanentDeletion({Model=Asset,client=cloudinary,db=()=>mongoose.
   if(!keys.length)return {pending:false};
   try{
    await Model.updateMany({key:{$in:keys}},{$set:{deleteRequested:true}});
+   if(require('./vps-media').enabled())return {pending:true}; // The batched worker owns disk I/O; never block a DELETE response on a full DB scan.
    await runSweep({Model,client,keys,limit:keys.length});
    return {pending:Boolean(await Model.exists({key:{$in:keys},deleteRequested:true}))};
   }catch{return {pending:true};} // The durable intent is retried by the worker.

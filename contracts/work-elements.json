@@ -55,10 +55,5 @@
     "id": "moments",
     "label": "Event moment",
     "source": "preset"
-  },
-  {
-    "id": "liveGoal",
-    "label": "Live goal",
-    "source": "preset"
   }
 ]

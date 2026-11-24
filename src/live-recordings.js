@@ -183,7 +183,7 @@ async function ensureRecording(roomName){
 async function sweepRecordings(){return pipeline.sweep();}
 let workerTimer;
 function registerLiveRecordings(app,requireAdmin,{sweep=sweepRecordings,startWorker=true}={}){
- require('./echo-reels').registerEchoReels(app,{requireAdmin,Recording:LiveRecording,serialize:view,videoUrl:item=>cloudinary.utils.private_download_url(item.publicId,'mp4',{resource_type:'video',type:item.delivery||'authenticated',expires_at:Math.floor(Date.now()/1000)+7200,attachment:false})});
+ require('./echo-reels').registerEchoReels(app,{requireAdmin,Recording:LiveRecording,serialize:view,videoUrl:item=>require('./vps-media').resolve(cloudinary.utils.private_download_url(item.publicId,'mp4',{resource_type:'video',type:item.delivery||'authenticated',expires_at:Math.floor(Date.now()/1000)+7200,attachment:false}))});
 
  require('./recording-session-metadata').registerRecordingSessionMetadata(app,requireAdmin,{
   Recording:LiveRecording,...require('./models'),LiveComment:require('./live-comments').LiveComment,isValidId:mongoose.isValidObjectId,

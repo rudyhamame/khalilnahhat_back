@@ -2,7 +2,7 @@ const STALE_RESERVATION_MS = 90000, RECONCILE_AFTER_MS = 120000;
 // Atomic room ownership prevents a delayed phone stop from ending a newer broadcast.
 const { audienceFromBody } = require('./live-audience');
 function registerLiveBroadcastRoutes(app, deps) {
-  const { requireAdmin, getLiveStreamConfig, LiveStreamConfig, defaults, createToken, getConfig, serialize, RoomServiceClient, randomUUID, verifyWebhook, serializePublic, prepareRecording, recordingStatus } = deps;
+  const { requireAdmin, getLiveStreamConfig, LiveStreamConfig, defaults, createToken, getConfig, serialize, RoomServiceClient, randomUUID, verifyWebhook, serializePublic } = deps;
   const obs = deps.IngressClient ? require('./obs-broadcast').registerObsBroadcastRoutes(app, deps) : null;
   if(obs)require('./ovh-browser-broadcast').registerOvhBrowserRoutes(app,deps,obs);
   // Missed room_finished webhook (deploy, outage): the site must not stay "live" for a room LiveKit no longer has.
@@ -53,7 +53,6 @@ function registerLiveBroadcastRoutes(app, deps) {
       const roomName = `khalil-live-${randomUUID()}`;
       const config = getConfig();
       const token = await createToken({ roomName, identity: 'khalil-broadcaster', name: 'Khalil Nahhat', canPublish: true });
-      const outputs=require('./recording-outputs').captureOutputs(request.body?.outputs);
       const source = request.body?.source === 'android' ? 'android' : 'browser';
       const title = typeof request.body?.title === 'string' ? request.body.title.trim().slice(0, 180) : '';
       // getLiveStreamConfig creates the singleton first. Never upsert a conditional claim.
@@ -68,22 +67,13 @@ function registerLiveBroadcastRoutes(app, deps) {
         await LiveStreamConfig.findOneAndUpdate({key:defaults.key,webrtcRoomName:roomName},{isLive:false,webrtcRoomName:'',statusLabel:defaults.statusLabel},{new:true});
         throw Object.assign(new Error('Could not prepare the selected set list. No live was started.'),{status:503});
       }
-      let recording;
-      const saveRecording = request.body?.saveRecording !== false;
-      if (prepareRecording && saveRecording) {
-        try { recording=await prepareRecording(roomName, title || current.title || defaults.title,false,{mode:request.body?.recordingMode==='direct'?'direct':'livekit',ownerId:request.user?._id,outputs}); }
-        catch (error) {
-          await LiveStreamConfig.findOneAndUpdate({ key: defaults.key, webrtcRoomName: roomName }, { isLive: false, webrtcRoomName: '', statusLabel: defaults.statusLabel }, { new: true });
-          throw error;
-        }
-      }
       const expiry = setTimeout(async () => {
         try {
           const expired = await LiveStreamConfig.findOneAndUpdate({key:defaults.key,webrtcRoomName:roomName,isLive:false}, {webrtcRoomName:'',statusLabel:defaults.statusLabel},{new:true});
           if(expired) await new RoomServiceClient(config.wsUrl,config.apiKey,config.apiSecret).deleteRoom(roomName);
         } catch { /* The exact-room webhook can still reconcile a disconnected publisher. */ }
       },60000); expiry.unref?.();
-      return response.status(201).json({ serverTime:Date.now(),item: serialize(updated), token, url: config.wsUrl, roomName,...(!saveRecording?{recording:{mode:'none'}}:recording?.provider==='direct'?{recording:{id:String(recording._id),mode:'direct',outputs:recording.outputRecordings?.map(out=>({id:String(out.id),key:out.key,width:out.width,height:out.height}))}}:{}) });
+      return response.status(201).json({ serverTime:Date.now(),item: serialize(updated), token, url: config.wsUrl, roomName,recording:{mode:'none'} });
     } catch (error) {
       console.error('WebRTC go-live failed:', error.message);
       const status = error.status || 500;
@@ -116,8 +106,7 @@ function registerLiveBroadcastRoutes(app, deps) {
       const current=await getLiveStreamConfig();
       if(!current.isLive||!current.webrtcRoomName||current.broadcastSource!=='browser'||current.obsRoomName)return response.status(409).json({message:'There is no browser live stream to reconnect.'});
       const config=getConfig(),token=await createToken({roomName:current.webrtcRoomName,identity:'khalil-broadcaster',name:'Khalil Nahhat',canPublish:true});
-      const recording=await recordingStatus?.(current.webrtcRoomName);
-      return response.json({serverTime:Date.now(),item:serialize(current),token,url:config.wsUrl,roomName:current.webrtcRoomName,...(recording?.id&&!['ready','partial','not_recorded'].includes(recording.status)?{recording:{id:recording.id,mode:'direct',outputs:recording.outputs}}:{recording:{mode:'none'}})});
+      return response.json({serverTime:Date.now(),item:serialize(current),token,url:config.wsUrl,roomName:current.webrtcRoomName,recording:{mode:'none'}});
     }catch(error){console.error('WebRTC resume failed:',error.message);return response.status(503).json({message:'Could not reconnect this browser to the live stream.'});}
   });
   app.post('/api/live-stream/webrtc/end', requireAdmin, async (request, response) => {

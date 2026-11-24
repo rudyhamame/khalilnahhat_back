@@ -3,15 +3,22 @@ const { sessionKey } = require('./live-interactions');
 const { notificationEmails } = require('./notification-emails');
 const { sendSimpleEmail } = require('./brevo');
 const { User, LiveStreamConfig } = require('./models');
+const { orderedSetList } = require('./live-setlist');
 const { defaultLiveStreamConfig } = require('./default-data');
 const Campaign = mongoose.models.LiveEmailCampaign || mongoose.model('LiveEmailCampaign', new mongoose.Schema({
- _id:String, title:String, goal:String, actionUrl:String, cutoff:Date, audienceReady:{type:Boolean,default:false},
+ _id:String, title:String, actionUrl:String, cutoff:Date, audienceReady:{type:Boolean,default:false},
 },{timestamps:true}));
 const Delivery = mongoose.models.LiveEmailDelivery || mongoose.model('LiveEmailDelivery',new mongoose.Schema({
  _id:String,campaignId:{type:String,index:true},userId:mongoose.Schema.Types.ObjectId,state:{type:String,default:'pending',index:true},attemptedAt:Date,
 },{timestamps:true}));
-const goals={broadcast:'Broadcast',event:'DJing in an Event','home-studio':'DJing in Home Studio','chill-mix':'Chilling-out Mix Time',radio:'Echo Radio Music'};
 let busy=false;
+// The running order installed for this live session, as plain text for the email ('' when the session has no set list).
+async function setListText(session){
+ const rows=await orderedSetList(mongoose.models.LiveSession,session);
+ if(!rows.length)return '';
+ const lines=rows.slice(0,30).map((row,i)=>`${i+1}. ${[row.artist,row.track].filter(Boolean).join(' — ')}`);
+ return `Set list:\n${lines.join('\n')}${rows.length>30?`\n…and ${rows.length-30} more`:''}`;
+}
 async function tick(){
  if(busy||mongoose.connection.readyState!==1)return;
  if(!process.env.BREVO_API_KEY?.trim()||!process.env.EMAIL_FROM_ADDRESS?.trim())return;
@@ -34,7 +41,7 @@ async function tick(){
     const [campaign,user]=await Promise.all([Campaign.findById(delivery.campaignId).lean(),User.findOne({_id:delivery.userId,emailVerified:true,isBlocked:{$ne:true}}).lean()]);
     const current=await LiveStreamConfig.findOne({key:defaultLiveStreamConfig.key}).lean();
     if(!campaign||!user||sessionKey(current)!==campaign._id){await Delivery.updateOne({_id:delivery._id},{$set:{state:'skipped'}});continue;}
-    const result=await sendSimpleEmail({to:user.email,name:user.firstName||user.username||'Member',tags:['live-started'],subject:'DJ Khalil is live',html:'',notificationContext:{liveTitle:campaign.title,liveGoal:campaign.goal,actionUrl:campaign.actionUrl}});
+    const result=await sendSimpleEmail({to:user.email,name:user.firstName||user.username||'Member',tags:['live-started'],subject:'DJ Khalil is live',html:'',notificationContext:{liveTitle:campaign.title,setList:await setListText(campaign._id),actionUrl:campaign.actionUrl}});
     await Delivery.updateOne({_id:delivery._id},{$set:{state:result.sent?'sent':result.disabled?'disabled':'failed'}});
    }catch(error){await Delivery.updateOne({_id:delivery._id},{$set:{state:'failed'}});console.error('Live announcement delivery failed:',error.name);}
   }
@@ -45,8 +52,8 @@ async function notifyLiveTransition(previous,next){
  if(!id||sessionKey(previous)===id)return;
  try{
   if(!(await notificationEmails.get('live-started')).enabled)return;
-  const actionUrl=(process.env.FRONTEND_URL||process.env.PUBLIC_APP_URL||'https://djkhalilnahhat.ca').replace(/\/+$/,'')+'/';
-  await Campaign.updateOne({_id:id},{$setOnInsert:{title:next.title||'Live with DJ Khalil',goal:goals[next.goal]||(mongoose.isValidObjectId(next.goal)&&(await mongoose.models.WorkElementOption?.findOne({_id:next.goal,key:'liveGoal'}).lean())?.value)||goals.broadcast,actionUrl,cutoff:new Date(),audienceReady:false}},{upsert:true});
+  const actionUrl=(process.env.FRONTEND_URL||process.env.PUBLIC_APP_URL||'https://djkhalilnahhat.ca').replace(/\/+$/,'')+'/live';
+  await Campaign.updateOne({_id:id},{$setOnInsert:{title:next.title||'Live with DJ Khalil',actionUrl,cutoff:new Date(),audienceReady:false}},{upsert:true});
   void tick();
  }catch(error){console.error('Could not queue live announcement:',error.name);}
 }

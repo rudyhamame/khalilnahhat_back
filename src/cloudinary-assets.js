@@ -6,7 +6,7 @@ const cloudinary=require('cloudinary').v2;
 const Asset=mongoose.models.CloudinaryAsset||mongoose.model('CloudinaryAsset',new mongoose.Schema({
  key:{type:String,unique:true,required:true},sha256:String,cloud:String,publicId:String,resourceType:String,delivery:String,
  result:mongoose.Schema.Types.Mixed,state:{type:String,default:'ready'},holdUntil:Date,missingSince:Date,
- checkedAt:Date,leaseUntil:Date,attempts:{type:Number,default:0},lastError:String,deleteRequested:{type:Boolean,default:false},
+ checkedAt:Date,leaseUntil:Date,deletedAt:Date,attempts:{type:Number,default:0},lastError:String,deleteRequested:{type:Boolean,default:false},
 },{timestamps:true}));
 const HOLD_MS=10*60*1000,GRACE_MS=5*60*1000;
 const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
@@ -57,6 +57,14 @@ function createAssetStore({client=cloudinary,Model=Asset,now=()=>new Date()}={})
 const store=createAssetStore();
 function referenced(value,asset,key=''){
  if(typeof value==='string'){
+  if(asset.cloud==='vps'){
+   if(/assetId$/i.test(key)&&asset.aliases?.includes(value))return true;
+   const media=require('./vps-media').store(),target=media.metadata(asset.publicId),m=media.metadata(value);
+   if(Boolean(target&&m?.id===target.id)||(/public.?id/i.test(key)&&(value===asset.publicId||value===target?.publicId)))return true;
+   // Rich text (for example an email template) can own an embedded media URL too.
+   if(target&&(value.includes('/khalil-media/')||value.includes('res.cloudinary.com/'))){for(const match of value.matchAll(/https:\/\/[^\s"'<>]+/g))if(media.metadata(match[0])?.id===target.id)return true;}
+   return false;
+  }
   if(/public.?id/i.test(key)&&value===asset.publicId)return true;
   if(/assetId$/i.test(key)&&asset.aliases?.includes(value))return true;
   try{
@@ -88,7 +96,7 @@ async function hasReferences(asset,{db=mongoose.connection.db}={}){
  return false;
 }
 async function sweep({Model=Asset,client=cloudinary,check=hasReferences,now=new Date(),limit=20,keys}={}){
- const rows=await Model.find({...(keys?{key:{$in:keys}}:{}),state:{$ne:'deleted'},holdUntil:{$lte:now},$or:[{leaseUntil:{$lte:now}},{leaseUntil:null}]}).sort({deleteRequested:-1,checkedAt:1}).limit(limit).lean();
+ const rows=await Model.find({...(require('./vps-media').enabled()?{cloud:'vps'}:{}),...(keys?{key:{$in:keys}}:{}),state:{$ne:'deleted'},holdUntil:{$lte:now},$or:[{leaseUntil:{$lte:now}},{leaseUntil:null}]}).sort({deleteRequested:-1,checkedAt:1}).limit(limit).lean();
  for(const row of rows){
   const claim=await Model.findOneAndUpdate({_id:row._id,$or:[{leaseUntil:{$lte:now}},{leaseUntil:null}]},{$set:{leaseUntil:new Date(+now+10*60*1000),checkedAt:now}},{returnDocument:'after'});
   if(!claim)continue;
@@ -100,10 +108,11 @@ async function sweep({Model=Asset,client=cloudinary,check=hasReferences,now=new 
    if(!locked)continue;
    // Recheck after locking; uploads cannot reuse an asset marked deleting.
    if(await check(row)){await Model.updateOne({_id:row._id},{$set:{state:'ready',missingSince:null}});continue;}
-   if(row.cloud!==client.config?.().cloud_name)throw Error('Cloudinary environment mismatch');
-   const result=await client.uploader.destroy(row.publicId,{resource_type:row.resourceType,type:row.delivery,invalidate:true});
+   if(row.cloud!=='vps'&&row.cloud!==client.config?.().cloud_name)throw Error('Cloudinary environment mismatch');
+   const result=row.cloud==='vps'?await require('./vps-media').store().remove(row.publicId):await client.uploader.destroy(row.publicId,{resource_type:row.resourceType,type:row.delivery,invalidate:true});
    if(!['ok','not found'].includes(result?.result))throw Error('Storage deletion not confirmed');
-   await Model.deleteOne({_id:row._id,state:'deleting'});
+   if(row.cloud==='vps')await Model.updateOne({_id:row._id,state:'deleting'},{$set:{state:'deleted',deletedAt:now,lastError:''}});
+   else await Model.deleteOne({_id:row._id,state:'deleting'});
   }catch(error){await Model.updateOne({_id:row._id},{$set:{state:'ready',lastError:String(error.message).slice(0,200)},$inc:{attempts:1}});}
   finally{await Model.updateOne({_id:row._id},{$set:{leaseUntil:null}});}
  }
@@ -112,6 +121,7 @@ async function sweep({Model=Asset,client=cloudinary,check=hasReferences,now=new 
 // site-assets and unrelated Cloudinary folders are deliberately outside this scope.
 const managedPrefix=/^(?:Gallery\/|Live\/|khalil\/(?:assets|content|music-archive|equipment|equipment-models|live-sessions|live-posters|song-covers|private)\/)/;
 function ownedIdentity(value,cloud){
+ if(require('./vps-media').enabled()&&typeof value==='string'){const m=require('./vps-media').store().metadata(value);if(m&&!m.pinned)return {cloud:'vps',resourceType:m.resourceType,delivery:m.delivery,publicId:`vps/${m.id}.${m.ext}`};}
  try{
   const url=new URL(value);if(url.hostname!=='res.cloudinary.com')return null;
   const match=decodeURIComponent(url.pathname).match(/^\/([^/]+)\/(image|video|raw)\/(upload|authenticated)\/(.+)$/);
@@ -125,7 +135,7 @@ function ownedIdentity(value,cloud){
  }catch{return null;}
 }
 function collectIdentities(value,cloud,out=new Map()){
- if(typeof value==='string'){const item=ownedIdentity(value,cloud);if(item)out.set([cloud,item.resourceType,item.delivery,item.publicId].join(':'),item);}
+ if(typeof value==='string'){const item=ownedIdentity(value,cloud);if(item)out.set([item.cloud,item.resourceType,item.delivery,item.publicId].join(':'),item);}
  else if(Array.isArray(value))value.forEach(item=>collectIdentities(item,cloud,out));
  else if(value&&typeof value==='object')Object.values(value).forEach(item=>collectIdentities(item,cloud,out));
  return out;
@@ -147,7 +157,34 @@ async function discoverReferenced({db=mongoose.connection.db,Model=Asset,cloud=c
  }
  return {referencesFound:found,dryRun};
 }
+async function uploadVpsAsset(input,options){
+ const result=await require('./vps-media').store().upload(input,options);
+ const publicId=result.public_id,key=['vps',result.resource_type,result.type,publicId].join(':');
+ try{
+  const row=await Asset.findOneAndUpdate({key,state:{$ne:'deleting'}},{$set:{state:'ready',result,holdUntil:new Date(Date.now()+HOLD_MS),missingSince:null,deleteRequested:false,deletedAt:null},$setOnInsert:{cloud:'vps',publicId,resourceType:result.resource_type,delivery:result.type}},{upsert:true,returnDocument:'after'});
+  if(!row)throw Error('Missing media registry receipt');
+ }catch(e){if(e.code===11000)throw Object.assign(Error('This file is being cleaned up. Retry the upload.'),{status:409});throw e;}
+ return result;
+}
+async function adoptVpsAssets({Model=Asset,media=require('./vps-media').store(),now=new Date()}={}){
+ let adopted=0;
+ for(const item of Object.values(media.load().assets)){
+  if(item.pinned)continue;
+  const publicId=`vps/${item.id}.${item.ext}`,key=['vps',item.resourceType,item.delivery,publicId].join(':');
+  await Model.updateOne({key},{$setOnInsert:{key,cloud:'vps',publicId,resourceType:item.resourceType,delivery:item.delivery,state:'ready',holdUntil:new Date(+now+HOLD_MS)}},{upsert:true});adopted++;
+ }
+ return {adopted};
+}
 function startCleanup(){
+ // Cloudinary originals stay intact during the migration; only local receipts are collected.
+ if(require('./vps-media').enabled()){
+  let running=false,lastAdoption=0;
+  const run=async()=>{if(running||mongoose.connection.readyState!==1)return;running=true;try{
+   if(Date.now()-lastAdoption>10*60*1000){await adoptVpsAssets();lastAdoption=Date.now();}
+   await require('./vps-media-lifecycle').sweep();
+  }catch(error){console.warn('Local media cleanup deferred:',error.name);}finally{running=false;}};
+  const timer=setInterval(run,30000);timer.unref();run();return()=>clearInterval(timer);
+ }
  let running=false,lastDiscovery=0;
  const run=async()=>{if(running||mongoose.connection.readyState!==1)return;running=true;try{
   if(Date.now()-lastDiscovery>10*60*1000){await discoverReferenced();lastDiscovery=Date.now();}
@@ -155,4 +192,4 @@ function startCleanup(){
  }catch(error){console.warn('Asset cleanup deferred:',error.name);}finally{running=false;}};
  const timer=setInterval(run,60000);timer.unref();run();return()=>clearInterval(timer);
 }
-module.exports={Asset,uploadAsset:store.upload,createAssetStore,identityOptions,referenced,hasReferences,sweep,startCleanup,ownedIdentity,collectIdentities,discoverReferenced};
+module.exports={Asset,uploadAsset:(input,options)=>require('./vps-media').enabled()?uploadVpsAsset(input,options):store.upload(input,options),createAssetStore,adoptVpsAssets,uploadVpsAsset,identityOptions,referenced,hasReferences,sweep,startCleanup,ownedIdentity,collectIdentities,discoverReferenced};

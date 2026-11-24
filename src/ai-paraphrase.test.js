@@ -21,3 +21,10 @@ test('booking summary: unknown booking is 404, contact details are not sent, sum
  sr.order.event.guestCount=80;await run(Model,{id:'x'});assert.equal(calls,2,'an edited booking is summarized again');
  assert.ok(!sent.includes('secret@x.co')&&!sent.includes('555'));
 });
+
+test('email polish: needs text, needs AI on, returns subject and body',async()=>{
+ const {createEmailPolisher}=require('./ai-paraphrase');
+ const run=(input,cfg={chat:{enabled:true,provider:'openai',model:'m'}})=>createEmailPolisher({configService:{load:async()=>cfg},env:{OPENAI_API_KEY:'k'},fetchImpl:async()=>({ok:true,json:async()=>({output:[{content:[{type:'output_text',text:JSON.stringify({subject:' Your booking ',body:' Dear client, hello. '})}]}]})})})(input);
+ await assert.rejects(run({text:' '}),{status:400});await assert.rejects(run({text:'x'},{chat:{enabled:false}}),{status:503});
+ assert.deepEqual(await run({text:'hi'}),{subject:'Your booking',body:'Dear client, hello.'});
+});

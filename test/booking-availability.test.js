@@ -45,12 +45,14 @@ test('the actual quote publishing route rejects a direct API bypass before chang
  const response={statusCode:200,status(n){this.statusCode=n;return this;},json(body){this.body=body;return this;}};await handler({params:{id:'r1'},body:{}},response);
  assert.equal(response.statusCode,409);assert.equal(response.body.code,'AVAILABILITY_REQUIRED');assert.equal(sr.items[0].unitPrice,100);assert.equal(saves,0);
 });
-test('the four client stages collapse acceptance into quote-ready and branch on availability',()=>{
+test('the five client stages (with deposit paid) collapse acceptance into quote-ready and branch on availability',()=>{
  const journey=require('../src/booking-journey'),{STATUS}=journey;
  const sr={status:STATUS.PENDING,event:{eventDate:'2099-06-20',startTime:'18:00',endTime:'23:00'}};
- let client=journey.describeRequest(sr);assert.equal(client.label,'Booking requested');assert.deepEqual(client.path.map(step=>step.status),['requested','available','quote_ready','booked']);
+ let client=journey.describeRequest(sr);assert.equal(client.label,'Booking requested');assert.deepEqual(client.path.map(step=>step.status),['requested','available','quote_ready','deposit_paid','booked']);
  sr.availabilityAcceptedAt=new Date();sr.availabilityWindow=windowKey(sr);assert.equal(journey.describeRequest(sr).clientStatus,'available');assert.equal(journey.describeRequest(sr).step,1);
  sr.availabilityAcceptedAt=null;sr.availabilityUnavailableAt=new Date();sr.availabilityReason='Already booked';client=journey.describeRequest(sr);assert.equal(client.clientStatus,'unavailable');assert.equal(client.path[1].status,'unavailable');assert.equal(client.canDiscussAvailability,true);
  for(const status of [STATUS.QUOTED,STATUS.ACCEPTED,STATUS.CHANGES_REQUESTED]){sr.status=status;client=journey.describeRequest(sr);assert.equal(client.clientStatus,'quote_ready');assert.equal(client.step,2);assert.equal(client.isBooked,false);}
- sr.status=STATUS.CONFIRMED;client=journey.describeRequest(sr);assert.equal(client.label,'Booked');assert.equal(client.step,3);assert.equal(client.isBooked,true);
+ sr.status=STATUS.CONFIRMED;client=journey.describeRequest(sr);assert.equal(client.label,'Booked');assert.equal(client.step,4);assert.equal(client.isBooked,true);
+ sr.status=STATUS.ACCEPTED;sr.payments=[{amountCents:5000,voided:false}];client=journey.describeRequest(sr);assert.equal(client.clientStatus,'deposit_paid');assert.equal(journey.bookingStatusOf(sr),'deposit_paid');
+ sr.payments=[{amountCents:5000,voided:true}];assert.equal(journey.bookingStatusOf(sr),'quote_ready');sr.status=STATUS.CANCELLED;assert.equal(journey.bookingStatusOf(sr),'cancelled');
 });

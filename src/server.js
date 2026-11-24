@@ -307,6 +307,8 @@ const serviceRequestQuoteSchema = z.object({
   discountType: z.enum(['amount','percent']).optional(),
   discountValue: z.coerce.number().min(0).optional(),
   paymentInstructions: z.string().trim().max(1000).optional(),
+  paymentOptions: z.array(z.enum(['etransfer', 'cheque', 'bank_transfer', 'other'])).max(4).optional(),
+  etransferEmail: z.union([z.literal(''), z.string().trim().email().max(254)]).optional(),
 });
 
 const anamPersonaConfig = {
@@ -408,6 +410,8 @@ function serializeServiceRequest(serviceRequest, includeQuote = true) {
     changeRequest: serviceRequest.changeRequest || '',
     depositPaidCents: (serviceRequest.payments || []).filter((p) => !p.voided).reduce((sum, p) => sum + (p.amountCents || 0), 0),
     paymentInstructions: serviceRequest.paymentInstructions || '',
+    paymentOptions: serviceRequest.paymentOptions || [],
+    etransferEmail: serviceRequest.etransferEmail || '',
     payments: (serviceRequest.payments || []).map((p) => ({ id: String(p._id), kind: p.kind, amountCents: p.amountCents, method: p.method, reference: p.reference, paidAt: p.paidAt, voided: Boolean(p.voided) })),
     planning: serviceRequest.planning || null,
   };
@@ -1087,6 +1091,8 @@ app.patch('/api/service-requests/:id/quote', requireAdmin, async (request, respo
   if (parsed.data.taxPercent !== undefined) serviceRequest.taxPercent = parsed.data.taxPercent;
   if (parsed.data.depositAmount !== undefined) serviceRequest.depositAmount = parsed.data.depositAmount;
   if (parsed.data.paymentInstructions !== undefined) serviceRequest.paymentInstructions = parsed.data.paymentInstructions;
+  if (parsed.data.paymentOptions !== undefined) serviceRequest.paymentOptions = [...new Set(parsed.data.paymentOptions)];
+  if (parsed.data.etransferEmail !== undefined) serviceRequest.etransferEmail = parsed.data.etransferEmail;
   serviceRequest.expiresAt = new Date(Date.now() + serviceRequest.validDays * DAY_MS);
   serviceRequest.reminderSentAt = null;
   try{await serviceRequest.save();}catch(error){if(error.name==='VersionError')return response.status(409).json({message:'The booking changed. Reload before publishing.'});throw error;}

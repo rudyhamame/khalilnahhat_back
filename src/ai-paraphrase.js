@@ -6,6 +6,8 @@ const bodySchema=z.object({text:z.string().trim().min(1).max(2000)}).strict();
 const outputSchema={type:'object',additionalProperties:false,required:['message'],properties:{message:{type:'string'}}};
 const text=data=>(data.output||[]).flatMap(item=>item.content||[]).filter(item=>item.type==='output_text').map(item=>item.text).join('');
 const fail=(status,message)=>Object.assign(new Error(message),{status});
+// A provider refusal becomes a message the admin can act on (a used-up free quota is the common case).
+const unavailable=response=>response.status===429?fail(429,'The AI daily free limit is used up. Try again after it resets, add credits to the AI provider, or switch the chat model in the AI configuration.'):fail(503,`AI is temporarily unavailable (provider replied ${response.status||'with an error'}).`);
 
 function createParaphraser({configService,env=process.env,fetchImpl=fetch}={}){
  const router=createOpenRouter({env,fetchImpl});
@@ -18,7 +20,7 @@ function createParaphraser({configService,env=process.env,fetchImpl=fetch}={}){
   const response=(chat.provider||'openai')==='openai'
    ?await fetchImpl('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify(request),signal})
    :await router.request({...request,config:chat},{signal});
-  if(!response.ok)throw fail(503,'AI is temporarily unavailable.');
+  if(!response.ok)throw unavailable(response);
   let message;try{message=JSON.parse(text(await response.json())).message;}catch{throw fail(502,'AI returned an unreadable reply.');}
   if(typeof message!=='string'||!message.trim())throw fail(502,'AI returned an empty reply.');
   return message.trim().slice(0,2000);
@@ -27,7 +29,7 @@ function createParaphraser({configService,env=process.env,fetchImpl=fetch}={}){
 
 function registerAiParaphrase(app,{requireAdmin,configService}){
  const paraphrase=createParaphraser({configService});
- app.post('/api/admin/ai/paraphrase',requireAdmin,async(req,res)=>{try{res.set('Cache-Control','no-store').json({message:await paraphrase(req.body)});}catch(error){res.status([400,503].includes(error.status)?error.status:502).json({message:error.message||'AI could not paraphrase the message.'});}});
+ app.post('/api/admin/ai/paraphrase',requireAdmin,async(req,res)=>{try{res.set('Cache-Control','no-store').json({message:await paraphrase(req.body)});}catch(error){res.status([400,429,503].includes(error.status)?error.status:502).json({message:error.message||'AI could not paraphrase the message.'});}});
 }
 
 // One-paragraph AI summary of a client booking for the admin who reviews it. Contact details are never sent to the model.
@@ -51,7 +53,7 @@ function createBookingSummarizer({configService,Model,env=process.env,fetchImpl=
   const response=(chat.provider||'openai')==='openai'
    ?await fetchImpl('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify(request),signal})
    :await router.request({...request,config:chat},{signal});
-  if(!response.ok)throw fail(503,'AI is temporarily unavailable.');
+  if(!response.ok)throw unavailable(response);
   let summary;try{summary=JSON.parse(text(await response.json())).summary;}catch{throw fail(502,'AI returned an unreadable reply.');}
   if(typeof summary!=='string'||!summary.trim())throw fail(502,'AI returned an empty reply.');
   const stored=summary.trim().slice(0,1500);
@@ -61,7 +63,7 @@ function createBookingSummarizer({configService,Model,env=process.env,fetchImpl=
 }
 function registerAiBookingSummary(app,{requireAdmin,configService,Model}){
  const summarize=createBookingSummarizer({configService,Model});
- app.post('/api/admin/ai/booking-summary',requireAdmin,async(req,res)=>{try{res.set('Cache-Control','no-store').json({summary:await summarize(req.body)});}catch(error){res.status([400,404,503].includes(error.status)?error.status:502).json({message:error.message||'AI could not summarize the booking.'});}});
+ app.post('/api/admin/ai/booking-summary',requireAdmin,async(req,res)=>{try{res.set('Cache-Control','no-store').json({summary:await summarize(req.body)});}catch(error){res.status([400,404,429,503].includes(error.status)?error.status:502).json({message:error.message||'AI could not summarize the booking.'});}});
 }
 
 // Email helper: turns the admin's rough message into a formal, polite email and writes the subject line.
@@ -77,7 +79,7 @@ function createEmailPolisher({configService,env=process.env,fetchImpl=fetch}={})
   const response=(chat.provider||'openai')==='openai'
    ?await fetchImpl('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify(request),signal})
    :await router.request({...request,config:chat},{signal});
-  if(!response.ok)throw fail(503,'AI is temporarily unavailable.');
+  if(!response.ok)throw unavailable(response);
   let out;try{out=JSON.parse(text(await response.json()));}catch{throw fail(502,'AI returned an unreadable reply.');}
   if(typeof out?.subject!=='string'||typeof out?.body!=='string'||!out.body.trim())throw fail(502,'AI returned an empty reply.');
   return {subject:out.subject.trim().slice(0,250),body:out.body.trim().slice(0,50000)};
@@ -85,6 +87,6 @@ function createEmailPolisher({configService,env=process.env,fetchImpl=fetch}={})
 }
 function registerAiEmail(app,{requireAdmin,configService}){
  const polish=createEmailPolisher({configService});
- app.post('/api/admin/ai/email-polish',requireAdmin,async(req,res)=>{try{res.set('Cache-Control','no-store').json(await polish(req.body));}catch(error){res.status([400,503].includes(error.status)?error.status:502).json({message:error.message||'AI could not polish the email.'});}});
+ app.post('/api/admin/ai/email-polish',requireAdmin,async(req,res)=>{try{res.set('Cache-Control','no-store').json(await polish(req.body));}catch(error){res.status([400,429,503].includes(error.status)?error.status:502).json({message:error.message||'AI could not polish the email.'});}});
 }
 module.exports={createParaphraser,registerAiParaphrase,createBookingSummarizer,registerAiBookingSummary,createEmailPolisher,registerAiEmail,bodySchema};

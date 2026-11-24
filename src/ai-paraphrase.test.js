@@ -28,3 +28,7 @@ test('email polish: needs text, needs AI on, returns subject and body',async()=>
  await assert.rejects(run({text:' '}),{status:400});await assert.rejects(run({text:'x'},{chat:{enabled:false}}),{status:503});
  assert.deepEqual(await run({text:'hi'}),{subject:'Your booking',body:'Dear client, hello.'});
 });
+
+test('a used-up free quota is reported as such (429), not as a generic outage',async()=>{
+ await assert.rejects(createParaphraser({configService:{load:async()=>({chat:{enabled:true,provider:'openai',model:'m'}})},env:{OPENAI_API_KEY:'k'},fetchImpl:async()=>({ok:false,status:429})})({text:'x'}),{status:429});
+});

@@ -329,6 +329,8 @@ const serviceRequestSchema = new mongoose.Schema(
     availabilityHistory: { type: [mongoose.Schema.Types.Mixed], default: [] },
     declinedBy: { type: String, enum: ['', 'admin', 'client'], default: '' },
     paymentInstructions: { type: String, default: '' },
+    etransferEmail: { type: String, default: '', trim: true }, // the administrator's address that receives e-transfers
+    paymentOptions: { type: [String], default: [] }, // payment methods the client may use (etransfer, cheque, bank_transfer, other)
     planning: { type: mongoose.Schema.Types.Mixed, default: null },
     payments: {
       type: [new mongoose.Schema({ kind: String, amountCents: Number, method: String, reference: { type: String, default: '' }, paidAt: Date, voided: { type: Boolean, default: false } })],

@@ -35,6 +35,8 @@ function createAiDj({configService,env=process.env,fetchImpl=fetch}={}){
 
 function registerAiDj(app,{requireAdmin,configService}){
  const plan=createAiDj({configService});
+ const remix=require('./ai-stem-remix').createAiStemRemix({configService});
+ app.post('/api/admin/ai-dj/remix-plan',requireAdmin,async(req,res)=>{try{res.set('Cache-Control','no-store').json({plan:await remix(req.body)});}catch(error){res.status(error.status||500).json({message:error.message});}});
  app.post('/api/admin/ai-dj/plan',requireAdmin,async(req,res)=>{try{res.set('Cache-Control','no-store').json({plan:await plan(req.body)});}catch(error){res.status([400,503].includes(error.status)?error.status:502).json({message:error.message||'AI DJ could not plan this transition.'});}});
 }
 module.exports={createAiDj,registerAiDj,input,outputSchema};

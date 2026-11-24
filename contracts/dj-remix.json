@@ -1,0 +1,103 @@
+{
+  "presets": {
+    "full": {
+      "label": "Original mix",
+      "vocals": 1,
+      "drums": 1,
+      "bass": 1,
+      "other": 1
+    },
+    "instrumental": {
+      "label": "Instrumental passage",
+      "vocals": 0,
+      "drums": 1,
+      "bass": 1,
+      "other": 1
+    },
+    "rhythm": {
+      "label": "Drums and bass groove",
+      "vocals": 0.15,
+      "drums": 1,
+      "bass": 1,
+      "other": 0.35
+    },
+    "vocal-focus": {
+      "label": "Vocal spotlight",
+      "vocals": 1,
+      "drums": 0.5,
+      "bass": 0.65,
+      "other": 0.4
+    },
+    "breakdown": {
+      "label": "Melodic breakdown",
+      "vocals": 0.8,
+      "drums": 0.3,
+      "bass": 0.35,
+      "other": 1
+    }
+  },
+  "fallback": [
+    {
+      "preset": "full",
+      "bars": 8
+    },
+    {
+      "preset": "instrumental",
+      "bars": 8
+    },
+    {
+      "preset": "rhythm",
+      "bars": 8
+    },
+    {
+      "preset": "full",
+      "bars": 8
+    },
+    {
+      "preset": "vocal-focus",
+      "bars": 8
+    },
+    {
+      "preset": "full",
+      "bars": 8
+    }
+  ],
+  "styles": {
+    "instrumental": [
+      {
+        "preset": "full",
+        "bars": 4
+      },
+      {
+        "preset": "instrumental",
+        "bars": 16
+      },
+      {
+        "preset": "rhythm",
+        "bars": 8
+      },
+      {
+        "preset": "full",
+        "bars": 8
+      }
+    ],
+    "vocal": [
+      {
+        "preset": "full",
+        "bars": 8
+      },
+      {
+        "preset": "vocal-focus",
+        "bars": 16
+      },
+      {
+        "preset": "breakdown",
+        "bars": 4
+      },
+      {
+        "preset": "full",
+        "bars": 8
+      }
+    ]
+  }
+}

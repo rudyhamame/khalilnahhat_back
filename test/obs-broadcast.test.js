@@ -99,9 +99,11 @@ test('OBS relay automatically goes live when media arrives and clears the live w
   const c=setup({randomUUID:()=>'11111111-1111-4111-8111-111111111111'});assert.equal((await c.call('/prepare',{title:'Night'})).code,201);assert.equal(c.row.obsGoLive,true);assert.equal(c.row.isLive,false);
   const room=c.row.obsRoomName;
   const early=await c.call('/go-live',{roomName:room});assert.equal(early.code,409,'no media yet: Go live is refused '+JSON.stringify(early.body));
-  // A session prepared by an older client must also go live without another admin action.
-  c.setRow({obsGoLive:false});
   relayState='live';await c.service.synchronize();
+  assert.equal(c.row.isLive,true);assert.equal(c.row.obsState,'live');assert.equal(c.row.streamUrl,'https://relay.example/play');
+  // A session prepared by an older client must also go live without another admin action.
+  c.setRow({obsGoLive:false,isLive:false,obsState:'ready',streamUrl:''});
+  await c.service.synchronize();
   assert.equal(c.row.isLive,true);assert.equal(c.row.obsState,'live');assert.equal(c.row.streamUrl,'https://relay.example/play');
   assert.equal((await c.call('/go-live',{roomName:room})).code,200,'older clients can still call the compatibility endpoint');
   relayState='ended';await c.service.synchronize();

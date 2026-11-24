@@ -72,6 +72,26 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     return res.json({item:serialize(sr,true), notificationSent:!!mail.sent});
   });
 
+  // Admin steps a booking back one stage: quote ready -> availability confirmed ("available"), or availability -> requested.
+  // Refused once a payment is recorded (same rule as admin-review), so a booked/paid request is never rolled back.
+  app.post('/api/service-requests/:id/step-back', requireAdmin, async (req, res) => {
+    const parsed = z.object({ to: z.enum(['available', 'requested']), quoteRevision: z.number().int().nonnegative().optional() }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: 'Choose a stage to go back to.' });
+    const sr = await find(req.params.id);
+    if (!sr) return notFound(res);
+    if (!journey.rule(sr.status).repriceable || (sr.payments || []).some(p => !p.voided)) return res.status(409).json({ message: 'A paid, booked or closed booking cannot be taken back.' });
+    if (parsed.data.quoteRevision !== undefined && parsed.data.quoteRevision !== (sr.quoteRevision || 0)) return res.status(409).json({ message: 'The booking changed. Reload before continuing.' });
+    const availability = require('./booking-availability'), previous = availability.availabilityFor(sr);
+    if (parsed.data.to === 'available' && (previous.status !== 'available' || !journey.rule(sr.status).showsPrices)) return res.status(409).json({ message: 'Only a booking with a quote ready can go back to availability.' });
+    if (parsed.data.to === 'requested' && previous.status === 'pending') return res.status(409).json({ message: 'This booking is already at the requested stage.' });
+    if (previous.informedAt) sr.availabilityHistory = [...(sr.availabilityHistory || []), { ...previous, window: sr.availabilityWindow, changedAt: new Date() }];
+    if (parsed.data.to === 'requested') { sr.availabilityAcceptedAt = null; sr.availabilityUnavailableAt = null; sr.availabilityReason = ''; }
+    sr.status = STATUS.PENDING; sr.acceptedAt = null; sr.expiresAt = null; sr.reminderSentAt = null;
+    sr.quoteRevision = (sr.quoteRevision || 0) + 1; // stale client accept/negotiate calls on the withdrawn quote fail
+    try { await sr.save(); } catch (error) { if (error.name === 'VersionError') return res.status(409).json({ message: 'The booking changed. Reload before continuing.' }); throw error; }
+    return res.json({ item: serialize(sr, true) });
+  });
+
   app.post('/api/service-requests/:id/reschedule-request',requireAuth,async(req,res)=>{
     const date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value=>!Number.isNaN(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value);
     const time=z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);

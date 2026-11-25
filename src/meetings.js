@@ -58,7 +58,7 @@ function meetingEmailContext(m) {
 
 async function bookSlot(id, user, topic, details = {}) {
   return Meeting.findOneAndUpdate(
-    { _id: id, status: 'open', start: { $gt: new Date(Date.now() + HOUR_MS) } },
+    { _id: id, status: 'open', start: { $gt: new Date() } },
     { ...details, status: 'booked', bookedBy: user._id, bookedByName: `${user.firstName} ${user.lastName}`.trim(), bookedByEmail: user.email, topic, reminderSentAt: null },
     { new: true },
   );
@@ -84,9 +84,9 @@ function registerMeetings(app, { requireAuth, requireAdmin, BookingModel=Service
   const mine = (m, u) => m && (u.isAdmin || String(m.bookedBy) === String(u._id));
 
   app.get('/api/meetings/slots', async (_req, res) => {
-    // Every open time still ahead is listed; one under an hour away is flagged tooSoon (it cannot be booked) instead of being hidden.
+    // Every open time still ahead is listed and can be booked, however soon it is.
     const slots = await Meeting.find({ status: 'open', start: { $gt: new Date() } }).sort({ start: 1 }).limit(200);
-    res.json({ items: slots.map((m) => ({ ...publicSlot(m), tooSoon: m.start.getTime() <= Date.now() + HOUR_MS })) });
+    res.json({ items: slots.map(publicSlot) });
   });
 
   app.post('/api/meetings/slots', requireAdmin, async (req, res) => {

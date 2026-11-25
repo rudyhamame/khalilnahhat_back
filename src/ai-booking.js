@@ -333,9 +333,11 @@ function attachAlibabaVoiceSocket(server,hooks){
   });
 }
 // The booking stage is decided by the app from the draft, never guessed from the chat: the model is told exactly what to do in each one.
+// The optional extras are the Additional-info atoms the Booking Tree currently marks optional.
+const optionalExtras = () => { const core = require('./eventOrderCore.mjs'); return core.fields.filter(field => /^(references|additional)\./.test(field.key) && !field.required && field.key !== 'references.photos' && field.key !== 'references.files').map(field => core.fieldName(field.key)).join(', ') || 'none'; };
 const stageInstructions = stage => ({
   required: '\nBooking stage: REQUIRED. Required details are still missing. Ask only for the next missing required detail. Do not mention review or submitting yet.',
-  optional: '\nBooking stage: OPTIONAL. All required details are complete. Do not say the booking is ready yet. Ask about the optional extras one at a time (inspiration photo links, Additional notes, voucher code), and finish by asking whether there is anything more to add.',
+  optional: '\nBooking stage: OPTIONAL. All required details are complete. Do not say the booking is ready yet. Ask about the optional extras one at a time ('+optionalExtras()+'), and finish by asking whether there is anything more to add.',
   ready: '\nBooking stage: READY. Everything required and optional has been asked. Say explicitly in your reply: "Your booking is complete and ready to be submitted. Press Submit booking." Ask no further question about details.',
 })[stage] || '';
 const guestContactInstructions='\nThis visitor has no account yet, so there is no account profile: ignore the rule that contact details cannot be changed. Ask for and save their own Personal info with orderPatch: customer.firstName, customer.lastName, customer.email, customer.phone and the contact choices customer.contactMethod and customer.phoneContact when they give a phone number. Account creation happens only after they press Submit booking; never ask them to sign in first.';

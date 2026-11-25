@@ -13,7 +13,7 @@ const setOrDrop=(field,name,value)=>{if(value===undefined)delete field[name];els
 export function applyBookingRules(rules){
   for(const field of fields){
     const base=baseOf(field),rule=rules?.[field.key]||{};
-    setOrDrop(field,'required',rule.required??base.required);setOrDrop(field,'maxLength',rule.maxLength??base.maxLength);setOrDrop(field,'options',rule.options??base.options);
+    setOrDrop(field,'required',rule.required??base.required);setOrDrop(field,'requiredOverride',rule.required);setOrDrop(field,'maxLength',rule.maxLength??base.maxLength);setOrDrop(field,'options',rule.options??base.options);
   }
 }
 // Returns the rules worth keeping (only what differs from the contract) or throws a readable message.
@@ -24,7 +24,7 @@ export function cleanBookingRules(input){
     const field=fields.find(item=>item.key===key);if(!field)throw new Error(`Unknown atom ${key}.`);
     if(!rule||typeof rule!=='object'||Object.keys(rule).some(name=>!['required','maxLength','options'].includes(name)))throw new Error(`Invalid rule for ${key}.`);
     const base=baseOf(field),clean={};
-    if(rule.required!==undefined){if(typeof rule.required!=='boolean')throw new Error(`${key}: required must be true or false.`);if(rule.required!==Boolean(base.required))clean.required=rule.required;}
+    if(rule.required!==undefined){if(typeof rule.required!=='boolean')throw new Error(`${key}: required must be true or false.`);if(rule.required!==Boolean(base.required)||key==='event.title')clean.required=rule.required;}
     if(rule.maxLength!==undefined){if(!base.maxLength||!Number.isInteger(rule.maxLength)||rule.maxLength<1||rule.maxLength>3000)throw new Error(`${key}: max length must be a whole number from 1 to 3000.`);if(rule.maxLength!==base.maxLength)clean.maxLength=rule.maxLength;}
     if(rule.options!==undefined){if(!base.options||!Array.isArray(rule.options)||!rule.options.length||rule.options.some(value=>!base.options.includes(value)))throw new Error(`${key}: choose at least one of its existing values.`);const kept=base.options.filter(value=>rule.options.includes(value));if(kept.length!==base.options.length)clean.options=kept;}
     if(Object.keys(clean).length)out[key]=clean;
@@ -260,7 +260,7 @@ export function applyOrderPatch(order,patch,{now=new Date()}={}) {
   },order);
 }
 export function missingOrderFields(order) {
-  return fields.filter(field=>(field.required||(field.key==='event.title'&&getPath(order,'event.type')==='other'))&&(!field.gate||getPath(order,field.gate)===true)&&(!isAnswered(getPath(order,field.key))||(field.key==='studio.rights.confirmed'&&getPath(order,field.key)!==true)));
+  return fields.filter(field=>(field.requiredOverride===false?false:(field.required||(field.key==='event.title'&&getPath(order,'event.type')==='other')))&&(!field.gate||getPath(order,field.gate)===true)&&(!isAnswered(getPath(order,field.key))||(field.key==='studio.rights.confirmed'&&getPath(order,field.key)!==true)));
 }
 export function validateEventOrder(input,{submission=false,today=new Date().toLocaleDateString('en-CA',{timeZone:contract.timezone})}={}) {
   const errors=[];

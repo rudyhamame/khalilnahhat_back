@@ -1623,7 +1623,7 @@ registerMeetingRoom(app, { requireAuth, Meeting: MeetingModel });
 registerAccount(app, { requireAuth, getFrontendUrl });
 registerContent(app, requireAdmin);
 require('./seasonal-theme').registerSeasonalTheme(app, { requireAdmin });
-require('./booking-rules').registerBookingRules(app, { requireAdmin });
+const bookingRulesReady = require('./booking-rules').registerBookingRules(app, { requireAdmin });
 require('./concept-map').registerConceptMap(app, { requireAdmin });
 require('./booking-signup').registerBookingSignup(app, { User, serializeUser, isAdminUser, issueSession: accountSessions.issueSession, sendMail: require('./brevo').sendSimpleEmail, hashPassword });
 require('./instagram-profile').registerInstagramProfile(app, { requireAdmin });
@@ -1656,6 +1656,7 @@ async function startServer(port = PORT) {
   const stopAssetCleanup=require('./cloudinary-assets').startCleanup();
   if(process.env.ECHO_ADMIN_WORKER_MODE!=='external')await aiAdministrator.start();
 
+  await bookingRulesReady; // saved booking rules are in force before the first request
   const server=app.listen(port, '0.0.0.0', () => {
     console.log(`Khalil app API listening on http://localhost:${port}`);
   });

@@ -1,6 +1,6 @@
 const crypto = require('crypto');
-const bookingFields=require('./eventOrderContract.json').sections.flatMap(section=>section.fields);
-const nameLimit=key=>bookingFields.find(field=>field.key===key).maxLength;
+// Read live from the booking contract, so the Booking Tree's max-length rules apply here too.
+const nameLimit=key=>require('./eventOrderCore.mjs').fields.find(field=>field.key===key).maxLength;
 const {issueSession}=require('./account-sessions');
 const {hasGrantedAdminRole}=require('./admin-role');
 const { OAuth2Client } = require('google-auth-library');

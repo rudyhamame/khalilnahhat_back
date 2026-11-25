@@ -143,9 +143,7 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
       sr.status = STATUS.PENDING; sr.acceptedAt = null; sr.expiresAt = null; sr.reminderSentAt = null; sr.quoteRevision = (sr.quoteRevision || 0) + 1;
     }
     try { await sr.save(); } catch (error) { if (error.name === 'VersionError') return res.status(409).json({ message: 'The booking changed. Reload before continuing.' }); throw error; }
-    const changedDetail = String(field.short || field.label || path).toLowerCase();
-    if (reset) { void notify(sr, 'booking-details-recheck', { changedDetail }); void notify(sr, 'booking-details-recheck-admin', { changedDetail }); }
-    else void notify(sr, 'booking-details-updated-admin', { changedDetail });
+    // A client's modification sends no notification email.
     return res.json({ item: serialize(sr, false), reset });
   });
 
@@ -178,7 +176,6 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     sr.order = next; sr.event = legacy.data; sr.modificationHistory = history; sr.modificationCount = Math.max(0, (sr.modificationCount || 1) - 1);
     sr.modifiedAt = history.some((item) => !item.undoneAt) ? new Date() : null; // everything undone: the booking is no longer "modified"
     try { await sr.save(); } catch (error) { if (error.name === 'VersionError') return res.status(409).json({ message: 'The booking changed. Reload before continuing.' }); throw error; }
-    void notify(sr, 'booking-details-updated-admin', { changedDetail: 'undo of a modification' });
     return res.json({ item: serialize(sr, false) });
   });
 

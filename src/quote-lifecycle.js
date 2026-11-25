@@ -145,15 +145,19 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     return res.json({ item: serialize(sr, false), reset });
   });
 
-  // Puts the booking's details back as they were before the last Save modifications.
+  // Puts the booking's details back as they were before the last Save modifications. The undone modification stays in the list, struck through.
   app.post('/api/service-requests/:id/undo-modification', requireAuth, async (req, res) => {
     const sr = await find(req.params.id);
     if (!own(req, sr)) return notFound(res);
-    const last = (sr.modificationHistory || []).at(-1);
-    if (!last || sr.status === STATUS.CANCELLED) return res.status(409).json({ message: 'There is no modification to undo.' });
+    const history = [...(sr.modificationHistory || [])];
+    let index = -1; history.forEach((entry, i) => { if (!entry.undoneAt && entry.order) index = i; }); // the newest modification that can still be undone
+    if (index < 0 || sr.status === STATUS.CANCELLED) return res.status(409).json({ message: 'There is no modification to undo.' });
     if ((sr.payments || []).some(p => !p.voided)) return res.status(409).json({ message: 'This booking has a payment. Contact us to change it.' });
-    sr.order = last.order; sr.event = last.event; sr.modifiedAt = new Date();
-    sr.modificationHistory = sr.modificationHistory.slice(0, -1); sr.modificationCount = Math.max(0, (sr.modificationCount || 1) - 1);
+    const entry = history[index];
+    sr.order = entry.order; sr.event = entry.event;
+    history[index] = { at: entry.at, undoneAt: new Date() }; // the restore point is spent; the entry stays as a struck-through step
+    sr.modificationHistory = history; sr.modificationCount = Math.max(0, (sr.modificationCount || 1) - 1);
+    sr.modifiedAt = history.some((item) => !item.undoneAt) ? new Date() : null; // everything undone: the booking is no longer "modified"
     try { await sr.save(); } catch (error) { if (error.name === 'VersionError') return res.status(409).json({ message: 'The booking changed. Reload before continuing.' }); throw error; }
     void notify(sr, 'booking-details-updated-admin', { changedDetail: 'undo of the last modification' });
     return res.json({ item: serialize(sr, false) });

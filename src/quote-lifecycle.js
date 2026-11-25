@@ -128,10 +128,14 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     if (errors.length) return res.status(400).json({ message: 'That change leaves the booking incomplete or invalid.', fields: errors });
     const legacy = require('./quote-validation').eventSchema.safeParse(eventOrder.orderToLegacy(next));
     if (!legacy.success) return res.status(400).json({ message: 'Event details failed validation.' });
-    if (parsed.data.countsAsModification !== false) { // one per Save modifications, however many atoms it carries
-      const history = (sr.modificationHistory || []).slice(-19); history.push({ order: structuredClone(sr.order.toObject ? sr.order.toObject() : sr.order), event: structuredClone(sr.event?.toObject ? sr.event.toObject() : sr.event), at: new Date() });
-      sr.modificationHistory = history; sr.modificationCount = (sr.modificationCount || 0) + 1;
+    // One history entry per Save modification: the order before it and, once its edits are in, the order after it. Undo reverts just that entry's changes.
+    let history = [...(sr.modificationHistory || [])];
+    if (parsed.data.countsAsModification !== false) {
+      history = history.slice(-19).concat({ at: new Date(), before: structuredClone(sr.order.toObject ? sr.order.toObject() : sr.order), event: structuredClone(sr.event?.toObject ? sr.event.toObject() : sr.event), after: null });
+      sr.modificationCount = (sr.modificationCount || 0) + 1;
     }
+    if (history.length) history[history.length - 1] = { ...history.at(-1), after: structuredClone(next) };
+    sr.modificationHistory = history;
     sr.order = next; sr.event = legacy.data; sr.modifiedAt = new Date();
     if (reset) {
       if (previous.informedAt) sr.availabilityHistory = [...(sr.availabilityHistory || []), { ...previous, window: sr.availabilityWindow, changedAt: new Date() }];
@@ -145,21 +149,36 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     return res.json({ item: serialize(sr, false), reset });
   });
 
-  // Puts the booking's details back as they were before the last Save modifications. The undone modification stays in the list, struck through.
+  // Reverts ONE saved modification (by its position in the list; the newest that can be undone when none is given). It stays in the list, struck through.
+  const changedPaths = (before, after) => { const out = []; const walk = (x, y, path) => {
+    if (x && y && typeof x === 'object' && typeof y === 'object' && !Array.isArray(x) && !Array.isArray(y)) { for (const key of new Set([...Object.keys(x), ...Object.keys(y)])) walk(x[key], y[key], path ? `${path}.${key}` : key); }
+    else if (path && JSON.stringify(x) !== JSON.stringify(y)) out.push(path);
+  }; walk(before, after, ''); return out; };
+  const valueAt = (source, path) => path.split('.').reduce((node, key) => (node && typeof node === 'object' ? node[key] : undefined), source);
   app.post('/api/service-requests/:id/undo-modification', requireAuth, async (req, res) => {
     const sr = await find(req.params.id);
     if (!own(req, sr)) return notFound(res);
     const history = [...(sr.modificationHistory || [])];
-    let index = -1; history.forEach((entry, i) => { if (!entry.undoneAt && entry.order) index = i; }); // the newest modification that can still be undone
-    if (index < 0 || sr.status === STATUS.CANCELLED) return res.status(409).json({ message: 'There is no modification to undo.' });
-    if ((sr.payments || []).some(p => !p.voided)) return res.status(409).json({ message: 'This booking has a payment. Contact us to change it.' });
+    const before = (entry) => entry.before || entry.order; // entries saved by the first version kept only "order"
+    let index = Number.isInteger(req.body?.index) ? req.body.index : -1;
+    if (index < 0) history.forEach((entry, i) => { if (!entry.undoneAt && before(entry)) index = i; });
     const entry = history[index];
-    sr.order = entry.order; sr.event = entry.event;
-    history[index] = { at: entry.at, undoneAt: new Date() }; // the restore point is spent; the entry stays as a struck-through step
-    sr.modificationHistory = history; sr.modificationCount = Math.max(0, (sr.modificationCount || 1) - 1);
+    if (!entry || entry.undoneAt || !before(entry) || sr.status === STATUS.CANCELLED) return res.status(409).json({ message: 'There is no modification to undo.' });
+    if ((sr.payments || []).some(p => !p.voided)) return res.status(409).json({ message: 'This booking has a payment. Contact us to change it.' });
+    const after = entry.after || (history[index + 1] && before(history[index + 1])) || (sr.order.toObject ? sr.order.toObject() : sr.order);
+    const next = structuredClone(sr.order.toObject ? sr.order.toObject() : sr.order);
+    for (const path of changedPaths(before(entry), after)) { // put back only what this modification changed
+      const keys = path.split('.'); let target = next; for (const key of keys.slice(0, -1)) target = target[key] = target[key] && typeof target[key] === 'object' ? target[key] : {};
+      const old = valueAt(before(entry), path); target[keys.at(-1)] = old === undefined ? null : structuredClone(old);
+    }
+    if (eventOrder.validateEventOrder(next).length) return res.status(409).json({ message: 'Undoing that would leave the booking incomplete. Undo the later changes first.' });
+    const legacy = require('./quote-validation').eventSchema.safeParse(eventOrder.orderToLegacy(next));
+    if (!legacy.success) return res.status(409).json({ message: 'Event details failed validation.' });
+    history[index] = { at: entry.at, undoneAt: new Date() };
+    sr.order = next; sr.event = legacy.data; sr.modificationHistory = history; sr.modificationCount = Math.max(0, (sr.modificationCount || 1) - 1);
     sr.modifiedAt = history.some((item) => !item.undoneAt) ? new Date() : null; // everything undone: the booking is no longer "modified"
     try { await sr.save(); } catch (error) { if (error.name === 'VersionError') return res.status(409).json({ message: 'The booking changed. Reload before continuing.' }); throw error; }
-    void notify(sr, 'booking-details-updated-admin', { changedDetail: 'undo of the last modification' });
+    void notify(sr, 'booking-details-updated-admin', { changedDetail: 'undo of a modification' });
     return res.json({ item: serialize(sr, false) });
   });
 

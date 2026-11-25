@@ -136,6 +136,13 @@ export function normalizeEventOrder(input) {
   if(typeof oldSpecial==='string'&&oldSpecial.trim()&&!order.additional.notes){const notes=oldSpecial.trim().slice(0,3000),field=fields.find(item=>item.key==='additional.notes');if(field&&validValue(field,notes))order.additional.notes=notes;}
   if(['manual','ai'].includes(input?.source))order.source=input.source;
   if(Array.isArray(input?.equipment))order.equipment=input.equipment.filter(item=>item&&typeof item.id==='string'&&item.id.length<=160&&Number.isInteger(item.quantity)&&item.quantity>0&&item.quantity<=10000).slice(0,100).map(item=>({id:item.id,name:String(item.name||'').slice(0,240),quantity:item.quantity}));
+  // The explicit service decision is authoritative. Upgrade older drafts that
+  // only stored services, without overriding an explicit No or losing music facts.
+  for(const [id,key] of [['dj','djRequested'],['mc','mcRequested']]){
+    const decision=order.music[key];
+    if(typeof decision==='boolean')order.services=decision?[...new Set([...order.services,id])]:order.services.filter(value=>value!==id);
+    else if(order.services.includes(id))order.music[key]=true;
+  }
   return order;
 }
 // Contract fields marked locked:"account" belong to the signed-in account (name, email, phone, company). A booking shows them but never edits them:

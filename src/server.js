@@ -1609,6 +1609,7 @@ app.use('/api/live-stream/recordings', requireAdmin, (_req,res)=>res.status(410)
 require('./live-suggestions').registerLiveSuggestions(app, { getLiveStreamConfig, requireAuth });
 require('./live-comments').registerLiveComments(app, { getLiveStreamConfig, requireAuth: requireViewer, requireAdmin });
 require('./notification-emails').registerNotificationEmails(app, { requireAdmin });
+require('./notification-email-suggestion').registerNotificationSuggestions(app, { requireAdmin, configService: aiConfiguration });
 require('./domain-mail').registerDomainMail(app, { requireAdmin });
 require('./contact-form').registerContactForm(app);
 registerEquipmentRoutes(app, requireAdmin);

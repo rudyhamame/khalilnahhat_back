@@ -43,12 +43,7 @@
         "event.venue.city",
         "event.venue.postalCode",
         "event.venue.country",
-        "event.venue.setting",
-        "event.venue.latitude",
-        "event.venue.longitude",
-        "event.venue.source",
-        "event.venue.sourceId",
-        "event.venue.sourceAttribution"
+        "event.venue.setting"
       ]
     ],
     [
@@ -71,8 +66,7 @@
     [
       "04.01",
       [
-        "rental.requested",
-        "equipment"
+        "rental.requested"
       ]
     ],
     [

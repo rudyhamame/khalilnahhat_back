@@ -106,7 +106,7 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
   app.post('/api/service-requests/:id/order-edit', requireAuth, async (req, res) => {
     const parsed = z.object({ path: z.string().max(80), value: z.any(), quoteRevision: z.number().int().nonnegative().optional(), acknowledgeReset: z.boolean().optional(), place: z.record(z.any()).optional() }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: 'Choose a detail and its new value.' });
-    const { path, value } = parsed.data;
+    const { path } = parsed.data; const value = path === 'event.venue.postalCode' && typeof parsed.data.value === 'string' ? parsed.data.value.toUpperCase() : parsed.data.value; // postal codes are always capitals
     const sr = await find(req.params.id);
     if (!own(req, sr)) return notFound(res);
     if (!sr.order || sr.status === STATUS.CANCELLED) return res.status(409).json({ message: 'This booking can no longer be edited.' });
@@ -123,7 +123,7 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     const keys = path.split('.'); let target = next; for (const key of keys.slice(0, -1)) target = target[key] = target[key] && typeof target[key] === 'object' ? target[key] : {};
     target[keys.at(-1)] = value;
     // A venue picked from the place search also carries its address, city and map position (the read-only atoms are only ever set this way).
-    if (path === 'event.venue.name' && parsed.data.place) { const p = parsed.data.place; for (const k of ['address', 'city', 'postalCode', 'country', 'source', 'sourceId', 'sourceAttribution']) if (typeof p[k] === 'string') target[k] = p[k].slice(0, 240); for (const k of ['latitude', 'longitude']) if (Number.isFinite(p[k])) target[k] = p[k]; }
+    if (path === 'event.venue.name' && parsed.data.place) { const p = parsed.data.place; for (const k of ['address', 'city', 'postalCode', 'country', 'source', 'sourceId', 'sourceAttribution']) if (typeof p[k] === 'string') target[k] = (k === 'postalCode' ? p[k].toUpperCase() : p[k]).slice(0, 240); for (const k of ['latitude', 'longitude']) if (Number.isFinite(p[k])) target[k] = p[k]; }
     const errors = eventOrder.validateEventOrder(next);
     if (errors.length) return res.status(400).json({ message: 'That change leaves the booking incomplete or invalid.', fields: errors });
     const legacy = require('./quote-validation').eventSchema.safeParse(eventOrder.orderToLegacy(next));

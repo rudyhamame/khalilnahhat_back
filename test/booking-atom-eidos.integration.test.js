@@ -14,7 +14,7 @@ test('every Booking atom has a stable, independent Eidos; deletion stays permane
  const origin=`http://127.0.0.1:${server.address().port}`,endpoint=origin+'/api/admin/eden/eidos';
  const request=async(method='GET',body,suffix='')=>{const res=await fetch(endpoint+suffix,{method,headers:{Authorization:'Bearer admin','Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});return{status:res.status,body:await res.json()};};
  assert.equal(new Set(BOOKING_ATOMS.map(row=>row.atomId)).size,BOOKING_ATOMS.length);
- assert.ok(BOOKING_ATOMS.some(row=>row.atomId==='event.venue.latitude'));
+ assert.ok(BOOKING_ATOMS.some(row=>row.atomId==='event.venue.setting')); // the map-provenance atoms (latitude, longitude, source…) and the equipment atom are no longer numbered atoms
  assert.equal((await fetch(endpoint+'/booking-atoms',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,401);
  assert.equal((await request('POST',{atomId:'invented'},'/booking-atoms')).status,400);
  const manual=(await request('POST',{fourthGoal:'Keep this independent seed.'})).body.item;

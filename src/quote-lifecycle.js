@@ -104,7 +104,7 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
   const READ_ONLY = new Set(['customer.email', 'event.venue.latitude', 'event.venue.longitude', 'event.venue.source', 'event.venue.sourceId', 'event.venue.sourceAttribution']);
   const AFFECTS_AVAILABILITY = path => /^event\.(type|title|date|startTime|endTime|guestCount|venue\.|setup\.)/.test(path);
   app.post('/api/service-requests/:id/order-edit', requireAuth, async (req, res) => {
-    const parsed = z.object({ path: z.string().max(80), value: z.any(), quoteRevision: z.number().int().nonnegative().optional(), acknowledgeReset: z.boolean().optional(), place: z.record(z.any()).optional() }).safeParse(req.body);
+    const parsed = z.object({ path: z.string().max(80), value: z.any(), quoteRevision: z.number().int().nonnegative().optional(), acknowledgeReset: z.boolean().optional(), place: z.record(z.any()).optional(), countsAsModification: z.boolean().optional() }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: 'Choose a detail and its new value.' });
     const { path } = parsed.data; const value = path === 'event.venue.postalCode' && typeof parsed.data.value === 'string' ? parsed.data.value.toUpperCase() : parsed.data.value; // postal codes are always capitals
     const sr = await find(req.params.id);
@@ -128,6 +128,10 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     if (errors.length) return res.status(400).json({ message: 'That change leaves the booking incomplete or invalid.', fields: errors });
     const legacy = require('./quote-validation').eventSchema.safeParse(eventOrder.orderToLegacy(next));
     if (!legacy.success) return res.status(400).json({ message: 'Event details failed validation.' });
+    if (parsed.data.countsAsModification !== false) { // one per Save modifications, however many atoms it carries
+      const history = (sr.modificationHistory || []).slice(-19); history.push({ order: structuredClone(sr.order.toObject ? sr.order.toObject() : sr.order), event: structuredClone(sr.event?.toObject ? sr.event.toObject() : sr.event), at: new Date() });
+      sr.modificationHistory = history; sr.modificationCount = (sr.modificationCount || 0) + 1;
+    }
     sr.order = next; sr.event = legacy.data; sr.modifiedAt = new Date();
     if (reset) {
       if (previous.informedAt) sr.availabilityHistory = [...(sr.availabilityHistory || []), { ...previous, window: sr.availabilityWindow, changedAt: new Date() }];
@@ -139,6 +143,20 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     if (reset) { void notify(sr, 'booking-details-recheck', { changedDetail }); void notify(sr, 'booking-details-recheck-admin', { changedDetail }); }
     else void notify(sr, 'booking-details-updated-admin', { changedDetail });
     return res.json({ item: serialize(sr, false), reset });
+  });
+
+  // Puts the booking's details back as they were before the last Save modifications.
+  app.post('/api/service-requests/:id/undo-modification', requireAuth, async (req, res) => {
+    const sr = await find(req.params.id);
+    if (!own(req, sr)) return notFound(res);
+    const last = (sr.modificationHistory || []).at(-1);
+    if (!last || sr.status === STATUS.CANCELLED) return res.status(409).json({ message: 'There is no modification to undo.' });
+    if ((sr.payments || []).some(p => !p.voided)) return res.status(409).json({ message: 'This booking has a payment. Contact us to change it.' });
+    sr.order = last.order; sr.event = last.event; sr.modifiedAt = new Date();
+    sr.modificationHistory = sr.modificationHistory.slice(0, -1); sr.modificationCount = Math.max(0, (sr.modificationCount || 1) - 1);
+    try { await sr.save(); } catch (error) { if (error.name === 'VersionError') return res.status(409).json({ message: 'The booking changed. Reload before continuing.' }); throw error; }
+    void notify(sr, 'booking-details-updated-admin', { changedDetail: 'undo of the last modification' });
+    return res.json({ item: serialize(sr, false) });
   });
 
   app.post('/api/service-requests/:id/reschedule-request',requireAuth,async(req,res)=>{

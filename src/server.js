@@ -389,6 +389,7 @@ function serializeServiceRequest(serviceRequest, includeQuote = true) {
     items,
     status: serviceRequest.status,
     quoteRevision: serviceRequest.quoteRevision || 0,
+    modificationCount: serviceRequest.modificationCount || 0,
     negotiationRevision: serviceRequest.negotiationRevision || 0,
     negotiation: serviceRequest.negotiation || null,
     negotiationHistory: serviceRequest.negotiationHistory || [],

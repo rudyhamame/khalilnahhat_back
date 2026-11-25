@@ -319,6 +319,10 @@ const serviceRequestSchema = new mongoose.Schema(
     acceptedAt: { type: Date, default: null },
     changeRequest: { type: String, default: '' },
     quoteRevision: {type:Number, default:0},
+    // How many times the client changed the booking's details after sending it (one per saved edit).
+    modificationCount: {type:Number, default:0},
+    // The order and event as they were before each counted modification, newest last (powers "Undo modification"); never sent to clients.
+    modificationHistory: {type:[mongoose.Schema.Types.Mixed], default:[]},
     negotiationRevision: {type:Number, default:0},
     negotiation: {type:mongoose.Schema.Types.Mixed,default:null},
     negotiationHistory: {type:[mongoose.Schema.Types.Mixed],default:[]},

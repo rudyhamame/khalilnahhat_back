@@ -30,9 +30,12 @@ function describeRequest(request){
  const internal=describe(request.status),availability=require('./booking-availability').availabilityFor(request);
  if(!TABLE[request.status]||request.status===STATUS.CANCELLED)return {...internal,clientStatus:null,canDiscussAvailability:false};
  const paid=(request.payments||[]).some(p=>!p.voided&&(p.amountCents||0)>0);
- const stage=internal.isBooked?'booked':paid?'deposit_paid':internal.showsPrices?'quote_ready':availability.status==='unavailable'?'unavailable':availability.status==='available'?'available':'requested';
+ let stage=internal.isBooked?'booked':paid?'deposit_paid':internal.showsPrices?'quote_ready':availability.status==='unavailable'?'unavailable':availability.status==='available'?'available':'requested';
+ // Any client edit puts the booking in "Booking modified" until the team acts on it again (confirms availability or sends a quote); never once paid or booked.
+ const lastAdminAction=Math.max(0,...[request.availabilityAcceptedAt,request.availabilityUnavailableAt,request.quotedAt].map(d=>d?new Date(d).getTime():0));
+ if(request.modifiedAt&&!paid&&!internal.isBooked&&new Date(request.modifiedAt).getTime()>lastAdminAction)stage='modified';
  const display=contract.clientStages[stage];
- const path=contract.clientPath.map(key=>key==='available'&&stage==='unavailable'?'unavailable':key).map(key=>({status:key,...contract.clientStages[key]}));
+ const path=contract.clientPath.map(key=>key==='available'&&stage==='unavailable'?'unavailable':key==='requested'&&stage==='modified'?'modified':key).map(key=>({status:key,...contract.clientStages[key]}));
  return {...internal,...display,clientStatus:stage,path,canDiscussAvailability:stage==='unavailable'&&internal.repriceable&&!(request.payments||[]).some(p=>!p.voided)};
 }
 // The REAL booking status: one stored key on the booking (requested, available, unavailable, quote_ready, deposit_paid, booked, cancelled), derived from the lifecycle status, availability and payments.

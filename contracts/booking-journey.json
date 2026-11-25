@@ -1,186 +1,194 @@
 {
- "_about": "The ONE description of what each booking-request status means. Owned by khalil-back/contracts; src/booking-journey.js loads it and the frontend keeps a synced copy for documentation. Edit here only.",
- "facts": {
-  "holdsStock": "its equipment counts against stock for upcoming events",
-  "expires": "the quote lapses automatically after its valid-days window",
-  "showsPrices": "the client may see the quote prices",
-  "needsAdmin": "an administrator must act (counted as 'needs attention')",
-  "repriceable": "an administrator may publish or republish a quote",
-  "extendable": "an administrator may extend or reactivate the quote",
-  "awaitingClient": "a quote is out and the client must accept or ask for changes (reminders go out here)",
-  "canRecordDeposit": "manual payments are recorded by administrators only; the deposit confirms the booking",
-  "isBooked": "a confirmed booking: its date is blocked, balance/refunds can be recorded, planning and the DJ set open",
-  "cancellable": "an administrator may cancel the request",
-  "canNegotiate": "client may propose prices or change services/equipment before acceptance or closure"
- },
- "path": [
-  "pending",
-  "quoted",
-  "accepted",
-  "confirmed"
- ],
- "statuses": {
-  "pending": {
-   "label": "Submitted",
-   "labelAr": "تم طلب عرض السعر",
-   "step": 0,
-   "facts": [
-    "cancellable",
-    "holdsStock",
-    "needsAdmin",
-    "repriceable",
-    "canNegotiate"
-   ],
-   "clientNext": "wait_for_quote",
-   "adminNext": "publish_quote",
-   "meaning": "Client request received; no quote has been sent and the date is not reserved.",
-   "whoActsNext": "Administrator reviews and prepares a quote."
+  "_about": "The ONE description of what each booking-request status means. Owned by khalil-back/contracts; src/booking-journey.js loads it and the frontend keeps a synced copy for documentation. Edit here only.",
+  "facts": {
+    "holdsStock": "its equipment counts against stock for upcoming events",
+    "expires": "the quote lapses automatically after its valid-days window",
+    "showsPrices": "the client may see the quote prices",
+    "needsAdmin": "an administrator must act (counted as 'needs attention')",
+    "repriceable": "an administrator may publish or republish a quote",
+    "extendable": "an administrator may extend or reactivate the quote",
+    "awaitingClient": "a quote is out and the client must accept or ask for changes (reminders go out here)",
+    "canRecordDeposit": "manual payments are recorded by administrators only; the deposit confirms the booking",
+    "isBooked": "a confirmed booking: its date is blocked, balance/refunds can be recorded, planning and the DJ set open",
+    "cancellable": "an administrator may cancel the request",
+    "canNegotiate": "client may propose prices or change services/equipment before acceptance or closure"
   },
-  "quoted": {
-   "label": "Waiting for client's decision",
-   "labelAr": "بانتظار قرار العميل",
-   "step": 1,
-   "facts": [
-    "awaitingClient",
-    "cancellable",
-    "expires",
-    "extendable",
-    "holdsStock",
-    "repriceable",
-    "showsPrices",
-    "canNegotiate"
-   ],
-   "clientNext": "accept_or_request_changes",
-   "adminNext": "wait_for_client",
-   "meaning": "A quote is available and has an expiry.",
-   "whoActsNext": "Client accepts or requests changes."
+  "path": [
+    "pending",
+    "quoted",
+    "accepted",
+    "confirmed"
+  ],
+  "statuses": {
+    "pending": {
+      "label": "Submitted",
+      "labelAr": "تم طلب عرض السعر",
+      "step": 0,
+      "facts": [
+        "cancellable",
+        "holdsStock",
+        "needsAdmin",
+        "repriceable",
+        "canNegotiate"
+      ],
+      "clientNext": "wait_for_quote",
+      "adminNext": "publish_quote",
+      "meaning": "Client request received; no quote has been sent and the date is not reserved.",
+      "whoActsNext": "Administrator reviews and prepares a quote."
+    },
+    "quoted": {
+      "label": "Waiting for client's decision",
+      "labelAr": "بانتظار قرار العميل",
+      "step": 1,
+      "facts": [
+        "awaitingClient",
+        "cancellable",
+        "expires",
+        "extendable",
+        "holdsStock",
+        "repriceable",
+        "showsPrices",
+        "canNegotiate"
+      ],
+      "clientNext": "accept_or_request_changes",
+      "adminNext": "wait_for_client",
+      "meaning": "A quote is available and has an expiry.",
+      "whoActsNext": "Client accepts or requests changes."
+    },
+    "accepted": {
+      "label": "Quote accepted",
+      "labelAr": "تم قبول العرض",
+      "step": 2,
+      "facts": [
+        "canRecordDeposit",
+        "cancellable",
+        "expires",
+        "holdsStock",
+        "repriceable",
+        "showsPrices"
+      ],
+      "clientNext": "pay_deposit",
+      "adminNext": "record_deposit",
+      "meaning": "Client accepted the active quote. This alone does not confirm the booking.",
+      "whoActsNext": "Administrator records the deposit."
+    },
+    "changes_requested": {
+      "label": "Negotiation in progress",
+      "labelAr": "التفاوض جارٍ",
+      "step": 1,
+      "facts": [
+        "cancellable",
+        "extendable",
+        "holdsStock",
+        "needsAdmin",
+        "repriceable",
+        "canNegotiate",
+        "showsPrices"
+      ],
+      "clientNext": "wait_for_revised_quote",
+      "adminNext": "publish_revised_quote",
+      "meaning": "Client asked for quote changes.",
+      "whoActsNext": "Administrator reviews and sends a revised quote."
+    },
+    "expired": {
+      "label": "Expired",
+      "labelAr": "منتهي",
+      "step": null,
+      "facts": [
+        "cancellable",
+        "extendable",
+        "repriceable",
+        "showsPrices"
+      ],
+      "clientNext": "contact_to_reactivate",
+      "adminNext": "reactivate_or_close",
+      "meaning": "Quote validity ended before acceptance or deposit confirmation.",
+      "whoActsNext": "Administrator extends/reactivates if appropriate."
+    },
+    "confirmed": {
+      "label": "Booking confirmed",
+      "labelAr": "تم تأكيد الحجز",
+      "step": 3,
+      "facts": [
+        "cancellable",
+        "holdsStock",
+        "isBooked",
+        "showsPrices"
+      ],
+      "clientNext": "plan_the_event",
+      "adminNext": "prepare_event",
+      "meaning": "Deposit threshold was recorded and date/equipment checks passed.",
+      "whoActsNext": "Client and team can proceed with the confirmed event."
+    },
+    "cancelled": {
+      "label": "Cancelled",
+      "labelAr": "ملغى",
+      "step": null,
+      "facts": [],
+      "clientNext": "none",
+      "adminNext": "none",
+      "meaning": "Administrator cancelled the request/quote.",
+      "whoActsNext": "Contact the team through existing account support channels."
+    }
   },
-  "accepted": {
-   "label": "Quote accepted",
-   "labelAr": "تم قبول العرض",
-   "step": 2,
-   "facts": [
-    "canRecordDeposit",
-    "cancellable",
-    "expires",
-    "holdsStock",
-    "repriceable",
-    "showsPrices"
-   ],
-   "clientNext": "pay_deposit",
-   "adminNext": "record_deposit",
-   "meaning": "Client accepted the active quote. This alone does not confirm the booking.",
-   "whoActsNext": "Administrator records the deposit."
-  },
-  "changes_requested": {
-   "label": "Negotiation in progress",
-   "labelAr": "التفاوض جارٍ",
-   "step": 1,
-   "facts": [
-    "cancellable",
-    "extendable",
-    "holdsStock",
-    "needsAdmin",
-    "repriceable",
-    "canNegotiate",
-    "showsPrices"
-   ],
-   "clientNext": "wait_for_revised_quote",
-   "adminNext": "publish_revised_quote",
-   "meaning": "Client asked for quote changes.",
-   "whoActsNext": "Administrator reviews and sends a revised quote."
-  },
-  "expired": {
-   "label": "Expired",
-   "labelAr": "منتهي",
-   "step": null,
-   "facts": [
-    "cancellable",
-    "extendable",
-    "repriceable",
-    "showsPrices"
-   ],
-   "clientNext": "contact_to_reactivate",
-   "adminNext": "reactivate_or_close",
-   "meaning": "Quote validity ended before acceptance or deposit confirmation.",
-   "whoActsNext": "Administrator extends/reactivates if appropriate."
-  },
-  "confirmed": {
-   "label": "Booking confirmed",
-   "labelAr": "تم تأكيد الحجز",
-   "step": 3,
-   "facts": [
-    "cancellable",
-    "holdsStock",
-    "isBooked",
-    "showsPrices"
-   ],
-   "clientNext": "plan_the_event",
-   "adminNext": "prepare_event",
-   "meaning": "Deposit threshold was recorded and date/equipment checks passed.",
-   "whoActsNext": "Client and team can proceed with the confirmed event."
-  },
-  "cancelled": {
-   "label": "Cancelled",
-   "labelAr": "ملغى",
-   "step": null,
-   "facts": [],
-   "clientNext": "none",
-   "adminNext": "none",
-   "meaning": "Administrator cancelled the request/quote.",
-   "whoActsNext": "Contact the team through existing account support channels."
+  "clientPath": [
+    "requested",
+    "available",
+    "quote_ready",
+    "deposit_paid",
+    "booked"
+  ],
+  "clientStages": {
+    "requested": {
+      "label": "Booking requested",
+      "labelAr": "تم طلب الحجز",
+      "adminLabel": "Booking received",
+      "adminLabelAr": "تم استلام الحجز",
+      "step": 0,
+      "clientNext": "wait_for_availability"
+    },
+    "modified": {
+      "label": "Booking modified",
+      "labelAr": "تم تعديل الحجز",
+      "adminLabel": "Booking modified",
+      "adminLabelAr": "تم تعديل الحجز",
+      "step": 0,
+      "clientNext": "wait_for_availability"
+    },
+    "available": {
+      "label": "Booking date available",
+      "labelAr": "تاريخ الحجز متاح",
+      "adminLabel": "Booking date availability confirmed",
+      "adminLabelAr": "تم تأكيد توفر تاريخ الحجز",
+      "step": 1,
+      "clientNext": "wait_for_quote"
+    },
+    "unavailable": {
+      "label": "Booking date unavailable",
+      "labelAr": "تاريخ الحجز غير متاح",
+      "step": 1,
+      "clientNext": "optional_availability_meeting"
+    },
+    "quote_ready": {
+      "label": "Booking quote ready",
+      "labelAr": "عرض سعر الحجز جاهز",
+      "adminLabel": "Booking quote sent",
+      "adminLabelAr": "تم إرسال عرض سعر الحجز",
+      "step": 2
+    },
+    "deposit_paid": {
+      "label": "Deposit paid",
+      "labelAr": "تم دفع العربون",
+      "adminLabel": "Deposit received",
+      "adminLabelAr": "تم استلام العربون",
+      "step": 3,
+      "clientNext": "wait_for_confirmation"
+    },
+    "booked": {
+      "label": "Booked",
+      "labelAr": "تم الحجز",
+      "step": 4,
+      "clientNext": "plan_the_event"
+    }
   }
- },
- "clientPath": [
-  "requested",
-  "available",
-  "quote_ready",
-  "deposit_paid",
-  "booked"
- ],
- "clientStages": {
-  "requested": {
-   "label": "Booking requested",
-   "labelAr": "تم طلب الحجز",
-   "adminLabel": "Booking received",
-   "adminLabelAr": "تم استلام الحجز",
-   "step": 0,
-   "clientNext": "wait_for_availability"
-  },
-  "available": {
-   "label": "Booking date available",
-   "labelAr": "تاريخ الحجز متاح",
-   "adminLabel": "Booking date availability confirmed",
-   "adminLabelAr": "تم تأكيد توفر تاريخ الحجز",
-   "step": 1,
-   "clientNext": "wait_for_quote"
-  },
-  "unavailable": {
-   "label": "Booking date unavailable",
-   "labelAr": "تاريخ الحجز غير متاح",
-   "step": 1,
-   "clientNext": "optional_availability_meeting"
-  },
-  "quote_ready": {
-   "label": "Booking quote ready",
-   "labelAr": "عرض سعر الحجز جاهز",
-   "adminLabel": "Booking quote sent",
-   "adminLabelAr": "تم إرسال عرض سعر الحجز",
-   "step": 2
-  },
-  "deposit_paid": {
-   "label": "Deposit paid",
-   "labelAr": "تم دفع العربون",
-   "adminLabel": "Deposit received",
-   "adminLabelAr": "تم استلام العربون",
-   "step": 3,
-   "clientNext": "wait_for_confirmation"
-  },
-  "booked": {
-   "label": "Booked",
-   "labelAr": "تم الحجز",
-   "step": 4,
-   "clientNext": "plan_the_event"
-  }
- }
 }

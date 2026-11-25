@@ -344,6 +344,7 @@ const serviceRequestSchema = new mongoose.Schema(
     bookingAiSummary: { type: mongoose.Schema.Types.Mixed, default: null }, // {text, hash, at}: admin-only AI summary, rewritten when the summarized data changes
     adminNote: { type: String, default: '', trim: true },
     quotedAt: { type: Date, default: null },
+    modifiedAt: { type: Date, default: null }, // last client edit of the booking details (see booking-journey: stage "modified")
   },
   { timestamps: true, optimisticConcurrency:true },
 );

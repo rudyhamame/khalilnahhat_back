@@ -104,7 +104,7 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
   const READ_ONLY = new Set(['customer.email', 'event.venue.latitude', 'event.venue.longitude', 'event.venue.source', 'event.venue.sourceId', 'event.venue.sourceAttribution']);
   const AFFECTS_AVAILABILITY = path => /^event\.(type|title|date|startTime|endTime|guestCount|venue\.|setup\.)/.test(path);
   app.post('/api/service-requests/:id/order-edit', requireAuth, async (req, res) => {
-    const parsed = z.object({ path: z.string().max(80), value: z.any(), quoteRevision: z.number().int().nonnegative().optional(), acknowledgeReset: z.boolean().optional() }).safeParse(req.body);
+    const parsed = z.object({ path: z.string().max(80), value: z.any(), quoteRevision: z.number().int().nonnegative().optional(), acknowledgeReset: z.boolean().optional(), place: z.record(z.any()).optional() }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: 'Choose a detail and its new value.' });
     const { path, value } = parsed.data;
     const sr = await find(req.params.id);
@@ -122,11 +122,13 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     const next = structuredClone(sr.order.toObject ? sr.order.toObject() : sr.order);
     const keys = path.split('.'); let target = next; for (const key of keys.slice(0, -1)) target = target[key] = target[key] && typeof target[key] === 'object' ? target[key] : {};
     target[keys.at(-1)] = value;
+    // A venue picked from the place search also carries its address, city and map position (the read-only atoms are only ever set this way).
+    if (path === 'event.venue.name' && parsed.data.place) { const p = parsed.data.place; for (const k of ['address', 'city', 'postalCode', 'country', 'source', 'sourceId', 'sourceAttribution']) if (typeof p[k] === 'string') target[k] = p[k].slice(0, 240); for (const k of ['latitude', 'longitude']) if (Number.isFinite(p[k])) target[k] = p[k]; }
     const errors = eventOrder.validateEventOrder(next);
     if (errors.length) return res.status(400).json({ message: 'That change leaves the booking incomplete or invalid.', fields: errors });
     const legacy = require('./quote-validation').eventSchema.safeParse(eventOrder.orderToLegacy(next));
     if (!legacy.success) return res.status(400).json({ message: 'Event details failed validation.' });
-    sr.order = next; sr.event = legacy.data;
+    sr.order = next; sr.event = legacy.data; sr.modifiedAt = new Date();
     if (reset) {
       if (previous.informedAt) sr.availabilityHistory = [...(sr.availabilityHistory || []), { ...previous, window: sr.availabilityWindow, changedAt: new Date() }];
       sr.availabilityAcceptedAt = null; sr.availabilityUnavailableAt = null; sr.availabilityReason = ''; sr.availabilityWindow = '';

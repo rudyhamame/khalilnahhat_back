@@ -406,6 +406,7 @@ function serializeServiceRequest(serviceRequest, includeQuote = true) {
     createdAt: serviceRequest.createdAt,
     quotedAt: serviceRequest.quotedAt,
     modifiedAt: serviceRequest.modifiedAt,
+    modifications: (serviceRequest.modificationHistory || []).map((entry) => ({ at: entry.at })), // one per saved modification, oldest first; "Undo modification" removes the last
     acceptedAt: serviceRequest.acceptedAt,
     ...(isQuoted || includeQuote ? quoteTotals(serviceRequest) : {}),
     expiresAt: serviceRequest.expiresAt,

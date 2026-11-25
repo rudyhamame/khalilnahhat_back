@@ -140,8 +140,8 @@
   ],
   "clientStages": {
     "requested": {
-      "label": "Booking requested",
-      "labelAr": "تم طلب الحجز",
+      "label": "Booking submitted",
+      "labelAr": "تم إرسال الحجز",
       "adminLabel": "Booking received",
       "adminLabelAr": "تم استلام الحجز",
       "step": 0,

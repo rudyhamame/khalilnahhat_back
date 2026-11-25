@@ -33,11 +33,11 @@ function describeRequest(request){
  let stage=internal.isBooked?'booked':paid?'deposit_paid':internal.showsPrices?'quote_ready':availability.status==='unavailable'?'unavailable':availability.status==='available'?'available':'requested';
  // Any client edit puts the booking in "Booking modified" until the team acts on it again (confirms availability or sends a quote); never once paid or booked.
  const lastAdminAction=Math.max(0,...[request.availabilityAcceptedAt,request.availabilityUnavailableAt,request.quotedAt].map(d=>d?new Date(d).getTime():0));
- let previous=null; // the status the booking had before the client's edit replaced it, so the app can still show it
- if(request.modifiedAt&&!paid&&!internal.isBooked&&new Date(request.modifiedAt).getTime()>lastAdminAction){previous=contract.clientStages[stage];stage='modified';}
+ let previous=null,previousKey=null; // the status the booking had before the client's edit replaced it, so the app can still show it
+ if(request.modifiedAt&&!paid&&!internal.isBooked&&new Date(request.modifiedAt).getTime()>lastAdminAction){previous=contract.clientStages[stage];previousKey=stage;stage='modified';}
  const display=contract.clientStages[stage];
  const path=contract.clientPath.map(key=>key==='available'&&stage==='unavailable'?'unavailable':key==='requested'&&stage==='modified'?'modified':key).map(key=>({status:key,...contract.clientStages[key]}));
- return {...internal,...display,clientStatus:stage,previousLabel:previous?.label||null,previousLabelAr:previous?.labelAr||null,path,canDiscussAvailability:stage==='unavailable'&&internal.repriceable&&!(request.payments||[]).some(p=>!p.voided)};
+ return {...internal,...display,clientStatus:stage,previousClientStatus:previousKey,previousLabel:previous?.label||null,previousLabelAr:previous?.labelAr||null,path,canDiscussAvailability:stage==='unavailable'&&internal.repriceable&&!(request.payments||[]).some(p=>!p.voided)};
 }
 // The REAL booking status: one stored key on the booking (requested, available, unavailable, quote_ready, deposit_paid, booked, cancelled), derived from the lifecycle status, availability and payments.
 const bookingStatusOf=request=>request.status===STATUS.CANCELLED?'cancelled':(describeRequest(request).clientStatus||'');

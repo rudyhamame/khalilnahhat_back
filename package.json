@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon",
     "start": "node src/server.js",
-    "check": "node --check src/server.js",
+    "check": "npm run check:booking-tree && node --check src/server.js",
     "test:deletion": "node --test test/permanent-deletion.test.js test/live-recordings.test.js test/cloudinary-assets.test.js test/mobile-admin.test.js test/work-type-sample.test.js test/ai-admin-conversation.test.js",
     "test:project-chat": "node --test test/echo-project-chat.test.js test/echo-project-chat-features.test.js test/project-chat-socket.test.js",
     "test:music-ontology": "node --test test/recording-ovh-validation.test.js test/genre-languages.integration.test.js test/music-ontology.test.js test/music-ontology.integration.test.js test/music-archive.test.js test/music-archive-files.test.js",
@@ -14,7 +14,11 @@
     "ai-administrator:worker": "node scripts/ai-administrator-worker.js",
     "ai-administrator:audit": "node scripts/audit-admin-capabilities.js",
     "test:eden": "node --test test/eden-eidos.integration.test.js test/booking-atom-eidos.integration.test.js",
-    "test:booking": "node --test test/client-booking-lifecycle.test.js test/service-request-submission.test.js test/service-request-idempotency.test.js test/quote-validation.test.js src/event-order.test.js test/assisted-booking-flow.test.js src/event-drafts.test.js src/booking-conversations.test.js src/ai-booking.test.js src/ai-booking-stream.test.js test/voice-tool-completion.test.js test/voice-context-current.test.js test/voice-recovery.test.js src/ai-booking-data.test.js"
+    "test:booking": "node --test test/client-booking-lifecycle.test.js test/service-request-submission.test.js test/service-request-idempotency.test.js test/quote-validation.test.js src/event-order.test.js test/assisted-booking-flow.test.js src/event-drafts.test.js src/booking-conversations.test.js src/ai-booking.test.js src/ai-booking-stream.test.js test/voice-tool-completion.test.js test/voice-context-current.test.js test/voice-recovery.test.js src/ai-booking-data.test.js",
+    "sync:booking-tree": "node scripts/sync-booking-tree.cjs",
+    "check:booking-tree": "node scripts/sync-booking-tree.cjs --check",
+    "prestart": "npm run check:booking-tree",
+    "predev": "npm run check:booking-tree"
   },
   "keywords": [
     "express",

@@ -1,5 +1,6 @@
 const crypto = require("node:crypto");
 const mongoose = require("mongoose");
+const {createMailboxEmailRenderer}=require('./design');
 const { textFromHtml } = require("./text");
 const { z } = require("zod");
 
@@ -90,6 +91,7 @@ function createDomainMail({
   fetchImpl = fetch,
   store = sendStore,
   clock = Date.now,
+  renderEmail = createMailboxEmailRenderer(),
 } = {}) {
   let token = null,
     refresh = null,
@@ -349,6 +351,9 @@ function createDomainMail({
         );
       }
       try {
+        let content;
+        try{content=await renderEmail({subject:draft.subject,text:draft.text});}
+        catch{throw Object.assign(failure(503,'The shared email design could not be loaded. No email was sent. Try again.'),{sendState:'not_sent'});}
         const response = await api(
           `/accounts/${accountId}/messages${draft.replyMessageId ? `/${draft.replyMessageId}` : ""}`,
           {
@@ -358,8 +363,8 @@ function createDomainMail({
               toAddress: draft.to.join(","),
               ...(draft.cc.length ? { ccAddress: draft.cc.join(",") } : {}),
               subject: draft.subject,
-              content: draft.text,
-              mailFormat: "plaintext",
+              content,
+              mailFormat: "html",
               encoding: "UTF-8",
               ...(draft.replyMessageId ? { action: "reply" } : {}),
             },

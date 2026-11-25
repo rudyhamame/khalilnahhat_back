@@ -1,3 +1,6 @@
+const {createMailboxEmailRenderer}=require('../src/mail/design');
+const {DEFAULT_EMAIL_DESIGN}=require('../src/notification-email-design');
+const renderEmail=createMailboxEmailRenderer({designs:{get:async()=>({...DEFAULT_EMAIL_DESIGN,brandName:'Test Echo Design',photoUrl:'https://example.test/shared-logo.png'})}});
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const express=require('express');
@@ -22,7 +25,7 @@ function fixture({wrongMailbox=false,mx=true,sendError=false}={}){
   if(options.method==='POST'){sends++;if(sendError)throw new Error('private upstream failure');return json({messageId:'9000000000000009999'});}
   throw new Error('Unexpected API call: '+url);
  };
- const service=createDomainMail({env,fetchImpl,store});return {service,calls,records,get sends(){return sends;}};
+ const service=createDomainMail({env,fetchImpl,store,renderEmail});return {service,calls,records,get sends(){return sends;}};
 }
 const draft=()=>({requestId:crypto.randomUUID(),to:['customer@example.test'],subject:'Your booking',text:'Hello, here is your booking information.'});
 test('mailbox connection is explicit and credentials are never returned',async()=>{
@@ -46,7 +49,7 @@ test('email send locks the sender, rejects header injection, and preserves provi
  await assert.rejects(()=>f.service.send('admin',{...value,subject:'hello\r\nBcc: other@example.test'}),{status:400});
  const result=await f.service.send('admin',value);assert.equal(result.sent,true);assert.equal(result.messageId,'9000000000000009999');
  const call=f.calls.find(call=>call.options.method==='POST'&&call.url.includes('/messages/'));
- const body=JSON.parse(call.options.body);assert.equal(body.fromAddress,BOOKINGS);assert.equal(body.action,'reply');assert.equal(body.mailFormat,'plaintext');
+ const body=JSON.parse(call.options.body);assert.equal(body.fromAddress,BOOKINGS);assert.equal(body.action,'reply');assert.equal(body.mailFormat,'html');assert.match(body.content,/Test Echo Design/);assert.match(body.content,/shared-logo.png/);assert.match(body.content,/Reply to this email/);assert.ok(body.content.includes(value.text));
 });
 test('concurrent duplicate send requests cannot send twice; changed payload conflicts',async()=>{
  const f=fixture(),value=draft();const results=await Promise.allSettled([f.service.send('admin',value),f.service.send('admin',value)]);

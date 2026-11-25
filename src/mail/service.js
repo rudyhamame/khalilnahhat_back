@@ -36,6 +36,7 @@ function createCloudflareMail({
   store = mongoStore,
   clock = Date.now,
   parser,
+  renderEmail,
 } = {}) {
   const receiving = () =>
     env.DOMAIN_MAIL_RECEIVING_ACTIVE === "true" &&
@@ -146,7 +147,7 @@ function createCloudflareMail({
       return store.remove(id);
     },
     receive: createReceiver({ env, store, clock, parser }),
-    send: createSender({ env, store, clock, fetchImpl }),
+    send: createSender({ env, store, clock, fetchImpl, renderEmail }),
   };
 }
 module.exports = { createCloudflareMail };

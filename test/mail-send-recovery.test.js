@@ -1,3 +1,6 @@
+const {createMailboxEmailRenderer}=require('../src/mail/design');
+const {DEFAULT_EMAIL_DESIGN}=require('../src/notification-email-design');
+const renderEmail=createMailboxEmailRenderer({designs:{get:async()=>({...DEFAULT_EMAIL_DESIGN,brandName:'Test Echo Design',photoUrl:'https://example.test/shared-logo.png'})}});
 const {test}=require('node:test'),assert=require('node:assert/strict'),crypto=require('node:crypto'),express=require('express');
 const {createCloudflareMail}=require('../src/mail/service');
 const {registerDomainMail}=require('../src/mail/routes');
@@ -8,7 +11,7 @@ function fixture(responses=[]){
   async finish(owner,id,values){Object.assign(rows.get(owner+':'+id),values);},
   async sendStatus(owner,id){return rows.get(owner+':'+id)||null;},
  };
- const service=createCloudflareMail({env:{DOMAIN_MAIL_SENDING_ACTIVE:'true',BREVO_API_KEY:'fixture-key'},store,fetchImpl:async()=>{requests++;const next=responses.shift();if(next instanceof Error)throw next;return next||Response.json({messageId:'qa-sent'});}});
+ const service=createCloudflareMail({renderEmail,env:{DOMAIN_MAIL_SENDING_ACTIVE:'true',BREVO_API_KEY:'fixture-key'},store,fetchImpl:async()=>{requests++;const next=responses.shift();if(next instanceof Error)throw next;return next||Response.json({messageId:'qa-sent'});}});
  return {service,rows,store,requests:()=>requests};
 }
 const draft=()=>({requestId:crypto.randomUUID(),to:['recipient@example.invalid'],cc:[],subject:'Fixture only',text:'No real email is sent.'});

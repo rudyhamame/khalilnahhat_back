@@ -1,3 +1,6 @@
+const {createMailboxEmailRenderer}=require('../src/mail/design');
+const {DEFAULT_EMAIL_DESIGN}=require('../src/notification-email-design');
+const renderEmail=createMailboxEmailRenderer({designs:{get:async()=>({...DEFAULT_EMAIL_DESIGN,brandName:'Test Echo Design',photoUrl:'https://example.test/shared-logo.png'})}});
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const crypto=require('node:crypto');
@@ -22,7 +25,7 @@ function fixture(){
   async move(id,folder){const row=rows.get(id);if(row)row.folder=folder;return row;},
  };
  const fetchImpl=async(_url,options)=>{sends++;body=JSON.parse(options.body);assert.equal(options.headers['api-key'],'private-key');return new Response(JSON.stringify({messageId:'<sent@brevo.test>'}));};
- return {service:createCloudflareMail({env,store,fetchImpl}),store,rows,get sends(){return sends;},get body(){return body;}};
+ return {service:createCloudflareMail({env,store,fetchImpl,renderEmail}),store,rows,get sends(){return sends;},get body(){return body;}};
 }
 test('signed MIME delivery is persisted once; HTML is inert and attachments are exact bytes',async()=>{
  const f=fixture();const result=await f.service.receive(mime,sign(mime));assert.equal(result.confirmed,true);assert.deepEqual(await f.service.receive(mime,sign(mime)),result);assert.equal(f.rows.size,1);
@@ -40,7 +43,7 @@ test('tampering, wrong recipient, expired timestamp, bad signature and oversized
 test('readers cannot fetch another folder; replies keep headers and send only once',async()=>{
  const f=fixture(),original=await f.service.receive(mime,sign(mime));await assert.rejects(()=>f.service.message('2',original.id),{status:404});
  const value={requestId:crypto.randomUUID(),to:['reply@example.test'],subject:'Re: An event',text:'Yes, we can help.',replyMessageId:original.id};
- const result=await f.service.send('admin',value);assert.equal(result.sent,true);assert.equal(f.sends,1);assert.equal(f.body.sender.email,BOOKINGS);assert.equal(f.body.replyTo.email,BOOKINGS);assert.equal(f.body.headers['In-Reply-To'],'<original@example.test>');
+ const result=await f.service.send('admin',value);assert.equal(result.sent,true);assert.equal(f.sends,1);assert.equal(f.body.sender.email,BOOKINGS);assert.equal(f.body.replyTo.email,BOOKINGS);assert.match(f.body.htmlContent,/Test Echo Design/);assert.match(f.body.htmlContent,/shared-logo.png/);assert.match(f.body.htmlContent,/Reply to this email/);assert.equal(f.body.textContent,value.text);assert.equal(f.body.headers['In-Reply-To'],'<original@example.test>');
  assert.equal((await f.service.send('admin',value)).messageId,result.messageId);assert.equal(f.sends,1);
  await assert.rejects(()=>f.service.send('admin',{...value,text:'Changed'}),{status:409});
  await assert.rejects(()=>f.service.send('admin',{...value,requestId:crypto.randomUUID(),sender:'bad@example.test'}),{status:400});

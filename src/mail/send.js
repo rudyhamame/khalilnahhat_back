@@ -2,9 +2,11 @@ const crypto = require("node:crypto");
 const { isIP } = require("node:net");
 const { BOOKINGS, FOLDERS } = require("./constants");
 const { fail, draftSchema } = require("./validation");
-const { cleanHeader, escapeHtml } = require("./text");
+const { cleanHeader } = require("./text");
 
-function createSender({ env, store, fetchImpl = fetch, clock = Date.now }) {
+const {createMailboxEmailRenderer}=require('./design');
+
+function createSender({ env, store, fetchImpl = fetch, clock = Date.now, renderEmail = createMailboxEmailRenderer() }) {
   return async function send(owner, value) {
     if (env.DOMAIN_MAIL_SENDING_ACTIVE !== "true" || !env.BREVO_API_KEY?.trim())
       throw fail(
@@ -64,6 +66,9 @@ function createSender({ env, store, fetchImpl = fetch, clock = Date.now }) {
             }
           : {}),
       };
+      let htmlContent;
+      try{htmlContent=await renderEmail({subject:draft.subject,text:draft.text});}
+      catch{throw fail(503,'The shared email design could not be loaded. No email was sent. Try again.',{sendState:'not_sent'});}
       const response = await fetchImpl("https://api.brevo.com/v3/smtp/email", {
         method: "POST",
         headers: {
@@ -80,7 +85,7 @@ function createSender({ env, store, fetchImpl = fetch, clock = Date.now }) {
           replyTo: { email: BOOKINGS },
           subject: draft.subject,
           textContent: draft.text,
-          htmlContent: `<div style="white-space:pre-wrap">${escapeHtml(draft.text)}</div>`,
+          htmlContent,
           headers,
           tags: ["bookings-mailbox"],
         }),

@@ -84,8 +84,9 @@ function registerMeetings(app, { requireAuth, requireAdmin, BookingModel=Service
   const mine = (m, u) => m && (u.isAdmin || String(m.bookedBy) === String(u._id));
 
   app.get('/api/meetings/slots', async (_req, res) => {
-    const slots = await Meeting.find({ status: 'open', start: { $gt: new Date(Date.now() + HOUR_MS) } }).sort({ start: 1 }).limit(200);
-    res.json({ items: slots.map(publicSlot) });
+    // Every open time still ahead is listed; one under an hour away is flagged tooSoon (it cannot be booked) instead of being hidden.
+    const slots = await Meeting.find({ status: 'open', start: { $gt: new Date() } }).sort({ start: 1 }).limit(200);
+    res.json({ items: slots.map((m) => ({ ...publicSlot(m), tooSoon: m.start.getTime() <= Date.now() + HOUR_MS })) });
   });
 
   app.post('/api/meetings/slots', requireAdmin, async (req, res) => {

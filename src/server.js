@@ -405,6 +405,8 @@ function serializeServiceRequest(serviceRequest, includeQuote = true) {
       : null,
     createdAt: serviceRequest.createdAt,
     quotedAt: serviceRequest.quotedAt,
+    modifiedAt: serviceRequest.modifiedAt,
+    acceptedAt: serviceRequest.acceptedAt,
     ...(isQuoted || includeQuote ? quoteTotals(serviceRequest) : {}),
     expiresAt: serviceRequest.expiresAt,
     validDays: serviceRequest.validDays,

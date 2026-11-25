@@ -65,7 +65,7 @@ function registerMeetingRoom(app, { requireAuth, Meeting, env = process.env, now
     const room = roomOf(req.params.id), queue = room.signals[other(ctx.role)];
     queue.push({ seq: ++room.seq, type, data: data ?? null });
     // Who is being rung: set by an offer, cleared once it is answered, declined or hung up (the admin's incoming-call check reads this).
-    if (type === 'offer') room.ringing = { from: ctx.role, kind: data?.kind === 'video' ? 'video' : 'voice', at: now() }; else room.ringing = null;
+    if (type === 'offer') room.ringing = { from: ctx.role, kind: data?.kind === 'video' ? 'video' : 'voice', at: now() }; else if (['answer', 'hangup', 'decline'].includes(type)) room.ringing = null; // candidates follow an offer and must not stop the ringing
     if (queue.length > MAX_SIGNALS) queue.splice(0, queue.length - MAX_SIGNALS);
     res.json({ ok: true });
   });

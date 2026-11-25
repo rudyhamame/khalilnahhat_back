@@ -53,6 +53,8 @@ test('the admin sees a client call while it rings, and not after it is answered,
   assert.deepEqual((await (await app.incoming('host')).json()).items,[]);
   await app.call('guest','/signal',{type:'offer',data:{sdp:'x',kind:'video'}});
   const ringing=(await (await app.incoming('host')).json()).items;
+  await app.call('guest','/signal',{type:'candidate',data:{candidate:'c'}}); // ICE candidates follow an offer and must not stop the ring
+  assert.equal((await (await app.incoming('host')).json()).items.length,1);
   assert.equal(ringing.length,1);assert.equal(ringing[0].meetingId,id);assert.equal(ringing[0].kind,'video');assert.equal(ringing[0].clientName,'Ana Client');
   clock.t+=61000;assert.deepEqual((await (await app.incoming('host')).json()).items,[]);
   await app.call('guest','/signal',{type:'offer',data:{sdp:'x',kind:'voice'}});

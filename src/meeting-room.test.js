@@ -48,14 +48,14 @@ test('TURN servers are added only when fully configured',()=>{
 });
 
 test('the admin sees a client call while it rings, and not after it is answered, declined or ended',async()=>{
-  const clock={t:start.getTime()},app=await boot(clock);
+  const clock={t:start.getTime()+3600000},app=await boot(clock); // an hour in: earlier tests' rings in the shared room have expired
   assert.equal((await app.incoming('guest')).status,403);
   assert.deepEqual((await (await app.incoming('host')).json()).items,[]);
   await app.call('guest','/signal',{type:'offer',data:{sdp:'x',kind:'video'}});
   const ringing=(await (await app.incoming('host')).json()).items;
   assert.equal(ringing.length,1);assert.equal(ringing[0].meetingId,id);assert.equal(ringing[0].kind,'video');assert.equal(ringing[0].clientName,'Ana Client');
   clock.t+=61000;assert.deepEqual((await (await app.incoming('host')).json()).items,[]);
-  clock.t=start.getTime();await app.call('guest','/signal',{type:'offer',data:{sdp:'x',kind:'voice'}});
+  await app.call('guest','/signal',{type:'offer',data:{sdp:'x',kind:'voice'}});
   await app.call('host','/signal',{type:'answer',data:{sdp:'y'}});assert.deepEqual((await (await app.incoming('host')).json()).items,[]);
   app.close();
 });

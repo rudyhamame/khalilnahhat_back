@@ -3,6 +3,7 @@ const assert=require('node:assert/strict');
 const express=require('express');
 const {catalog,validate,render,createNotificationEmails,registerNotificationEmails}=require('../src/notification-emails');
 const {sendBrevoEmail}=require('../src/brevo');
+const {createEmailDesign}=require('../src/notification-email-design');
 const {sweepMeetings}=require('../src/meetings');
 const {sweepQuotes}=require('../src/quote-lifecycle');
 function fixture(){
@@ -11,15 +12,16 @@ function fixture(){
   const previous=rows.get(id);if((previous?.revision||0)!==value.revision)return null;
   const row={_id:id,...value,revision:value.revision+1,updatedBy:owner};rows.set(id,row);return row;
  }};
- return {rows,service:createNotificationEmails({store})};
+ let designRow=null;const designs=createEmailDesign({store:{get:async()=>designRow,save:async(value,owner)=>{if((designRow?.revision||0)!==value.revision)return null;designRow={...value,revision:value.revision+1,updatedBy:owner};return designRow;}}});
+ return {rows,service:createNotificationEmails({store,designs})};
 }
 const draft=item=>({revision:item.revision,enabled:item.enabled,subject:item.subject,body:item.body,leadHours:item.leadHours});
 const payload={to:[{email:'recipient@example.test',name:'Alex'}],subject:'Original subject',htmlContent:'<p>Original rich email</p>',tags:['password-reset'],notificationContext:{actionUrl:'https://example.test/reset?token=private-token'}};
 
-test('all current events have valid defaults and existing rich emails are preserved until saved',async()=>{
+test('all current events have valid defaults and share a branded design before customization',async()=>{
  const {service,rows}=fixture();const events=await service.list();assert.equal(events.length,39);
  for(const event of events){assert.equal(event.enabled,true);validate(event.id,draft(event));}
- const actual=await service.apply(payload);assert.equal(actual.htmlContent,payload.htmlContent);assert.equal(actual.subject,payload.subject);assert.equal(actual.notificationContext,undefined);assert.equal(rows.size,0);
+ const actual=await service.apply(payload);assert.match(actual.htmlContent,/Echo Event Entertainment/);assert.match(actual.htmlContent,/<img /);assert.match(actual.subject,/Reset your password/);assert.ok(actual.htmlContent.includes(payload.notificationContext.actionUrl));assert.equal(actual.notificationContext,undefined);assert.equal(rows.size,0);
 });
 test('saved content uses the real recipient and action link without exposing template context to Brevo',async()=>{
  const {service}=fixture();const original=await service.get('password-reset');
@@ -44,7 +46,7 @@ test('preview does not save or send, escapes content and rejects broken account 
  assert.throws(()=>service.preview(original.id,{...value,leadHours:2}),e=>e.status===400);
  assert.throws(()=>service.preview(original.id,{...value,to:'attacker@example.test'}),e=>e.status===400);
  const safe=render({subject:'Hello {{recipientName}}',body:'{{recipientName}}'},{recipientName:'<img src=x onerror=alert(1)>\r\nBcc: bad'});
- assert.ok(!safe.html.includes('<img'));assert.ok(!/[\r\n]/.test(safe.subject));
+ assert.ok(!safe.html.includes('<img src=x'));assert.ok(!/[\r\n]/.test(safe.subject));
 });
 test('concurrent edits cannot overwrite a newer rule or modify another event',async()=>{
  const {service}=fixture();const original=await service.get('meeting-reminder');
@@ -76,6 +78,14 @@ test('the settings and preview endpoints require admin authentication and expose
  const call=(path,method='GET',body,token)=>fetch(`http://127.0.0.1:${server.address().port}/api/admin/notifications/emails${path}`,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body:body?JSON.stringify(body):undefined});
  for(const token of [undefined,'member']){assert.equal((await call('','GET',null,token)).status,401);assert.equal((await call('/password-reset','PUT',{},token)).status,401);assert.equal((await call('/password-reset/preview','POST',{},token)).status,401);}
  const response=await call('','GET',null,'admin');assert.equal(response.status,200);const text=await response.text();assert.ok(!text.includes('never-expose-this'));assert.equal(JSON.parse(text).provider.name,'Brevo');
+ const designCall=(method='GET',body,token='admin',preview=false)=>fetch(`http://127.0.0.1:${server.address().port}/api/admin/notifications/email-design${preview?'/preview':''}`,{method,headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},...(body?{body:JSON.stringify(body)}:{})});
+ for(const method of ['GET','PUT','POST'])assert.equal((await designCall(method,method==='GET'?null:{},'member',method==='POST')).status,401);
+ const design=(await (await designCall()).json()).design;
+ assert.equal((await designCall('PUT',{...design,brandName:'Shared test brand'})).status,200);
+ assert.equal((await designCall('PUT',design)).status,409);
+ const current=(await (await designCall()).json()).design;
+ const designPreview=await designCall('POST',current,'admin',true);assert.equal(designPreview.status,200);assert.match((await designPreview.json()).html,/Shared test brand/);
+ assert.equal((await designCall('POST',{...current,to:'unexpected@example.test'},'admin',true)).status,400);
  const value=draft(await service.get('meeting-reminder'));
  assert.equal((await call('/meeting-reminder','PUT',{...value,leadHours:3},'admin')).status,200);
  assert.equal((await call('/meeting-reminder/preview','POST',value,'admin')).status,200);
@@ -86,4 +96,32 @@ test('not-available emails require the reason and date-change link and escape th
  assert.throws(()=>validate(rule.id,{...draft(rule),body:'Please choose another date: {{actionUrl}}'}),e=>e.status===400);
  await service.save(rule.id,draft(rule),'admin');const email=await service.apply({to:[{email:'client@example.test',name:'Client'}],tags:[rule.id],subject:'Not available',htmlContent:'fallback',notificationContext:{customerName:'Client',eventCode:'ECHO-TEST',reason:'Already booked <script>bad()</script>',actionUrl:'https://example.test/dashboard/bookings',meetingUrl:'https://example.test/dashboard/bookings?meeting=availability'}});
  assert.ok(email.htmlContent.includes('Already booked &lt;script&gt;'));assert.ok(!email.htmlContent.includes('<script>'));assert.match(email.htmlContent,/optional meeting/i);assert.ok(email.htmlContent.includes('meeting=availability'));assert.ok(email.htmlContent.includes('https://example.test/dashboard/bookings'));
+});
+
+
+test('one saved design applies to customized, default, and uncatalogued automated emails',async()=>{
+ const {service,rows}=fixture();const design=await service.getDesign();
+ assert.equal(design.revision,0);assert.match(design.photoUrl,/^https:/);
+ const latest=await service.saveDesign({...design,brandName:'Echo Studio',tagline:'Music & moments',photoUrl:'https://example.test/portrait.jpg',photoAlt:'Khalil portrait'},'admin');
+ assert.equal(latest.revision,1);
+ const password=await service.get('password-reset');await service.save(password.id,{...draft(password),subject:'Custom reset subject'},'admin');
+ for(const email of [payload,{...payload,tags:['verify-email']},{to:payload.to,subject:'Contact received',tags:['website-contact'],textContent:'Plain text <script>unsafe</script>'}]){
+  const actual=await service.apply(email);assert.match(actual.htmlContent,/Echo Studio/);assert.match(actual.htmlContent,/https:\/\/example.test\/portrait.jpg/);assert.match(actual.htmlContent,/Contact our team/);assert.equal((actual.htmlContent.match(/<!doctype html>/g)||[]).length,1);assert.ok(!actual.htmlContent.includes('<script>'));
+ }
+ assert.equal(rows.size,1);
+ const rule=await service.get('verify-email');const preview=service.preview(rule.id,draft(rule),latest);
+ const actual=await service.apply({...payload,tags:[rule.id],to:[{email:'recipient@example.test',name:'Alex'}],notificationContext:rule.sample});
+ assert.equal(preview.html,actual.htmlContent);
+});
+test('shared design preview is read-only, safely escapes branding and rejects unsafe photos or stale updates',async()=>{
+ const {service}=fixture(),design=await service.getDesign();
+ const preview=service.previewDesign({...design,brandName:'Echo <script>bad()</script>',photoAlt:'" onerror="alert(1)'});
+ assert.ok(preview.html.includes('Echo &lt;script&gt;'));assert.ok(!preview.html.includes('<script>'));assert.ok(!preview.html.includes('alt="" onerror='));assert.equal((await service.getDesign()).revision,0);
+ for(const photoUrl of ['', 'http://example.test/photo.jpg','javascript:alert(1)','https://user:pass@example.test/photo.jpg'])assert.throws(()=>service.previewDesign({...design,photoUrl}),error=>error.status===400);
+ await service.saveDesign(design,'one');await assert.rejects(service.saveDesign({...design,tagline:'Stale'},'two'),error=>error.status===409);
+ const saved=await service.getDesign();assert.equal(saved.revision,1);assert.equal(saved.tagline,design.tagline);
+});
+test('the same shared design wraps legacy HTML without nested documents and keeps attachments and replies',async()=>{
+ const {service}=fixture(),input={to:payload.to,subject:'System message',tags:['other'],replyTo:{email:'bookings@example.test'},attachment:[{name:'details.txt',content:'aGVsbG8='}],htmlContent:'<!doctype html><html><body><p>Existing content</p></body></html>'};
+ const actual=await service.apply(input);assert.match(actual.htmlContent,/<p>Existing content<\/p>/);assert.equal((actual.htmlContent.match(/<body\b/g)||[]).length,1);assert.deepEqual(actual.replyTo,input.replyTo);assert.deepEqual(actual.attachment,input.attachment);
 });

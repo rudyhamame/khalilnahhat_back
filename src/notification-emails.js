@@ -1,9 +1,10 @@
 const mongoose = require('mongoose');
 const { z } = require('zod');
 const {senderAddress,senderName}=require('./business-mail-identity');
+const {DEFAULT_EMAIL_DESIGN,createEmailDesign,validateEmailDesign,renderEmailLayout}=require('./notification-email-design');
 
 const BRAND = 'Echo Event Entertainment';
-const sample = { recipientName:'Alex', customerName:'Alex Morgan', customerEmail:'alex@example.com', requestId:'ECHO-1042', eventDate:'November 21, 2026', venue:'Toronto', depositAmount:'$250.00', total:'$1,000.00', details:'DJ performance × 1 — $1,000.00', adminNote:'We look forward to your event.', expiresAt:'November 14, 2026 at 5:00 p.m. Eastern', meetingTime:'November 7, 2026 at 2:00 p.m. Eastern', duration:'30 minutes', meetingLocation:'Online meeting', topic:'Event planning', actionUrl:'https://example.com/your-link',meetingUrl:'https://example.com/dashboard/bookings?meeting=availability',eventTime:'18:00 – 23:00',timezone:'America/Toronto', brand:BRAND, liveTitle:'Live with DJ Khalil', code:'123456', setList:'Set list:\n1. Artist — Opening track\n2. Artist — Second track', eventCode:'ECHO-1042', reason:'We already have another event at that time.', version:'1.0.0' };
+const sample = { recipientName:'Alex', customerName:'Alex Morgan', customerEmail:'alex@example.com', requestId:'ECHO-1042', eventDate:'November 21, 2026', venue:'Toronto', depositAmount:'$250.00', total:'$1,000.00', details:'DJ performance × 1 — $1,000.00', adminNote:'We look forward to your event.', expiresAt:'November 14, 2026 at 5:00 p.m. Eastern', meetingTime:'November 7, 2026 at 2:00 p.m. Eastern', duration:'30 minutes', meetingLocation:'Online meeting', topic:'Event planning', actionUrl:'https://example.com/your-link',meetingUrl:'https://example.com/dashboard/bookings?meeting=availability',eventTime:'18:00 – 23:00',timezone:'America/Toronto', brand:BRAND, liveTitle:'Live with DJ Khalil', code:'123456', setList:'Set list:\n1. Artist — Opening track\n2. Artist — Second track', eventCode:'ECHO-1042', reason:'We already have another event at that time.', version:'1.0.0',message:'Could we start the music one hour earlier?',paymentAmount:'$250.00',balance:'$750.00',changedDetail:'The event start time was updated to 6:00 p.m.' };
 const catalog = [
   {id:'booking-requested',label:'Booking received · customer receipt',group:'Bookings',when:'Once a new booking request is saved or a replacement schedule is requested',recipient:'Customer',subject:'Booking requested — {{eventCode}}',body:'Hello {{customerName}},\n\nBooking requested. We have received your request for {{eventDate}} at {{eventTime}} ({{timezone}}).\n\nOur team will check availability before preparing your quote. This request does not reserve the event date or mark it as Booked.\n\nView your booking:\n{{actionUrl}}\n\n{{brand}}',variables:['customerName','eventCode','eventDate','eventTime','timezone','actionUrl','brand'],required:['actionUrl']},
   {id:'booking-decision-unavailable',label:'Booking date unavailable',group:'Bookings',when:'When the admin marks the requested schedule unavailable',recipient:'Customer',subject:'Booking date unavailable — {{eventCode}}',body:'Hello {{customerName}},\n\nBooking date unavailable.\nRequested date: {{eventDate}}\nRequested time: {{eventTime}} ({{timezone}})\n\nReason: {{reason}}\n\nIf you would like, book an optional meeting to discuss other date or time options:\n{{meetingUrl}}\n\nYour request remains open. The meeting does not reserve or confirm your event. You can also suggest another date and time here:\n{{actionUrl}}\n\n{{brand}}',variables:['customerName','eventCode','eventDate','eventTime','timezone','reason','meetingUrl','actionUrl','brand'],required:['reason','meetingUrl','actionUrl']},
@@ -74,28 +75,32 @@ function validate(id,value){
  for(const key of event.required)if(!new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`).test(rule.body))throw fail(400,`Keep {{${key}}} in the message so the email includes its essential details.`);
  return rule;
 }
-function render(rule,context={}){
- const values={brand:BRAND,...context};
+function render(rule,context={},design=DEFAULT_EMAIL_DESIGN){
+ const values={...context,brand:design.brandName||BRAND};
  const subject=interpolate(rule.subject,values).replace(/[\r\n]+/g,' ').slice(0,300);
  const text=interpolate(rule.body,values);
  const imageUrl=rule.imageUrl||'';
- const content=escapeHtml(text).replace(/https?:\/\/[^\s<>]+/g,url=>`<a href="${url}">${url}</a>`);
- const layout=imageUrl?`<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td valign="top" style="white-space:pre-wrap;line-height:1.7;overflow-wrap:anywhere">${content}</td><td width="200" valign="top" style="padding-left:24px"><img src="${escapeHtml(imageUrl)}" alt="" width="200" style="display:block;width:200px;max-width:100%;height:auto;border-radius:8px"></td></tr></table>`:`<div style="white-space:pre-wrap;line-height:1.7">${content}</div>`;
- return {subject,text,imageUrl,html:`<!doctype html><html><body style="margin:0;background:#f5f5f4;font-family:Arial,sans-serif;color:#202124"><div style="max-width:640px;margin:auto;padding:32px 24px"><p style="font-size:12px;color:#68716e">${BRAND}</p>${layout}</div></body></html>`};
+ const content=escapeHtml(text).replace(/https?:\/\/[^\s<>]+/g,url=>`<a href="${url}" style="color:#345b46;text-decoration:underline;word-break:break-all">${url}</a>`);
+ return renderEmailLayout({subject,text,contentHtml:`<div style="white-space:pre-wrap">${content}</div>`,imageUrl},design);
 }
-function createNotificationEmails({store=mongoStore}={}){
+
+function createNotificationEmails({store=mongoStore,designs=createEmailDesign()}={}){
  const merged=(event,saved)=>({...event,enabled:true,revision:0,imageUrl:'',leadHours:event.leadHours??null,...(saved?{enabled:saved.enabled,revision:saved.revision,subject:saved.subject,body:saved.body,imageUrl:saved.imageUrl||'',leadHours:saved.leadHours??null}:{}),customized:Boolean(saved),sample});
  return {
+  getDesign:()=>designs.get(),
+  saveDesign:(value,owner)=>designs.save(value,owner),
+  previewDesign(value){return render(catalog.find(event=>event.id==='booking-requested'),sample,validateEmailDesign(value));},
   async list(){const rows=await store.list();return catalog.map(event=>merged(event,rows.find(row=>String(row._id)===event.id)));},
   async get(id){return merged(definition(id),await store.get(id));},
   async save(id,value,owner){const rule=validate(id,value);const saved=await store.save(id,rule,owner);if(!saved)throw fail(409,'This email was changed elsewhere. Reload before saving.');return merged(definition(id),saved);},
-  preview(id,value){return render(validate(id,value),sample);},
+  preview(id,value,design=DEFAULT_EMAIL_DESIGN){return render(validate(id,value),sample,design);},
   async apply(payload){
    const {notificationContext,...email}=payload;
-   const event=catalog.find(event=>email.tags?.includes(event.id));if(!event)return email;
-   const saved=await store.get(event.id) || (event.id==='live-started'?{...event,enabled:true}:null);if(!saved)return email;
-   if(!saved.enabled)return null;
-   const message=render(saved,{recipientName:email.to?.[0]?.name||'there',...notificationContext});
+   const event=catalog.find(event=>email.tags?.includes(event.id));
+   const saved=event?await store.get(event.id):null;
+   if(saved&&!saved.enabled)return null;
+   const design=await designs.get();
+   const message=event?render(saved||event,{recipientName:email.to?.[0]?.name||'there',...notificationContext},design):renderEmailLayout({subject:email.subject,text:email.textContent||'',contentHtml:email.htmlContent||`<div style="white-space:pre-wrap">${escapeHtml(email.textContent||'')}</div>`},design);
    return {...email,subject:message.subject,htmlContent:message.html,textContent:message.text};
   },
  };
@@ -103,7 +108,10 @@ function createNotificationEmails({store=mongoStore}={}){
 const notificationEmails=createNotificationEmails();
 function registerNotificationEmails(app,{requireAdmin,service=notificationEmails,env=process.env}){
  app.get('/api/admin/notifications/emails',requireAdmin,async(_req,res)=>res.set('Cache-Control','no-store').json({items:await service.list(),provider:{name:'Brevo',configured:Boolean(env.BREVO_API_KEY?.trim()&&senderAddress(env)),senderEmail:senderAddress(env),senderName:senderName(env)}}));
+ app.get('/api/admin/notifications/email-design',requireAdmin,async(_req,res)=>res.set('Cache-Control','no-store').json({design:await service.getDesign()}));
+ app.put('/api/admin/notifications/email-design',requireAdmin,async(req,res)=>res.json({design:await service.saveDesign(req.body,String(req.user._id))}));
+ app.post('/api/admin/notifications/email-design/preview',requireAdmin,(req,res)=>res.json(service.previewDesign(req.body)));
  app.put('/api/admin/notifications/emails/:id',requireAdmin,async(req,res)=>res.json({item:await service.save(req.params.id,req.body,String(req.user._id))}));
- app.post('/api/admin/notifications/emails/:id/preview',requireAdmin,(req,res)=>res.json(service.preview(req.params.id,req.body)));
+ app.post('/api/admin/notifications/emails/:id/preview',requireAdmin,async(req,res)=>res.json(service.preview(req.params.id,req.body,await service.getDesign())));
 }
 module.exports={catalog,validate,render,createNotificationEmails,notificationEmails,registerNotificationEmails};

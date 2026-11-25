@@ -49,8 +49,7 @@
     [
       "03.01",
       [
-        "music.djRequested",
-        "music.mcRequested"
+        "music.djRequested"
       ]
     ],
     [
@@ -64,13 +63,20 @@
       ]
     ],
     [
-      "04.06",
+      "03.03",
+      [
+        "music.mcRequested",
+        "music.mcLanguagePairs"
+      ]
+    ],
+    [
+      "03.08",
       [
         "event.setup.requirements"
       ]
     ],
     [
-      "05.01",
+      "04.01",
       [
         "references.photos",
         "references.images",
@@ -78,13 +84,13 @@
       ]
     ],
     [
-      "05.02",
+      "04.02",
       [
         "additional.notes"
       ]
     ],
     [
-      "05.03",
+      "04.03",
       [
         "additional.voucherCode"
       ]

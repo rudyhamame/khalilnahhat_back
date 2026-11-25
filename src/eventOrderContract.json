@@ -454,6 +454,16 @@
      "shortAr": "تقديم الحفل"
     },
     {
+     "key": "music.mcLanguagePairs",
+     "gate": "music.mcRequested",
+     "label": "Language and dialect for MC hosting",
+     "ar": "لغة ولهجة تقديم الحفل",
+     "type": "pairs",
+     "hidden": true,
+     "short": "MC language and dialect",
+     "shortAr": "لغة ولهجة المقدّم"
+    },
+    {
      "key": "rental.requested",
      "label": "Would you like rental services or equipment?",
      "ar": "هل تريد خدمات تأجير أو معدات؟",

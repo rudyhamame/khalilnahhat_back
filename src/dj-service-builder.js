@@ -14,9 +14,11 @@ const djSetSchema = z.object({ segments: z.array(djSegment).max(100), notes: z.s
 
 // One saved set per live stream, so past and upcoming streams each keep their own prepared set list.
 const LiveStreamPlan = mongoose.models.LiveStreamPlan || mongoose.model('LiveStreamPlan', new mongoose.Schema({ title: { type: String, required: true, trim: true, maxlength: 180 }, djSet: { type: Object, default: { segments: [], notes: '' } } }, { timestamps: true }));
+// Reusable lists with no event, booking or broadcast association.
+const StandaloneSetList = mongoose.models.StandaloneSetList || mongoose.model('StandaloneSetList', new mongoose.Schema({ title: { type: String, required: true, trim: true, maxlength: 180 }, djSet: { type: Object, default: { segments: [], notes: '' } } }, { timestamps: true }));
 const count = (djSet) => (djSet?.segments || []).reduce((n, row) => n + (row.entries?.length || (row.recordingIds?.length || 0) + (row.manualTracks?.length || 0)), 0);
 
-function registerDjServiceBuilder(app, { requireAdmin, ArchiveModel = ArchiveItem, BookingModel = ServiceRequest, StreamModel = LiveStreamConfig, getLiveStreamConfig }) {
+function registerDjServiceBuilder(app, { requireAdmin, ArchiveModel = ArchiveItem, BookingModel = ServiceRequest, StreamModel = LiveStreamConfig, getLiveStreamConfig, StandaloneModel = StandaloneSetList }) {
   const validateSet = async (req,res) => {
     const parsed=z.object({djSet:djSetSchema}).strict().safeParse(req.body);
     if(!parsed.success||JSON.stringify(req.body).length>250000){res.status(400).json({message:parsed.success?'The set plan is too large.':parsed.error.issues[0].message});return null;}
@@ -32,6 +34,36 @@ function registerDjServiceBuilder(app, { requireAdmin, ArchiveModel = ArchiveIte
   app.post('/api/admin/dj-service-builder/live-plans',requireAdmin,async(req,res)=>{const parsed=z.object({title:z.string().trim().min(1).max(180)}).strict().safeParse(req.body);if(!parsed.success)return res.status(400).json({message:'Enter a live stream title.'});try{const row=await LiveStreamPlan.create({title:parsed.data.title});res.status(201).json({item:planView(row.toObject())});}catch{res.status(503).json({message:'The live stream could not be created.'});}});
   app.get('/api/admin/dj-service-builder/live-plans/:id',requireAdmin,async(req,res)=>{try{const row=mongoose.isValidObjectId(req.params.id)&&await LiveStreamPlan.findById(req.params.id).lean();if(!row)return res.status(404).json({message:'Live stream not found.'});res.set('Cache-Control','no-store').json({item:planView(row),djSet:row.djSet});}catch{res.status(503).json({message:'The live stream could not be loaded.'});}});
   app.put('/api/admin/dj-service-builder/live-plans/:id',requireAdmin,async(req,res)=>{try{if(!mongoose.isValidObjectId(req.params.id))return res.status(404).json({message:'Live stream not found.'});const djSet=await validateSet(req,res);if(!djSet)return;const row=await LiveStreamPlan.findByIdAndUpdate(req.params.id,{$set:{djSet}},{new:true}).lean();if(!row)return res.status(404).json({message:'Live stream not found.'});res.set('Cache-Control','no-store').json({item:planView(row),djSet:row.djSet});}catch{res.status(503).json({message:'The live stream set could not be saved. Your changes remain in the editor; please retry.'});}});
+  app.get('/api/admin/dj-service-builder/standalone', requireAdmin, async (_req, res) => {
+    try {
+      const rows = await StandaloneModel.find().sort({createdAt:-1}).limit(200).lean();
+      res.set('Cache-Control', 'no-store').json({items:rows.map(planView)});
+    } catch { res.status(503).json({message:'Standalone set lists could not be loaded.'}); }
+  });
+  app.post('/api/admin/dj-service-builder/standalone', requireAdmin, async (req, res) => {
+    const parsed = z.object({title:z.string().trim().min(1).max(180)}).strict().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({message:'Enter a set list title.'});
+    try {
+      const row = await StandaloneModel.create({title:parsed.data.title});
+      res.status(201).json({item:planView(row.toObject())});
+    } catch { res.status(503).json({message:'The standalone set list could not be created.'}); }
+  });
+  app.get('/api/admin/dj-service-builder/standalone/:id', requireAdmin, async (req, res) => {
+    try {
+      const row = mongoose.isValidObjectId(req.params.id) && await StandaloneModel.findById(req.params.id).lean();
+      if (!row) return res.status(404).json({message:'Set list not found.'});
+      res.set('Cache-Control', 'no-store').json({item:planView(row),djSet:row.djSet});
+    } catch { res.status(503).json({message:'The standalone set list could not be loaded.'}); }
+  });
+  app.put('/api/admin/dj-service-builder/standalone/:id', requireAdmin, async (req, res) => {
+    try {
+      if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({message:'Set list not found.'});
+      const djSet = await validateSet(req,res); if (!djSet) return;
+      const row = await StandaloneModel.findByIdAndUpdate(req.params.id, {$set:{djSet}}, {new:true}).lean();
+      if (!row) return res.status(404).json({message:'Set list not found.'});
+      res.set('Cache-Control', 'no-store').json({item:planView(row),djSet:row.djSet});
+    } catch { res.status(503).json({message:'The standalone set list could not be saved. Your changes remain in the editor; please retry.'}); }
+  });
   app.put('/api/admin/dj-service-builder/:bookingId', requireAdmin, async (req, res) => {
     try {
       const djSet=await validateSet(req,res);if(!djSet)return;
@@ -44,4 +76,4 @@ function registerDjServiceBuilder(app, { requireAdmin, ArchiveModel = ArchiveIte
   });
 }
 
-module.exports = { registerDjServiceBuilder, LiveStreamPlan };
+module.exports = { registerDjServiceBuilder, LiveStreamPlan, StandaloneSetList };

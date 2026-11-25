@@ -6,6 +6,31 @@ const planningNames={brideName:['Bride','العروس'],groomName:['Groom','ال
 // The after-confirmation planning worksheet is filled by the client in the dashboard only: the booking conversation (text or voice) can read it but never creates these atoms.
 const planningFields=Object.entries(planningNames).map(([key,[short,shortAr]])=>({key:'planning.'+key,label:key,short,shortAr,type:'textarea',manualOnly:true}));
 planningFields.push({key:'planning.musicUploads',label:'Planning music references',short:'Music references',shortAr:'مراجع موسيقية',type:'links',manualOnly:true});
+// Admin-editable rules (required, max length, allowed values) laid over the contract in place. The contract's own values are remembered, so removing a rule restores them.
+const contractRules=new WeakMap();
+const baseOf=field=>contractRules.get(field)||contractRules.set(field,{required:field.required,maxLength:field.maxLength,options:field.options}).get(field);
+const setOrDrop=(field,name,value)=>{if(value===undefined)delete field[name];else field[name]=value;};
+export function applyBookingRules(rules){
+  for(const field of fields){
+    const base=baseOf(field),rule=rules?.[field.key]||{};
+    setOrDrop(field,'required',rule.required??base.required);setOrDrop(field,'maxLength',rule.maxLength??base.maxLength);setOrDrop(field,'options',rule.options??base.options);
+  }
+}
+// Returns the rules worth keeping (only what differs from the contract) or throws a readable message.
+export function cleanBookingRules(input){
+  if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('Rules must be an object.');
+  const out={};
+  for(const [key,rule] of Object.entries(input)){
+    const field=fields.find(item=>item.key===key);if(!field)throw new Error(`Unknown atom ${key}.`);
+    if(!rule||typeof rule!=='object'||Object.keys(rule).some(name=>!['required','maxLength','options'].includes(name)))throw new Error(`Invalid rule for ${key}.`);
+    const base=baseOf(field),clean={};
+    if(rule.required!==undefined){if(typeof rule.required!=='boolean')throw new Error(`${key}: required must be true or false.`);if(rule.required!==Boolean(base.required))clean.required=rule.required;}
+    if(rule.maxLength!==undefined){if(!base.maxLength||!Number.isInteger(rule.maxLength)||rule.maxLength<1||rule.maxLength>3000)throw new Error(`${key}: max length must be a whole number from 1 to 3000.`);if(rule.maxLength!==base.maxLength)clean.maxLength=rule.maxLength;}
+    if(rule.options!==undefined){if(!base.options||!Array.isArray(rule.options)||!rule.options.length||rule.options.some(value=>!base.options.includes(value)))throw new Error(`${key}: choose at least one of its existing values.`);const kept=base.options.filter(value=>rule.options.includes(value));if(kept.length!==base.options.length)clean.options=kept;}
+    if(Object.keys(clean).length)out[key]=clean;
+  }
+  return out;
+}
 export const aiFields = [...fields,...planningFields,{key:'equipment',label:'Equipment and complete sets',short:'Equipment',shortAr:'المعدات',type:'equipment'}];
 // The short name people see in summaries, reviews and task lists (the long `label` is the form prompt). One place, both languages.
 // The shown name of one option of a field (for example the "phone" contact method), from the same contract.

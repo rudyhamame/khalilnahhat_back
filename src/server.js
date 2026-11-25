@@ -1623,6 +1623,7 @@ registerMeetingRoom(app, { requireAuth, Meeting: MeetingModel });
 registerAccount(app, { requireAuth, getFrontendUrl });
 registerContent(app, requireAdmin);
 require('./seasonal-theme').registerSeasonalTheme(app, { requireAdmin });
+require('./booking-rules').registerBookingRules(app, { requireAdmin });
 require('./concept-map').registerConceptMap(app, { requireAdmin });
 require('./booking-signup').registerBookingSignup(app, { User, serializeUser, isAdminUser, issueSession: accountSessions.issueSession, sendMail: require('./brevo').sendSimpleEmail, hashPassword });
 require('./instagram-profile').registerInstagramProfile(app, { requireAdmin });

@@ -112,7 +112,7 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     if (!sr.order || sr.status === STATUS.CANCELLED) return res.status(409).json({ message: 'This booking can no longer be edited.' });
     const field = eventOrder.fields.find(item => item.key === path);
     if (!field || READ_ONLY.has(path) || path.startsWith('customer.')) return res.status(400).json({ message: 'Personal info comes from your account. Change it in your account, not in the booking.' });
-    if (PRICED.has(path) || field.type === 'attachments') return res.status(400).json({ message: 'Use "Request changes" to change your services, equipment or files.' });
+    if (PRICED.has(path)) return res.status(400).json({ message: 'Use "Request changes" to change your services or equipment.' });
     if (!eventOrder.validValue(field, value)) return res.status(400).json({ message: 'That value is not valid for this detail.' });
     if (parsed.data.quoteRevision !== undefined && parsed.data.quoteRevision !== (sr.quoteRevision || 0)) return res.status(409).json({ message: 'The booking changed. Reload before editing.' });
     const availability = require('./booking-availability'), previous = availability.availabilityFor(sr);

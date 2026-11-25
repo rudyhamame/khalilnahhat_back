@@ -33,6 +33,13 @@ function registerMeetingRoom(app, { requireAuth, Meeting, env = process.env, now
   }
   const other = role => (role === 'host' ? 'guest' : 'host');
 
+  // Admin only: calls from clients that are ringing right now (an offer in the last minute that nobody has answered, declined or ended).
+  app.get('/api/meetings/room/incoming', requireAuth, async (req, res) => {
+    if (!req.authUser?.isAdmin) return res.status(403).json({ message: 'Admins only.' });
+    const live = [...rooms].filter(([, room]) => room.ringing?.from === 'guest' && now() - room.ringing.at < 60 * 1000).filter(([id]) => mongoose.isValidObjectId(id));
+    const meetings = live.length ? await Meeting.find({ _id: { $in: live.map(([id]) => id) }, status: 'booked' }) : [];
+    res.set('Cache-Control', 'no-store').json({ items: meetings.map((m) => ({ meetingId: m.id, clientName: m.bookedByName, kind: rooms.get(m.id).ringing.kind, at: new Date(rooms.get(m.id).ringing.at).toISOString() })) });
+  });
   app.get('/api/meetings/:id/room', requireAuth, async (req, res) => {
     const ctx = await access(req, res); if (!ctx) return;
     res.set('Cache-Control', 'no-store').json({ role: ctx.role, name: ctx.name, meeting: { id: ctx.meeting.id, start: ctx.meeting.start, durationMin: ctx.meeting.durationMin, topic: ctx.meeting.topic, clientName: ctx.meeting.bookedByName }, iceServers: iceServers(env) });
@@ -57,6 +64,8 @@ function registerMeetingRoom(app, { requireAuth, Meeting, env = process.env, now
     if (size > 20000) return res.status(413).json({ message: 'Signal too large.' });
     const room = roomOf(req.params.id), queue = room.signals[other(ctx.role)];
     queue.push({ seq: ++room.seq, type, data: data ?? null });
+    // Who is being rung: set by an offer, cleared once it is answered, declined or hung up (the admin's incoming-call check reads this).
+    if (type === 'offer') room.ringing = { from: ctx.role, kind: data?.kind === 'video' ? 'video' : 'voice', at: now() }; else room.ringing = null;
     if (queue.length > MAX_SIGNALS) queue.splice(0, queue.length - MAX_SIGNALS);
     res.json({ ok: true });
   });

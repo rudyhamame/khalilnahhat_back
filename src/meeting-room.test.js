@@ -9,10 +9,11 @@ const meeting={id,status:'booked',mode:'online',start,durationMin:30,bookedBy:cl
 async function boot(clock){
   const users={host:{_id:new mongoose.Types.ObjectId(),isAdmin:true,firstName:'Khalil'},guest:{_id:clientId,firstName:'Ana'},stranger:{_id:stranger,firstName:'X'}};
   const app=express();app.use(express.json());
-  registerMeetingRoom(app,{requireAuth:(req,_res,next)=>{req.authUser=users[req.get('x-user')];next();},Meeting:{findById:async()=>meeting},now:()=>clock.t});
+  registerMeetingRoom(app,{requireAuth:(req,_res,next)=>{req.authUser=users[req.get('x-user')];next();},Meeting:{findById:async()=>meeting,find:async()=>[meeting]},now:()=>clock.t});
   const server=await new Promise(r=>{const s=app.listen(0,()=>r(s));});const base=`http://127.0.0.1:${server.address().port}/api/meetings/${id}/room`;
+  const incoming=async who=>fetch(`http://127.0.0.1:${server.address().port}/api/meetings/room/incoming`,{headers:{'x-user':who}});
   const call=(who,path,body)=>fetch(base+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json','x-user':who},body:body?JSON.stringify(body):undefined});
-  return {call,close:()=>server.close()};
+  return {call,incoming,close:()=>server.close()};
 }
 test('only the booked client and an admin may enter, and the client only near the meeting time',async()=>{
   const clock={t:start.getTime()-5*60000},app=await boot(clock);
@@ -44,4 +45,17 @@ test('TURN servers are added only when fully configured',()=>{
   assert.equal(iceServers({}).length,1);
   assert.equal(iceServers({MEETING_TURN_URLS:'turn:t.example:3478',MEETING_TURN_USERNAME:'u',MEETING_TURN_CREDENTIAL:'c'}).length,2);
   assert.equal(iceServers({MEETING_TURN_URLS:'turn:t.example:3478'}).length,1);
+});
+
+test('the admin sees a client call while it rings, and not after it is answered, declined or ended',async()=>{
+  const clock={t:start.getTime()},app=await boot(clock);
+  assert.equal((await app.incoming('guest')).status,403);
+  assert.deepEqual((await (await app.incoming('host')).json()).items,[]);
+  await app.call('guest','/signal',{type:'offer',data:{sdp:'x',kind:'video'}});
+  const ringing=(await (await app.incoming('host')).json()).items;
+  assert.equal(ringing.length,1);assert.equal(ringing[0].meetingId,id);assert.equal(ringing[0].kind,'video');assert.equal(ringing[0].clientName,'Ana Client');
+  clock.t+=61000;assert.deepEqual((await (await app.incoming('host')).json()).items,[]);
+  clock.t=start.getTime();await app.call('guest','/signal',{type:'offer',data:{sdp:'x',kind:'voice'}});
+  await app.call('host','/signal',{type:'answer',data:{sdp:'y'}});assert.deepEqual((await (await app.incoming('host')).json()).items,[]);
+  app.close();
 });

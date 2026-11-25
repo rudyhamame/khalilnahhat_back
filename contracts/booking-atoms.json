@@ -70,7 +70,13 @@
       ]
     ],
     [
-      "03.08",
+      "03.04",
+      [
+        "rental.requested"
+      ]
+    ],
+    [
+      "03.09",
       [
         "event.setup.requirements"
       ]

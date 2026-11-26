@@ -118,13 +118,13 @@
       ]
     ],
     [
-      "03.04",
+      "03.03",
       [
         "rental.requested"
       ]
     ],
     [
-      "03.09",
+      "03.08",
       [
         "event.setup.requirements"
       ]
@@ -186,14 +186,14 @@
       ]
     },
     {
-      "code": "03.04",
+      "code": "03.03",
       "title": "Rental equipment",
       "requiresAny": [
         "rental"
       ]
     },
     {
-      "code": "03.09",
+      "code": "03.08",
       "title": "Setup requirements"
     },
     {
@@ -1042,8 +1042,8 @@
   ],
   "rentalCategories": {
     "step": "03",
-    "firstSection": 5,
-    "note": "The rental question is 03.04.01; category N of the catalogue is section 03.(firstSection+N-1), its equipment 03.(section).01, 03.(section).02 ..."
+    "firstSection": 4,
+    "note": "The rental question is 03.03.01; category N of the catalogue is section 03.(firstSection+N-1), its equipment 03.(section).01, 03.(section).02 ..."
   },
   "viewerNames": {
     "music.djRequested": [

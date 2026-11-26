@@ -34,8 +34,11 @@ function branchesOf(request,stage){
  const quoteOut=rule(request.status).showsPrices||paid||booked||request.status===STATUS.CANCELLED;
  const reached={quote_accepted:booked||request.status===STATUS.ACCEPTED,best_offer_requested:quoteOut&&(Boolean(request.changeRequestedAt)||request.status===STATUS.CHANGES_REQUESTED)};
  const cancelled=request.status===STATUS.CANCELLED&&request.declinedBy==='client';
- return {after:contract.branches.decisions.after,decisions:decisions.map(key=>({status:key,...stages[key],reached:Boolean(reached[key])})),
-  cancelled:cancelled?{status:contract.branches.cancel.stage,...stages[contract.branches.cancel.stage],afterStage:({modified:'requested',unavailable:'available'})[request.cancelledAtStage||stage]||request.cancelledAtStage||stage||'requested'}:null};
+ const lapsed=Boolean(request.expiresAt&&new Date(request.expiresAt)<=new Date());
+ // What the CLIENT may undo (the server enforces the same rules in client-step-back).
+ const canUndo={quote_accepted:request.status===STATUS.ACCEPTED&&!paid&&!lapsed,best_offer_requested:request.status===STATUS.CHANGES_REQUESTED&&!paid&&!lapsed};
+ return {after:contract.branches.decisions.after,decisions:decisions.map(key=>({status:key,...stages[key],reached:Boolean(reached[key]),canUndo:Boolean(canUndo[key])})),
+  cancelled:cancelled?{status:contract.branches.cancel.stage,...stages[contract.branches.cancel.stage],afterStage:({modified:'requested',unavailable:'available'})[request.cancelledAtStage||stage]||request.cancelledAtStage||stage||'requested',canRestore:Boolean(request.cancelledFromStatus)&&rule(request.cancelledFromStatus).cancellable&&!rule(request.cancelledFromStatus).isBooked&&!paid}:null};
 }
 function describeRequest(request){
  const internal=describe(request.status),availability=require('./booking-availability').availabilityFor(request);

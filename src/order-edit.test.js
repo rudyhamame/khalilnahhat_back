@@ -28,3 +28,17 @@ test('admin order-edit edits any client booking through the admin route',async()
  await routes['/api/service-requests/:id/order-edit']({params:{id:'x'},body:{path:'additional.notes',value:'x'},authUser:{_id:'someone-else'}},other);
  assert.equal(other.code,404);
 });
+
+test('client-step-back: the client undoes their acceptance, a best-offer request or a cancellation, within safe limits',async()=>{
+ const run=async(body,authId='u1')=>{const res={code:200,status(c){this.code=c;return this;},json(b){this.body=b;return this;}};await routes['/api/service-requests/:id/client-step-back']({params:{id:'x'},body,authUser:{_id:authId}},res);return res;};
+ sr={...mk(),status:'accepted',acceptedAt:new Date(),expiresAt:new Date(Date.now()+864e5)};
+ let r=await run({to:'quote'});assert.equal(r.code,200,JSON.stringify(r.body));assert.equal(sr.status,'quoted');assert.equal(sr.acceptedAt,null);
+ sr={...mk(),status:'changes_requested',changeRequest:'less?',changeRequestedAt:new Date()};
+ r=await run({to:'quote'});assert.equal(r.code,200);assert.equal(sr.status,'quoted');assert.equal(sr.changeRequest,'');
+ sr={...mk(),status:'accepted',payments:[{amountCents:5000}]};r=await run({to:'quote'});assert.equal(r.code,409); // money recorded: cannot be undone
+ sr={...mk(),status:'accepted',expiresAt:new Date(Date.now()-1000)};r=await run({to:'quote'});assert.equal(r.code,409); // the quote lapsed
+ sr={...mk(),status:'cancelled',declinedBy:'client',cancelledFromStatus:'quoted'};r=await run({to:'restore'});assert.equal(r.code,200);assert.equal(sr.status,'quoted');assert.equal(sr.declinedBy,'');
+ sr={...mk(),status:'cancelled',declinedBy:'client',cancelledFromStatus:'confirmed'};r=await run({to:'restore'});assert.equal(r.code,409); // a confirmed date may have been taken
+ sr={...mk(),status:'cancelled',declinedBy:'admin',cancelledFromStatus:'quoted'};r=await run({to:'restore'});assert.equal(r.code,409); // only the client's own cancellation
+ sr=mk();r=await run({to:'quote'},'someone-else');assert.equal(r.code,404);
+});

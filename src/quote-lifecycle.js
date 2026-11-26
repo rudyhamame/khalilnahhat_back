@@ -212,10 +212,32 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     if (!own(req,sr)) return notFound(res);
     if (isExpired(sr) || sr.status === STATUS.EXPIRED || !journey.rule(sr.status).cancellable) return res.status(409).json({message:'This request can no longer be canceled.'});
     { const d = journey.describeRequest(sr); sr.cancelledAtStage = (d.clientStatus === 'modified' ? d.previousClientStatus : d.clientStatus) || ''; } sr.cancelledAt = new Date(); // the step the booking was really at (a client edit is not a step of its own)
-    sr.status = STATUS.CANCELLED; sr.declinedBy = 'client';
+    sr.cancelledFromStatus = sr.status; sr.status = STATUS.CANCELLED; sr.declinedBy = 'client';
     try{await sr.save();}catch(error){if(error.name==='VersionError')return res.status(409).json({message:'The booking changed. Reload before continuing.'});throw error;}
     const mail = await notify(sr,'booking-withdrawn'); void notify(sr,'booking-withdrawn-admin');
     return res.json({item:serialize(sr,false),notificationSent:!!mail?.sent});
+  });
+
+  // The client steps BACK through their own decisions (never the team's): undo the acceptance or the best-offer request (the quote awaits their decision again),
+  // or restore a booking they cancelled to the status it had. Refused once money is recorded, once the quote lapsed, or when the date could have been taken (a confirmed booking).
+  app.post('/api/service-requests/:id/client-step-back', requireAuth, async (req, res) => {
+    const parsed = z.object({ to: z.enum(['quote', 'restore']), quoteRevision: z.number().int().nonnegative().optional() }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: 'Choose a step to go back to.' });
+    const sr = await find(req.params.id);
+    if (!own(req, sr)) return notFound(res);
+    const paid = (sr.payments || []).some(p => !p.voided);
+    if (parsed.data.quoteRevision !== undefined && parsed.data.quoteRevision !== (sr.quoteRevision || 0)) return res.status(409).json({ message: 'The booking changed. Reload before continuing.' });
+    if (parsed.data.to === 'quote') {
+      if (![STATUS.ACCEPTED, STATUS.CHANGES_REQUESTED].includes(sr.status) || paid) return res.status(409).json({ message: 'This decision can no longer be undone.' });
+      if (sr.expiresAt && sr.expiresAt <= new Date()) return res.status(409).json({ message: 'This quote has expired. Contact us to reactivate it.' });
+      sr.status = STATUS.QUOTED; sr.acceptedAt = null; sr.changeRequest = ''; sr.changeRequestedAt = null;
+    } else {
+      const back = sr.cancelledFromStatus;
+      if (sr.status !== STATUS.CANCELLED || sr.declinedBy !== 'client' || !back || !journey.rule(back).cancellable || journey.rule(back).isBooked || paid) return res.status(409).json({ message: 'This booking can no longer be restored. Contact us.' });
+      sr.status = back; sr.declinedBy = ''; sr.cancelledAt = null; sr.cancelledAtStage = ''; sr.cancelledFromStatus = '';
+    }
+    try { await sr.save(); } catch (error) { if (error.name === 'VersionError') return res.status(409).json({ message: 'The booking changed. Reload before continuing.' }); throw error; }
+    return res.json({ item: serialize(sr, false) });
   });
 
   app.post('/api/service-requests/:id/accept', requireAuth, async (req, res) => {

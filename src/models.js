@@ -321,6 +321,7 @@ const serviceRequestSchema = new mongoose.Schema(
     changeRequest: { type: String, default: '' },
     changeRequestedAt: { type: Date, default: null },
     cancelledAt: { type: Date, default: null },
+    cancelledFromStatus: { type: String, default: '' }, // the lifecycle status the booking had when the client cancelled it (so the client can restore it)
     cancelledAtStage: { type: String, default: '' }, // the journey stage the booking was at when it was cancelled
     quoteRevision: {type:Number, default:0},
     // How many times the client changed the booking's details after sending it (one per saved edit).

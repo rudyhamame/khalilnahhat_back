@@ -130,13 +130,13 @@ function registerMeetings(app, { requireAuth, requireAdmin, BookingModel=Service
       const discussion=booking&&journey.describeRequest(booking).canDiscussAvailability;
       const planning=booking&&[STATUS.ACCEPTED,STATUS.CONFIRMED].includes(booking.status)&&!(booking.status===STATUS.ACCEPTED&&booking.expiresAt&&booking.expiresAt<=new Date());
       if(purpose==='availability'?!discussion:!planning)return res.status(409).json({message:purpose==='availability'?'Availability discussion meetings are only offered for your unavailable booking request.':'Accept your active quote before scheduling its planning meeting.'});
-      if (!details.callMethod || !details.contactPhone) return bad(res,'Choose a call method and enter your contact number.');
     }
     if(purpose==='availability'&&!details.bookingRequestId)return bad(res,'Choose the booking whose availability you want to discuss.');
     const slot = await MeetingModel.findById(req.params.id);
     if (!slot) return notFound(res);
     if(CALL_MODES.includes(slot.mode) && !details.bookingRequestId)return bad(res,'Accept your quote and schedule this call from your booking dashboard.');
-    if (details.bookingRequestId && !CALL_MODES.includes(slot.mode)) return bad(res,'Choose a phone or WhatsApp appointment.');
+    if (details.bookingRequestId && slot.mode!=='online' && !CALL_MODES.includes(slot.mode)) return bad(res,'Choose a Meet Echo, phone or WhatsApp appointment.');
+    if (details.bookingRequestId && CALL_MODES.includes(slot.mode) && (!details.callMethod || !details.contactPhone)) return bad(res,'Choose a call method and enter your contact number.');
     if (CALL_MODES.includes(slot.mode) && details.callMethod && details.callMethod !== slot.mode) return bad(res,'This slot uses a different call method.');
     await MeetingModel.init();
     let m;

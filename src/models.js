@@ -319,6 +319,9 @@ const serviceRequestSchema = new mongoose.Schema(
     reminderSentAt: { type: Date, default: null },
     acceptedAt: { type: Date, default: null },
     changeRequest: { type: String, default: '' },
+    changeRequestedAt: { type: Date, default: null },
+    cancelledAt: { type: Date, default: null },
+    cancelledAtStage: { type: String, default: '' }, // the journey stage the booking was at when it was cancelled
     quoteRevision: {type:Number, default:0},
     // How many times the client changed the booking's details after sending it (one per saved edit).
     modificationCount: {type:Number, default:0},

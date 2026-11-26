@@ -277,7 +277,7 @@ function registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest 
   const upload=multer({storage:disk,limits:{fileSize:50*1024*1024,files:1,fields:5}});
   let active=0;
   const limit=(req,res,next)=>{if(active>=2)return fail(res,429,'Two uploads are already running. Try again shortly.');active++;res.once('close',()=>active--);next();};
-  app.post('/api/admin/storage/upload', requireAdmin, limit, upload.single('file'), async (req,res) => {
+  const storeUpload = async (req,res) => {
     let uploaded;
     try {
       if(!req.file) return fail(res,400,'Choose a file to upload.');
@@ -297,6 +297,13 @@ function registerMobileAdmin(app, { requireAdmin, requireAuth, serializeRequest 
       console.error('Private upload failed:',error.http_code||error.name);
       return fail(res,502,'Storage upload failed. Check Cloudinary settings and file limits.');
     } finally {if(req.file?.path) await fs.unlink(req.file.path).catch(()=>{});}
-  });
+  };
+  app.post('/api/admin/storage/upload', requireAdmin, limit, upload.single('file'), storeUpload);
+  // Files shared with ONE booking's client, addressed by the booking so no client id is needed: list, upload (the owner and booking come from the booking itself).
+  const bookingOf = async (req,res) => { const sr=await ServiceRequest.findOne({externalId:req.params.id}); if(!sr) fail(res,404,'Booking not found.'); return sr; };
+  app.get('/api/admin/service-requests/:id/files', requireAdmin, async (req,res) => { const sr=await bookingOf(req,res); if(!sr) return;
+    res.json({items:(await StoredFile.find({requestId:sr.externalId,archived:false}).sort({createdAt:-1}).limit(200)).map(fileView)}); });
+  app.post('/api/admin/service-requests/:id/files', requireAdmin, limit, upload.single('file'), async (req,res) => { const sr=await bookingOf(req,res); if(!sr){ if(req.file?.path) await fs.unlink(req.file.path).catch(()=>{}); return; }
+    req.body={...req.body,clientId:String(sr.userId),requestId:sr.externalId}; return storeUpload(req,res); });
 }
 module.exports={registerMobileAdmin,StoredFile,clientUpdate,clientCreate,clientView,fileView,signedFileUrl};

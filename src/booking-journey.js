@@ -26,9 +26,18 @@ const statusesWhere = fact => STATUSES.filter(status => TABLE[status][fact] === 
 // What the API sends with each request so no client re-derives these facts.
 const describe = status => ({ status, ...rule(status), path: PATH_STEPS });
 
+// The steps beside the main path: the client's two parallel decisions after the quote, and a cancellation by the client at ANY step.
+function branchesOf(request,stage){
+ const stages=contract.clientStages,decisions=contract.branches.decisions.stages;
+ const paid=(request.payments||[]).some(p=>!p.voided&&(p.amountCents||0)>0),booked=Boolean(request.acceptedAt)||paid||rule(request.status).isBooked;
+ const reached={quote_accepted:booked||request.status===STATUS.ACCEPTED,best_offer_requested:Boolean(request.changeRequestedAt)||request.status===STATUS.CHANGES_REQUESTED};
+ const cancelled=request.status===STATUS.CANCELLED&&request.declinedBy==='client';
+ return {after:contract.branches.decisions.after,decisions:decisions.map(key=>({status:key,...stages[key],reached:Boolean(reached[key])})),
+  cancelled:cancelled?{status:contract.branches.cancel.stage,...stages[contract.branches.cancel.stage],afterStage:request.cancelledAtStage||stage||'requested'}:null};
+}
 function describeRequest(request){
  const internal=describe(request.status),availability=require('./booking-availability').availabilityFor(request);
- if(!TABLE[request.status]||request.status===STATUS.CANCELLED)return {...internal,clientStatus:null,canDiscussAvailability:false};
+ if(!TABLE[request.status]||request.status===STATUS.CANCELLED)return {...internal,clientStatus:null,canDiscussAvailability:false,clientCancellable:false,branches:TABLE[request.status]?branchesOf(request,''):null,...(request.declinedBy==='client'?{path:contract.clientPath.map(key=>({status:key,...contract.clientStages[key]}))}:{})};
  const paid=(request.payments||[]).some(p=>!p.voided&&(p.amountCents||0)>0);
  let stage=internal.isBooked?'booked':paid?'deposit_paid':internal.showsPrices?'quote_ready':availability.status==='unavailable'?'unavailable':availability.status==='available'?'available':'requested';
  // Any client edit puts the booking in "Booking modified" until the team acts on it again (confirms availability or sends a quote); never once paid or booked.
@@ -37,7 +46,7 @@ function describeRequest(request){
  if(request.modifiedAt&&!paid&&!internal.isBooked&&new Date(request.modifiedAt).getTime()>lastAdminAction){previous=contract.clientStages[stage];previousKey=stage;stage='modified';}
  const display=contract.clientStages[stage];
  const path=contract.clientPath.map(key=>key==='available'&&stage==='unavailable'?'unavailable':key==='requested'&&stage==='modified'?'modified':key).map(key=>({status:key,...contract.clientStages[key]}));
- return {...internal,...display,clientStatus:stage,previousClientStatus:previousKey,previousLabel:previous?.label||null,previousLabelAr:previous?.labelAr||null,path,canDiscussAvailability:stage==='unavailable'&&internal.repriceable&&!(request.payments||[]).some(p=>!p.voided)};
+ return {...internal,...display,clientCancellable:internal.cancellable&&request.status!==STATUS.EXPIRED,clientStatus:stage,previousClientStatus:previousKey,previousLabel:previous?.label||null,previousLabelAr:previous?.labelAr||null,path,branches:branchesOf(request,stage),canDiscussAvailability:stage==='unavailable'&&internal.repriceable&&!(request.payments||[]).some(p=>!p.voided)};
 }
 // The REAL booking status: one stored key on the booking (requested, available, unavailable, quote_ready, deposit_paid, booked, cancelled), derived from the lifecycle status, availability and payments.
 const bookingStatusOf=request=>request.status===STATUS.CANCELLED?'cancelled':(describeRequest(request).clientStatus||'');

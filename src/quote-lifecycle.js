@@ -210,7 +210,8 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
   app.post('/api/service-requests/:id/decline', requireAuth, async (req,res) => {
     const sr = await find(req.params.id);
     if (!own(req,sr)) return notFound(res);
-    if (isExpired(sr) || !journey.rule(sr.status).canNegotiate) return res.status(409).json({message:'This request can no longer be declined.'});
+    if (isExpired(sr) || sr.status === STATUS.EXPIRED || !journey.rule(sr.status).cancellable) return res.status(409).json({message:'This request can no longer be canceled.'});
+    sr.cancelledAtStage = journey.describeRequest(sr).clientStatus || ''; sr.cancelledAt = new Date();
     sr.status = STATUS.CANCELLED; sr.declinedBy = 'client';
     try{await sr.save();}catch(error){if(error.name==='VersionError')return res.status(409).json({message:'The booking changed. Reload before continuing.'});throw error;}
     const mail = await notify(sr,'booking-withdrawn'); void notify(sr,'booking-withdrawn-admin');
@@ -240,7 +241,7 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     if (!own(req, sr)) return notFound(res);
     if (isExpired(sr) || !journey.rule(sr.status).awaitingClient) return res.status(409).json({ message: 'Only an active quote can be changed.' });
     sr.status = STATUS.CHANGES_REQUESTED;
-    sr.changeRequest = parsed.data.message;
+    sr.changeRequest = parsed.data.message; sr.changeRequestedAt = new Date();
     try{await sr.save();}catch(error){if(error.name==='VersionError')return res.status(409).json({message:'The booking changed. Reload before continuing.'});throw error;}
     void notify(sr,'booking-changes-requested',{message:sr.changeRequest}); void notify(sr,'booking-changes-requested-admin',{message:sr.changeRequest});
     return res.json({ item: serialize(sr, false) });
@@ -270,6 +271,7 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
   app.post('/api/service-requests/:id/cancel', requireAdmin, async (req, res) => {
     const sr = await find(req.params.id);
     if (!sr) return notFound(res);
+    sr.cancelledAtStage = journey.describeRequest(sr).clientStatus || ''; sr.cancelledAt = new Date();
     sr.status = STATUS.CANCELLED;
     try{await sr.save();}catch(error){if(error.name==='VersionError')return res.status(409).json({message:'The booking changed. Reload before continuing.'});throw error;}
     void notify(sr,'booking-cancelled');

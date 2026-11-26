@@ -409,6 +409,7 @@ function serializeServiceRequest(serviceRequest, includeQuote = true) {
     modifiedAt: serviceRequest.modifiedAt,
     modifications: (serviceRequest.modificationHistory || []).map((entry) => ({ at: entry.at, undone: Boolean(entry.undoneAt), undoneAt: entry.undoneAt || null, canUndo: !entry.undoneAt && Boolean(entry.before || entry.order) })), // one per saved modification, oldest first; an undone one stays, struck through
     acceptedAt: serviceRequest.acceptedAt,
+    changeRequestedAt: serviceRequest.changeRequestedAt, cancelledAt: serviceRequest.cancelledAt, declinedBy: serviceRequest.declinedBy,
     ...(isQuoted || includeQuote ? quoteTotals(serviceRequest) : {}),
     expiresAt: serviceRequest.expiresAt,
     validDays: serviceRequest.validDays,

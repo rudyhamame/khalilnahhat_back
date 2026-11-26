@@ -10,7 +10,7 @@
     "awaitingClient": "a quote is out and the client must accept or ask for changes (reminders go out here)",
     "canRecordDeposit": "manual payments are recorded by administrators only; the deposit confirms the booking",
     "isBooked": "a confirmed booking: its date is blocked, balance/refunds can be recorded, planning and the DJ set open",
-    "cancellable": "an administrator may cancel the request",
+    "cancellable": "the booking may be cancelled (by an administrator, or by the client themselves) at any step before it is closed",
     "canNegotiate": "client may propose prices or change services/equipment before acceptance or closure"
   },
   "path": [
@@ -25,11 +25,11 @@
       "labelAr": "تم طلب عرض السعر",
       "step": 0,
       "facts": [
+        "canNegotiate",
         "cancellable",
         "holdsStock",
         "needsAdmin",
-        "repriceable",
-        "canNegotiate"
+        "repriceable"
       ],
       "clientNext": "wait_for_quote",
       "adminNext": "publish_quote",
@@ -42,13 +42,13 @@
       "step": 1,
       "facts": [
         "awaitingClient",
+        "canNegotiate",
         "cancellable",
         "expires",
         "extendable",
         "holdsStock",
         "repriceable",
-        "showsPrices",
-        "canNegotiate"
+        "showsPrices"
       ],
       "clientNext": "accept_or_request_changes",
       "adminNext": "wait_for_client",
@@ -77,12 +77,12 @@
       "labelAr": "التفاوض جارٍ",
       "step": 1,
       "facts": [
+        "canNegotiate",
         "cancellable",
         "extendable",
         "holdsStock",
         "needsAdmin",
         "repriceable",
-        "canNegotiate",
         "showsPrices"
       ],
       "clientNext": "wait_for_revised_quote",
@@ -189,6 +189,40 @@
       "labelAr": "تم الحجز",
       "step": 4,
       "clientNext": "plan_the_event"
+    },
+    "quote_accepted": {
+      "label": "Client accepted booking quote",
+      "labelAr": "قبل العميل عرض سعر الحجز",
+      "adminLabel": "Client accepted booking quote",
+      "adminLabelAr": "قبل العميل عرض سعر الحجز",
+      "step": 2
+    },
+    "best_offer_requested": {
+      "label": "Client asked for best offer",
+      "labelAr": "طلب العميل أفضل عرض",
+      "adminLabel": "Client asked for best offer",
+      "adminLabelAr": "طلب العميل أفضل عرض",
+      "step": 2
+    },
+    "cancelled_by_client": {
+      "label": "Booking canceled by client",
+      "labelAr": "ألغى العميل الحجز",
+      "adminLabel": "Booking canceled by client",
+      "adminLabelAr": "ألغى العميل الحجز",
+      "step": null
+    }
+  },
+  "branches": {
+    "_about": "Steps that happen beside the main path. `decisions` are parallel: after the quote is ready the client either accepts it or asks for the best offer (both can happen, in either order). `cancel` can happen after ANY step of the path; it is shown branching off the step where it happened.",
+    "decisions": {
+      "after": "quote_ready",
+      "stages": [
+        "quote_accepted",
+        "best_offer_requested"
+      ]
+    },
+    "cancel": {
+      "stage": "cancelled_by_client"
     }
   }
 }

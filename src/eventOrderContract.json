@@ -473,8 +473,8 @@
      "label": "Would you like rental services or equipment?",
      "ar": "هل تريد خدمات تأجير أو معدات؟",
      "type": "boolean",
-     "short": "Rentals",
-     "shortAr": "التأجير"
+     "short": "Equipment Rental",
+     "shortAr": "تأجير المعدات"
     },
     {
      "key": "music.genres",

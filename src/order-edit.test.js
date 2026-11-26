@@ -4,7 +4,8 @@ const {registerQuoteLifecycle}=require('./quote-lifecycle');
 const routes={};const app={post:(p,...h)=>{routes[p]=h[h.length-1];},get(){},patch(){},put(){}};
 let sr;
 const Model={findOne:async()=>sr};
-registerQuoteLifecycle(app,{requireAuth:1,requireAdmin:1,serialize:x=>x,Model});
+const notified=[];
+registerQuoteLifecycle(app,{requireAuth:1,requireAdmin:1,serialize:x=>x,Model,notify:async(...args)=>{notified.push(args);return {sent:true};}});
 const order=core.createEventOrder();
 Object.assign(order.customer,{firstName:'A',lastName:'B',email:'a@b.co',phone:'+14165550101',contactMethod:'email'});
 Object.assign(order.event,{type:'wedding',date:'2099-01-01',startTime:'18:00',endTime:'23:00',guestCount:50,venue:{name:'Hall',address:'1 St',city:'Toronto',country:'Canada'}});
@@ -33,8 +34,10 @@ test('client-step-back: the client undoes their acceptance, a best-offer request
  const run=async(body,authId='u1')=>{const res={code:200,status(c){this.code=c;return this;},json(b){this.body=b;return this;}};await routes['/api/service-requests/:id/client-step-back']({params:{id:'x'},body,authUser:{_id:authId}},res);return res;};
  sr={...mk(),status:'accepted',acceptedAt:new Date(),expiresAt:new Date(Date.now()+864e5)};
  let r=await run({to:'quote'});assert.equal(r.code,200,JSON.stringify(r.body));assert.equal(sr.status,'quoted');assert.equal(sr.acceptedAt,null);
- sr={...mk(),status:'changes_requested',changeRequest:'less?',changeRequestedAt:new Date()};
+ sr={...mk(),status:'changes_requested',changeRequest:'less?',changeRequestedAt:new Date(),negotiation:{revision:1,items:[]},negotiationHistory:[{revision:1,items:[]}]};
  r=await run({to:'quote'});assert.equal(r.code,200);assert.equal(sr.status,'quoted');assert.equal(sr.changeRequest,'');
+ assert.ok(sr.negotiation.withdrawn&&sr.negotiation.resolvedAt&&sr.negotiationHistory[0].withdrawn); // the price offer is withdrawn with it
+ assert.equal(notified.at(-1)[1],'booking-client-step-back-admin'); // the team is told
  sr={...mk(),status:'accepted',payments:[{amountCents:5000}]};r=await run({to:'quote'});assert.equal(r.code,409); // money recorded: cannot be undone
  sr={...mk(),status:'accepted',expiresAt:new Date(Date.now()-1000)};r=await run({to:'quote'});assert.equal(r.code,409); // the quote lapsed
  sr={...mk(),status:'cancelled',declinedBy:'client',cancelledFromStatus:'quoted'};r=await run({to:'restore'});assert.equal(r.code,200);assert.equal(sr.status,'quoted');assert.equal(sr.declinedBy,'');

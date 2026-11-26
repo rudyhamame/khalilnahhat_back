@@ -231,12 +231,15 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
       if (![STATUS.ACCEPTED, STATUS.CHANGES_REQUESTED].includes(sr.status) || paid) return res.status(409).json({ message: 'This decision can no longer be undone.' });
       if (sr.expiresAt && sr.expiresAt <= new Date()) return res.status(409).json({ message: 'This quote has expired. Contact us to reactivate it.' });
       sr.status = STATUS.QUOTED; sr.acceptedAt = null; sr.changeRequest = ''; sr.changeRequestedAt = null;
+      // A price offer the client sent with it goes too: the team has nothing left to review.
+      if (sr.negotiation && !sr.negotiation.resolvedAt) { sr.negotiation = { ...sr.negotiation, resolvedAt: new Date(), withdrawn: true }; sr.negotiationHistory = (sr.negotiationHistory || []).map(entry => entry.revision === sr.negotiation.revision ? sr.negotiation : entry); }
     } else {
       const back = sr.cancelledFromStatus;
       if (sr.status !== STATUS.CANCELLED || sr.declinedBy !== 'client' || !back || !journey.rule(back).cancellable || journey.rule(back).isBooked || paid) return res.status(409).json({ message: 'This booking can no longer be restored. Contact us.' });
       sr.status = back; sr.declinedBy = ''; sr.cancelledAt = null; sr.cancelledAtStage = ''; sr.cancelledFromStatus = '';
     }
     try { await sr.save(); } catch (error) { if (error.name === 'VersionError') return res.status(409).json({ message: 'The booking changed. Reload before continuing.' }); throw error; }
+    void notify(sr, 'booking-client-step-back-admin', { message: parsed.data.to === 'restore' ? 'The client restored a booking they had cancelled. It is back at the step it was at.' : 'The client undid their acceptance or change request. The quote is waiting for their decision again.' });
     return res.json({ item: serialize(sr, false) });
   });
 

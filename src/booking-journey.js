@@ -30,10 +30,12 @@ const describe = status => ({ status, ...rule(status), path: PATH_STEPS });
 function branchesOf(request,stage){
  const stages=contract.clientStages,decisions=contract.branches.decisions.stages;
  const paid=(request.payments||[]).some(p=>!p.voided&&(p.amountCents||0)>0),booked=Boolean(request.acceptedAt)||paid||rule(request.status).isBooked;
- const reached={quote_accepted:booked||request.status===STATUS.ACCEPTED,best_offer_requested:Boolean(request.changeRequestedAt)||request.status===STATUS.CHANGES_REQUESTED};
+ // A decision belongs to the quote: it only counts while a quote is out (or the booking moved past it), so a quote withdrawn by a step back shows no stale decision.
+ const quoteOut=rule(request.status).showsPrices||paid||booked||request.status===STATUS.CANCELLED;
+ const reached={quote_accepted:booked||request.status===STATUS.ACCEPTED,best_offer_requested:quoteOut&&(Boolean(request.changeRequestedAt)||request.status===STATUS.CHANGES_REQUESTED)};
  const cancelled=request.status===STATUS.CANCELLED&&request.declinedBy==='client';
  return {after:contract.branches.decisions.after,decisions:decisions.map(key=>({status:key,...stages[key],reached:Boolean(reached[key])})),
-  cancelled:cancelled?{status:contract.branches.cancel.stage,...stages[contract.branches.cancel.stage],afterStage:request.cancelledAtStage||stage||'requested'}:null};
+  cancelled:cancelled?{status:contract.branches.cancel.stage,...stages[contract.branches.cancel.stage],afterStage:({modified:'requested',unavailable:'available'})[request.cancelledAtStage||stage]||request.cancelledAtStage||stage||'requested'}:null};
 }
 function describeRequest(request){
  const internal=describe(request.status),availability=require('./booking-availability').availabilityFor(request);

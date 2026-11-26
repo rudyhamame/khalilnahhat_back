@@ -89,7 +89,7 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     if (parsed.data.to === 'requested' && !previous.informedAt) return res.status(409).json({ message: 'This booking is already at the requested stage.' });
     if (previous.informedAt) sr.availabilityHistory = [...(sr.availabilityHistory || []), { ...previous, window: sr.availabilityWindow, changedAt: new Date() }];
     if (parsed.data.to === 'requested') { sr.availabilityAcceptedAt = null; sr.availabilityUnavailableAt = null; sr.availabilityReason = ''; }
-    sr.status = STATUS.PENDING; sr.acceptedAt = null; sr.expiresAt = null; sr.reminderSentAt = null;
+    sr.status = STATUS.PENDING; sr.acceptedAt = null; sr.expiresAt = null; sr.reminderSentAt = null; sr.changeRequestedAt = null;
     sr.quoteRevision = (sr.quoteRevision || 0) + 1; // stale client accept/negotiate calls on the withdrawn quote fail
     try { await sr.save(); } catch (error) { if (error.name === 'VersionError') return res.status(409).json({ message: 'The booking changed. Reload before continuing.' }); throw error; }
     void notify(sr, parsed.data.to === 'requested' ? 'booking-step-back-requested' : 'booking-step-back-available');
@@ -211,7 +211,7 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     const sr = await find(req.params.id);
     if (!own(req,sr)) return notFound(res);
     if (isExpired(sr) || sr.status === STATUS.EXPIRED || !journey.rule(sr.status).cancellable) return res.status(409).json({message:'This request can no longer be canceled.'});
-    sr.cancelledAtStage = journey.describeRequest(sr).clientStatus || ''; sr.cancelledAt = new Date();
+    { const d = journey.describeRequest(sr); sr.cancelledAtStage = (d.clientStatus === 'modified' ? d.previousClientStatus : d.clientStatus) || ''; } sr.cancelledAt = new Date(); // the step the booking was really at (a client edit is not a step of its own)
     sr.status = STATUS.CANCELLED; sr.declinedBy = 'client';
     try{await sr.save();}catch(error){if(error.name==='VersionError')return res.status(409).json({message:'The booking changed. Reload before continuing.'});throw error;}
     const mail = await notify(sr,'booking-withdrawn'); void notify(sr,'booking-withdrawn-admin');
@@ -271,7 +271,7 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
   app.post('/api/service-requests/:id/cancel', requireAdmin, async (req, res) => {
     const sr = await find(req.params.id);
     if (!sr) return notFound(res);
-    sr.cancelledAtStage = journey.describeRequest(sr).clientStatus || ''; sr.cancelledAt = new Date();
+    { const d = journey.describeRequest(sr); sr.cancelledAtStage = (d.clientStatus === 'modified' ? d.previousClientStatus : d.clientStatus) || ''; } sr.cancelledAt = new Date(); // the step the booking was really at (a client edit is not a step of its own)
     sr.status = STATUS.CANCELLED;
     try{await sr.save();}catch(error){if(error.name==='VersionError')return res.status(409).json({message:'The booking changed. Reload before continuing.'});throw error;}
     void notify(sr,'booking-cancelled');

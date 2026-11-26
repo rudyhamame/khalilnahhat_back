@@ -96,3 +96,21 @@ test('the contract is well formed: every fact named by a status is declared, wit
   }
   for (const status of contract.path) assert.ok(status in contract.statuses, status);
 });
+
+test('quote decisions are parallel, belong to the quote, and a client cancellation branches off the real step', () => {
+  const base = { createdAt: new Date(), availabilityAcceptedAt: new Date(), quotedAt: new Date(), payments: [] };
+  const by = (request, key) => journey.describeRequest({ ...base, ...request }).branches.decisions.find(d => d.status === key).reached;
+  assert.equal(by({ status: 'quoted' }, 'quote_accepted'), false);
+  assert.equal(by({ status: 'quoted' }, 'best_offer_requested'), false);
+  assert.equal(by({ status: 'accepted', acceptedAt: new Date() }, 'quote_accepted'), true);
+  assert.equal(by({ status: 'changes_requested', changeRequestedAt: new Date() }, 'best_offer_requested'), true);
+  // asked for a better price first, then accepted: both happened
+  assert.equal(by({ status: 'accepted', acceptedAt: new Date(), changeRequestedAt: new Date() }, 'best_offer_requested'), true);
+  // a quote withdrawn by a step back (status pending) leaves no stale decision
+  assert.equal(by({ status: 'pending', changeRequestedAt: new Date() }, 'best_offer_requested'), false);
+  const cancelled = stage => journey.describeRequest({ ...base, status: 'cancelled', declinedBy: 'client', cancelledAtStage: stage }).branches.cancelled;
+  assert.equal(cancelled('quote_ready').afterStage, 'quote_ready');
+  assert.equal(cancelled('unavailable').afterStage, 'available'); // always a step of the client path
+  assert.equal(cancelled('modified').afterStage, 'requested');
+  assert.equal(journey.describeRequest({ ...base, status: 'cancelled', declinedBy: 'admin' }).branches.cancelled, null);
+});

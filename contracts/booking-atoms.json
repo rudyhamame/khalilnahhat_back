@@ -111,7 +111,7 @@
       ]
     ],
     [
-      "03.03",
+      "03.02",
       [
         "music.mcRequested",
         "music.mcLanguagePairs"
@@ -179,7 +179,7 @@
       ]
     },
     {
-      "code": "03.03",
+      "code": "03.02",
       "title": "MC hosting",
       "requiresAny": [
         "mc"

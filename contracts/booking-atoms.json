@@ -102,12 +102,7 @@
     [
       "03.01",
       [
-        "music.djRequested"
-      ]
-    ],
-    [
-      "03.02",
-      [
+        "music.djRequested",
         "music.languagePairs",
         "music.genres",
         "music.suggestedSongs",
@@ -179,13 +174,6 @@
     {
       "code": "03.01",
       "title": "DJ service",
-      "requiresAny": [
-        "dj"
-      ]
-    },
-    {
-      "code": "03.02",
-      "title": "Music preferences",
       "requiresAny": [
         "dj"
       ]

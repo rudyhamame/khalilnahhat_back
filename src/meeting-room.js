@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const {meetingJoinWindow}=require('./meeting-attendance');
 // Online meeting room between the booked client and Khalil: WebRTC calls (voice/video) plus text chat.
 // Signalling and chat go through this server by polling; the media itself flows peer to peer.
 const MINUTE = 60 * 1000;
@@ -21,14 +22,23 @@ const iceServers = (env = process.env) => {
 
 function registerMeetingRoom(app, { requireAuth, Meeting, env = process.env, now = Date.now }) {
   // Only the client who booked an online meeting, or an admin, may enter; clients from 30 minutes before the start until an hour after the end.
-  async function access(req, res) {
+  async function access(req, res,recordJoin=false) {
     if (!mongoose.isValidObjectId(req.params.id)) { res.status(404).json({ message: 'Meeting not found.' }); return null; }
-    const meeting = await Meeting.findById(req.params.id);
+    let meeting = await Meeting.findById(req.params.id);
     const user = req.authUser, admin = Boolean(user.isAdmin);
     if (!meeting || meeting.status !== 'booked' || (!admin && String(meeting.bookedBy) !== String(user._id))) { res.status(404).json({ message: 'Meeting not found.' }); return null; }
     if (meeting.mode !== 'online') { res.status(409).json({ message: 'This is an in-person meeting.' }); return null; }
-    const start = meeting.start.getTime(), end = start + meeting.durationMin * MINUTE;
-    if (!admin && (now() < start - 30 * MINUTE || now() > end + 60 * MINUTE)) { res.status(403).json({ message: 'The meeting room opens 30 minutes before the start time.' }); return null; }
+    const at=now(),window=meetingJoinWindow(meeting);
+    if(!admin&&at<window.opensAt.getTime()){res.status(403).json({message:'The meeting room opens 30 minutes before the start time.'});return null;}
+    if(!admin&&at>window.closesAt.getTime()){res.status(403).json({message:'The meeting join window has closed.'});return null;}
+    if(!admin&&recordJoin&&!meeting.clientJoinedAt){
+      const joinedAt=new Date(at);
+      const result=await Meeting.updateOne({_id:meeting._id||req.params.id,status:'booked',mode:'online',bookedBy:user._id,clientJoinedAt:null},{$set:{clientJoinedAt:joinedAt}});
+      if(!result.matchedCount){
+        meeting=await Meeting.findById(req.params.id);
+        if(!meeting||meeting.status!=='booked'||meeting.mode!=='online'||String(meeting.bookedBy)!==String(user._id)||!meeting.clientJoinedAt){res.status(404).json({message:'Meeting not found.'});return null;}
+      }else meeting.clientJoinedAt=joinedAt;
+    }
     return { meeting, role: admin ? 'host' : 'guest', name: admin ? 'Khalil' : (user.firstName || meeting.bookedByName || 'Client') };
   }
   const other = role => (role === 'host' ? 'guest' : 'host');
@@ -38,20 +48,32 @@ function registerMeetingRoom(app, { requireAuth, Meeting, env = process.env, now
     if (!req.authUser?.isAdmin) return res.status(403).json({ message: 'Admins only.' });
     const live = [...rooms].filter(([, room]) => room.ringing?.from === 'guest' && now() - room.ringing.at < 60 * 1000).filter(([id]) => mongoose.isValidObjectId(id));
     const meetings = live.length ? await Meeting.find({ _id: { $in: live.map(([id]) => id) }, status: 'booked' }) : [];
-    res.set('Cache-Control', 'no-store').json({ items: meetings.map((m) => ({ meetingId: m.id, clientName: m.bookedByName, kind: rooms.get(m.id).ringing.kind, at: new Date(rooms.get(m.id).ringing.at).toISOString() })) });
+    res.set('Cache-Control', 'no-store').json({ items: meetings.flatMap(m=>{
+      const ringing=rooms.get(m.id)?.ringing;
+      return ringing?.from==='guest'&&now()-ringing.at<60000?[{meetingId:m.id,clientName:m.bookedByName,kind:ringing.kind,at:new Date(ringing.at).toISOString()}]:[];
+    }) });
   });
   app.get('/api/meetings/:id/room', requireAuth, async (req, res) => {
-    const ctx = await access(req, res); if (!ctx) return;
-    res.set('Cache-Control', 'no-store').json({ role: ctx.role, name: ctx.name, meeting: { id: ctx.meeting.id, start: ctx.meeting.start, durationMin: ctx.meeting.durationMin, topic: ctx.meeting.topic, clientName: ctx.meeting.bookedByName }, iceServers: iceServers(env) });
+    const ctx = await access(req, res,true); if (!ctx) return;
+    res.set('Cache-Control', 'no-store').json({ role: ctx.role, name: ctx.name, meeting: { id: ctx.meeting.id, start: ctx.meeting.start, durationMin: ctx.meeting.durationMin, topic: ctx.meeting.topic, clientName: ctx.meeting.bookedByName,clientJoinedAt:ctx.meeting.clientJoinedAt||null }, iceServers: iceServers(env) });
+  });
+  app.post('/api/meetings/:id/end',requireAuth,async(req,res)=>{
+    if(!req.authUser?.isAdmin)return res.status(403).json({message:'Only the host can end a meeting.'});
+    const ctx=await access(req,res);if(!ctx)return;
+    if(!ctx.meeting.clientJoinedAt)return res.status(409).json({message:'The client has not joined this meeting yet.'});
+    const removed=await Meeting.findOneAndDelete({_id:ctx.meeting._id||req.params.id,status:'booked',mode:'online',clientJoinedAt:{$type:'date'}});
+    if(!removed)return res.status(404).json({message:'Meeting not found.'});
+    rooms.delete(req.params.id);return res.json({ok:true,ended:true});
   });
   // Poll: returns what is new for me (signals, chat) and whether the other person is in the room.
   app.get('/api/meetings/:id/room/poll', requireAuth, async (req, res) => {
-    const ctx = await access(req, res); if (!ctx) return;
+    const ctx = await access(req, res,true); if (!ctx) return;
     const room = roomOf(req.params.id), after = Number(req.query.signal) || 0, afterMessage = Number(req.query.message) || 0;
     room.seen[ctx.role] = now();
     const mine = room.signals[ctx.role];
     res.set('Cache-Control', 'no-store').json({
       peerOnline: now() - room.seen[other(ctx.role)] < 8000,
+      clientJoinedAt:ctx.meeting.clientJoinedAt||null,
       signals: mine.filter(item => item.seq > after),
       messages: room.messages.filter(item => item.seq > afterMessage),
     });
@@ -79,4 +101,4 @@ function registerMeetingRoom(app, { requireAuth, Meeting, env = process.env, now
     res.status(201).json({ item });
   });
 }
-module.exports = { registerMeetingRoom, iceServers };
+module.exports = { registerMeetingRoom, iceServers,forgetMeetingRoom:id=>rooms.delete(String(id)) };

@@ -1,3 +1,4 @@
+const {CONTACT_METHODS}=require('./contact-methods');
 const permanentDeletion=require('./permanent-deletion');
 const accountSessions = require('./account-sessions');
 const {uploadAsset}=require('./cloudinary-assets');
@@ -903,7 +904,7 @@ app.patch('/api/auth/profile', async (request, response) => {
   if (lastName !== undefined && (lastName.length > 60 || (!lastName && !user.googleSubject))) return response.status(400).json({ message: 'Enter a last name (up to 60 characters).' });
   if (phoneNumber !== undefined && !/^[0-9+()\-.\s]{0,30}$/.test(phoneNumber)) return response.status(400).json({ message: 'Enter a valid phone number.' });
   if (company !== undefined && company.length > 120) return response.status(400).json({ message: 'Company name can be up to 120 characters.' });
-  if (body.preferredContact !== undefined && !['any', 'email', 'phone'].includes(body.preferredContact)) return response.status(400).json({ message: 'Choose any method, email only or phone only.' });
+  if (body.preferredContact !== undefined && !CONTACT_METHODS.includes(body.preferredContact)) return response.status(400).json({ message: 'Choose a valid preferred contact method.' });
   if (body.phoneContact !== undefined && !['', 'whatsapp-text', 'whatsapp-call', 'sms', 'call'].includes(body.phoneContact)) return response.status(400).json({ message: 'Choose WhatsApp text, WhatsApp call, text message or phone call.' });
   if (body.emailNotifications !== undefined && typeof body.emailNotifications !== 'boolean') return response.status(400).json({ message: 'Notifications must be on or off.' });
   if (body.skipHome !== undefined && typeof body.skipHome !== 'boolean') return response.status(400).json({ message: 'Skip home must be on or off.' });

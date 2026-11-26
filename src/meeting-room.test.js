@@ -9,11 +9,13 @@ const meeting={id,status:'booked',mode:'online',start,durationMin:30,bookedBy:cl
 async function boot(clock){
   const users={host:{_id:new mongoose.Types.ObjectId(),isAdmin:true,firstName:'Khalil'},guest:{_id:clientId,firstName:'Ana'},stranger:{_id:stranger,firstName:'X'}};
   const app=express();app.use(express.json());
-  registerMeetingRoom(app,{requireAuth:(req,_res,next)=>{req.authUser=users[req.get('x-user')];next();},Meeting:{findById:async()=>meeting,find:async()=>[meeting]},now:()=>clock.t});
+  let row={...meeting,clientJoinedAt:null,attendanceTrackingStartedAt:new Date(start.getTime()-3600000)};
+  const Model={findById:async()=>row?{...row}:null,find:async()=>row?[{...row}]:[],updateOne:async(query,update)=>{if(!row||row.status!=='booked'||row.clientJoinedAt||String(row.bookedBy)!==String(query.bookedBy))return {matchedCount:0};Object.assign(row,update.$set);return {matchedCount:1};},findOneAndDelete:async query=>{assert.equal(query.status,'booked');assert.equal(query.mode,'online');assert.deepEqual(query.clientJoinedAt,{$type:'date'});if(!row||!row.clientJoinedAt)return null;const previous=row;row=null;return previous;}};
+  registerMeetingRoom(app,{requireAuth:(req,_res,next)=>{req.authUser=users[req.get('x-user')];next();},Meeting:Model,now:()=>clock.t});
   const server=await new Promise(r=>{const s=app.listen(0,()=>r(s));});const base=`http://127.0.0.1:${server.address().port}/api/meetings/${id}/room`;
   const incoming=async who=>fetch(`http://127.0.0.1:${server.address().port}/api/meetings/room/incoming`,{headers:{'x-user':who}});
   const call=(who,path,body)=>fetch(base+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json','x-user':who},body:body?JSON.stringify(body):undefined});
-  return {call,incoming,close:()=>server.close()};
+  return {call,incoming,meeting:()=>row,end:who=>fetch(`http://127.0.0.1:${server.address().port}/api/meetings/${id}/end`,{method:'POST',headers:{'x-user':who}}),close:()=>server.close()};
 }
 test('only the booked client and an admin may enter, and the client only near the meeting time',async()=>{
   const clock={t:start.getTime()-5*60000},app=await boot(clock);
@@ -60,4 +62,26 @@ test('the admin sees a client call while it rings, and not after it is answered,
   await app.call('guest','/signal',{type:'offer',data:{sdp:'x',kind:'voice'}});
   await app.call('host','/signal',{type:'answer',data:{sdp:'y'}});assert.deepEqual((await (await app.incoming('host')).json()).items,[]);
   app.close();
+});
+
+test('only a real client room entry records attendance, and that first join survives later polls',async()=>{
+ const clock={t:start.getTime()-31*60000},app=await boot(clock);
+ try{
+  assert.equal((await app.call('host','')).status,200);assert.equal(app.meeting().clientJoinedAt,null);
+  assert.equal((await app.call('guest','')).status,403);assert.equal(app.meeting().clientJoinedAt,null);
+  assert.equal((await app.call('stranger','')).status,404);assert.equal(app.meeting().clientJoinedAt,null);
+  clock.t=start.getTime()+3*3600000;assert.equal((await app.call('guest','')).status,403);assert.equal(app.meeting().clientJoinedAt,null);
+  clock.t=start.getTime()-5*60000;const first=await(await app.call('guest','')).json();assert.equal(first.meeting.clientJoinedAt,new Date(clock.t).toISOString());
+  clock.t+=60000;const poll=await(await app.call('guest','/poll')).json();assert.equal(poll.clientJoinedAt,first.meeting.clientJoinedAt);
+ }finally{app.close();}
+});
+test('only the host can end an attended meeting; ending deletes it without reopening its time',async()=>{
+ const clock={t:start.getTime()},app=await boot(clock);
+ try{
+  assert.equal((await app.end('guest')).status,403);
+  assert.equal((await app.end('host')).status,409);assert.ok(app.meeting());
+  await app.call('guest','');assert.ok(app.meeting().clientJoinedAt);
+  assert.equal((await app.end('host')).status,200);assert.equal(app.meeting(),null);
+  assert.equal((await app.call('guest','/poll')).status,404);assert.equal((await app.call('host','')).status,404);
+ }finally{app.close();}
 });

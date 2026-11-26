@@ -1,3 +1,4 @@
+const {CONTACT_METHODS}=require('./contact-methods');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { z } = require('zod');
@@ -23,7 +24,7 @@ const startSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required.').max(60), lastName: z.string().trim().min(1, 'Last name is required.').max(60), email,
   password: z.string().min(8, 'Choose a password of at least 8 characters.').max(128),
   phoneNumber: z.string().trim().max(40).optional().default(''), company: z.string().trim().max(120).optional().default(''),
-  preferredContact: z.enum(['any', 'email', 'phone']).optional(), phoneContact: z.enum(['whatsapp-text', 'whatsapp-call', 'sms', 'call']).optional(),
+  preferredContact: z.enum(CONTACT_METHODS).optional(), phoneContact: z.enum(['whatsapp-text', 'whatsapp-call', 'sms', 'call']).optional(),
 });
 const verifySchema = z.object({ email, code: z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code.') });
 // The contact choices the guest gave Echo become the account's.

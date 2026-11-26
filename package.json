@@ -18,7 +18,8 @@
     "sync:booking-tree": "node scripts/sync-booking-tree.cjs",
     "check:booking-tree": "node scripts/sync-booking-tree.cjs --check",
     "prestart": "npm run check:booking-tree",
-    "predev": "npm run check:booking-tree"
+    "predev": "npm run check:booking-tree",
+    "test:meetings": "node --test src/meeting-room.test.js src/meeting-attendance.test.js test/booking-negotiation.test.js"
   },
   "keywords": [
     "express",

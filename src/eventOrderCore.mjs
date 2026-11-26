@@ -188,7 +188,7 @@ export function accountProfile(user){
     'customer.phone':user.phoneNumber||user.phone||null,
     'customer.company':user.company||null,
     // WhatsApp is no longer a contact method of its own: an older "WhatsApp only" account becomes phone + WhatsApp text.
-    'customer.contactMethod':user.preferredContact==='whatsapp'?'phone':['any','email','phone'].includes(user.preferredContact)?user.preferredContact:'email',
+    'customer.contactMethod':user.preferredContact==='whatsapp'?'phone':fields.find(field=>field.key==='customer.contactMethod').options.includes(user.preferredContact)?user.preferredContact:'email',
     // A signed-in client's Personal info is always complete: an account with a phone number but no phone contact choice yet (saved before the choice existed) reads as Phone call until they pick another in the dashboard.
     'customer.phoneContact':['whatsapp-text','whatsapp-call','sms','call'].includes(user.phoneContact)?user.phoneContact:user.preferredContact==='whatsapp'?'whatsapp-text':(user.phoneNumber||user.phone)?'call':null,
   };

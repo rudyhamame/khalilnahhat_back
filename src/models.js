@@ -1,3 +1,4 @@
+const {CONTACT_METHODS}=require('./contact-methods');
 const mongoose = require('mongoose');
 const journey = require('./booking-journey');
 
@@ -10,7 +11,7 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, trim: true, lowercase: true },
     phoneNumber: { type: String, default: '', trim: true },
     company: { type: String, default: '', trim: true },
-    preferredContact: { type: String, enum: ['any', 'email', 'phone', 'whatsapp'], default: 'email' }, // 'whatsapp' is kept only for accounts saved before WhatsApp became a phone option
+    preferredContact: { type: String, enum: [...CONTACT_METHODS, 'whatsapp'], default: 'email' }, // 'whatsapp' is kept only for accounts saved before WhatsApp became a phone option
     phoneContact: { type: String, enum: ['', 'whatsapp-text', 'whatsapp-call', 'sms', 'call'], default: '' },
     emailNotifications: { type: Boolean, default: true },
     skipHome: { type: Boolean, default: false },

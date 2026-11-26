@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const {pruneMissedMeetings}=require('./meeting-attendance');
+const {forgetMeetingRoom}=require('./meeting-room');
 const { z } = require('zod');
 const { ServiceRequest } = require('./models');
 const journey = require('./booking-journey');
@@ -28,6 +30,8 @@ const meetingSchema = new mongoose.Schema(
     callMethod: {type:String, enum:['', ...CALL_MODES], default:''},
     contactPhone: {type:String, default:''},
     reminderSentAt: { type: Date, default: null },
+    clientJoinedAt: {type:Date,default:null},
+    attendanceTrackingStartedAt: {type:Date,default:null},
   },
   { timestamps: true },
 );
@@ -39,7 +43,7 @@ const when = (d) => new Intl.DateTimeFormat('en-CA', { dateStyle: 'full', timeSt
 const adminEmail = () => notificationAddress();
 
 const publicSlot = (m) => ({ id: m.id, start: m.start, durationMin: m.durationMin, mode: m.mode });
-const bookedView = (m) => ({ ...publicSlot(m), bookingRequestId:m.bookingRequestId, meetingPurpose:m.meetingPurpose||'planning', callMethod:m.callMethod, contactPhone:m.contactPhone, link: m.link, location: m.location, topic: m.topic, bookedByName: m.bookedByName, bookedByEmail: m.bookedByEmail });
+const bookedView = (m) => ({ ...publicSlot(m), bookingRequestId:m.bookingRequestId, meetingPurpose:m.meetingPurpose||'planning', callMethod:m.callMethod, contactPhone:m.contactPhone, link: m.link, location: m.location, topic: m.topic, bookedByName: m.bookedByName, bookedByEmail: m.bookedByEmail,clientJoinedAt:m.clientJoinedAt||null });
 
 function mail(m, subject, intro) {
   const event = subject.toLowerCase().replaceAll(' ', '-');
@@ -59,11 +63,11 @@ function meetingEmailContext(m) {
 async function bookSlot(id, user, topic, details = {}) {
   return Meeting.findOneAndUpdate(
     { _id: id, status: 'open', start: { $gt: new Date() } },
-    { ...details, status: 'booked', bookedBy: user._id, bookedByName: `${user.firstName} ${user.lastName}`.trim(), bookedByEmail: user.email, topic, reminderSentAt: null },
+    { ...details, status: 'booked', bookedBy: user._id, bookedByName: `${user.firstName} ${user.lastName}`.trim(), bookedByEmail: user.email, topic, reminderSentAt: null,clientJoinedAt:null,attendanceTrackingStartedAt:new Date() },
     { new: true },
   );
 }
-const freeSlot = (m) => Meeting.updateOne({ _id: m._id }, { status: 'open', bookedBy: null, bookedByName: '', bookedByEmail: '', topic: '', bookingRequestId:null,callMethod:'',contactPhone:'', reminderSentAt: null });
+const freeSlot = (m) => Meeting.updateOne({ _id: m._id }, { status: 'open', bookedBy: null, bookedByName: '', bookedByEmail: '', topic: '', bookingRequestId:null,callMethod:'',contactPhone:'', reminderSentAt: null,clientJoinedAt:null,attendanceTrackingStartedAt:null });
 
 async function sweepMeetings({notifications=notificationEmails,Model=Meeting,send=sendSimpleEmail,clock=Date.now} = {}) {
   const rule = await notifications.get('meeting-reminder');
@@ -175,8 +179,9 @@ function registerMeetings(app, { requireAuth, requireAdmin, BookingModel=Service
   });
 
   if (require.main?.filename?.endsWith('server.js')) {
+    setInterval(()=>pruneMissedMeetings({Model:MeetingModel,onDeleted:forgetMeetingRoom}).catch(error=>console.error('Meeting attendance cleanup failed:',error)),60000).unref();
     setInterval(() => sweepMeetings().catch((e) => console.error('Meeting sweep failed:', e)), 10 * 60 * 1000).unref();
   }
 }
 
-module.exports = { Meeting, registerMeetings, sweepMeetings };
+module.exports = { Meeting, registerMeetings, sweepMeetings,pruneMissedMeetings };

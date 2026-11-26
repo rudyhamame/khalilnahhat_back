@@ -1,3 +1,4 @@
+const {CONTACT_METHODS}=require('./contact-methods');
 const { z } = require('zod');
 // The service keys a saved booking accepts come from the shared order contract, the single definition.
 const SERVICES = new Set(require('./eventOrderCore.mjs').contract.sections.flatMap((section) => section.fields).find((field) => field.key === 'services').options);
@@ -8,7 +9,7 @@ const eventSchema = z.object({
   eventDate: z.string().refine(validDate, 'Enter a valid event date.').refine((s) => s >= new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' }), 'Event date cannot be in the past.'),
   startTime: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$|^$/).default(''),
   endTime: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$|^$/).default(''),
-  phone: z.string().trim().max(30).refine((value) => !value || value.length >= 5, 'Enter a valid phone number or leave it empty.').default(''), contactMethod: z.enum(['any', 'email', 'phone', 'whatsapp']).default('email'),
+  phone: z.string().trim().max(30).refine((value) => !value || value.length >= 5, 'Enter a valid phone number or leave it empty.').default(''), contactMethod: z.enum([...CONTACT_METHODS, 'whatsapp']).default('email'),
   company: text(120), venueName: text(160), venueAddress: text(240), city: text(80), postalCode: text(12),
   indoor: z.boolean().default(true), guests: z.coerce.number().int().min(0).max(100000).default(0),
   services: z.array(z.enum([...SERVICES])).max(8).default([]), musicStyle: z.enum(['arabic', 'english', 'mixed', 'other']).default('mixed'),

@@ -59,7 +59,8 @@
      "options": [
       "any",
       "email",
-      "phone"
+      "phone",
+      "meet-echo"
      ],
      "required": true,
      "private": true,
@@ -78,6 +79,10 @@
       "phone": [
        "Phone only",
        "الهاتف فقط"
+      ],
+      "meet-echo": [
+       "Meet Echo",
+       "لقاء إيكو"
       ]
      }
     },

@@ -19,3 +19,12 @@ test('client order-edit: safe edits apply, availability edits need acknowledgeme
  sr=mk();r=await call({path:'customer.firstName',value:'Z'});assert.equal(r.code,400);assert.equal(sr.order.customer.firstName,'A');
  sr=mk();sr.payments=[{voided:false}];r=await call({path:'event.guestCount',value:60,acknowledgeReset:true});assert.equal(r.code,409);
 });
+test('admin order-edit edits any client booking through the admin route',async()=>{
+ sr=mk();const res={code:200,status(c){this.code=c;return this;},json(b){this.body=b;return this;}};
+ await routes['/api/service-requests/:id/admin-order-edit']({params:{id:'x'},body:{path:'additional.notes',value:'by admin'},authUser:{_id:'admin-1'}},res);
+ assert.equal(res.code,200,JSON.stringify(res.body));assert.equal(sr.order.additional.notes,'by admin');
+ sr=mk();const denied=await call({path:'additional.notes',value:'x'});assert.equal(denied.code,200); // owner still can
+ sr=mk();const other={code:200,status(c){this.code=c;return this;},json(b){this.body=b;return this;}};
+ await routes['/api/service-requests/:id/order-edit']({params:{id:'x'},body:{path:'additional.notes',value:'x'},authUser:{_id:'someone-else'}},other);
+ assert.equal(other.code,404);
+});

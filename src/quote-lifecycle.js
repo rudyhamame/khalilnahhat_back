@@ -103,12 +103,14 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
   const PRICED = new Set(['services', 'equipment', 'music.djRequested', 'music.mcRequested', 'rental.requested']);
   const READ_ONLY = new Set(['customer.email', 'event.venue.latitude', 'event.venue.longitude', 'event.venue.source', 'event.venue.sourceId', 'event.venue.sourceAttribution']);
   const AFFECTS_AVAILABILITY = path => /^event\.(type|title|date|startTime|endTime|guestCount|venue\.|setup\.)/.test(path);
-  app.post('/api/service-requests/:id/order-edit', requireAuth, async (req, res) => {
+  // One handler for both: the owner edits their own booking; an administrator edits any booking from the admin Booking pages.
+  const orderEdit = (admin) => async (req, res) => {
     const parsed = z.object({ path: z.string().max(80), value: z.any(), quoteRevision: z.number().int().nonnegative().optional(), acknowledgeReset: z.boolean().optional(), place: z.record(z.any()).optional(), countsAsModification: z.boolean().optional() }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: 'Choose a detail and its new value.' });
     const { path } = parsed.data; const value = path === 'event.venue.postalCode' && typeof parsed.data.value === 'string' ? parsed.data.value.toUpperCase() : parsed.data.value; // postal codes are always capitals
     const sr = await find(req.params.id);
-    if (!own(req, sr)) return notFound(res);
+    if (!admin && !own(req, sr)) return notFound(res);
+    if (!sr) return notFound(res);
     if (!sr.order || sr.status === STATUS.CANCELLED) return res.status(409).json({ message: 'This booking can no longer be edited.' });
     const field = eventOrder.fields.find(item => item.key === path);
     if (!field || READ_ONLY.has(path) || path.startsWith('customer.')) return res.status(400).json({ message: 'Personal info comes from your account. Change it in your account, not in the booking.' });
@@ -144,8 +146,10 @@ function registerQuoteLifecycle(app, { requireAuth, requireAdmin, serialize, Mod
     }
     try { await sr.save(); } catch (error) { if (error.name === 'VersionError') return res.status(409).json({ message: 'The booking changed. Reload before continuing.' }); throw error; }
     // A client's modification sends no notification email.
-    return res.json({ item: serialize(sr, false), reset });
-  });
+    return res.json({ item: serialize(sr, admin), reset });
+  };
+  app.post('/api/service-requests/:id/order-edit', requireAuth, orderEdit(false));
+  app.post('/api/service-requests/:id/admin-order-edit', requireAdmin, orderEdit(true));
 
   // Reverts ONE saved modification (by its position in the list; the newest that can be undone when none is given). It stays in the list, struck through.
   const changedPaths = (before, after) => { const out = []; const walk = (x, y, path) => {

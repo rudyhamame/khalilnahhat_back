@@ -11,14 +11,14 @@ test('a visitor creates an account, confirms the email with a code, and is only 
   store:{get:async e=>rows.get(e)||null,save:async(e,row)=>rows.set(e,{...(rows.get(e)||{}),...row}),bump:async e=>{rows.get(e).attempts++;},remove:async e=>rows.delete(e)}});
  const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));const base=`http://127.0.0.1:${server.address().port}/api/booking-signup`;
  const post=(path,body)=>fetch(base+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
- const details={firstName:'Sam',lastName:'Client',email:'Sam@Example.com',password:'long-enough-pw'};
+ const details={firstName:'Sam',lastName:'Client',email:'Sam@Example.com',password:'long-enough-pw',preferredContact:'meet-echo'};
  try{
   assert.equal((await post('/start',{...details,password:'short'})).status,400);assert.equal(users.length,0);
   assert.equal((await post('/start',{...details,lastName:''})).status,400);
   for(const key of ['firstName','lastName'])assert.equal((await post('/start',{...details,[key]:'x'.repeat(61)})).status,400);
   assert.equal(users.length,0);assert.equal(mails.length,0);
   assert.equal((await post('/start',details)).status,202);
-  assert.equal(users.length,1);assert.equal(users[0].awaitingVerification,true);assert.equal(users[0].emailVerified,false);assert.equal(users[0].passwordHash,'hash:long-enough-pw');
+  assert.equal(users.length,1);assert.equal(users[0].awaitingVerification,true);assert.equal(users[0].emailVerified,false);assert.equal(users[0].passwordHash,'hash:long-enough-pw');assert.equal(users[0].preferredContact,'meet-echo');
   assert.equal(mails.length,1);assert.equal(mails[0].to,'sam@example.com');assert.ok(mails[0].html.includes('123456'));
   assert.equal((await post('/start',details)).status,202);assert.equal(mails.length,1); // a quick retry does not send another email
   assert.equal((await post('/verify',{email:'sam@example.com',code:'000000'})).status,400);assert.equal(users[0].emailVerified,false); // no session without the right code

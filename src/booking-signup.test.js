@@ -18,19 +18,19 @@ test('a visitor creates an account, confirms the email with a code, and is only 
   for(const key of ['firstName','lastName'])assert.equal((await post('/start',{...details,[key]:'x'.repeat(61)})).status,400);
   assert.equal(users.length,0);assert.equal(mails.length,0);
   assert.equal((await post('/start',details)).status,202);
-  assert.equal(users.length,1);assert.equal(users[0].awaitingVerification,true);assert.equal(users[0].emailVerified,false);assert.equal(users[0].passwordHash,'hash:long-enough-pw');assert.equal(users[0].preferredContact,'meet-echo');
+  assert.equal(users.length,0); // nothing is created before the code is confirmed
   assert.equal(mails.length,1);assert.equal(mails[0].to,'sam@example.com');assert.ok(mails[0].html.includes('123456'));
   assert.equal((await post('/start',details)).status,202);assert.equal(mails.length,1); // a quick retry does not send another email
-  assert.equal((await post('/verify',{email:'sam@example.com',code:'000000'})).status,400);assert.equal(users[0].emailVerified,false); // no session without the right code
+  assert.equal((await post('/verify',{email:'sam@example.com',code:'000000'})).status,400);assert.equal(users.length,0); // no account and no session without the right code
   const ok=await post('/verify',{email:'sam@example.com',code:'123456'});assert.equal(ok.status,200);assert.equal((await ok.json()).token,'token-1');
-  assert.equal(users[0].emailVerified,true);assert.equal(users[0].awaitingVerification,false);
+  assert.equal(users.length,1);assert.equal(users[0].emailVerified,true);assert.equal(users[0].awaitingVerification,false);assert.equal(users[0].passwordHash,'hash:long-enough-pw');assert.equal(users[0].preferredContact,'meet-echo');
   assert.equal((await post('/verify',{email:'sam@example.com',code:'123456'})).status,400); // a code works once
   assert.equal((await post('/start',details)).status,409); // the account exists now: sign in
   users.push({_id:'9',id:'9',email:'admin@example.com',isAdmin:true,emailVerified:true});
   assert.equal((await post('/start',{...details,email:'admin@example.com'})).status,409);
-  clock+=120_000;users.push({_id:'10',id:'10',email:'late@example.com',firstName:'L',awaitingVerification:true,emailVerified:false});
-  assert.equal((await post('/resend',{email:'late@example.com'})).status,200);assert.equal(mails.length,2); // pending accounts can ask for a new code
-  assert.equal((await post('/resend',{email:'nobody@example.com'})).status,200);assert.equal(mails.length,2);
+  clock+=120_000;assert.equal((await post('/start',{...details,email:'late@example.com'})).status,202);assert.equal(mails.length,2);
+  clock+=120_000;assert.equal((await post('/resend',{email:'late@example.com'})).status,200);assert.equal(mails.length,3); // a waiting sign-up can ask for a new code
+  assert.equal((await post('/resend',{email:'nobody@example.com'})).status,200);assert.equal(mails.length,3);
   for(let i=0;i<5;i++)await post('/verify',{email:'late@example.com',code:'111111'});
   assert.equal((await post('/verify',{email:'late@example.com',code:'123456'})).status,429);
  }finally{await new Promise(resolve=>server.close(resolve));}

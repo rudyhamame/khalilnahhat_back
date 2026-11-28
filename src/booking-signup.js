@@ -5,10 +5,11 @@ const { z } = require('zod');
 
 // Sending a booking needs an account. A visitor who is not signed in goes through three steps on purpose:
 // 1. create the account (name, email and a password they choose), 2. confirm the email with a 6-digit code, 3. send the booking.
-// The account stays "awaiting verification" (no session, no login) until the code is entered; the code then signs them in.
+// No account exists until the code is entered: the details wait (password already hashed) beside the code and expire with it; the right code creates the account and signs them in.
 const CODE_MS = 10 * 60 * 1000, RESEND_MS = 60 * 1000, MAX_ATTEMPTS = 5;
 const Challenge = mongoose.models.BookingSignupCode || mongoose.model('BookingSignupCode', new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  profile: mongoose.Schema.Types.Mixed, // the sign-up details waiting for the code (never the plain password)
   codeHash: String, attempts: { type: Number, default: 0 }, sentAt: Date,
   expiresAt: { type: Date, expires: 0 }, // MongoDB removes the row once it has expired
 }));
@@ -42,7 +43,7 @@ function registerBookingSignup(app, { User, serializeUser, isAdminUser, issueSes
     return 0;
   }
 
-  // Step 1: create the account (awaiting verification) and email the code.
+  // Step 1: keep the details with the code and email it. No account is created yet.
   app.post('/api/booking-signup/start', async (req, res) => {
     const parsed = startSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || 'Check your details and try again.' });
@@ -50,15 +51,12 @@ function registerBookingSignup(app, { User, serializeUser, isAdminUser, issueSes
     try {
       const existing = await User.find({ email: data.email }).limit(2);
       if (existing.some((user) => !pending(user))) return res.status(409).json({ code: 'ACCOUNT_EXISTS', message: 'An account with this email already exists. Please sign in.' });
-      const passwordHash = await hashPassword(data.password);
-      if (existing.length) await User.updateOne({ _id: existing[0]._id }, { firstName: data.firstName, lastName: data.lastName, passwordHash, phoneNumber: data.phoneNumber, company: data.company, ...contact(data) });
-      else await User.create({ username: `client-${crypto.randomUUID()}`, firstName: data.firstName, lastName: data.lastName, email: data.email, passwordHash,
-        phoneNumber: data.phoneNumber, company: data.company, ...contact(data), isAdmin: false, awaitingVerification: true, emailVerified: false });
-      if (!existing.length) require('./admin-alerts').alert('signup');
+      const profile = { firstName: data.firstName, lastName: data.lastName, passwordHash: await hashPassword(data.password), phoneNumber: data.phoneNumber, company: data.company, ...contact(data) };
+      await store.save(data.email, { profile });
       const retryAfter = await sendCode(data.email, data.firstName);
       return res.status(202).json({ pending: true, email: data.email, retryAfter });
     } catch (error) {
-      return res.status(error.code === 11000 ? 409 : 503).json({ message: 'Could not create your account. Please try again.' });
+      return res.status(503).json({ message: 'Could not start your sign-up. Please try again.' });
     }
   });
 
@@ -67,8 +65,8 @@ function registerBookingSignup(app, { User, serializeUser, isAdminUser, issueSes
     const address = email.safeParse(req.body?.email);
     if (address.success) {
       try {
-        const user = (await User.find({ email: address.data }).limit(1))[0];
-        if (user && pending(user)) await sendCode(address.data, user.firstName);
+        const row = await store.get(address.data);
+        if (row?.profile) await sendCode(address.data, row.profile.firstName);
       } catch (error) { console.error('Verification code email failed:', error); }
     }
     return res.json({ ok: true });
@@ -85,11 +83,14 @@ function registerBookingSignup(app, { User, serializeUser, isAdminUser, issueSes
       if (row.attempts >= MAX_ATTEMPTS) return res.status(429).json({ message: 'Too many wrong codes. Ask for a new one.' });
       const given = Buffer.from(hashCode(address, parsed.data.code)), wanted = Buffer.from(row.codeHash || '');
       if (given.length !== wanted.length || !crypto.timingSafeEqual(given, wanted)) { await store.bump(address); return res.status(400).json({ message: 'That code is not right.' }); }
-      const user = (await User.find({ email: address }).limit(1))[0];
-      if (!user || !pending(user) || user.isBlocked || user.isAdmin || isAdminUser(user)) return res.status(400).json({ message: 'This code cannot be used. Sign in or create your account again.' });
+      if (!row.profile) return res.status(400).json({ message: 'This code cannot be used. Sign in or create your account again.' });
+      const existing = (await User.find({ email: address }).limit(1))[0];
+      if (existing && (!pending(existing) || existing.isBlocked || existing.isAdmin || isAdminUser(existing))) return res.status(400).json({ message: 'This code cannot be used. Sign in or create your account again.' });
       await store.remove(address);
-      await User.updateOne({ _id: user._id }, { emailVerified: true, awaitingVerification: false });
-      user.emailVerified = true; user.awaitingVerification = false;
+      // The account is created only now, already verified. (An old unverified account from before this change is completed instead.)
+      let user = existing;
+      if (user) { await User.updateOne({ _id: user._id }, { ...row.profile, emailVerified: true, awaitingVerification: false }); Object.assign(user, row.profile, { emailVerified: true, awaitingVerification: false }); }
+      else { user = await User.create({ username: `client-${crypto.randomUUID()}`, ...row.profile, email: address, isAdmin: false, awaitingVerification: false, emailVerified: true }); require('./admin-alerts').alert('signup'); }
       const token = await issueSession(user, req, isAdminUser);
       return res.json({ token, user: serializeUser(user) });
     } catch (error) {

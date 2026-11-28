@@ -66,7 +66,7 @@ function registerBookingSignup(app, { User, serializeUser, isAdminUser, issueSes
     if (address.success) {
       try {
         const row = await store.get(address.data);
-        if (row?.profile) await sendCode(address.data, row.profile.firstName);
+        if (row?.profile) { const retryAfter = await sendCode(address.data, row.profile.firstName); return res.json({ ok: true, sent: retryAfter === 0, retryAfter }); }
       } catch (error) { console.error('Verification code email failed:', error); }
     }
     return res.json({ ok: true });

@@ -38,8 +38,10 @@ function registerBookingSignup(app, { User, serializeUser, isAdminUser, issueSes
     if (row?.sentAt && now() - new Date(row.sentAt).getTime() < RESEND_MS) return Math.ceil((RESEND_MS - (now() - new Date(row.sentAt).getTime())) / 1000);
     const code = randomCode();
     await store.save(address, { codeHash: hashCode(address, code), attempts: 0, sentAt: new Date(now()), expiresAt: new Date(now() + CODE_MS) });
-    await sendMail({ to: address, name, subject: 'Your verification code — Echo Event Entertainment', tags: ['booking-signup'], notificationContext: { code },
+    const mail = await sendMail({ to: address, name, subject: 'Your verification code — Echo Event Entertainment', tags: ['booking-signup'], notificationContext: { code },
       html: `<p>Welcome to Echo Event Entertainment. Your verification code is:</p><p style="font-size:28px;letter-spacing:6px;font-weight:700">${code}</p><p>It works for 10 minutes. If you did not create an account, ignore this email.</p>` });
+    // The mail service reports a skipped send (no API key, or this email switched off in Notification emails) without throwing: do not tell the client a code is on its way.
+    if (mail && mail.sent === false) throw Object.assign(new Error('The verification email was not sent.'), { code: 'MAIL_NOT_SENT' });
     return 0;
   }
 
@@ -67,7 +69,7 @@ function registerBookingSignup(app, { User, serializeUser, isAdminUser, issueSes
       try {
         const row = await store.get(address.data);
         if (row?.profile) { const retryAfter = await sendCode(address.data, row.profile.firstName); return res.json({ ok: true, sent: retryAfter === 0, retryAfter }); }
-      } catch (error) { console.error('Verification code email failed:', error); }
+      } catch (error) { console.error('Verification code email failed:', error); return res.status(503).json({ message: 'We could not send the email right now. Please try again in a minute.' }); }
     }
     return res.json({ ok: true });
   });

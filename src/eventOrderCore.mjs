@@ -302,7 +302,8 @@ export function orderFromContext(context={}){
  return order;
 }
 export function aiOrderContext(order) {
-  return Object.fromEntries(aiFields.map(field=>[field.key,getPath(order,field.key)??(['multi','links','attachments','equipment'].includes(field.type)?[]:null)]));
+  // The conversation sees only what the Booking page holds (the Booking data atoms tree); the after-confirmation planning worksheet stays out.
+  return Object.fromEntries(aiFields.filter(field=>!field.key.startsWith('planning.')).map(field=>[field.key,getPath(order,field.key)??(['multi','links','attachments','equipment'].includes(field.type)?[]:null)]));
 }
 
 // Opening line for a voice call: greet, say what the assistant is for, recap the draft, then offer help with what is still empty.

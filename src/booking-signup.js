@@ -71,7 +71,8 @@ function registerBookingSignup(app, { User, serializeUser, isAdminUser, issueSes
         if (row?.profile) { const retryAfter = await sendCode(address.data, row.profile.firstName); return res.json({ ok: true, sent: retryAfter === 0, retryAfter }); }
       } catch (error) { console.error('Verification code email failed:', error); return res.status(503).json({ message: 'We could not send the email right now. Please try again in a minute.' }); }
     }
-    return res.json({ ok: true });
+    // The waiting details are gone (they expire 10 minutes after the last code): say so, so the page can start over instead of pretending a code was sent.
+    return res.json({ ok: true, sent: false, expired: true });
   });
 
   // Step 2: the code confirms the email and signs the new client in.
